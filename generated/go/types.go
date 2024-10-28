@@ -1901,7 +1901,7 @@ func (g *GeneralRequestInfo) String() string {
 }
 
 type GeneralResponseInfo struct {
-	StatusCode int               `json:"statusCode" url:"statusCode"`
+	StatusCode *int              `json:"statusCode,omitempty" url:"statusCode,omitempty"`
 	Body       *string           `json:"body,omitempty" url:"body,omitempty"`
 	Headers    map[string]string `json:"headers,omitempty" url:"headers,omitempty"`
 	Error      *string           `json:"error,omitempty" url:"error,omitempty"`
@@ -2219,7 +2219,7 @@ func (v *VersionEnumerateAttemptInfo) String() string {
 }
 
 type VersionEnumerateResponseInfo struct {
-	StatusCode    int     `json:"statusCode" url:"statusCode"`
+	StatusCode    *int    `json:"statusCode,omitempty" url:"statusCode,omitempty"`
 	Header        *string `json:"header,omitempty" url:"header,omitempty"`
 	VersionType   *string `json:"versionType,omitempty" url:"versionType,omitempty"`
 	VersionNumber *string `json:"versionNumber,omitempty" url:"versionNumber,omitempty"`

@@ -48,5 +48,9 @@ func (PathTraversalLib *PathTraversalLibrary) ModuleRun(target string, config *w
 }
 
 func (PathTraversalLib *PathTraversalLibrary) AnalyzeResponse(response *webscan.ResponseUnion) bool {
-	return response.GeneralResponse.StatusCode == http.StatusOK
+	if response.GeneralResponse.StatusCode == nil {
+		return false
+	}
+
+	return *response.GeneralResponse.StatusCode == http.StatusOK
 }

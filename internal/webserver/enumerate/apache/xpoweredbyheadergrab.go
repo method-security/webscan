@@ -43,13 +43,13 @@ func (XPoweredByHeaderGrabLib *XPoweredByHeaderGrabLibrary) ModuleRun(target str
 	if xPoweredBy != "" {
 		typeVersion := parseXPoweredByHeader(xPoweredBy)
 		response = webscan.VersionEnumerateResponseInfo{
-			StatusCode:    resp.StatusCode,
+			StatusCode:    &resp.StatusCode,
 			VersionType:   &typeVersion[0],
 			VersionNumber: &typeVersion[1],
 		}
 	} else {
 		response = webscan.VersionEnumerateResponseInfo{
-			StatusCode: resp.StatusCode,
+			StatusCode: &resp.StatusCode,
 		}
 	}
 	err = resp.Body.Close()

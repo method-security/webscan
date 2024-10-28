@@ -52,7 +52,7 @@ func (CRLFInjectionLib *CRLFInjectionLibrary) ModuleRun(target string, config *w
 	}
 
 	response := webscan.GeneralResponseInfo{
-		StatusCode: resp.StatusCode,
+		StatusCode: &resp.StatusCode,
 		Body:       &bodyStr,
 		Headers:    headerMap,
 	}
@@ -73,7 +73,10 @@ func (CRLFInjectionLib *CRLFInjectionLibrary) ModuleRun(target string, config *w
 }
 
 func (CRLFInjectionLib *CRLFInjectionLibrary) AnalyzeResponse(response *webscan.ResponseUnion) bool {
-	if response.GeneralResponse.StatusCode == http.StatusOK {
+	if response.GeneralResponse.StatusCode == nil {
+		return false
+	}
+	if *response.GeneralResponse.StatusCode == http.StatusOK {
 		if setCookieHeader, ok := response.GeneralResponse.Headers["Set-Cookie"]; ok {
 			if strings.Contains(setCookieHeader, "crlfInjected=1") {
 				return true

@@ -52,7 +52,7 @@ func (ReverseProxyCheckLib *ReverseProxyCheckLibrary) ModuleRun(target string, c
 	}
 	bodyStr := string(body)
 	response := webscan.GeneralResponseInfo{
-		StatusCode: resp.StatusCode,
+		StatusCode: &resp.StatusCode,
 		Body:       &bodyStr,
 	}
 	err = resp.Body.Close()
@@ -70,7 +70,11 @@ func (ReverseProxyCheckLib *ReverseProxyCheckLibrary) ModuleRun(target string, c
 }
 
 func (ReverseProxyCheckLib *ReverseProxyCheckLibrary) AnalyzeResponse(response *webscan.ResponseUnion) bool {
-	if response.GeneralResponse.StatusCode != http.StatusOK {
+	if response.GeneralResponse.StatusCode == nil {
+		return false
+	}
+
+	if *response.GeneralResponse.StatusCode != http.StatusOK {
 		return false
 	}
 	internalIndicators := []string{

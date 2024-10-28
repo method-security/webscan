@@ -74,7 +74,7 @@ func (RCEModFileLib *RCEModFileLibrary) ModuleRun(target string, config *webscan
 		}
 		bodyStr := string(body)
 		response := webscan.GeneralResponseInfo{
-			StatusCode: resp.StatusCode,
+			StatusCode: &resp.StatusCode,
 			Body:       &bodyStr,
 		}
 
@@ -103,8 +103,12 @@ func (RCEModFileLib *RCEModFileLibrary) AnalyzeResponse(response *webscan.Respon
 	if response.GeneralResponse.Body == nil {
 		return false
 	}
+
+	if response.GeneralResponse.StatusCode == nil {
+		return false
+	}
 	body := *response.GeneralResponse.Body
-	return containsLSOutput(strings.ToLower(body)) && response.GeneralResponse.StatusCode == http.StatusOK
+	return containsLSOutput(strings.ToLower(body)) && *response.GeneralResponse.StatusCode == http.StatusOK
 }
 
 func containsLSOutput(responseBody string) bool {

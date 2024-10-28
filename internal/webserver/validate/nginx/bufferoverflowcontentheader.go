@@ -53,7 +53,7 @@ func (BufferOverflowContentHeaderLib *BufferOverflowContentHeaderLibrary) Module
 		return &attempt, errors
 	}
 	response := webscan.GeneralResponseInfo{
-		StatusCode: resp.StatusCode,
+		StatusCode: &resp.StatusCode,
 	}
 	err = resp.Body.Close()
 	if err != nil {
@@ -70,5 +70,8 @@ func (BufferOverflowContentHeaderLib *BufferOverflowContentHeaderLibrary) Module
 }
 
 func (BufferOverflowContentHeaderLib *BufferOverflowContentHeaderLibrary) AnalyzeResponse(response *webscan.ResponseUnion) bool {
-	return response.GeneralResponse.StatusCode >= 500
+	if response.GeneralResponse.StatusCode == nil {
+		return false
+	}
+	return *response.GeneralResponse.StatusCode >= 500
 }

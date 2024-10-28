@@ -34,14 +34,14 @@ types:
       VersionEnumerateResponse: VersionEnumerateResponseInfo
   VersionEnumerateResponseInfo:
     properties:
-      statusCode: integer
+      statusCode: optional<integer>
       header: optional<string>
       versionType: optional<string>
       versionNumber: optional<string>
       error: optional<string>
   GeneralResponseInfo:
     properties:
-      statusCode: integer
+      statusCode: optional<integer>
       body: optional<string>
       headers: optional<map<string,string>>
       error: optional<string>

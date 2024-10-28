@@ -46,7 +46,7 @@ func PathTraversal(target string, timeout int, commonExposedPaths []string) ([]*
 		}
 		bodyStr := string(body)
 		response := webscan.GeneralResponseInfo{
-			StatusCode: resp.StatusCode,
+			StatusCode: &resp.StatusCode,
 			Body:       &bodyStr,
 		}
 

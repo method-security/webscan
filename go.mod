@@ -8,7 +8,6 @@ require (
 	github.com/Method-Security/pkg v0.0.3
 	github.com/PuerkitoBio/goquery v1.9.3
 	github.com/chromedp/chromedp v0.9.2
-	github.com/ffuf/ffuf/v2 v2.1.0
 	github.com/go-rod/rod v0.116.2
 	github.com/gobwas/ws v1.4.0
 	github.com/google/uuid v1.6.0
@@ -48,7 +47,6 @@ require (
 	github.com/Mzack9999/go-http-digest-auth-client v0.6.1-0.20220414142836-eb8883508809 // indirect
 	github.com/ProtonMail/go-crypto v1.1.0-alpha.0-proton // indirect
 	github.com/VividCortex/ewma v1.2.0 // indirect
-	github.com/adrg/xdg v0.4.0 // indirect
 	github.com/akrylysov/pogreb v0.10.2 // indirect
 	github.com/alecthomas/chroma v0.10.0 // indirect
 	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751 // indirect
@@ -116,7 +114,6 @@ require (
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/fatih/color v1.16.0 // indirect
 	github.com/fatih/structs v1.1.0 // indirect
-	github.com/ffuf/pencode v0.0.0-20230421231718-2cea7e60a693 // indirect
 	github.com/free5gc/util v1.0.5-0.20230511064842-2e120956883b // indirect
 	github.com/gabriel-vasile/mimetype v1.4.2 // indirect
 	github.com/gaissmai/bart v0.9.5 // indirect
@@ -230,7 +227,6 @@ require (
 	github.com/palantir/witchcraft-go-error v1.38.0 // indirect
 	github.com/palantir/witchcraft-go-params v1.35.0 // indirect
 	github.com/palantir/witchcraft-go-tracing v1.37.0 // indirect
-	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.8 // indirect
 	github.com/perimeterx/marshmallow v1.1.5 // indirect
 	github.com/pierrec/lz4 v2.6.1+incompatible // indirect

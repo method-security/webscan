@@ -1,124 +1,177 @@
 package fuzz
 
 import (
-	"fmt"
+	"context"
+	"crypto/tls"
+	"errors"
+	"io/ioutil"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
 
-	"github.com/ffuf/ffuf/v2/pkg/ffuf"
-	"github.com/ffuf/ffuf/v2/pkg/filter"
-	"github.com/ffuf/ffuf/v2/pkg/input"
-	"github.com/ffuf/ffuf/v2/pkg/runner"
+	webscan "github.com/Method-Security/webscan/generated/go"
 )
 
-// PrepareJob creates a new ffuf job with the provided configuration, leveraging the CustomOutput ffuf type to provide
-// control over the output.
-func PrepareJob(conf *ffuf.Config) (*ffuf.Job, error) {
-	job := ffuf.NewJob(conf)
+func PerformPathFuzz(ctx context.Context, config *webscan.FuzzPathConfig) (*webscan.FuzzPathReport, error) {
+	resources := webscan.FuzzPathReport{}
+	var allErrors []string
 
-	var errs ffuf.Multierror
-	job.Input, errs = input.NewInputProvider(conf)
-
-	job.Runner = runner.NewRunnerByName("http", conf, false)
-	if job.Runner == nil {
-		return nil, fmt.Errorf("error creating runner")
+	// Initialize Client
+	client := &http.Client{
+		Timeout: time.Duration(config.Timeout) * time.Millisecond,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
 	}
 
-	job.Output = NewCustomOutput(conf)
-	if job.Output == nil {
-		return nil, fmt.Errorf("error creating output provider")
+	// Create valid codes dict
+	validCodes, err := parseResponseCodes(config.ResponseCodes)
+	if err != nil {
+		return nil, errors.New("invalid response code range")
 	}
 
-	return job, errs.ErrorOrNil()
+	// Loop through targets
+	var targets []*webscan.TargetInfo
+	for _, target := range config.Targets {
+		targetInfo := webscan.TargetInfo{Target: target}
+
+		// Get baseline
+		baselineSize, baselineWords, err := baseLine(target)
+		if err != nil {
+			allErrors = append(allErrors, err.Error())
+			continue
+		}
+
+		// Loop through paths
+		var fuzzAttempts []*webscan.FuzzAttemptInfo
+		for _, path := range config.Paths {
+			for i := 0; i < config.Retries; i++ {
+				// Request
+				url := strings.TrimRight(target, "/") + "/" + strings.TrimLeft(path, "/")
+				fuzzAttemptInfo := webscan.FuzzAttemptInfo{
+					Path:      path,
+					Timestamp: time.Now(),
+				}
+				fuzzAttemptInfo.Request = &webscan.RequestInfo{
+					Method: webscan.HttpMethodGet,
+					Url:    url,
+				}
+				req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+				if err != nil {
+					allErrors = append(allErrors, err.Error())
+					continue
+				}
+				resp, err := client.Do(req)
+
+				// Response
+				var responseInfo *webscan.ResponseInfo
+				var isValid bool
+				if err != nil {
+					responseErr := err.Error()
+					responseInfo = &webscan.ResponseInfo{
+						Error: &responseErr,
+					}
+				} else {
+					bodyBytes, _ := ioutil.ReadAll(resp.Body)
+					body := string(bodyBytes)
+
+					statusCode := resp.StatusCode
+					responseInfo = &webscan.ResponseInfo{
+						StatusCode: &statusCode,
+						Body:       &body,
+					}
+
+					isValid = AnalyzeResponse(responseInfo, validCodes, config.IgnoreBaseContent, baselineSize, baselineWords)
+
+					err = resp.Body.Close()
+					if err != nil {
+						allErrors = append(allErrors, err.Error())
+					}
+				}
+
+				// Marshal data
+				if !config.SuccessfulOnly || isValid {
+					fuzzAttemptInfo.Response = responseInfo
+					fuzzAttemptInfo.Finding = &isValid
+					fuzzAttempts = append(fuzzAttempts, &fuzzAttemptInfo)
+				}
+
+				// Sleep if configured
+				if config.Sleep > 0 {
+					time.Sleep(time.Duration(config.Sleep) * time.Millisecond)
+				}
+			}
+		}
+		targetInfo.FuzzAttempts = fuzzAttempts
+		targets = append(targets, &targetInfo)
+	}
+
+	resources.Targets = targets
+	resources.Errors = allErrors
+	return &resources, nil
 }
 
-// SetupFilters sets up the filters for the ffuf job based on the provided configuration options.
-func SetupFilters(parseOpts *ffuf.ConfigOptions, conf *ffuf.Config) error {
-	errs := ffuf.NewMultierror()
-	conf.MatcherManager = filter.NewMatcherManager()
-	// If any other matcher is set, ignore -mc default value
-	matcherSet := false
-	statusSet := false
-	warningIgnoreBody := false
-
-	// Check if any matchers or filters are explicitly set
-	if parseOpts.Matcher.Status != "" {
-		statusSet = true
-	}
-	if parseOpts.Matcher.Size != "" || parseOpts.Matcher.Regexp != "" || parseOpts.Matcher.Words != "" || parseOpts.Matcher.Lines != "" || parseOpts.Matcher.Time != "" {
-		matcherSet = true
-		warningIgnoreBody = true
-	}
-	if parseOpts.Filter.Status != "" || parseOpts.Filter.Size != "" || parseOpts.Filter.Regexp != "" || parseOpts.Filter.Words != "" || parseOpts.Filter.Lines != "" || parseOpts.Filter.Time != "" {
-		matcherSet = true
-		warningIgnoreBody = true
+func AnalyzeResponse(response *webscan.ResponseInfo, validCodes map[int]bool, ignoreBaseContent bool, baselineSize, baselineWords int) bool {
+	if response.StatusCode == nil || !validCodes[*response.StatusCode] {
+		return false
 	}
 
-	// Only set default matchers if no other matchers or filters are set
-	if statusSet || !matcherSet {
-		if err := conf.MatcherManager.AddMatcher("status", parseOpts.Matcher.Status); err != nil {
-			errs.Add(err)
+	// Checks for web backend redirect
+	bodySize := len(*response.Body)
+	wordCount := len(strings.Fields(*response.Body))
+	if ignoreBaseContent {
+		if bodySize == baselineSize && wordCount == baselineWords {
+			return false
 		}
+	}
+	return true
+}
+
+func baseLine(baseTarget string) (int, int, error) {
+	resp, err := http.Get(baseTarget)
+	if err != nil {
+		return 0, 0, err
 	}
 
-	if parseOpts.Filter.Status != "" {
-		if err := conf.MatcherManager.AddFilter("status", parseOpts.Filter.Status, false); err != nil {
-			errs.Add(err)
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	bodySize := len(body)
+	wordCount := len(strings.Fields(string(body)))
+
+	err = resp.Body.Close()
+	if err != nil {
+		return 0, 0, err
+	}
+
+	return bodySize, wordCount, nil
+}
+
+// parseResponseCodes parses a comma-separated or range-based string of response codes
+// (e.g., "200,301,404-410") and returns a map of valid codes.
+func parseResponseCodes(responseCodes string) (map[int]bool, error) {
+	validCodes := make(map[int]bool)
+	for _, part := range strings.Split(responseCodes, ",") {
+		if strings.Contains(part, "-") {
+			rangeParts := strings.Split(part, "-")
+			start, err1 := strconv.Atoi(rangeParts[0])
+			end, err2 := strconv.Atoi(rangeParts[1])
+			if err1 != nil || err2 != nil || start > end {
+				return nil, errors.New("invalid response code range")
+			}
+			for i := start; i <= end; i++ {
+				validCodes[i] = true
+			}
+		} else {
+			code, err := strconv.Atoi(part)
+			if err != nil {
+				return nil, errors.New("invalid response code")
+			}
+			validCodes[code] = true
 		}
 	}
-	if parseOpts.Filter.Size != "" {
-		warningIgnoreBody = true
-		if err := conf.MatcherManager.AddFilter("size", parseOpts.Filter.Size, false); err != nil {
-			errs.Add(err)
-		}
-	}
-	if parseOpts.Filter.Regexp != "" {
-		if err := conf.MatcherManager.AddFilter("regexp", parseOpts.Filter.Regexp, false); err != nil {
-			errs.Add(err)
-		}
-	}
-	if parseOpts.Filter.Words != "" {
-		warningIgnoreBody = true
-		if err := conf.MatcherManager.AddFilter("word", parseOpts.Filter.Words, false); err != nil {
-			errs.Add(err)
-		}
-	}
-	if parseOpts.Filter.Lines != "" {
-		warningIgnoreBody = true
-		if err := conf.MatcherManager.AddFilter("line", parseOpts.Filter.Lines, false); err != nil {
-			errs.Add(err)
-		}
-	}
-	if parseOpts.Filter.Time != "" {
-		if err := conf.MatcherManager.AddFilter("time", parseOpts.Filter.Time, false); err != nil {
-			errs.Add(err)
-		}
-	}
-	if parseOpts.Matcher.Size != "" {
-		if err := conf.MatcherManager.AddMatcher("size", parseOpts.Matcher.Size); err != nil {
-			errs.Add(err)
-		}
-	}
-	if parseOpts.Matcher.Regexp != "" {
-		if err := conf.MatcherManager.AddMatcher("regexp", parseOpts.Matcher.Regexp); err != nil {
-			errs.Add(err)
-		}
-	}
-	if parseOpts.Matcher.Words != "" {
-		if err := conf.MatcherManager.AddMatcher("word", parseOpts.Matcher.Words); err != nil {
-			errs.Add(err)
-		}
-	}
-	if parseOpts.Matcher.Lines != "" {
-		if err := conf.MatcherManager.AddMatcher("line", parseOpts.Matcher.Lines); err != nil {
-			errs.Add(err)
-		}
-	}
-	if parseOpts.Matcher.Time != "" {
-		if err := conf.MatcherManager.AddMatcher("time", parseOpts.Matcher.Time); err != nil {
-			errs.Add(err)
-		}
-	}
-	if conf.IgnoreBody && warningIgnoreBody {
-		fmt.Printf("*** Warning: possible undesired combination of -ignore-body and the response options: fl,fs,fw,ml,ms and mw.\n")
-	}
-	return errs.ErrorOrNil()
+	return validCodes, nil
 }

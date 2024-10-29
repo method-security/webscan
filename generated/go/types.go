@@ -398,11 +398,120 @@ func (t *TlsInfo) String() string {
 	return fmt.Sprintf("%#v", t)
 }
 
+type FuzzAttemptInfo struct {
+	Path      string        `json:"path" url:"path"`
+	Timestamp time.Time     `json:"timestamp" url:"timestamp"`
+	Request   *RequestInfo  `json:"request,omitempty" url:"request,omitempty"`
+	Response  *ResponseInfo `json:"response,omitempty" url:"response,omitempty"`
+	Finding   *bool         `json:"finding,omitempty" url:"finding,omitempty"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (f *FuzzAttemptInfo) GetExtraProperties() map[string]interface{} {
+	return f.extraProperties
+}
+
+func (f *FuzzAttemptInfo) UnmarshalJSON(data []byte) error {
+	type embed FuzzAttemptInfo
+	var unmarshaler = struct {
+		embed
+		Timestamp *core.DateTime `json:"timestamp"`
+	}{
+		embed: embed(*f),
+	}
+	if err := json.Unmarshal(data, &unmarshaler); err != nil {
+		return err
+	}
+	*f = FuzzAttemptInfo(unmarshaler.embed)
+	f.Timestamp = unmarshaler.Timestamp.Time()
+
+	extraProperties, err := core.ExtractExtraProperties(data, *f)
+	if err != nil {
+		return err
+	}
+	f.extraProperties = extraProperties
+
+	f._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (f *FuzzAttemptInfo) MarshalJSON() ([]byte, error) {
+	type embed FuzzAttemptInfo
+	var marshaler = struct {
+		embed
+		Timestamp *core.DateTime `json:"timestamp"`
+	}{
+		embed:     embed(*f),
+		Timestamp: core.NewDateTime(f.Timestamp),
+	}
+	return json.Marshal(marshaler)
+}
+
+func (f *FuzzAttemptInfo) String() string {
+	if len(f._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(f._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(f); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", f)
+}
+
+type FuzzPathConfig struct {
+	Targets           []string `json:"targets,omitempty" url:"targets,omitempty"`
+	Paths             []string `json:"paths,omitempty" url:"paths,omitempty"`
+	ResponseCodes     string   `json:"responseCodes" url:"responseCodes"`
+	IgnoreBaseContent bool     `json:"ignoreBaseContent" url:"ignoreBaseContent"`
+	Timeout           int      `json:"timeout" url:"timeout"`
+	Sleep             int      `json:"sleep" url:"sleep"`
+	Retries           int      `json:"retries" url:"retries"`
+	SuccessfulOnly    bool     `json:"successfulOnly" url:"successfulOnly"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (f *FuzzPathConfig) GetExtraProperties() map[string]interface{} {
+	return f.extraProperties
+}
+
+func (f *FuzzPathConfig) UnmarshalJSON(data []byte) error {
+	type unmarshaler FuzzPathConfig
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*f = FuzzPathConfig(value)
+
+	extraProperties, err := core.ExtractExtraProperties(data, *f)
+	if err != nil {
+		return err
+	}
+	f.extraProperties = extraProperties
+
+	f._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (f *FuzzPathConfig) String() string {
+	if len(f._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(f._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(f); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", f)
+}
+
 type FuzzPathReport struct {
-	Target                   string        `json:"target" url:"target"`
-	Urls                     []*UrlDetails `json:"urls,omitempty" url:"urls,omitempty"`
-	UrlsSkippedFromBaseMatch []*UrlDetails `json:"urlsSkippedFromBaseMatch,omitempty" url:"urlsSkippedFromBaseMatch,omitempty"`
-	Errors                   []string      `json:"errors,omitempty" url:"errors,omitempty"`
+	Targets []*TargetInfo `json:"targets,omitempty" url:"targets,omitempty"`
+	Errors  []string      `json:"errors,omitempty" url:"errors,omitempty"`
 
 	extraProperties map[string]interface{}
 	_rawJSON        json.RawMessage
@@ -442,47 +551,131 @@ func (f *FuzzPathReport) String() string {
 	return fmt.Sprintf("%#v", f)
 }
 
-type UrlDetails struct {
-	Url    string `json:"url" url:"url"`
-	Status string `json:"status" url:"status"`
-	Size   int    `json:"size" url:"size"`
+type RequestInfo struct {
+	Method HttpMethod `json:"method" url:"method"`
+	Url    string     `json:"url" url:"url"`
 
 	extraProperties map[string]interface{}
 	_rawJSON        json.RawMessage
 }
 
-func (u *UrlDetails) GetExtraProperties() map[string]interface{} {
-	return u.extraProperties
+func (r *RequestInfo) GetExtraProperties() map[string]interface{} {
+	return r.extraProperties
 }
 
-func (u *UrlDetails) UnmarshalJSON(data []byte) error {
-	type unmarshaler UrlDetails
+func (r *RequestInfo) UnmarshalJSON(data []byte) error {
+	type unmarshaler RequestInfo
 	var value unmarshaler
 	if err := json.Unmarshal(data, &value); err != nil {
 		return err
 	}
-	*u = UrlDetails(value)
+	*r = RequestInfo(value)
 
-	extraProperties, err := core.ExtractExtraProperties(data, *u)
+	extraProperties, err := core.ExtractExtraProperties(data, *r)
 	if err != nil {
 		return err
 	}
-	u.extraProperties = extraProperties
+	r.extraProperties = extraProperties
 
-	u._rawJSON = json.RawMessage(data)
+	r._rawJSON = json.RawMessage(data)
 	return nil
 }
 
-func (u *UrlDetails) String() string {
-	if len(u._rawJSON) > 0 {
-		if value, err := core.StringifyJSON(u._rawJSON); err == nil {
+func (r *RequestInfo) String() string {
+	if len(r._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(r._rawJSON); err == nil {
 			return value
 		}
 	}
-	if value, err := core.StringifyJSON(u); err == nil {
+	if value, err := core.StringifyJSON(r); err == nil {
 		return value
 	}
-	return fmt.Sprintf("%#v", u)
+	return fmt.Sprintf("%#v", r)
+}
+
+type ResponseInfo struct {
+	StatusCode *int    `json:"statusCode,omitempty" url:"statusCode,omitempty"`
+	Body       *string `json:"body,omitempty" url:"body,omitempty"`
+	Error      *string `json:"error,omitempty" url:"error,omitempty"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (r *ResponseInfo) GetExtraProperties() map[string]interface{} {
+	return r.extraProperties
+}
+
+func (r *ResponseInfo) UnmarshalJSON(data []byte) error {
+	type unmarshaler ResponseInfo
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*r = ResponseInfo(value)
+
+	extraProperties, err := core.ExtractExtraProperties(data, *r)
+	if err != nil {
+		return err
+	}
+	r.extraProperties = extraProperties
+
+	r._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (r *ResponseInfo) String() string {
+	if len(r._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(r._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(r); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", r)
+}
+
+type TargetInfo struct {
+	Target       string             `json:"target" url:"target"`
+	FuzzAttempts []*FuzzAttemptInfo `json:"fuzzAttempts,omitempty" url:"fuzzAttempts,omitempty"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (t *TargetInfo) GetExtraProperties() map[string]interface{} {
+	return t.extraProperties
+}
+
+func (t *TargetInfo) UnmarshalJSON(data []byte) error {
+	type unmarshaler TargetInfo
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*t = TargetInfo(value)
+
+	extraProperties, err := core.ExtractExtraProperties(data, *t)
+	if err != nil {
+		return err
+	}
+	t.extraProperties = extraProperties
+
+	t._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (t *TargetInfo) String() string {
+	if len(t._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(t._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(t); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", t)
 }
 
 type GraphQlData struct {

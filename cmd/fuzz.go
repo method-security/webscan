@@ -104,7 +104,7 @@ func (a *WebScan) InitFuzzCommand() {
 	// Define flags for the path command
 	pathCmd.Flags().StringSlice("targets", []string{}, "URL of target")
 	pathCmd.Flags().StringSlice("paths", []string{}, "File paths to use in attack")
-	pathCmd.Flags().StringSlice("pathlists", []string{}, "File paths containing paths to fuzz")
+	pathCmd.Flags().StringSlice("pathlists", []string{}, "Path to a file that contains a new line delimited list of paths to fuzz")
 	pathCmd.Flags().String("responsecodes", "200-299", "Response codes to consider as valid responses")
 	pathCmd.Flags().Bool("ignore-base-content-match", true, "Ignores valid responses with identical size and word length to the base path, typically signifying a web backend redirect")
 	pathCmd.Flags().Int("timeout", 3000, "Timeout per request (milliseconds)")

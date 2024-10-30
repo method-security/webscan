@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -241,29 +243,32 @@ The requests command allows you to send custom HTTP requests to a target URL wit
 			defer a.OutputSignal.PanicHandler(cmd.Context())
 			baseURL, err := cmd.Flags().GetString("baseUrl")
 			if err != nil || baseURL == "" {
-				a.handleError(cmd, "baseUrl flag is required")
+				a.OutputSignal.AddError(err)
 				return
 			}
 
 			path, err := cmd.Flags().GetString("path")
 			if err != nil || path == "" {
-				a.handleError(cmd, "path flag is required")
+				a.OutputSignal.AddError(err)
 				return
 			}
 
 			method, err := cmd.Flags().GetString("method")
 			if err != nil || method == "" {
-				a.handleError(cmd, "method flag is required")
+				a.OutputSignal.AddError(err)
 				return
 			}
 
-			params := webscan.RequestParams{
-				PathParams:      cmd.Flag("pathParams").Value.String(),
-				QueryParams:     cmd.Flag("queryParams").Value.String(),
-				HeaderParams:    cmd.Flag("headerParams").Value.String(),
-				BodyParams:      cmd.Flag("bodyParams").Value.String(),
-				FormParams:      cmd.Flag("formParams").Value.String(),
-				MultipartParams: cmd.Flag("multipartParams").Value.String(),
+			isEncoded, err := cmd.Flags().GetBool("encodedParams")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			params, err := DecodeAndSetParams(cmd, isEncoded)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
 			}
 
 			vulnTypes, _ := cmd.Flags().GetStringSlice("vulnType")
@@ -288,12 +293,80 @@ The requests command allows you to send custom HTTP requests to a target URL wit
 	requestsCmd.Flags().String("bodyParams", "", "Body parameters as a JSON string (optional)")
 	requestsCmd.Flags().String("formParams", "", "Form parameters as a JSON string (optional)")
 	requestsCmd.Flags().String("multipartParams", "", "Multipart form parameters as a JSON string (optional)")
+	requestsCmd.Flags().Bool("encodedParams", false, "Request parameters base64 encoded")
+
 	requestsCmd.Flags().StringSlice("vulnType", []string{}, "Types of vulnerabilities to check (optional)")
+
+	_ = requestsCmd.MarkFlagRequired("baseUrl")
+	_ = requestsCmd.MarkFlagRequired("path")
+	_ = requestsCmd.MarkFlagRequired("method")
 
 	a.AppCmd.AddCommand(requestsCmd)
 }
 
-func (a *WebScan) handleError(cmd *cobra.Command, errMsg string) {
-	a.OutputSignal.ErrorMessage = &errMsg
-	a.OutputSignal.Status = 1
+// DecodeAndSetParams decodes flags as base64 if isEncoded is true, and parses JSON for all params.
+func DecodeAndSetParams(cmd *cobra.Command, isEncoded bool) (webscan.RequestParams, error) {
+	getFlagValue := func(flagName string) (string, error) {
+		flagValue := cmd.Flag(flagName).Value.String()
+		if isEncoded {
+			decodedBytes, err := base64.StdEncoding.DecodeString(flagValue)
+			if err != nil {
+				return "", err
+			}
+			return string(decodedBytes), nil
+		}
+		return flagValue, nil
+	}
+
+	params := webscan.RequestParams{}
+
+	// Helper function to test if decode JSON for each parameter
+	decodeJSON := func(flagValue string, target interface{}) error {
+		if flagValue == "" {
+			return nil
+		}
+		if err := json.Unmarshal([]byte(flagValue), &target); err != nil {
+			return errors.New("failed to parse as JSON: " + err.Error())
+		}
+		return nil
+	}
+
+	// Decode and parse each parameter
+	if pathParams, err := getFlagValue("pathParams"); err == nil {
+		if err := decodeJSON(pathParams, &params.PathParams); err != nil {
+			return params, err
+		}
+	}
+
+	if queryParams, err := getFlagValue("queryParams"); err == nil {
+		if err := decodeJSON(queryParams, &params.QueryParams); err != nil {
+			return params, err
+		}
+	}
+
+	if headerParams, err := getFlagValue("headerParams"); err == nil {
+		if err := decodeJSON(headerParams, &params.HeaderParams); err != nil {
+			return params, err
+		}
+	}
+
+	if bodyParams, err := getFlagValue("bodyParams"); err == nil {
+		if err := decodeJSON(bodyParams, &params.BodyParams); err != nil {
+			return params, err
+		}
+	}
+
+	if formParams, err := getFlagValue("formParams"); err == nil {
+		if err := decodeJSON(formParams, &params.FormParams); err != nil {
+			return params, err
+		}
+	}
+
+	if multipartParams, err := getFlagValue("multipartParams"); err == nil {
+		if err := decodeJSON(multipartParams, &params.MultipartParams); err != nil {
+			return params, err
+		}
+	}
+
+	return params, nil
 }

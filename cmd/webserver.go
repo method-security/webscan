@@ -51,6 +51,44 @@ func (a *WebScan) InitWebServerCommand() {
 
 	webServerCmd.AddCommand(probeCmd)
 
+	headerCmd := &cobra.Command{
+		Use:   "header",
+		Short: "Perform actions on a webservers headers",
+		Long:  `Perform actions on a webservers headers`,
+	}
+
+	headerGrabCmd := &cobra.Command{
+		Use:   "grab",
+		Short: "Grab the response headers given a URL of a webserver",
+		Long:  `Grab the response headers given a URL of a webserver`,
+		Run: func(cmd *cobra.Command, args []string) {
+			defer a.OutputSignal.PanicHandler(cmd.Context())
+			targets, err := cmd.Flags().GetStringSlice("targets")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			timeout, err := cmd.Flags().GetInt("timeout")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			report, err := webserver.PerformHeaderGrab(cmd.Context(), targets, timeout)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+			}
+			a.OutputSignal.Content = report
+
+		},
+	}
+
+	headerGrabCmd.Flags().StringSlice("targets", []string{}, "Url of target")
+	headerGrabCmd.Flags().Int("timeout", 5, "Timeout limit in seconds")
+	headerCmd.AddCommand(headerGrabCmd)
+	webServerCmd.AddCommand(headerCmd)
+
 	enumerationCmd := &cobra.Command{
 		Use:   "enumerate",
 		Short: "Enumerate a specific type of web server",

@@ -1,0 +1,22 @@
+imports:
+  common: ./common.yml
+types:
+  HeaderResponseInfo:
+    properties:
+      statusCode: optional<integer>
+      headers: optional<map<string,string>>
+      error: optional<string>
+  HeaderRequestInfo:
+    properties:
+      method: common.HttpMethod
+      url: string
+  HeaderGrabInfo:
+    properties:
+      target: string
+      request: HeaderRequestInfo
+      response: optional<HeaderResponseInfo>
+      timestamp: datetime
+  HeaderGrabReport:
+    properties:
+      targets: optional<list<HeaderGrabInfo>>
+      errors: optional<list<string>>

@@ -928,6 +928,195 @@ func (g *GraphQlType) String() string {
 	return fmt.Sprintf("%#v", g)
 }
 
+type HeaderGrabInfo struct {
+	Target    string              `json:"target" url:"target"`
+	Request   *HeaderRequestInfo  `json:"request,omitempty" url:"request,omitempty"`
+	Response  *HeaderResponseInfo `json:"response,omitempty" url:"response,omitempty"`
+	Timestamp time.Time           `json:"timestamp" url:"timestamp"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (h *HeaderGrabInfo) GetExtraProperties() map[string]interface{} {
+	return h.extraProperties
+}
+
+func (h *HeaderGrabInfo) UnmarshalJSON(data []byte) error {
+	type embed HeaderGrabInfo
+	var unmarshaler = struct {
+		embed
+		Timestamp *core.DateTime `json:"timestamp"`
+	}{
+		embed: embed(*h),
+	}
+	if err := json.Unmarshal(data, &unmarshaler); err != nil {
+		return err
+	}
+	*h = HeaderGrabInfo(unmarshaler.embed)
+	h.Timestamp = unmarshaler.Timestamp.Time()
+
+	extraProperties, err := core.ExtractExtraProperties(data, *h)
+	if err != nil {
+		return err
+	}
+	h.extraProperties = extraProperties
+
+	h._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (h *HeaderGrabInfo) MarshalJSON() ([]byte, error) {
+	type embed HeaderGrabInfo
+	var marshaler = struct {
+		embed
+		Timestamp *core.DateTime `json:"timestamp"`
+	}{
+		embed:     embed(*h),
+		Timestamp: core.NewDateTime(h.Timestamp),
+	}
+	return json.Marshal(marshaler)
+}
+
+func (h *HeaderGrabInfo) String() string {
+	if len(h._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(h._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(h); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", h)
+}
+
+type HeaderGrabReport struct {
+	Targets []*HeaderGrabInfo `json:"targets,omitempty" url:"targets,omitempty"`
+	Errors  []string          `json:"errors,omitempty" url:"errors,omitempty"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (h *HeaderGrabReport) GetExtraProperties() map[string]interface{} {
+	return h.extraProperties
+}
+
+func (h *HeaderGrabReport) UnmarshalJSON(data []byte) error {
+	type unmarshaler HeaderGrabReport
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*h = HeaderGrabReport(value)
+
+	extraProperties, err := core.ExtractExtraProperties(data, *h)
+	if err != nil {
+		return err
+	}
+	h.extraProperties = extraProperties
+
+	h._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (h *HeaderGrabReport) String() string {
+	if len(h._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(h._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(h); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", h)
+}
+
+type HeaderRequestInfo struct {
+	Method HttpMethod `json:"method" url:"method"`
+	Url    string     `json:"url" url:"url"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (h *HeaderRequestInfo) GetExtraProperties() map[string]interface{} {
+	return h.extraProperties
+}
+
+func (h *HeaderRequestInfo) UnmarshalJSON(data []byte) error {
+	type unmarshaler HeaderRequestInfo
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*h = HeaderRequestInfo(value)
+
+	extraProperties, err := core.ExtractExtraProperties(data, *h)
+	if err != nil {
+		return err
+	}
+	h.extraProperties = extraProperties
+
+	h._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (h *HeaderRequestInfo) String() string {
+	if len(h._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(h._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(h); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", h)
+}
+
+type HeaderResponseInfo struct {
+	StatusCode *int              `json:"statusCode,omitempty" url:"statusCode,omitempty"`
+	Headers    map[string]string `json:"headers,omitempty" url:"headers,omitempty"`
+	Error      *string           `json:"error,omitempty" url:"error,omitempty"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (h *HeaderResponseInfo) GetExtraProperties() map[string]interface{} {
+	return h.extraProperties
+}
+
+func (h *HeaderResponseInfo) UnmarshalJSON(data []byte) error {
+	type unmarshaler HeaderResponseInfo
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*h = HeaderResponseInfo(value)
+
+	extraProperties, err := core.ExtractExtraProperties(data, *h)
+	if err != nil {
+		return err
+	}
+	h.extraProperties = extraProperties
+
+	h._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (h *HeaderResponseInfo) String() string {
+	if len(h._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(h._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(h); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", h)
+}
+
 type PageCaptureReport struct {
 	Target      string   `json:"target" url:"target"`
 	HtmlEncoded *string  `json:"html_encoded,omitempty" url:"html_encoded,omitempty"`

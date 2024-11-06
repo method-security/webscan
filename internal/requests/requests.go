@@ -8,6 +8,8 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
+	"os/exec"
+	"strconv"
 	"strings"
 
 	webscan "github.com/Method-Security/webscan/generated/go"
@@ -34,6 +36,14 @@ func PerformRequestScan(baseURL, path, method string, params webscan.RequestPara
 		return report
 	}
 
+	// Add parsed parameters to Report
+	report.PathParams = parsedParams.PathParams
+	report.QueryParams = parsedParams.QueryParams
+	report.HeaderParams = parsedParams.HeaderParams
+	report.BodyParams = &parsedParams.BodyParams
+	report.FormParams = parsedParams.FormParams
+	report.MultipartParams = parsedParams.MultipartParams
+
 	// Construct the URL
 	fullURL, err := constructURL(baseURL, path, parsedParams.PathParams, parsedParams.QueryParams)
 	if err != nil {
@@ -48,27 +58,58 @@ func PerformRequestScan(baseURL, path, method string, params webscan.RequestPara
 		return report
 	}
 
-	// Create and send the request
-	resp, err := sendRequest(httpMethod, fullURL.String(), reqBody, contentType, parsedParams.HeaderParams)
-	if err != nil {
-		report.Errors = append(report.Errors, err.Error())
-		return report
-	}
-	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			report.Errors = append(report.Errors, fmt.Sprintf("Error closing response body: %v", err))
+	// Check for escape characters in headers
+	hasEscapeChars := false
+	for _, value := range parsedParams.HeaderParams {
+		if strings.Contains(value, "\r") || strings.Contains(value, "\n") {
+			hasEscapeChars = true
+			break
 		}
-	}()
+	}
 
-	// Read response body
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		report.Errors = append(report.Errors, fmt.Sprintf("Failed to read response body: %v", err))
-		return report
+	var statusCode int
+	var responseBody string
+	var responseHeader map[string]string
+	responseHeader = make(map[string]string)
+	var resp *http.Response
+
+	// Create and send the request based on the presence of escape characters
+	if !hasEscapeChars {
+		resp, err = sendRequest(httpMethod, fullURL.String(), reqBody, contentType, parsedParams.HeaderParams)
+		if err != nil {
+			report.Errors = append(report.Errors, err.Error())
+			return report
+		}
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				report.Errors = append(report.Errors, fmt.Sprintf("Error closing response body: %v", err))
+			}
+		}()
+
+		// Read response body
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			report.Errors = append(report.Errors, fmt.Sprintf("Failed to read response body: %v", err))
+			return report
+		}
+		statusCode = resp.StatusCode
+		responseBody = string(body)
+		for key, values := range resp.Header {
+			if len(values) > 0 {
+				responseHeader[key] = values[0]
+			}
+		}
+	} else {
+		// Use sendCurlRequest if escape characters are present
+		statusCode, responseHeader, responseBody, err = sendCurlRequest(httpMethod, fullURL.String(), responseBody, contentType, parsedParams.HeaderParams)
+		if err != nil {
+			report.Errors = append(report.Errors, err.Error())
+			return report
+		}
 	}
 
 	// Populate report
-	populateReport(&report, resp, body, parsedParams, vulnTypes)
+	populateReport(&report, statusCode, responseHeader, responseBody, parsedParams, vulnTypes)
 
 	return report
 }
@@ -222,13 +263,72 @@ func sendRequest(method, url string, body io.Reader, contentType string, headers
 	return resp, nil
 }
 
-func populateReport(report *webscan.RequestReport, resp *http.Response, body []byte, params webscan.ParsedParams, vulnTypes []string) {
-	report.StatusCode = resp.StatusCode
-	report.ResponseBody = string(body)
-	report.ResponseHeaders = make(map[string]string)
-	for key, values := range resp.Header {
-		report.ResponseHeaders[key] = strings.Join(values, ", ")
+func sendCurlRequest(method, url string, body string, contentType string, headers map[string]string) (int, map[string]string, string, error) {
+	cmdArgs := []string{"-i", "-X", method, url} // Add `-i` to include headers in the output
+
+	for key, value := range headers {
+		cmdArgs = append(cmdArgs, "-H", fmt.Sprintf("%s: %s", key, value))
 	}
+
+	if contentType != "" {
+		cmdArgs = append(cmdArgs, "-H", fmt.Sprintf("Content-Type: %s", contentType))
+	}
+
+	if body != "" {
+		cmdArgs = append(cmdArgs, "-d", body)
+	}
+
+	cmd := exec.Command("curl", cmdArgs...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return 0, nil, "", fmt.Errorf("failed to perform request: %v\nOutput: %s", err, string(output))
+	}
+
+	// Convert output to string and split headers and body
+	outputStr := string(output)
+	headerEnd := strings.Index(outputStr, "\r\n\r\n")
+	if headerEnd == -1 {
+		return 0, nil, "", fmt.Errorf("invalid response format: no headers found")
+	}
+
+	// Separate headers and body
+	headerText := outputStr[:headerEnd]
+	bodyText := outputStr[headerEnd+4:]
+
+	// Extract the status code from the first line of headers
+	headerLines := strings.Split(headerText, "\r\n")
+	statusLine := headerLines[0]
+	statusParts := strings.Split(statusLine, " ")
+	if len(statusParts) < 2 {
+		return 0, nil, "", fmt.Errorf("invalid status line: %s", statusLine)
+	}
+	statusCode, err := strconv.Atoi(statusParts[1])
+	if err != nil {
+		return 0, nil, "", fmt.Errorf("failed to parse status code: %v", err)
+	}
+
+	// Parse headers
+	headersMap := make(map[string]string)
+	for _, line := range headerLines[1:] {
+		if strings.Contains(line, ": ") {
+			parts := strings.SplitN(line, ": ", 2)
+			headersMap[parts[0]] = parts[1]
+		}
+	}
+
+	return statusCode, headersMap, bodyText, nil
+}
+
+func populateReport(report *webscan.RequestReport, statusCode int, headers map[string]string, body string, params webscan.ParsedParams, vulnTypes []string) {
+	if headers != nil {
+		report.ResponseHeaders = make(map[string]string)
+		for key, values := range headers {
+			report.ResponseHeaders[key] = values
+		}
+	}
+
+	report.ResponseBody = body
+	report.StatusCode = statusCode
 
 	if len(params.PathParams) > 0 {
 		report.PathParams = params.PathParams

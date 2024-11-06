@@ -8,11 +8,10 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
-	"os/exec"
-	"strconv"
 	"strings"
 
 	webscan "github.com/Method-Security/webscan/generated/go"
+	"github.com/valyala/fasthttp"
 )
 
 func PerformRequestScan(baseURL, path, method string, params webscan.RequestParams, vulnTypes []string) webscan.RequestReport {
@@ -69,13 +68,11 @@ func PerformRequestScan(baseURL, path, method string, params webscan.RequestPara
 
 	var statusCode int
 	var responseBody string
-	var responseHeader map[string]string
-	responseHeader = make(map[string]string)
-	var resp *http.Response
+	responseHeader := make(map[string]string)
 
 	// Create and send the request based on the presence of escape characters
 	if !hasEscapeChars {
-		resp, err = sendRequest(httpMethod, fullURL.String(), reqBody, contentType, parsedParams.HeaderParams)
+		resp, err := sendRequest(httpMethod, fullURL.String(), reqBody, contentType, parsedParams.HeaderParams)
 		if err != nil {
 			report.Errors = append(report.Errors, err.Error())
 			return report
@@ -100,12 +97,18 @@ func PerformRequestScan(baseURL, path, method string, params webscan.RequestPara
 			}
 		}
 	} else {
-		// Use sendCurlRequest if escape characters are present
-		statusCode, responseHeader, responseBody, err = sendCurlRequest(httpMethod, fullURL.String(), responseBody, contentType, parsedParams.HeaderParams)
+		// Use sendFastHTTPRequest if escape characters are present
+		resp, err := sendFastHTTPRequest(httpMethod, fullURL.String(), responseBody, contentType, parsedParams.HeaderParams)
 		if err != nil {
 			report.Errors = append(report.Errors, err.Error())
 			return report
 		}
+		statusCode = resp.StatusCode()
+		responseBody = string(resp.Body())
+		resp.Header.VisitAll(func(key, value []byte) {
+			responseHeader[string(key)] = string(value)
+		})
+		fasthttp.ReleaseResponse(resp)
 	}
 
 	// Populate report
@@ -263,60 +266,32 @@ func sendRequest(method, url string, body io.Reader, contentType string, headers
 	return resp, nil
 }
 
-func sendCurlRequest(method, url string, body string, contentType string, headers map[string]string) (int, map[string]string, string, error) {
-	cmdArgs := []string{"-i", "-X", method, url} // Add `-i` to include headers in the output
+func sendFastHTTPRequest(method, url string, body string, contentType string, headers map[string]string) (*fasthttp.Response, error) {
+	// Prepare the fasthttp request and response objects
+	req := fasthttp.AcquireRequest()
+	defer fasthttp.ReleaseRequest(req)
 
-	for key, value := range headers {
-		cmdArgs = append(cmdArgs, "-H", fmt.Sprintf("%s: %s", key, value))
-	}
+	resp := fasthttp.AcquireResponse()
+
+	req.SetRequestURI(url)
+	req.Header.SetMethod(method)
+	req.SetBodyString(body)
 
 	if contentType != "" {
-		cmdArgs = append(cmdArgs, "-H", fmt.Sprintf("Content-Type: %s", contentType))
+		req.Header.Set("Content-Type", contentType)
 	}
 
-	if body != "" {
-		cmdArgs = append(cmdArgs, "-d", body)
+	for key, value := range headers {
+		req.Header.Set(key, value)
 	}
 
-	cmd := exec.Command("curl", cmdArgs...)
-	output, err := cmd.CombinedOutput()
+	err := fasthttp.Do(req, resp)
 	if err != nil {
-		return 0, nil, "", fmt.Errorf("failed to perform request: %v\nOutput: %s", err, string(output))
+		fasthttp.ReleaseResponse(resp)
+		return nil, fmt.Errorf("failed to perform request: %v", err)
 	}
 
-	// Convert output to string and split headers and body
-	outputStr := string(output)
-	headerEnd := strings.Index(outputStr, "\r\n\r\n")
-	if headerEnd == -1 {
-		return 0, nil, "", fmt.Errorf("invalid response format: no headers found")
-	}
-
-	// Separate headers and body
-	headerText := outputStr[:headerEnd]
-	bodyText := outputStr[headerEnd+4:]
-
-	// Extract the status code from the first line of headers
-	headerLines := strings.Split(headerText, "\r\n")
-	statusLine := headerLines[0]
-	statusParts := strings.Split(statusLine, " ")
-	if len(statusParts) < 2 {
-		return 0, nil, "", fmt.Errorf("invalid status line: %s", statusLine)
-	}
-	statusCode, err := strconv.Atoi(statusParts[1])
-	if err != nil {
-		return 0, nil, "", fmt.Errorf("failed to parse status code: %v", err)
-	}
-
-	// Parse headers
-	headersMap := make(map[string]string)
-	for _, line := range headerLines[1:] {
-		if strings.Contains(line, ": ") {
-			parts := strings.SplitN(line, ": ", 2)
-			headersMap[parts[0]] = parts[1]
-		}
-	}
-
-	return statusCode, headersMap, bodyText, nil
+	return resp, nil
 }
 
 func populateReport(report *webscan.RequestReport, statusCode int, headers map[string]string, body string, params webscan.ParsedParams, vulnTypes []string) {

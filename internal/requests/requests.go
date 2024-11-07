@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	webscan "github.com/Method-Security/webscan/generated/go"
+	"github.com/valyala/fasthttp"
 )
 
 func PerformRequestScan(baseURL, path, method string, params webscan.RequestParams, vulnTypes []string) webscan.RequestReport {
@@ -34,6 +35,14 @@ func PerformRequestScan(baseURL, path, method string, params webscan.RequestPara
 		return report
 	}
 
+	// Add parsed parameters to Report
+	report.PathParams = parsedParams.PathParams
+	report.QueryParams = parsedParams.QueryParams
+	report.HeaderParams = parsedParams.HeaderParams
+	report.BodyParams = &parsedParams.BodyParams
+	report.FormParams = parsedParams.FormParams
+	report.MultipartParams = parsedParams.MultipartParams
+
 	// Construct the URL
 	fullURL, err := constructURL(baseURL, path, parsedParams.PathParams, parsedParams.QueryParams)
 	if err != nil {
@@ -48,27 +57,62 @@ func PerformRequestScan(baseURL, path, method string, params webscan.RequestPara
 		return report
 	}
 
-	// Create and send the request
-	resp, err := sendRequest(httpMethod, fullURL.String(), reqBody, contentType, parsedParams.HeaderParams)
-	if err != nil {
-		report.Errors = append(report.Errors, err.Error())
-		return report
-	}
-	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			report.Errors = append(report.Errors, fmt.Sprintf("Error closing response body: %v", err))
+	// Check for escape characters in headers
+	hasEscapeChars := false
+	for _, value := range parsedParams.HeaderParams {
+		if strings.Contains(value, "\r") || strings.Contains(value, "\n") {
+			hasEscapeChars = true
+			break
 		}
-	}()
+	}
 
-	// Read response body
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		report.Errors = append(report.Errors, fmt.Sprintf("Failed to read response body: %v", err))
-		return report
+	var statusCode int
+	var responseBody string
+	responseHeader := make(map[string]string)
+
+	// Create and send the request based on the presence of escape characters
+	if !hasEscapeChars {
+		resp, err := sendRequest(httpMethod, fullURL.String(), reqBody, contentType, parsedParams.HeaderParams)
+		if err != nil {
+			report.Errors = append(report.Errors, err.Error())
+			return report
+		}
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				report.Errors = append(report.Errors, fmt.Sprintf("Error closing response body: %v", err))
+			}
+		}()
+
+		// Read response body
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			report.Errors = append(report.Errors, fmt.Sprintf("Failed to read response body: %v", err))
+			return report
+		}
+		statusCode = resp.StatusCode
+		responseBody = string(body)
+		for key, values := range resp.Header {
+			if len(values) > 0 {
+				responseHeader[key] = values[0]
+			}
+		}
+	} else {
+		// Use sendFastHTTPRequest if escape characters are present
+		resp, err := sendFastHTTPRequest(httpMethod, fullURL.String(), responseBody, contentType, parsedParams.HeaderParams)
+		if err != nil {
+			report.Errors = append(report.Errors, err.Error())
+			return report
+		}
+		statusCode = resp.StatusCode()
+		responseBody = string(resp.Body())
+		resp.Header.VisitAll(func(key, value []byte) {
+			responseHeader[string(key)] = string(value)
+		})
+		fasthttp.ReleaseResponse(resp)
 	}
 
 	// Populate report
-	populateReport(&report, resp, body, parsedParams, vulnTypes)
+	populateReport(&report, statusCode, responseHeader, responseBody, parsedParams, vulnTypes)
 
 	return report
 }
@@ -222,13 +266,44 @@ func sendRequest(method, url string, body io.Reader, contentType string, headers
 	return resp, nil
 }
 
-func populateReport(report *webscan.RequestReport, resp *http.Response, body []byte, params webscan.ParsedParams, vulnTypes []string) {
-	report.StatusCode = resp.StatusCode
-	report.ResponseBody = string(body)
-	report.ResponseHeaders = make(map[string]string)
-	for key, values := range resp.Header {
-		report.ResponseHeaders[key] = strings.Join(values, ", ")
+func sendFastHTTPRequest(method, url string, body string, contentType string, headers map[string]string) (*fasthttp.Response, error) {
+	// Prepare the fasthttp request and response objects
+	req := fasthttp.AcquireRequest()
+	defer fasthttp.ReleaseRequest(req)
+
+	resp := fasthttp.AcquireResponse()
+
+	req.SetRequestURI(url)
+	req.Header.SetMethod(method)
+	req.SetBodyString(body)
+
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
 	}
+
+	for key, value := range headers {
+		req.Header.Set(key, value)
+	}
+
+	err := fasthttp.Do(req, resp)
+	if err != nil {
+		fasthttp.ReleaseResponse(resp)
+		return nil, fmt.Errorf("failed to perform request: %v", err)
+	}
+
+	return resp, nil
+}
+
+func populateReport(report *webscan.RequestReport, statusCode int, headers map[string]string, body string, params webscan.ParsedParams, vulnTypes []string) {
+	if headers != nil {
+		report.ResponseHeaders = make(map[string]string)
+		for key, values := range headers {
+			report.ResponseHeaders[key] = values
+		}
+	}
+
+	report.ResponseBody = body
+	report.StatusCode = statusCode
 
 	if len(params.PathParams) > 0 {
 		report.PathParams = params.PathParams

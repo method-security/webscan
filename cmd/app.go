@@ -321,11 +321,12 @@ func DecodeAndSetParams(cmd *cobra.Command, isEncoded bool) (webscan.RequestPara
 	params := webscan.RequestParams{}
 
 	// Helper function to test if decode JSON for each parameter
-	decodeJSON := func(flagValue string, target interface{}) error {
+	decodeJSON := func(flagValue string) error {
 		if flagValue == "" {
 			return nil
 		}
-		if err := json.Unmarshal([]byte(flagValue), &target); err != nil {
+		var result map[string]string
+		if err := json.Unmarshal([]byte(flagValue), &result); err != nil {
 			return errors.New("failed to parse as JSON: " + err.Error())
 		}
 		return nil
@@ -333,39 +334,44 @@ func DecodeAndSetParams(cmd *cobra.Command, isEncoded bool) (webscan.RequestPara
 
 	// Decode and parse each parameter
 	if pathParams, err := getFlagValue("pathParams"); err == nil {
-		if err := decodeJSON(pathParams, &params.PathParams); err != nil {
+		if err := decodeJSON(pathParams); err != nil {
 			return params, err
 		}
+		params.PathParams = pathParams
 	}
 
 	if queryParams, err := getFlagValue("queryParams"); err == nil {
-		if err := decodeJSON(queryParams, &params.QueryParams); err != nil {
+		if err := decodeJSON(queryParams); err != nil {
 			return params, err
 		}
+		params.QueryParams = queryParams
 	}
 
 	if headerParams, err := getFlagValue("headerParams"); err == nil {
-		if err := decodeJSON(headerParams, &params.HeaderParams); err != nil {
+		if err := decodeJSON(headerParams); err != nil {
 			return params, err
 		}
+		params.HeaderParams = headerParams
 	}
 
 	if bodyParams, err := getFlagValue("bodyParams"); err == nil {
-		if err := decodeJSON(bodyParams, &params.BodyParams); err != nil {
+		if err := decodeJSON(bodyParams); err != nil {
 			return params, err
 		}
 	}
 
 	if formParams, err := getFlagValue("formParams"); err == nil {
-		if err := decodeJSON(formParams, &params.FormParams); err != nil {
+		if err := decodeJSON(formParams); err != nil {
 			return params, err
 		}
+		params.FormParams = formParams
 	}
 
 	if multipartParams, err := getFlagValue("multipartParams"); err == nil {
-		if err := decodeJSON(multipartParams, &params.MultipartParams); err != nil {
+		if err := decodeJSON(multipartParams); err != nil {
 			return params, err
 		}
+		params.MultipartParams = multipartParams
 	}
 
 	return params, nil

@@ -928,6 +928,115 @@ func (g *GraphQlType) String() string {
 	return fmt.Sprintf("%#v", g)
 }
 
+type K8SPathInfo struct {
+	Path            string            `json:"path" url:"path"`
+	Method          HttpMethod        `json:"method" url:"method"`
+	ResponseStatus  *int              `json:"response_status,omitempty" url:"response_status,omitempty"`
+	ResponseHeaders map[string]string `json:"response_headers,omitempty" url:"response_headers,omitempty"`
+	ResponseBody    *string           `json:"response_body,omitempty" url:"response_body,omitempty"`
+	Finding         bool              `json:"finding" url:"finding"`
+	Timestamp       time.Time         `json:"timestamp" url:"timestamp"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (k *K8SPathInfo) GetExtraProperties() map[string]interface{} {
+	return k.extraProperties
+}
+
+func (k *K8SPathInfo) UnmarshalJSON(data []byte) error {
+	type embed K8SPathInfo
+	var unmarshaler = struct {
+		embed
+		Timestamp *core.DateTime `json:"timestamp"`
+	}{
+		embed: embed(*k),
+	}
+	if err := json.Unmarshal(data, &unmarshaler); err != nil {
+		return err
+	}
+	*k = K8SPathInfo(unmarshaler.embed)
+	k.Timestamp = unmarshaler.Timestamp.Time()
+
+	extraProperties, err := core.ExtractExtraProperties(data, *k)
+	if err != nil {
+		return err
+	}
+	k.extraProperties = extraProperties
+
+	k._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (k *K8SPathInfo) MarshalJSON() ([]byte, error) {
+	type embed K8SPathInfo
+	var marshaler = struct {
+		embed
+		Timestamp *core.DateTime `json:"timestamp"`
+	}{
+		embed:     embed(*k),
+		Timestamp: core.NewDateTime(k.Timestamp),
+	}
+	return json.Marshal(marshaler)
+}
+
+func (k *K8SPathInfo) String() string {
+	if len(k._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(k._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(k); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", k)
+}
+
+type K8SReport struct {
+	Target    string         `json:"target" url:"target"`
+	K8SPaths  []*K8SPathInfo `json:"k8sPaths,omitempty" url:"k8sPaths,omitempty"`
+	IsCluster bool           `json:"isCluster" url:"isCluster"`
+	Errors    []string       `json:"errors,omitempty" url:"errors,omitempty"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (k *K8SReport) GetExtraProperties() map[string]interface{} {
+	return k.extraProperties
+}
+
+func (k *K8SReport) UnmarshalJSON(data []byte) error {
+	type unmarshaler K8SReport
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*k = K8SReport(value)
+
+	extraProperties, err := core.ExtractExtraProperties(data, *k)
+	if err != nil {
+		return err
+	}
+	k.extraProperties = extraProperties
+
+	k._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (k *K8SReport) String() string {
+	if len(k._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(k._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(k); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", k)
+}
+
 type PageCaptureReport struct {
 	Target      string   `json:"target" url:"target"`
 	HtmlEncoded *string  `json:"html_encoded,omitempty" url:"html_encoded,omitempty"`

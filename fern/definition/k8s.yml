@@ -1,0 +1,18 @@
+imports: 
+  common: ./common.yml
+types:
+  K8sPathInfo:
+    properties:
+      path: string 
+      method: common.HttpMethod
+      response_status: optional<integer>
+      response_headers: optional<map<string, string>>
+      response_body: optional<string>
+      finding: boolean
+      timestamp: datetime
+  K8sReport:
+    properties:
+      target: string
+      k8sPaths: optional<list<K8sPathInfo>>
+      isCluster: boolean
+      errors: optional<list<string>>

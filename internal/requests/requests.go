@@ -59,8 +59,12 @@ func PerformRequestScan(baseURL, path, method string, params webscan.RequestPara
 
 	// Check for escape characters in headers
 	hasEscapeChars := false
-	for _, value := range parsedParams.HeaderParams {
-		if strings.Contains(value, "\r") || strings.Contains(value, "\n") {
+	for key, value := range parsedParams.HeaderParams {
+		if strings.Contains(key, "\r") || strings.Contains(key, "\n") || strings.Contains(key, "\\") || strings.Contains(key, "\u0000") {
+			hasEscapeChars = true
+			break
+		}
+		if strings.Contains(value, "\r") || strings.Contains(value, "\n") || strings.Contains(value, "\\") || strings.Contains(value, "\u0000") {
 			hasEscapeChars = true
 			break
 		}

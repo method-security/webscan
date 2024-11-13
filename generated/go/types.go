@@ -1257,8 +1257,8 @@ type RequestReport struct {
 	FormParams      map[string]string `json:"formParams,omitempty" url:"formParams,omitempty"`
 	MultipartParams map[string]string `json:"multipartParams,omitempty" url:"multipartParams,omitempty"`
 	VulnTypes       []VulnType        `json:"vulnTypes,omitempty" url:"vulnTypes,omitempty"`
-	StatusCode      int               `json:"statusCode" url:"statusCode"`
-	ResponseBody    string            `json:"responseBody" url:"responseBody"`
+	StatusCode      *int              `json:"statusCode,omitempty" url:"statusCode,omitempty"`
+	ResponseBody    *string           `json:"responseBody,omitempty" url:"responseBody,omitempty"`
 	ResponseHeaders map[string]string `json:"responseHeaders,omitempty" url:"responseHeaders,omitempty"`
 	Errors          []string          `json:"errors,omitempty" url:"errors,omitempty"`
 

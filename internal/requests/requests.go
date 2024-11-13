@@ -40,6 +40,9 @@ func PerformRequestScan(baseURL, path, method string, params webscan.RequestPara
 	report.QueryParams = parsedParams.QueryParams
 	report.HeaderParams = parsedParams.HeaderParams
 	report.BodyParams = &parsedParams.BodyParams
+	if parsedParams.BodyParams == "" {
+		report.BodyParams = nil
+	}
 	report.FormParams = parsedParams.FormParams
 	report.MultipartParams = parsedParams.MultipartParams
 
@@ -179,6 +182,8 @@ func parseAllParams(params webscan.RequestParams) (webscan.ParsedParams, error) 
 		return parsed, fmt.Errorf("failed to parse header parameters: %v", err)
 	}
 
+	parsed.BodyParams = params.BodyParams
+
 	parsed.FormParams, err = parseJSONParams(params.FormParams)
 	if err != nil {
 		return parsed, fmt.Errorf("failed to parse form parameters: %v", err)
@@ -306,8 +311,8 @@ func populateReport(report *webscan.RequestReport, statusCode int, headers map[s
 		}
 	}
 
-	report.ResponseBody = body
-	report.StatusCode = statusCode
+	report.ResponseBody = &body
+	report.StatusCode = &statusCode
 
 	if len(params.PathParams) > 0 {
 		report.PathParams = params.PathParams

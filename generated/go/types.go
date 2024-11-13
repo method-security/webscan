@@ -263,23 +263,50 @@ func (h *HttpHeaders) String() string {
 type PublicKeyAlgorithm string
 
 const (
-	PublicKeyAlgorithmRsa     PublicKeyAlgorithm = "RSA"
-	PublicKeyAlgorithmDsa     PublicKeyAlgorithm = "DSA"
-	PublicKeyAlgorithmEcdsa   PublicKeyAlgorithm = "ECDSA"
-	PublicKeyAlgorithmEd25519 PublicKeyAlgorithm = "Ed25519"
-	PublicKeyAlgorithmUnknown PublicKeyAlgorithm = "Unknown"
+	PublicKeyAlgorithmDes       PublicKeyAlgorithm = "DES"
+	PublicKeyAlgorithmDh1024    PublicKeyAlgorithm = "DH1024"
+	PublicKeyAlgorithmDh512     PublicKeyAlgorithm = "DH512"
+	PublicKeyAlgorithmDh768     PublicKeyAlgorithm = "DH768"
+	PublicKeyAlgorithmDsa       PublicKeyAlgorithm = "DSA"
+	PublicKeyAlgorithmDsa1024   PublicKeyAlgorithm = "DSA1024"
+	PublicKeyAlgorithmEcdsa     PublicKeyAlgorithm = "ECDSA"
+	PublicKeyAlgorithmEcdsasha1 PublicKeyAlgorithm = "ECDSASHA1"
+	PublicKeyAlgorithmEcdhsha1  PublicKeyAlgorithm = "ECDHSHA1"
+	PublicKeyAlgorithmEd25519   PublicKeyAlgorithm = "Ed25519"
+	PublicKeyAlgorithmRc4       PublicKeyAlgorithm = "RC4"
+	PublicKeyAlgorithmRsa       PublicKeyAlgorithm = "RSA"
+	PublicKeyAlgorithmRsa1024   PublicKeyAlgorithm = "RSA1024"
+	PublicKeyAlgorithmUnknown   PublicKeyAlgorithm = "Unknown"
 )
 
 func NewPublicKeyAlgorithmFromString(s string) (PublicKeyAlgorithm, error) {
 	switch s {
-	case "RSA":
-		return PublicKeyAlgorithmRsa, nil
+	case "DES":
+		return PublicKeyAlgorithmDes, nil
+	case "DH1024":
+		return PublicKeyAlgorithmDh1024, nil
+	case "DH512":
+		return PublicKeyAlgorithmDh512, nil
+	case "DH768":
+		return PublicKeyAlgorithmDh768, nil
 	case "DSA":
 		return PublicKeyAlgorithmDsa, nil
+	case "DSA1024":
+		return PublicKeyAlgorithmDsa1024, nil
 	case "ECDSA":
 		return PublicKeyAlgorithmEcdsa, nil
+	case "ECDSASHA1":
+		return PublicKeyAlgorithmEcdsasha1, nil
+	case "ECDHSHA1":
+		return PublicKeyAlgorithmEcdhsha1, nil
 	case "Ed25519":
 		return PublicKeyAlgorithmEd25519, nil
+	case "RC4":
+		return PublicKeyAlgorithmRc4, nil
+	case "RSA":
+		return PublicKeyAlgorithmRsa, nil
+	case "RSA1024":
+		return PublicKeyAlgorithmRsa1024, nil
 	case "Unknown":
 		return PublicKeyAlgorithmUnknown, nil
 	}
@@ -296,6 +323,7 @@ type SignatureAlgorithm string
 const (
 	SignatureAlgorithmMd2Rsa       SignatureAlgorithm = "MD2RSA"
 	SignatureAlgorithmMd5Rsa       SignatureAlgorithm = "MD5RSA"
+	SignatureAlgorithmMd5Ecdsa     SignatureAlgorithm = "MD5ECDSA"
 	SignatureAlgorithmSha1Rsa      SignatureAlgorithm = "SHA1RSA"
 	SignatureAlgorithmSha256Rsa    SignatureAlgorithm = "SHA256RSA"
 	SignatureAlgorithmSha384Rsa    SignatureAlgorithm = "SHA384RSA"
@@ -318,6 +346,8 @@ func NewSignatureAlgorithmFromString(s string) (SignatureAlgorithm, error) {
 		return SignatureAlgorithmMd2Rsa, nil
 	case "MD5RSA":
 		return SignatureAlgorithmMd5Rsa, nil
+	case "MD5ECDSA":
+		return SignatureAlgorithmMd5Ecdsa, nil
 	case "SHA1RSA":
 		return SignatureAlgorithmSha1Rsa, nil
 	case "SHA256RSA":

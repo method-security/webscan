@@ -7,6 +7,7 @@ types:
     enum:
       - MD2RSA
       - MD5RSA
+      - MD5ECDSA
       - SHA1RSA
       - SHA256RSA
       - SHA384RSA
@@ -23,10 +24,19 @@ types:
       - Ed25519
   PublicKeyAlgorithm:
     enum:
-      - RSA
+      - DES
+      - DH1024
+      - DH512
+      - DH768
       - DSA
+      - DSA1024
       - ECDSA
+      - ECDSASHA1
+      - ECDHSHA1
       - Ed25519
+      - RC4
+      - RSA
+      - RSA1024
       - Unknown
   Certificate:
     properties:

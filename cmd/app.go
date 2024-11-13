@@ -4,7 +4,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"fmt"
 
 	webscan "github.com/Method-Security/webscan/generated/go"
 	"github.com/Method-Security/webscan/internal/graphql"
@@ -278,7 +277,6 @@ The requests command allows you to send custom HTTP requests to a target URL wit
 			report := requests.PerformRequestScan(baseURL, path, method, params, vulnTypes)
 
 			if len(report.Errors) > 0 {
-				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Error: %s\n", err)
 				a.OutputSignal.Status = 1
 			}
 
@@ -357,9 +355,7 @@ func DecodeAndSetParams(cmd *cobra.Command, isEncoded bool) (webscan.RequestPara
 	}
 
 	if bodyParams, err := getFlagValue("bodyParams"); err == nil {
-		if err := decodeJSON(bodyParams); err != nil {
-			return params, err
-		}
+		params.BodyParams = bodyParams
 	}
 
 	if formParams, err := getFlagValue("formParams"); err == nil {

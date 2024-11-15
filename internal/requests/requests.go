@@ -8,6 +8,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	webscan "github.com/Method-Security/webscan/generated/go"
@@ -60,9 +61,10 @@ func PerformRequestScan(baseURL, path, method string, params webscan.RequestPara
 		return report
 	}
 
-	// Check for escape characters in headers
+	// Check for headers that require specfic actions (Escape and Server Overload Headers)
 	hasEscapeChars := false
 	for key, value := range parsedParams.HeaderParams {
+		// Escape Headers
 		if strings.Contains(key, "\r") || strings.Contains(key, "\n") || strings.Contains(key, "\\") || strings.Contains(key, "\u0000") {
 			hasEscapeChars = true
 			break
@@ -71,6 +73,48 @@ func PerformRequestScan(baseURL, path, method string, params webscan.RequestPara
 			hasEscapeChars = true
 			break
 		}
+		// Server Overload Headers
+		if strings.Contains(key, "|*") {
+			// Split the key to extract the prefix and payload size
+			parts := strings.Split(key, "|*")
+			if len(parts) == 2 {
+				headerValue := parts[0] // e.g., "X-Header-"
+				sizeStr := parts[1]
+
+				size, err := strconv.Atoi(sizeStr)
+				if err != nil {
+					fmt.Printf("Error parsing size for key %s: %v\n", key, err)
+					continue
+				}
+
+				// Generate keys like "X-Header-1", "X-Header-2"
+				for i := 1; i <= size; i++ {
+					newKey := fmt.Sprintf("%s%d", headerValue, i)
+					parsedParams.HeaderParams[newKey] = value
+				}
+			} else {
+				fmt.Printf("Invalid key format: %s\n", key)
+			}
+		}
+		if strings.Contains(value, "|*") {
+			// Split the value to extract the instruction and payload size
+			parts := strings.Split(value, "|*")
+			if len(parts) == 2 {
+				headerValue := parts[0] // e.g., "A"
+				sizeStr := parts[1]
+
+				size, err := strconv.Atoi(sizeStr)
+				if err != nil {
+					fmt.Printf("Error parsing size for header %s: %v\n", key, err)
+					continue
+				}
+
+				// Generate the repeated characters
+				processedValue := strings.Repeat(headerValue, size)
+				parsedParams.HeaderParams[key] = processedValue
+			}
+		}
+
 	}
 
 	var statusCode int

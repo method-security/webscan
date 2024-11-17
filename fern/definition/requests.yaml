@@ -1,9 +1,35 @@
 imports:
   routes: ./routes.yml
   common: ./common.yml
-
 types:
-
+  VulnType:
+    enum:
+    - IDOR
+    - PATH_TRAVERSAL
+    - RCE
+    - SQLI
+    - XSS
+    - CORS_HEADER_INJECTION
+    - ESCAPE_HEADERS_INJECTION
+    - HTTP_HEADERS_INJECTION
+    - SENSITIVE_EXPOSED_HEADER_INJECTION
+    - SERVER_OVERLOAD_HEADER_INJECTION
+  RequestParams:
+    properties:
+      pathParams: string
+      queryParams: string
+      headerParams: string
+      bodyParams: string
+      formParams: string
+      multipartParams: string
+  ParsedRequestParams:
+    properties:
+      pathParams: map<string, string>
+      queryParams: map<string, string>
+      headerParams: map<string, string>
+      bodyParams: string
+      formParams: map<string, string>
+      multipartParams: map<string, string>
   RequestReport:
     properties:
       baseUrl: string
@@ -20,32 +46,7 @@ types:
       responseBody: optional<string>
       responseHeaders: optional<map<string, string>>
       errors: optional<list<string>>
-
-  VulnType:
-    enum:
-      - COMMAND
-      - SQL
-      - XSS
-      - AUTH
-      - SENSITIVEERROR
-      - SQLINJECTION
-      - TEMPLATE
-      - NOSQL
-
-  RequestParams:
+  MultipleRequestReport:
     properties:
-      pathParams: string
-      queryParams: string
-      headerParams: string
-      bodyParams: string
-      formParams: string
-      multipartParams: string
-
-  ParsedParams:
-    properties:
-      pathParams: map<string, string>
-      queryParams: map<string, string>
-      headerParams: map<string, string>
-      bodyParams: string
-      formParams: map<string, string>
-      multipartParams: map<string, string>
+      requests: list<RequestReport>
+      errors: optional<list<string>>

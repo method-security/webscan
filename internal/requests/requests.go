@@ -163,8 +163,8 @@ func parseJSONParams(jsonStr string) (map[string]string, error) {
 	return params, nil
 }
 
-func parseAllParams(params webscan.RequestParams) (webscan.ParsedParams, error) {
-	var parsed webscan.ParsedParams
+func parseAllParams(params webscan.RequestParams) (webscan.ParsedRequestParams, error) {
+	var parsed webscan.ParsedRequestParams
 	var err error
 
 	parsed.PathParams, err = parseJSONParams(params.PathParams)
@@ -220,7 +220,7 @@ func constructURL(baseURL, path string, pathParams, queryParams map[string]strin
 	return fullURL, nil
 }
 
-func prepareRequestBody(params webscan.ParsedParams) (io.Reader, string, error) {
+func prepareRequestBody(params webscan.ParsedRequestParams) (io.Reader, string, error) {
 	if params.BodyParams != "" {
 		if !json.Valid([]byte(params.BodyParams)) {
 			return nil, "", fmt.Errorf("invalid JSON in body parameters")
@@ -303,7 +303,7 @@ func sendFastHTTPRequest(method, url string, body string, contentType string, he
 	return resp, nil
 }
 
-func populateReport(report *webscan.RequestReport, statusCode int, headers map[string]string, body string, params webscan.ParsedParams, vulnTypes []string) {
+func populateReport(report *webscan.RequestReport, statusCode int, headers map[string]string, body string, params webscan.ParsedRequestParams, vulnTypes []string) {
 	if headers != nil {
 		report.ResponseHeaders = make(map[string]string)
 		for key, values := range headers {

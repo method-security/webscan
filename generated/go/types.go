@@ -1154,7 +1154,49 @@ func (p *PageScreenshotReport) String() string {
 	return fmt.Sprintf("%#v", p)
 }
 
-type ParsedParams struct {
+type MultipleRequestReport struct {
+	Requests []*RequestReport `json:"requests,omitempty" url:"requests,omitempty"`
+	Errors   []string         `json:"errors,omitempty" url:"errors,omitempty"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (m *MultipleRequestReport) GetExtraProperties() map[string]interface{} {
+	return m.extraProperties
+}
+
+func (m *MultipleRequestReport) UnmarshalJSON(data []byte) error {
+	type unmarshaler MultipleRequestReport
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*m = MultipleRequestReport(value)
+
+	extraProperties, err := core.ExtractExtraProperties(data, *m)
+	if err != nil {
+		return err
+	}
+	m.extraProperties = extraProperties
+
+	m._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (m *MultipleRequestReport) String() string {
+	if len(m._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(m._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(m); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", m)
+}
+
+type ParsedRequestParams struct {
 	PathParams      map[string]string `json:"pathParams,omitempty" url:"pathParams,omitempty"`
 	QueryParams     map[string]string `json:"queryParams,omitempty" url:"queryParams,omitempty"`
 	HeaderParams    map[string]string `json:"headerParams,omitempty" url:"headerParams,omitempty"`
@@ -1166,17 +1208,17 @@ type ParsedParams struct {
 	_rawJSON        json.RawMessage
 }
 
-func (p *ParsedParams) GetExtraProperties() map[string]interface{} {
+func (p *ParsedRequestParams) GetExtraProperties() map[string]interface{} {
 	return p.extraProperties
 }
 
-func (p *ParsedParams) UnmarshalJSON(data []byte) error {
-	type unmarshaler ParsedParams
+func (p *ParsedRequestParams) UnmarshalJSON(data []byte) error {
+	type unmarshaler ParsedRequestParams
 	var value unmarshaler
 	if err := json.Unmarshal(data, &value); err != nil {
 		return err
 	}
-	*p = ParsedParams(value)
+	*p = ParsedRequestParams(value)
 
 	extraProperties, err := core.ExtractExtraProperties(data, *p)
 	if err != nil {
@@ -1188,7 +1230,7 @@ func (p *ParsedParams) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (p *ParsedParams) String() string {
+func (p *ParsedRequestParams) String() string {
 	if len(p._rawJSON) > 0 {
 		if value, err := core.StringifyJSON(p._rawJSON); err == nil {
 			return value
@@ -1303,34 +1345,40 @@ func (r *RequestReport) String() string {
 type VulnType string
 
 const (
-	VulnTypeCommand        VulnType = "COMMAND"
-	VulnTypeSql            VulnType = "SQL"
-	VulnTypeXss            VulnType = "XSS"
-	VulnTypeAuth           VulnType = "AUTH"
-	VulnTypeSensitiveerror VulnType = "SENSITIVEERROR"
-	VulnTypeSqlinjection   VulnType = "SQLINJECTION"
-	VulnTypeTemplate       VulnType = "TEMPLATE"
-	VulnTypeNosql          VulnType = "NOSQL"
+	VulnTypeIdor                            VulnType = "IDOR"
+	VulnTypePathTraversal                   VulnType = "PATH_TRAVERSAL"
+	VulnTypeRce                             VulnType = "RCE"
+	VulnTypeSqli                            VulnType = "SQLI"
+	VulnTypeXss                             VulnType = "XSS"
+	VulnTypeCorsHeaderInjection             VulnType = "CORS_HEADER_INJECTION"
+	VulnTypeEscapeHeadersInjection          VulnType = "ESCAPE_HEADERS_INJECTION"
+	VulnTypeHttpHeadersInjection            VulnType = "HTTP_HEADERS_INJECTION"
+	VulnTypeSensitiveExposedHeaderInjection VulnType = "SENSITIVE_EXPOSED_HEADER_INJECTION"
+	VulnTypeServerOverloadHeaderInjection   VulnType = "SERVER_OVERLOAD_HEADER_INJECTION"
 )
 
 func NewVulnTypeFromString(s string) (VulnType, error) {
 	switch s {
-	case "COMMAND":
-		return VulnTypeCommand, nil
-	case "SQL":
-		return VulnTypeSql, nil
+	case "IDOR":
+		return VulnTypeIdor, nil
+	case "PATH_TRAVERSAL":
+		return VulnTypePathTraversal, nil
+	case "RCE":
+		return VulnTypeRce, nil
+	case "SQLI":
+		return VulnTypeSqli, nil
 	case "XSS":
 		return VulnTypeXss, nil
-	case "AUTH":
-		return VulnTypeAuth, nil
-	case "SENSITIVEERROR":
-		return VulnTypeSensitiveerror, nil
-	case "SQLINJECTION":
-		return VulnTypeSqlinjection, nil
-	case "TEMPLATE":
-		return VulnTypeTemplate, nil
-	case "NOSQL":
-		return VulnTypeNosql, nil
+	case "CORS_HEADER_INJECTION":
+		return VulnTypeCorsHeaderInjection, nil
+	case "ESCAPE_HEADERS_INJECTION":
+		return VulnTypeEscapeHeadersInjection, nil
+	case "HTTP_HEADERS_INJECTION":
+		return VulnTypeHttpHeadersInjection, nil
+	case "SENSITIVE_EXPOSED_HEADER_INJECTION":
+		return VulnTypeSensitiveExposedHeaderInjection, nil
+	case "SERVER_OVERLOAD_HEADER_INJECTION":
+		return VulnTypeServerOverloadHeaderInjection, nil
 	}
 	var t VulnType
 	return "", fmt.Errorf("%s is not a valid %T", s, t)

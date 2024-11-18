@@ -135,7 +135,7 @@ func (a *WebScan) InitRequestsCommand() {
 	serverOverloadCmd.Flags().StringSlice("headerName", []string{}, "Specifies Header keys to use in request.")
 	serverOverloadCmd.Flags().Int("headerSize", 100, "Specifies the length of header values to include in requests.")
 
-	_ = requestsCmd.MarkFlagRequired("headerNames")
+	_ = requestsCmd.MarkFlagRequired("headerName")
 
 	headerCmd.AddCommand(serverOverloadCmd)
 	requestsCmd.AddCommand(headerCmd)

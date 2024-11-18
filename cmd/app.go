@@ -1,15 +1,11 @@
 package cmd
 
 import (
-	"encoding/base64"
-	"encoding/json"
 	"errors"
 
-	webscan "github.com/Method-Security/webscan/generated/go"
 	"github.com/Method-Security/webscan/internal/graphql"
 	"github.com/Method-Security/webscan/internal/grpc"
 	"github.com/Method-Security/webscan/internal/k8s"
-	"github.com/Method-Security/webscan/internal/requests"
 	"github.com/Method-Security/webscan/internal/swagger"
 	"github.com/Method-Security/webscan/internal/vuln"
 	"github.com/spf13/cobra"
@@ -26,7 +22,6 @@ func (a *WebScan) InitAppCommand() {
 	a.RootCmd.AddCommand(a.AppCmd)
 	a.initFingerprintCommand()
 	a.initEnumerateCommand()
-	a.initRequestsCommand()
 }
 
 func (a *WebScan) initFingerprintCommand() {
@@ -231,146 +226,4 @@ HTTP methods, query parameters, and authentication mechanisms.`,
 	_ = swaggerCmd.MarkFlagRequired("target")
 
 	return swaggerCmd
-}
-
-func (a *WebScan) initRequestsCommand() {
-	requestsCmd := &cobra.Command{
-		Use:   "requests",
-		Short: "Perform custom requests against a target route",
-		Long: `Perform custom requests against a target route of an API Application using specified parameters.
-		
-The requests command allows you to send custom HTTP requests to a target URL with specified method, path, and optional parameters including query, path, header, body, form, and multipart form data.`,
-		Run: func(cmd *cobra.Command, args []string) {
-			defer a.OutputSignal.PanicHandler(cmd.Context())
-			baseURL, err := cmd.Flags().GetString("baseUrl")
-			if err != nil || baseURL == "" {
-				a.OutputSignal.AddError(err)
-				return
-			}
-
-			path, err := cmd.Flags().GetString("path")
-			if err != nil || path == "" {
-				a.OutputSignal.AddError(err)
-				return
-			}
-
-			method, err := cmd.Flags().GetString("method")
-			if err != nil || method == "" {
-				a.OutputSignal.AddError(err)
-				return
-			}
-
-			isEncoded, err := cmd.Flags().GetBool("encodedParams")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-
-			params, err := DecodeAndSetParams(cmd, isEncoded)
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-
-			vulnTypes, _ := cmd.Flags().GetStringSlice("vulnType")
-
-			report := requests.PerformRequestScan(baseURL, path, method, params, vulnTypes)
-
-			if len(report.Errors) > 0 {
-				a.OutputSignal.Status = 1
-			}
-
-			a.OutputSignal.Content = report
-		},
-	}
-
-	requestsCmd.Flags().String("baseUrl", "", "Base URL of the target")
-	requestsCmd.Flags().String("path", "", "Path to append to the base URL")
-	requestsCmd.Flags().String("method", "", "HTTP method to use (GET, POST, etc.)")
-	requestsCmd.Flags().String("pathParams", "", "Path parameters as a JSON string (optional)")
-	requestsCmd.Flags().String("queryParams", "", "Query parameters as a JSON string (optional)")
-	requestsCmd.Flags().String("headerParams", "", "Header parameters as a JSON string (optional)")
-	requestsCmd.Flags().String("bodyParams", "", "Body parameters as a JSON string (optional)")
-	requestsCmd.Flags().String("formParams", "", "Form parameters as a JSON string (optional)")
-	requestsCmd.Flags().String("multipartParams", "", "Multipart form parameters as a JSON string (optional)")
-	requestsCmd.Flags().Bool("encodedParams", false, "Request parameters base64 encoded")
-
-	requestsCmd.Flags().StringSlice("vulnType", []string{}, "Types of vulnerabilities to check (optional)")
-
-	_ = requestsCmd.MarkFlagRequired("baseUrl")
-	_ = requestsCmd.MarkFlagRequired("path")
-	_ = requestsCmd.MarkFlagRequired("method")
-
-	a.AppCmd.AddCommand(requestsCmd)
-}
-
-// DecodeAndSetParams decodes flags as base64 if isEncoded is true, and parses JSON for all params.
-func DecodeAndSetParams(cmd *cobra.Command, isEncoded bool) (webscan.RequestParams, error) {
-	getFlagValue := func(flagName string) (string, error) {
-		flagValue := cmd.Flag(flagName).Value.String()
-		if isEncoded {
-			decodedBytes, err := base64.StdEncoding.DecodeString(flagValue)
-			if err != nil {
-				return "", err
-			}
-			return string(decodedBytes), nil
-		}
-		return flagValue, nil
-	}
-
-	params := webscan.RequestParams{}
-
-	// Helper function to test if decode JSON for each parameter
-	decodeJSON := func(flagValue string) error {
-		if flagValue == "" {
-			return nil
-		}
-		var result map[string]string
-		if err := json.Unmarshal([]byte(flagValue), &result); err != nil {
-			return errors.New("failed to parse as JSON: " + err.Error())
-		}
-		return nil
-	}
-
-	// Decode and parse each parameter
-	if pathParams, err := getFlagValue("pathParams"); err == nil {
-		if err := decodeJSON(pathParams); err != nil {
-			return params, err
-		}
-		params.PathParams = pathParams
-	}
-
-	if queryParams, err := getFlagValue("queryParams"); err == nil {
-		if err := decodeJSON(queryParams); err != nil {
-			return params, err
-		}
-		params.QueryParams = queryParams
-	}
-
-	if headerParams, err := getFlagValue("headerParams"); err == nil {
-		if err := decodeJSON(headerParams); err != nil {
-			return params, err
-		}
-		params.HeaderParams = headerParams
-	}
-
-	if bodyParams, err := getFlagValue("bodyParams"); err == nil {
-		params.BodyParams = bodyParams
-	}
-
-	if formParams, err := getFlagValue("formParams"); err == nil {
-		if err := decodeJSON(formParams); err != nil {
-			return params, err
-		}
-		params.FormParams = formParams
-	}
-
-	if multipartParams, err := getFlagValue("multipartParams"); err == nil {
-		if err := decodeJSON(multipartParams); err != nil {
-			return params, err
-		}
-		params.MultipartParams = multipartParams
-	}
-
-	return params, nil
 }

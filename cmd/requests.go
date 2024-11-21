@@ -117,13 +117,8 @@ func (a *WebScan) InitRequestsCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			vulnTypes, err := cmd.Flags().GetStringSlice("vulnType")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
 
-			report := requests.PerformServerOverloadHeaderRequests(baseURL, path, method, headerNames, payloadSize, vulnTypes)
+			report := requests.PerformServerOverloadHeaderRequests(baseURL, path, method, headerNames, payloadSize)
 			if len(report.Errors) > 0 {
 				a.OutputSignal.Status = 1
 			}

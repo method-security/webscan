@@ -7,10 +7,10 @@ import (
 	webscan "github.com/Method-Security/webscan/generated/go"
 )
 
-func PerformServerOverloadHeaderRequests(baseURL, path, method string, headerNames []string, payloadSize int, vulnTypes []string) webscan.RequestReport {
+func PerformServerOverloadHeaderRequests(baseURL, path, method string, headerNames []string, payloadSize int) webscan.RequestReport {
 	params := webscan.RequestParams{}
 	params.HeaderParams = GenerateServerOverloadHeaders(headerNames, payloadSize)
-	return PerformRequestScan(baseURL, path, method, params, vulnTypes)
+	return PerformRequestScan(baseURL, path, method, params, []string{"SERVEROVERLOAD"})
 }
 
 func GenerateServerOverloadHeaders(headerNames []string, payloadSize int) string {

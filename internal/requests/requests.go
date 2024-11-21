@@ -333,12 +333,28 @@ func populateReport(report *webscan.RequestReport, statusCode int, headers map[s
 		report.MultipartParams = params.MultipartParams
 	}
 	if len(vulnTypes) > 0 {
-		report.VulnTypes = make([]webscan.VulnType, 0, len(vulnTypes))
-		for _, vt := range vulnTypes {
-			if vulnType, err := webscan.NewVulnTypeFromString(vt); err == nil {
+		// Iterate over the input vulnTypes
+		if len(vulnTypes) > 0 {
+			report.VulnTypes = make([]*webscan.VulnType, 0, len(vulnTypes))
+
+			for _, vt := range vulnTypes {
+				var vulnType *webscan.VulnType
+
+				// Attempt to create a VulnType based on the string
+				if commandInjectionType, err := webscan.NewCommandInjectionTypeFromString(vt); err == nil {
+					vulnType = webscan.NewVulnTypeFromCommandInjectionType(commandInjectionType)
+				} else if headerInjectionType, err := webscan.NewHeaderInjectionTypeFromString(vt); err == nil {
+					vulnType = webscan.NewVulnTypeFromHeaderInjectionType(headerInjectionType)
+				} else if misconfigurationType, err := webscan.NewMisconfigurationTypeFromString(vt); err == nil {
+					vulnType = webscan.NewVulnTypeFromMisconfigurationType(misconfigurationType)
+				} else {
+					// If no type matches, log the error and continue
+					report.Errors = append(report.Errors, fmt.Sprintf("Invalid vulnerability type: %s", vt))
+					continue
+				}
+
+				// Append the pointer to the VulnType slice
 				report.VulnTypes = append(report.VulnTypes, vulnType)
-			} else {
-				report.Errors = append(report.Errors, fmt.Sprintf("Invalid vulnerability type: %s", vt))
 			}
 		}
 	}

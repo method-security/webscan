@@ -3,6 +3,28 @@ imports:
   common: ./common.yml
 
 types:
+  CommandInjectionType:
+    enum:
+      - COMMAND
+      - NOSQL
+      - SQL
+      - TEMPLATE
+      - XSS
+  HeaderInjectionType:
+    enum:
+      - CORS
+      - ESCAPE
+      - HTTP
+      - SENSITIVEEXPOSED
+      - SERVEROVERLOAD
+  MisconfigurationType:
+    enum:
+      - DOMAIN_TAKEOVER
+  VulnType:
+    union:
+      CommandInjectionType: CommandInjectionType
+      HeaderInjectionType: HeaderInjectionType
+      MisconfigurationType: MisconfigurationType
 
   RequestReport:
     properties:
@@ -20,18 +42,6 @@ types:
       responseBody: optional<string>
       responseHeaders: optional<map<string, string>>
       errors: optional<list<string>>
-
-  VulnType:
-    enum:
-      - COMMAND
-      - SQL
-      - XSS
-      - AUTH
-      - SENSITIVEERROR
-      - SQLINJECTION
-      - TEMPLATE
-      - NOSQL
-
   RequestParams:
     properties:
       pathParams: string
@@ -40,7 +50,6 @@ types:
       bodyParams: string
       formParams: string
       multipartParams: string
-
   ParsedParams:
     properties:
       pathParams: map<string, string>

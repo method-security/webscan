@@ -1154,6 +1154,87 @@ func (p *PageScreenshotReport) String() string {
 	return fmt.Sprintf("%#v", p)
 }
 
+type CommandInjectionType string
+
+const (
+	CommandInjectionTypeCommand  CommandInjectionType = "COMMAND"
+	CommandInjectionTypeNosql    CommandInjectionType = "NOSQL"
+	CommandInjectionTypeSql      CommandInjectionType = "SQL"
+	CommandInjectionTypeTemplate CommandInjectionType = "TEMPLATE"
+	CommandInjectionTypeXss      CommandInjectionType = "XSS"
+)
+
+func NewCommandInjectionTypeFromString(s string) (CommandInjectionType, error) {
+	switch s {
+	case "COMMAND":
+		return CommandInjectionTypeCommand, nil
+	case "NOSQL":
+		return CommandInjectionTypeNosql, nil
+	case "SQL":
+		return CommandInjectionTypeSql, nil
+	case "TEMPLATE":
+		return CommandInjectionTypeTemplate, nil
+	case "XSS":
+		return CommandInjectionTypeXss, nil
+	}
+	var t CommandInjectionType
+	return "", fmt.Errorf("%s is not a valid %T", s, t)
+}
+
+func (c CommandInjectionType) Ptr() *CommandInjectionType {
+	return &c
+}
+
+type HeaderInjectionType string
+
+const (
+	HeaderInjectionTypeCors             HeaderInjectionType = "CORS"
+	HeaderInjectionTypeEscape           HeaderInjectionType = "ESCAPE"
+	HeaderInjectionTypeHttp             HeaderInjectionType = "HTTP"
+	HeaderInjectionTypeSensitiveexposed HeaderInjectionType = "SENSITIVEEXPOSED"
+	HeaderInjectionTypeServeroverload   HeaderInjectionType = "SERVEROVERLOAD"
+)
+
+func NewHeaderInjectionTypeFromString(s string) (HeaderInjectionType, error) {
+	switch s {
+	case "CORS":
+		return HeaderInjectionTypeCors, nil
+	case "ESCAPE":
+		return HeaderInjectionTypeEscape, nil
+	case "HTTP":
+		return HeaderInjectionTypeHttp, nil
+	case "SENSITIVEEXPOSED":
+		return HeaderInjectionTypeSensitiveexposed, nil
+	case "SERVEROVERLOAD":
+		return HeaderInjectionTypeServeroverload, nil
+	}
+	var t HeaderInjectionType
+	return "", fmt.Errorf("%s is not a valid %T", s, t)
+}
+
+func (h HeaderInjectionType) Ptr() *HeaderInjectionType {
+	return &h
+}
+
+type MisconfigurationType string
+
+const (
+	MisconfigurationTypeDomainTakeover MisconfigurationType = "DOMAIN_TAKEOVER"
+)
+
+func NewMisconfigurationTypeFromString(s string) (MisconfigurationType, error) {
+	switch s {
+	case "DOMAIN_TAKEOVER":
+		return MisconfigurationTypeDomainTakeover, nil
+	}
+	var t MisconfigurationType
+	return "", fmt.Errorf("%s is not a valid %T", s, t)
+}
+
+func (m MisconfigurationType) Ptr() *MisconfigurationType {
+	return &m
+}
+
 type ParsedParams struct {
 	PathParams      map[string]string `json:"pathParams,omitempty" url:"pathParams,omitempty"`
 	QueryParams     map[string]string `json:"queryParams,omitempty" url:"queryParams,omitempty"`
@@ -1256,7 +1337,7 @@ type RequestReport struct {
 	BodyParams      *string           `json:"bodyParams,omitempty" url:"bodyParams,omitempty"`
 	FormParams      map[string]string `json:"formParams,omitempty" url:"formParams,omitempty"`
 	MultipartParams map[string]string `json:"multipartParams,omitempty" url:"multipartParams,omitempty"`
-	VulnTypes       []VulnType        `json:"vulnTypes,omitempty" url:"vulnTypes,omitempty"`
+	VulnTypes       []*VulnType       `json:"vulnTypes,omitempty" url:"vulnTypes,omitempty"`
 	StatusCode      *int              `json:"statusCode,omitempty" url:"statusCode,omitempty"`
 	ResponseBody    *string           `json:"responseBody,omitempty" url:"responseBody,omitempty"`
 	ResponseHeaders map[string]string `json:"responseHeaders,omitempty" url:"responseHeaders,omitempty"`
@@ -1300,44 +1381,116 @@ func (r *RequestReport) String() string {
 	return fmt.Sprintf("%#v", r)
 }
 
-type VulnType string
-
-const (
-	VulnTypeCommand        VulnType = "COMMAND"
-	VulnTypeSql            VulnType = "SQL"
-	VulnTypeXss            VulnType = "XSS"
-	VulnTypeAuth           VulnType = "AUTH"
-	VulnTypeSensitiveerror VulnType = "SENSITIVEERROR"
-	VulnTypeSqlinjection   VulnType = "SQLINJECTION"
-	VulnTypeTemplate       VulnType = "TEMPLATE"
-	VulnTypeNosql          VulnType = "NOSQL"
-)
-
-func NewVulnTypeFromString(s string) (VulnType, error) {
-	switch s {
-	case "COMMAND":
-		return VulnTypeCommand, nil
-	case "SQL":
-		return VulnTypeSql, nil
-	case "XSS":
-		return VulnTypeXss, nil
-	case "AUTH":
-		return VulnTypeAuth, nil
-	case "SENSITIVEERROR":
-		return VulnTypeSensitiveerror, nil
-	case "SQLINJECTION":
-		return VulnTypeSqlinjection, nil
-	case "TEMPLATE":
-		return VulnTypeTemplate, nil
-	case "NOSQL":
-		return VulnTypeNosql, nil
-	}
-	var t VulnType
-	return "", fmt.Errorf("%s is not a valid %T", s, t)
+type VulnType struct {
+	Type                 string
+	CommandInjectionType CommandInjectionType
+	HeaderInjectionType  HeaderInjectionType
+	MisconfigurationType MisconfigurationType
 }
 
-func (v VulnType) Ptr() *VulnType {
-	return &v
+func NewVulnTypeFromCommandInjectionType(value CommandInjectionType) *VulnType {
+	return &VulnType{Type: "CommandInjectionType", CommandInjectionType: value}
+}
+
+func NewVulnTypeFromHeaderInjectionType(value HeaderInjectionType) *VulnType {
+	return &VulnType{Type: "HeaderInjectionType", HeaderInjectionType: value}
+}
+
+func NewVulnTypeFromMisconfigurationType(value MisconfigurationType) *VulnType {
+	return &VulnType{Type: "MisconfigurationType", MisconfigurationType: value}
+}
+
+func (v *VulnType) UnmarshalJSON(data []byte) error {
+	var unmarshaler struct {
+		Type string `json:"type"`
+	}
+	if err := json.Unmarshal(data, &unmarshaler); err != nil {
+		return err
+	}
+	v.Type = unmarshaler.Type
+	if unmarshaler.Type == "" {
+		return fmt.Errorf("%T did not include discriminant type", v)
+	}
+	switch unmarshaler.Type {
+	case "CommandInjectionType":
+		var valueUnmarshaler struct {
+			CommandInjectionType CommandInjectionType `json:"value"`
+		}
+		if err := json.Unmarshal(data, &valueUnmarshaler); err != nil {
+			return err
+		}
+		v.CommandInjectionType = valueUnmarshaler.CommandInjectionType
+	case "HeaderInjectionType":
+		var valueUnmarshaler struct {
+			HeaderInjectionType HeaderInjectionType `json:"value"`
+		}
+		if err := json.Unmarshal(data, &valueUnmarshaler); err != nil {
+			return err
+		}
+		v.HeaderInjectionType = valueUnmarshaler.HeaderInjectionType
+	case "MisconfigurationType":
+		var valueUnmarshaler struct {
+			MisconfigurationType MisconfigurationType `json:"value"`
+		}
+		if err := json.Unmarshal(data, &valueUnmarshaler); err != nil {
+			return err
+		}
+		v.MisconfigurationType = valueUnmarshaler.MisconfigurationType
+	}
+	return nil
+}
+
+func (v VulnType) MarshalJSON() ([]byte, error) {
+	switch v.Type {
+	default:
+		return nil, fmt.Errorf("invalid type %s in %T", v.Type, v)
+	case "CommandInjectionType":
+		var marshaler = struct {
+			Type                 string               `json:"type"`
+			CommandInjectionType CommandInjectionType `json:"value"`
+		}{
+			Type:                 "CommandInjectionType",
+			CommandInjectionType: v.CommandInjectionType,
+		}
+		return json.Marshal(marshaler)
+	case "HeaderInjectionType":
+		var marshaler = struct {
+			Type                string              `json:"type"`
+			HeaderInjectionType HeaderInjectionType `json:"value"`
+		}{
+			Type:                "HeaderInjectionType",
+			HeaderInjectionType: v.HeaderInjectionType,
+		}
+		return json.Marshal(marshaler)
+	case "MisconfigurationType":
+		var marshaler = struct {
+			Type                 string               `json:"type"`
+			MisconfigurationType MisconfigurationType `json:"value"`
+		}{
+			Type:                 "MisconfigurationType",
+			MisconfigurationType: v.MisconfigurationType,
+		}
+		return json.Marshal(marshaler)
+	}
+}
+
+type VulnTypeVisitor interface {
+	VisitCommandInjectionType(CommandInjectionType) error
+	VisitHeaderInjectionType(HeaderInjectionType) error
+	VisitMisconfigurationType(MisconfigurationType) error
+}
+
+func (v *VulnType) Accept(visitor VulnTypeVisitor) error {
+	switch v.Type {
+	default:
+		return fmt.Errorf("invalid type %s in %T", v.Type, v)
+	case "CommandInjectionType":
+		return visitor.VisitCommandInjectionType(v.CommandInjectionType)
+	case "HeaderInjectionType":
+		return visitor.VisitHeaderInjectionType(v.HeaderInjectionType)
+	case "MisconfigurationType":
+		return visitor.VisitMisconfigurationType(v.MisconfigurationType)
+	}
 }
 
 type BodyParams struct {

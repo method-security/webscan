@@ -3,10 +3,9 @@
 package client
 
 import (
-	http "net/http"
-
 	core "github.com/Method-Security/webscan/generated/go/core"
 	option "github.com/Method-Security/webscan/generated/go/option"
+	http "net/http"
 )
 
 type Client struct {

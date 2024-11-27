@@ -15,9 +15,9 @@ import (
 
 type GraphQLLibrary struct{}
 
-func (graphqlLib *GraphQLLibrary) ModuleRun(target string, config *webscan.DetectConfig) (*webscan.DetectAttempt, []string) {
-	attempt := webscan.DetectAttempt{
-		Name:      webscan.NewDetectResourceModuleFromApiApplicationModule(webscan.ApiApplicationModuleGraphql),
+func (graphqlLib *GraphQLLibrary) ModuleRun(target string, config *webscan.AppFingerprintConfig) (*webscan.AppFingerprintAttempt, []string) {
+	attempt := webscan.AppFingerprintAttempt{
+		Name:      webscan.NewAppFingerprintResourceModuleFromApiApplicationModule(webscan.ApiApplicationModuleGraphql),
 		Timestamp: time.Now(),
 	}
 	errors := []string{}
@@ -55,7 +55,7 @@ func (graphqlLib *GraphQLLibrary) ModuleRun(target string, config *webscan.Detec
 	bodyStr := string(jsonQuery)
 
 	for _, path := range graphqlPaths {
-		request := webscan.DetectRequestInfo{
+		request := webscan.AppFingerprintRequestInfo{
 			BaseUrl:    baseURL,
 			Path:       strings.TrimSuffix(targetPath, "/") + path,
 			Method:     webscan.HttpMethodPost,
@@ -74,20 +74,20 @@ func (graphqlLib *GraphQLLibrary) ModuleRun(target string, config *webscan.Detec
 
 		resp, err := client.Do(req)
 		if err != nil {
-			attempt.AttemptInfo = append(attempt.AttemptInfo, &webscan.DetectAttemptInfo{Request: &request, Errors: []string{err.Error()}})
+			attempt.AttemptInfo = append(attempt.AttemptInfo, &webscan.AppFingerprintAttemptInfo{Request: &request, Errors: []string{err.Error()}})
 			continue
 		}
 
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			attempt.AttemptInfo = append(attempt.AttemptInfo, &webscan.DetectAttemptInfo{Request: &request, Errors: []string{err.Error()}})
+			attempt.AttemptInfo = append(attempt.AttemptInfo, &webscan.AppFingerprintAttemptInfo{Request: &request, Errors: []string{err.Error()}})
 			continue
 		}
 
 		bodyStr := string(body)
 		err = resp.Body.Close()
 		if err != nil {
-			attempt.AttemptInfo = append(attempt.AttemptInfo, &webscan.DetectAttemptInfo{Request: &request, Errors: []string{err.Error()}})
+			attempt.AttemptInfo = append(attempt.AttemptInfo, &webscan.AppFingerprintAttemptInfo{Request: &request, Errors: []string{err.Error()}})
 			continue
 		}
 
@@ -97,13 +97,13 @@ func (graphqlLib *GraphQLLibrary) ModuleRun(target string, config *webscan.Detec
 		}
 
 		statusCode := resp.StatusCode
-		responseInfo := &webscan.DetectResponseInfo{
+		responseInfo := &webscan.AppFingerprintResponseInfo{
 			StatusCode:      &statusCode,
 			ResponseHeaders: headers,
 			ResponseBody:    &bodyStr,
 		}
 
-		attempt.AttemptInfo = append(attempt.AttemptInfo, &webscan.DetectAttemptInfo{Request: &request, Response: responseInfo})
+		attempt.AttemptInfo = append(attempt.AttemptInfo, &webscan.AppFingerprintAttemptInfo{Request: &request, Response: responseInfo})
 
 		if graphqlLib.AnalyzeResponse(responseInfo) {
 			attempt.Finding = true
@@ -113,7 +113,7 @@ func (graphqlLib *GraphQLLibrary) ModuleRun(target string, config *webscan.Detec
 	return &attempt, errors
 }
 
-func (graphqlLib *GraphQLLibrary) AnalyzeResponse(response *webscan.DetectResponseInfo) bool {
+func (graphqlLib *GraphQLLibrary) AnalyzeResponse(response *webscan.AppFingerprintResponseInfo) bool {
 	if response == nil {
 		return false
 	}

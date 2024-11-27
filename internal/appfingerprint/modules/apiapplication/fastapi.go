@@ -13,9 +13,9 @@ import (
 
 type FastAPILibrary struct{}
 
-func (fastapiLib *FastAPILibrary) ModuleRun(target string, config *webscan.DetectConfig) (*webscan.DetectAttempt, []string) {
-	attempt := webscan.DetectAttempt{
-		Name:      webscan.NewDetectResourceModuleFromApiApplicationModule(webscan.ApiApplicationModuleFastapi),
+func (fastapiLib *FastAPILibrary) ModuleRun(target string, config *webscan.AppFingerprintConfig) (*webscan.AppFingerprintAttempt, []string) {
+	attempt := webscan.AppFingerprintAttempt{
+		Name:      webscan.NewAppFingerprintResourceModuleFromApiApplicationModule(webscan.ApiApplicationModuleFastapi),
 		Timestamp: time.Now(),
 	}
 	errors := []string{}
@@ -44,7 +44,7 @@ func (fastapiLib *FastAPILibrary) ModuleRun(target string, config *webscan.Detec
 	}
 
 	for _, path := range fastapiPaths {
-		request := webscan.DetectRequestInfo{
+		request := webscan.AppFingerprintRequestInfo{
 			BaseUrl: baseURL,
 			Path:    strings.TrimSuffix(targetPath, "/") + path,
 			Method:  webscan.HttpMethodGet,
@@ -59,20 +59,20 @@ func (fastapiLib *FastAPILibrary) ModuleRun(target string, config *webscan.Detec
 
 		resp, err := client.Do(req)
 		if err != nil {
-			attempt.AttemptInfo = append(attempt.AttemptInfo, &webscan.DetectAttemptInfo{Request: &request, Errors: []string{err.Error()}})
+			attempt.AttemptInfo = append(attempt.AttemptInfo, &webscan.AppFingerprintAttemptInfo{Request: &request, Errors: []string{err.Error()}})
 			continue
 		}
 
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			attempt.AttemptInfo = append(attempt.AttemptInfo, &webscan.DetectAttemptInfo{Request: &request, Errors: []string{err.Error()}})
+			attempt.AttemptInfo = append(attempt.AttemptInfo, &webscan.AppFingerprintAttemptInfo{Request: &request, Errors: []string{err.Error()}})
 			continue
 		}
 
 		bodyStr := string(body)
 		err = resp.Body.Close()
 		if err != nil {
-			attempt.AttemptInfo = append(attempt.AttemptInfo, &webscan.DetectAttemptInfo{Request: &request, Errors: []string{err.Error()}})
+			attempt.AttemptInfo = append(attempt.AttemptInfo, &webscan.AppFingerprintAttemptInfo{Request: &request, Errors: []string{err.Error()}})
 			continue
 		}
 
@@ -82,13 +82,13 @@ func (fastapiLib *FastAPILibrary) ModuleRun(target string, config *webscan.Detec
 		}
 
 		statusCode := resp.StatusCode
-		responseInfo := &webscan.DetectResponseInfo{
+		responseInfo := &webscan.AppFingerprintResponseInfo{
 			StatusCode:      &statusCode,
 			ResponseHeaders: headers,
 			ResponseBody:    &bodyStr,
 		}
 
-		attempt.AttemptInfo = append(attempt.AttemptInfo, &webscan.DetectAttemptInfo{Request: &request, Response: responseInfo})
+		attempt.AttemptInfo = append(attempt.AttemptInfo, &webscan.AppFingerprintAttemptInfo{Request: &request, Response: responseInfo})
 
 		if fastapiLib.AnalyzeResponse(responseInfo) {
 			attempt.Finding = true
@@ -98,7 +98,7 @@ func (fastapiLib *FastAPILibrary) ModuleRun(target string, config *webscan.Detec
 	return &attempt, errors
 }
 
-func (fastapiLib *FastAPILibrary) AnalyzeResponse(response *webscan.DetectResponseInfo) bool {
+func (fastapiLib *FastAPILibrary) AnalyzeResponse(response *webscan.AppFingerprintResponseInfo) bool {
 	// Ensure the response and its body are valid
 	if response == nil || response.ResponseBody == nil || response.ResponseHeaders == nil {
 		return false

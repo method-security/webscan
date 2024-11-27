@@ -1,7 +1,7 @@
 imports:
   common: ./common.yml
 types:
-  # DetectEnums
+  # AppFingerprintEnums
   ApiApplicationModule:
     enum:
       - FASTAPI
@@ -13,54 +13,54 @@ types:
     enum:
       - AWSS3
       - AZUREBLOB
-  DetectResourceModule:
+  AppFingerprintResourceModule:
     union:
       ApiApplicationModule: ApiApplicationModule
       CloudBucketModule: CloudBucketModule
-  DetectResourceType:
+  AppFingerprintResourceType:
     enum:
       - APIAPPLICATION
       - CLOUDBUCKET
-# Detect Config Struct
-  DetectConfig:
+# AppFingerprint Config Struct
+  AppFingerprintConfig:
     properties:
       targets: list<string>
-      modules: list<DetectResourceModule>
-      resourceType: DetectResourceType
+      modules: list<AppFingerprintResourceModule>
+      resourceType: AppFingerprintResourceType
       timeout: integer
       successfulOnly: boolean
 # Request/Response Structs
-  DetectResponseInfo:
+  AppFingerprintResponseInfo:
     properties:
       statusCode: optional<integer>
       responseHeaders: optional<map<string, string>>
       responseBody: optional<string>
       errors: optional<list<string>>
-  DetectRequestInfo:
+  AppFingerprintRequestInfo:
     properties:
       baseUrl: string
       path: string
       method: common.HttpMethod
       bodyParams: optional<string>
-# Detect Report Struct
-  DetectAttemptInfo:
+# AppFingerprint Report Struct
+  AppFingerprintAttemptInfo:
     properties:
-      request: DetectRequestInfo
-      response: optional<DetectResponseInfo>
+      request: AppFingerprintRequestInfo
+      response: optional<AppFingerprintResponseInfo>
       errors: optional<list<string>>
-  DetectAttempt:
+  AppFingerprintAttempt:
     properties:
-      name: DetectResourceModule
+      name: AppFingerprintResourceModule
       timestamp: datetime
-      AttemptInfo: optional<list<DetectAttemptInfo>>
+      AttemptInfo: optional<list<AppFingerprintAttemptInfo>>
       finding : boolean
-  DetectResourceInfo:
+  AppFingerprintResourceInfo:
     properties:
       target: string
-      attempts: list<DetectAttempt>
-  DetectReport:
+      attempts: list<AppFingerprintAttempt>
+  AppFingerprintReport:
     properties:
-      resourseType: DetectResourceType
-      resourses: optional<list<DetectResourceInfo>>
-      config: DetectConfig
+      resourseType: AppFingerprintResourceType
+      resourses: optional<list<AppFingerprintResourceInfo>>
+      config: AppFingerprintConfig
       errors: optional<list<string>>

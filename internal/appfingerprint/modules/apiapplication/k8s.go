@@ -13,9 +13,9 @@ import (
 
 type K8sLibrary struct{}
 
-func (k8sLib *K8sLibrary) ModuleRun(target string, config *webscan.DetectConfig) (*webscan.DetectAttempt, []string) {
-	attempt := webscan.DetectAttempt{
-		Name:      webscan.NewDetectResourceModuleFromApiApplicationModule(webscan.ApiApplicationModuleK8S),
+func (k8sLib *K8sLibrary) ModuleRun(target string, config *webscan.AppFingerprintConfig) (*webscan.AppFingerprintAttempt, []string) {
+	attempt := webscan.AppFingerprintAttempt{
+		Name:      webscan.NewAppFingerprintResourceModuleFromApiApplicationModule(webscan.ApiApplicationModuleK8S),
 		Timestamp: time.Now(),
 	}
 	// Parse target URL to separate base URL and path
@@ -27,12 +27,12 @@ func (k8sLib *K8sLibrary) ModuleRun(target string, config *webscan.DetectConfig)
 		targetpath = parsedURL.Path
 	}
 
-	request := webscan.DetectRequestInfo{
+	request := webscan.AppFingerprintRequestInfo{
 		BaseUrl: baseURL,
 		Path:    targetpath,
 		Method:  webscan.HttpMethodGet,
 	}
-	attempt.AttemptInfo = append(attempt.AttemptInfo, &webscan.DetectAttemptInfo{Request: &request})
+	attempt.AttemptInfo = append(attempt.AttemptInfo, &webscan.AppFingerprintAttemptInfo{Request: &request})
 	errors := []string{}
 
 	client := &http.Client{
@@ -83,7 +83,7 @@ func (k8sLib *K8sLibrary) ModuleRun(target string, config *webscan.DetectConfig)
 	}
 
 	statusCode := resp.StatusCode
-	responseInfo := &webscan.DetectResponseInfo{
+	responseInfo := &webscan.AppFingerprintResponseInfo{
 		StatusCode:      &statusCode,
 		ResponseHeaders: headers,
 		ResponseBody:    &bodyStr,
@@ -95,7 +95,7 @@ func (k8sLib *K8sLibrary) ModuleRun(target string, config *webscan.DetectConfig)
 	return &attempt, errors
 }
 
-func (k8sLib *K8sLibrary) AnalyzeResponse(response *webscan.DetectResponseInfo) bool {
+func (k8sLib *K8sLibrary) AnalyzeResponse(response *webscan.AppFingerprintResponseInfo) bool {
 	if response == nil || response.ResponseHeaders == nil {
 		return false
 	}

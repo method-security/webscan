@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	webscan "github.com/Method-Security/webscan/generated/go"
-	"github.com/Method-Security/webscan/internal/detect"
+	"github.com/Method-Security/webscan/internal/appfingerprint"
 	"github.com/Method-Security/webscan/internal/graphql"
 	"github.com/Method-Security/webscan/internal/grpc"
 	"github.com/Method-Security/webscan/internal/k8s"
@@ -18,22 +18,22 @@ func (a *WebScan) InitAppCommand() {
 	a.AppCmd = &cobra.Command{
 		Use:   "app",
 		Short: "Perform various application scans",
-		Long:  `Perform various application scans such as detect and enumeration`,
+		Long:  `Perform various application scans such as fingerprinting and enumeration`,
 	}
 
 	a.RootCmd.AddCommand(a.AppCmd)
-	a.initDetectCommand()
+	a.initFingerprintCommand()
 	a.initEnumerateCommand()
 }
 
-func (a *WebScan) initDetectCommand() {
-	detectCmd := &cobra.Command{
-		Use:   "detect",
-		Short: "Perform a detection scan against a target",
-		Long: `Perform a detection scan against a target using specified types.
+func (a *WebScan) initFingerprintCommand() {
+	fingerprintCmd := &cobra.Command{
+		Use:   "fingerprint",
+		Short: "Perform a fingerprinting scan against a target",
+		Long: `Perform a fingerprinting scan against a target using specified types.
 		
-The detection command identifies the type of web application running on the target URL.
-It supports detecting different resource types including API applications (FastAPI, Swagger, gRPC, GraphQL, K8s), and 
+The fingerprint command identifies the type of web application running on the target URL.
+It supports fingerprinting different resource types including API applications (FastAPI, Swagger, gRPC, GraphQL, K8s), and 
 cloud buckets (AWSS3, AzureBlob). The command accepts a list of modules to run
 for the specified resource type.`,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -47,7 +47,7 @@ for the specified resource type.`,
 				a.OutputSignal.AddError(err)
 				return
 			}
-			resourceTypeEnum, err := validateDetectResourceType(resourceType)
+			resourceTypeEnum, err := validateFingerprintResourceType(resourceType)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -57,7 +57,7 @@ for the specified resource type.`,
 				a.OutputSignal.AddError(err)
 				return
 			}
-			moduleEnums, err := validateDetectResourseModuleSelection(*resourceTypeEnum, modules)
+			moduleEnums, err := validateFingerprintResourseModuleSelection(*resourceTypeEnum, modules)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -72,13 +72,13 @@ for the specified resource type.`,
 				a.OutputSignal.AddError(err)
 				return
 			}
-			config, err := newDetectConfig(targets, *resourceTypeEnum, moduleEnums, timeout, successfulOnly)
+			config, err := newFingerprintConfig(targets, *resourceTypeEnum, moduleEnums, timeout, successfulOnly)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
 
-			engine := detect.NewEngine(config)
+			engine := appfingerprint.NewEngine(config)
 			report, err := engine.Launch(cmd.Context())
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -89,8 +89,8 @@ for the specified resource type.`,
 
 	// Flag Description Strings
 	resourceTypes := strings.Join([]string{
-		string(webscan.DetectResourceTypeApiapplication),
-		string(webscan.DetectResourceTypeCloudbucket),
+		string(webscan.AppFingerprintResourceTypeApiapplication),
+		string(webscan.AppFingerprintResourceTypeCloudbucket),
 	}, ", ")
 	apiApplicationModules := strings.Join([]string{
 		string(webscan.ApiApplicationModuleFastapi),
@@ -104,16 +104,16 @@ for the specified resource type.`,
 		string(webscan.CloudBucketModuleAzureblob),
 	}, ", ")
 
-	detectCmd.Flags().StringSlice("targets", []string{}, "URL target to perform detect against")
-	detectCmd.Flags().String("resourcetype", "", fmt.Sprintf("Resource type to detect (%s)", resourceTypes))
-	detectCmd.Flags().StringSlice("modules", []string{}, fmt.Sprintf("Modules to run (APIApplication: %s; CloudBucket: %s)", apiApplicationModules, cloudBucketModules))
-	detectCmd.Flags().Int("timeout", 5, "Timeout per request (seconds)")
-	detectCmd.Flags().Bool("successfulonly", false, "Only show successful attempts")
+	fingerprintCmd.Flags().StringSlice("targets", []string{}, "URL target to perform fingerprint against")
+	fingerprintCmd.Flags().String("resourcetype", "", fmt.Sprintf("Resource type to fingerprint (%s)", resourceTypes))
+	fingerprintCmd.Flags().StringSlice("modules", []string{}, fmt.Sprintf("Modules to run (APIApplication: %s; CloudBucket: %s)", apiApplicationModules, cloudBucketModules))
+	fingerprintCmd.Flags().Int("timeout", 5, "Timeout per request (seconds)")
+	fingerprintCmd.Flags().Bool("successfulonly", false, "Only show successful attempts")
 
-	_ = detectCmd.MarkFlagRequired("targets")
-	_ = detectCmd.MarkFlagRequired("resoursetype")
+	_ = fingerprintCmd.MarkFlagRequired("targets")
+	_ = fingerprintCmd.MarkFlagRequired("resoursetype")
 
-	a.AppCmd.AddCommand(detectCmd)
+	a.AppCmd.AddCommand(fingerprintCmd)
 }
 
 func (a *WebScan) initEnumerateCommand() {
@@ -257,35 +257,35 @@ HTTP methods, query parameters, and authentication mechanisms.`,
 	return swaggerCmd
 }
 
-func validateDetectResourceType(resourceType string) (*webscan.DetectResourceType, error) {
-	resourceTypeEnum, err := webscan.NewDetectResourceTypeFromString(strings.ToUpper(resourceType))
+func validateFingerprintResourceType(resourceType string) (*webscan.AppFingerprintResourceType, error) {
+	resourceTypeEnum, err := webscan.NewAppFingerprintResourceTypeFromString(strings.ToUpper(resourceType))
 	if err != nil {
 		return nil, err
 	}
 	return &resourceTypeEnum, nil
 }
 
-func validateDetectResourseModuleSelection(resourceType webscan.DetectResourceType, modules []string) ([]*webscan.DetectResourceModule, error) {
-	moduleEnums := []*webscan.DetectResourceModule{}
+func validateFingerprintResourseModuleSelection(resourceType webscan.AppFingerprintResourceType, modules []string) ([]*webscan.AppFingerprintResourceModule, error) {
+	moduleEnums := []*webscan.AppFingerprintResourceModule{}
 	if len(modules) == 0 {
 		return nil, nil
 	}
-	if resourceType == webscan.DetectResourceTypeApiapplication {
+	if resourceType == webscan.AppFingerprintResourceTypeApiapplication {
 		for _, module := range modules {
 			moduleName, err := webscan.NewApiApplicationModuleFromString(strings.ToUpper(module))
 			if err != nil {
 				return nil, err
 			}
-			moduleEnum := webscan.NewDetectResourceModuleFromApiApplicationModule(moduleName)
+			moduleEnum := webscan.NewAppFingerprintResourceModuleFromApiApplicationModule(moduleName)
 			moduleEnums = append(moduleEnums, moduleEnum)
 		}
-	} else if resourceType == webscan.DetectResourceTypeCloudbucket {
+	} else if resourceType == webscan.AppFingerprintResourceTypeCloudbucket {
 		for _, module := range modules {
 			moduleName, err := webscan.NewCloudBucketModuleFromString(strings.ToUpper(module))
 			if err != nil {
 				return nil, err
 			}
-			moduleEnum := webscan.NewDetectResourceModuleFromCloudBucketModule(moduleName)
+			moduleEnum := webscan.NewAppFingerprintResourceModuleFromCloudBucketModule(moduleName)
 			moduleEnums = append(moduleEnums, moduleEnum)
 		}
 	}
@@ -293,8 +293,8 @@ func validateDetectResourseModuleSelection(resourceType webscan.DetectResourceTy
 	return moduleEnums, nil
 }
 
-func newDetectConfig(targets []string, resourceEnum webscan.DetectResourceType, moduleEnums []*webscan.DetectResourceModule, timeout int, successfulOnly bool) (*webscan.DetectConfig, error) {
-	config := &webscan.DetectConfig{
+func newFingerprintConfig(targets []string, resourceEnum webscan.AppFingerprintResourceType, moduleEnums []*webscan.AppFingerprintResourceModule, timeout int, successfulOnly bool) (*webscan.AppFingerprintConfig, error) {
+	config := &webscan.AppFingerprintConfig{
 		Targets:        targets,
 		ResourceType:   resourceEnum,
 		Modules:        moduleEnums,

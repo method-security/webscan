@@ -14,9 +14,9 @@ import (
 
 type SwaggerLibrary struct{}
 
-func (swaggerLib *SwaggerLibrary) ModuleRun(target string, config *webscan.DetectConfig) (*webscan.DetectAttempt, []string) {
-	attempt := webscan.DetectAttempt{
-		Name:      webscan.NewDetectResourceModuleFromApiApplicationModule(webscan.ApiApplicationModuleSwagger),
+func (swaggerLib *SwaggerLibrary) ModuleRun(target string, config *webscan.AppFingerprintConfig) (*webscan.AppFingerprintAttempt, []string) {
+	attempt := webscan.AppFingerprintAttempt{
+		Name:      webscan.NewAppFingerprintResourceModuleFromApiApplicationModule(webscan.ApiApplicationModuleSwagger),
 		Timestamp: time.Now(),
 	}
 	errors := []string{}
@@ -52,7 +52,7 @@ func (swaggerLib *SwaggerLibrary) ModuleRun(target string, config *webscan.Detec
 	}
 
 	for _, path := range swaggerPaths {
-		request := webscan.DetectRequestInfo{
+		request := webscan.AppFingerprintRequestInfo{
 			BaseUrl: baseURL,
 			Path:    strings.TrimSuffix(targetPath, "/") + path,
 			Method:  webscan.HttpMethodGet,
@@ -69,20 +69,20 @@ func (swaggerLib *SwaggerLibrary) ModuleRun(target string, config *webscan.Detec
 
 		resp, err := client.Do(req)
 		if err != nil {
-			attempt.AttemptInfo = append(attempt.AttemptInfo, &webscan.DetectAttemptInfo{Request: &request, Errors: []string{err.Error()}})
+			attempt.AttemptInfo = append(attempt.AttemptInfo, &webscan.AppFingerprintAttemptInfo{Request: &request, Errors: []string{err.Error()}})
 			continue
 		}
 
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			attempt.AttemptInfo = append(attempt.AttemptInfo, &webscan.DetectAttemptInfo{Request: &request, Errors: []string{err.Error()}})
+			attempt.AttemptInfo = append(attempt.AttemptInfo, &webscan.AppFingerprintAttemptInfo{Request: &request, Errors: []string{err.Error()}})
 			continue
 		}
 
 		bodyStr := string(body)
 		err = resp.Body.Close()
 		if err != nil {
-			attempt.AttemptInfo = append(attempt.AttemptInfo, &webscan.DetectAttemptInfo{Request: &request, Errors: []string{err.Error()}})
+			attempt.AttemptInfo = append(attempt.AttemptInfo, &webscan.AppFingerprintAttemptInfo{Request: &request, Errors: []string{err.Error()}})
 			continue
 		}
 
@@ -92,13 +92,13 @@ func (swaggerLib *SwaggerLibrary) ModuleRun(target string, config *webscan.Detec
 		}
 
 		statusCode := resp.StatusCode
-		responseInfo := &webscan.DetectResponseInfo{
+		responseInfo := &webscan.AppFingerprintResponseInfo{
 			StatusCode:      &statusCode,
 			ResponseHeaders: headers,
 			ResponseBody:    &bodyStr,
 		}
 
-		attempt.AttemptInfo = append(attempt.AttemptInfo, &webscan.DetectAttemptInfo{Request: &request, Response: responseInfo})
+		attempt.AttemptInfo = append(attempt.AttemptInfo, &webscan.AppFingerprintAttemptInfo{Request: &request, Response: responseInfo})
 
 		if swaggerLib.AnalyzeResponse(responseInfo) {
 			attempt.Finding = true
@@ -108,7 +108,7 @@ func (swaggerLib *SwaggerLibrary) ModuleRun(target string, config *webscan.Detec
 	return &attempt, errors
 }
 
-func (swaggerLib *SwaggerLibrary) AnalyzeResponse(response *webscan.DetectResponseInfo) bool {
+func (swaggerLib *SwaggerLibrary) AnalyzeResponse(response *webscan.AppFingerprintResponseInfo) bool {
 	// Validate response
 	if response == nil || response.StatusCode == nil || response.ResponseBody == nil || response.ResponseHeaders == nil {
 		return false

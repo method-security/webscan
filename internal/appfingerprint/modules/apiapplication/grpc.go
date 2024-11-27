@@ -13,9 +13,9 @@ import (
 
 type GrpcLibrary struct{}
 
-func (grpcLib *GrpcLibrary) ModuleRun(target string, config *webscan.DetectConfig) (*webscan.DetectAttempt, []string) {
-	attempt := webscan.DetectAttempt{
-		Name:      webscan.NewDetectResourceModuleFromApiApplicationModule(webscan.ApiApplicationModuleGrpc),
+func (grpcLib *GrpcLibrary) ModuleRun(target string, config *webscan.AppFingerprintConfig) (*webscan.AppFingerprintAttempt, []string) {
+	attempt := webscan.AppFingerprintAttempt{
+		Name:      webscan.NewAppFingerprintResourceModuleFromApiApplicationModule(webscan.ApiApplicationModuleGrpc),
 		Timestamp: time.Now(),
 	}
 	errors := []string{}
@@ -51,7 +51,7 @@ func (grpcLib *GrpcLibrary) ModuleRun(target string, config *webscan.DetectConfi
 
 	for _, path := range grpcPaths {
 		bodyParams := "{}"
-		request := webscan.DetectRequestInfo{
+		request := webscan.AppFingerprintRequestInfo{
 			BaseUrl:    baseURL,
 			Path:       strings.TrimSuffix(targetPath, "/") + path,
 			Method:     webscan.HttpMethodPost,
@@ -66,20 +66,20 @@ func (grpcLib *GrpcLibrary) ModuleRun(target string, config *webscan.DetectConfi
 
 		resp, err := client.Do(req)
 		if err != nil {
-			attempt.AttemptInfo = append(attempt.AttemptInfo, &webscan.DetectAttemptInfo{Request: &request, Errors: []string{err.Error()}})
+			attempt.AttemptInfo = append(attempt.AttemptInfo, &webscan.AppFingerprintAttemptInfo{Request: &request, Errors: []string{err.Error()}})
 			continue
 		}
 
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			attempt.AttemptInfo = append(attempt.AttemptInfo, &webscan.DetectAttemptInfo{Request: &request, Errors: []string{err.Error()}})
+			attempt.AttemptInfo = append(attempt.AttemptInfo, &webscan.AppFingerprintAttemptInfo{Request: &request, Errors: []string{err.Error()}})
 			continue
 		}
 
 		bodyStr := string(body)
 		err = resp.Body.Close()
 		if err != nil {
-			attempt.AttemptInfo = append(attempt.AttemptInfo, &webscan.DetectAttemptInfo{Request: &request, Errors: []string{err.Error()}})
+			attempt.AttemptInfo = append(attempt.AttemptInfo, &webscan.AppFingerprintAttemptInfo{Request: &request, Errors: []string{err.Error()}})
 			continue
 		}
 
@@ -89,13 +89,13 @@ func (grpcLib *GrpcLibrary) ModuleRun(target string, config *webscan.DetectConfi
 		}
 
 		statusCode := resp.StatusCode
-		responseInfo := &webscan.DetectResponseInfo{
+		responseInfo := &webscan.AppFingerprintResponseInfo{
 			StatusCode:      &statusCode,
 			ResponseHeaders: headers,
 			ResponseBody:    &bodyStr,
 		}
 
-		attempt.AttemptInfo = append(attempt.AttemptInfo, &webscan.DetectAttemptInfo{Request: &request, Response: responseInfo})
+		attempt.AttemptInfo = append(attempt.AttemptInfo, &webscan.AppFingerprintAttemptInfo{Request: &request, Response: responseInfo})
 
 		if grpcLib.AnalyzeResponse(responseInfo) {
 			attempt.Finding = true
@@ -105,7 +105,7 @@ func (grpcLib *GrpcLibrary) ModuleRun(target string, config *webscan.DetectConfi
 	return &attempt, errors
 }
 
-func (grpcLib *GrpcLibrary) AnalyzeResponse(response *webscan.DetectResponseInfo) bool {
+func (grpcLib *GrpcLibrary) AnalyzeResponse(response *webscan.AppFingerprintResponseInfo) bool {
 	if response == nil || response.ResponseHeaders == nil {
 		return false
 	}

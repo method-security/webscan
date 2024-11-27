@@ -11,13 +11,14 @@ import (
 	webscan "github.com/Method-Security/webscan/generated/go"
 )
 
-type AwsS3Library struct{}
+type AzureBlobLibrary struct{}
 
-func (awsLib *AwsS3Library) ModuleRun(target string, config *webscan.DetectConfig) (*webscan.DetectAttempt, []string) {
-	attempt := webscan.DetectAttempt{
-		Name:      webscan.NewDetectResourceModuleFromCloudBucketModule(webscan.CloudBucketModuleAwss3),
+func (azureLib *AzureBlobLibrary) ModuleRun(target string, config *webscan.AppFingerprintConfig) (*webscan.AppFingerprintAttempt, []string) {
+	attempt := webscan.AppFingerprintAttempt{
+		Name:      webscan.NewAppFingerprintResourceModuleFromCloudBucketModule(webscan.CloudBucketModuleAzureblob),
 		Timestamp: time.Now(),
 	}
+	errors := []string{}
 
 	// Parse target URL to separate base URL and path
 	parsedURL, err := url.Parse(target)
@@ -28,13 +29,12 @@ func (awsLib *AwsS3Library) ModuleRun(target string, config *webscan.DetectConfi
 		targetpath = parsedURL.Path
 	}
 
-	request := webscan.DetectRequestInfo{
+	request := webscan.AppFingerprintRequestInfo{
 		BaseUrl: baseURL,
 		Path:    targetpath,
 		Method:  webscan.HttpMethodGet,
 	}
-	attempt.AttemptInfo = append(attempt.AttemptInfo, &webscan.DetectAttemptInfo{Request: &request})
-	errors := []string{}
+	attempt.AttemptInfo = append(attempt.AttemptInfo, &webscan.AppFingerprintAttemptInfo{Request: &request})
 
 	client := &http.Client{
 		Timeout: time.Duration(config.Timeout) * time.Second,
@@ -83,57 +83,36 @@ func (awsLib *AwsS3Library) ModuleRun(target string, config *webscan.DetectConfi
 	}
 
 	statusCode := resp.StatusCode
-	responseInfo := &webscan.DetectResponseInfo{
+	responseInfo := &webscan.AppFingerprintResponseInfo{
 		StatusCode:      &statusCode,
 		ResponseHeaders: headers,
 		ResponseBody:    &bodyStr,
 	}
 
 	attempt.AttemptInfo[0].Response = responseInfo
-	attempt.Finding = awsLib.AnalyzeResponse(responseInfo)
+	attempt.Finding = azureLib.AnalyzeResponse(responseInfo)
 
 	return &attempt, errors
 }
 
-func (awsLib *AwsS3Library) AnalyzeResponse(response *webscan.DetectResponseInfo) bool {
+func (azureLib *AzureBlobLibrary) AnalyzeResponse(response *webscan.AppFingerprintResponseInfo) bool {
 	if response == nil {
 		return false
 	}
 
-	// Check status code (200 or 403 as per yaml template)
-	if response.StatusCode != nil {
-		if *response.StatusCode != 200 && *response.StatusCode != 403 {
-			return false
-		}
-	}
-
-	// Check for AWS S3 specific headers and server
+	// Check for Azure Blob specific headers and server
 	if response.ResponseHeaders != nil {
-		// Check for Amazon S3 server header
+		// Check for Microsoft Azure Storage server header
 		server, exists := response.ResponseHeaders["Server"]
-		if !exists || !strings.Contains(strings.ToLower(server), "amazons3") {
-			return false
+		if exists && strings.Contains(strings.ToLower(server), "microsoft") &&
+			strings.Contains(strings.ToLower(server), "blob") {
+			return true
 		}
 
-		// Check for required AWS headers
-		requiredHeaders := []string{
-			"x-amz-bucket-region",
+		// Check for x-ms-blob-type header
+		if _, exists := response.ResponseHeaders["X-Ms-Blob-Type"]; exists {
+			return true
 		}
-
-		for _, header := range requiredHeaders {
-			found := false
-			for key := range response.ResponseHeaders {
-				if strings.EqualFold(key, header) {
-					found = true
-					break
-				}
-			}
-			if !found {
-				return false
-			}
-		}
-
-		return true
 	}
 
 	return false

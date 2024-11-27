@@ -21,7 +21,6 @@ func main() {
 	webscan.InitRequestsCommand()
 	webscan.InitRoutecaptureCommand()
 	webscan.InitSpiderCommand()
-	webscan.InitVulnCommand()
 	webscan.InitWebServerCommand()
 
 	if err := webscan.RootCmd.Execute(); err != nil {

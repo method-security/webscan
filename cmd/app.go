@@ -1,13 +1,10 @@
 package cmd
 
 import (
-	"errors"
-
 	"github.com/Method-Security/webscan/internal/graphql"
 	"github.com/Method-Security/webscan/internal/grpc"
 	"github.com/Method-Security/webscan/internal/k8s"
 	"github.com/Method-Security/webscan/internal/swagger"
-	"github.com/Method-Security/webscan/internal/vuln"
 	"github.com/spf13/cobra"
 )
 
@@ -20,71 +17,7 @@ func (a *WebScan) InitAppCommand() {
 	}
 
 	a.RootCmd.AddCommand(a.AppCmd)
-	a.initFingerprintCommand()
 	a.initEnumerateCommand()
-}
-
-func (a *WebScan) initFingerprintCommand() {
-	fingerprintCmd := &cobra.Command{
-		Use:   "fingerprint",
-		Short: "Perform a fingerprint scan against a target",
-		Long: `Perform a fingerprint scan against a target using specified types.
-		
-The fingerprint command identifies the type of web application running on the target URL. 
-It uses custom templates to match URLs hosting different types of web applications or cloud services
-such as Swagger, gRPC, GraphQL, and cloud buckets.`,
-		Run: func(cmd *cobra.Command, args []string) {
-			target, err := cmd.Flags().GetString("target")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			if target == "" {
-				err = errors.New("target flag is required")
-				a.OutputSignal.AddError(err)
-				return
-			}
-
-			tags, err := cmd.Flags().GetStringSlice("tags")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			if len(tags) == 0 {
-				tags = []string{"swagger", "graphql", "grpc", "bucket"}
-			}
-			rawSeverity, err := cmd.Flags().GetStringSlice("severity")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			severity := parseSeverityIntoString(rawSeverity)
-			defaultTemplateDirectory, err := cmd.Flags().GetString("defaultTemplateDirectory")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-
-			customTemplateDirectory, err := cmd.Flags().GetString("customTemplateDirectory")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			report, err := vuln.PerformVulnScan(cmd.Context(), target, tags, severity, defaultTemplateDirectory, customTemplateDirectory)
-			if err != nil {
-				a.OutputSignal.AddError(err)
-			}
-			a.OutputSignal.Content = report
-		},
-	}
-
-	fingerprintCmd.Flags().String("target", "", "URL target to perform fingerprinting against")
-	fingerprintCmd.Flags().StringSlice("tags", []string{}, "Tags to filter templates by")
-	fingerprintCmd.Flags().StringSlice("severity", []string{}, "Severity to filter templates by")
-	fingerprintCmd.Flags().String("defaultTemplateDirectory", "", "Directory to load default templates from")
-	fingerprintCmd.Flags().String("customTemplateDirectory", "", "Directory to load custom templates from")
-
-	a.AppCmd.AddCommand(fingerprintCmd)
 }
 
 func (a *WebScan) initEnumerateCommand() {

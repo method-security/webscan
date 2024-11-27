@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"strings"
 
 	webscan "github.com/Method-Security/webscan/generated/go"
@@ -86,9 +87,26 @@ for the specified resource type.`,
 		},
 	}
 
+	// Flag Description Strings
+	resourceTypes := strings.Join([]string{
+		string(webscan.DetectResourceTypeApiapplication),
+		string(webscan.DetectResourceTypeCloudbucket),
+	}, ", ")
+	apiApplicationModules := strings.Join([]string{
+		string(webscan.ApiApplicationModuleFastapi),
+		string(webscan.ApiApplicationModuleGraphql),
+		string(webscan.ApiApplicationModuleGrpc),
+		string(webscan.ApiApplicationModuleSwagger),
+		string(webscan.ApiApplicationModuleK8S),
+	}, ", ")
+	cloudBucketModules := strings.Join([]string{
+		string(webscan.CloudBucketModuleAwss3),
+		string(webscan.CloudBucketModuleAzureblob),
+	}, ", ")
+
 	detectCmd.Flags().StringSlice("targets", []string{}, "URL target to perform detect against")
-	detectCmd.Flags().String("resourcetype", "", "Resource type to detect")
-	detectCmd.Flags().StringSlice("modules", []string{}, "Modules to run")
+	detectCmd.Flags().String("resourcetype", "", fmt.Sprintf("Resource type to detect (%s)", resourceTypes))
+	detectCmd.Flags().StringSlice("modules", []string{}, fmt.Sprintf("Modules to run (APIApplication: %s; CloudBucket: %s)", apiApplicationModules, cloudBucketModules))
 	detectCmd.Flags().Int("timeout", 5, "Timeout per request (seconds)")
 	detectCmd.Flags().Bool("successfulonly", false, "Only show successful attempts")
 

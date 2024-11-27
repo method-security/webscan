@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -13,21 +14,28 @@ import (
 type FastAPILibrary struct{}
 
 func (fastapiLib *FastAPILibrary) ModuleRun(target string, config *webscan.DetectConfig) (*webscan.DetectAttempt, []string) {
-	// Initialize structs
 	attempt := webscan.DetectAttempt{
 		Name:      webscan.NewDetectResourceModuleFromApiApplicationModule(webscan.ApiApplicationModuleFastapi),
 		Timestamp: time.Now(),
 	}
 	errors := []string{}
 
-	// FastAPI paths to check
+	// Parse target URL to separate base URL and path
+	parsedURL, err := url.Parse(target)
+	baseURL := strings.TrimSuffix(target, "/")
+	targetPath := "/"
+	if err == nil && parsedURL.Path != "" {
+		baseURL = parsedURL.Scheme + "://" + parsedURL.Host
+		targetPath = parsedURL.Path
+	}
+
+	// Common FastAPI paths to check
 	fastapiPaths := []string{
 		"/docs",
 		"/redoc",
 		"/openapi.json",
 	}
 
-	// Create HTTP client with TLS skip verify
 	client := &http.Client{
 		Timeout: time.Duration(config.Timeout) * time.Second,
 		Transport: &http.Transport{
@@ -37,12 +45,12 @@ func (fastapiLib *FastAPILibrary) ModuleRun(target string, config *webscan.Detec
 
 	for _, path := range fastapiPaths {
 		request := webscan.DetectRequestInfo{
-			BaseUrl: target,
-			Path:    path,
+			BaseUrl: baseURL,
+			Path:    strings.TrimSuffix(targetPath, "/") + path,
 			Method:  webscan.HttpMethodGet,
 		}
 
-		fullURL := strings.TrimSuffix(target, "/") + path
+		fullURL := baseURL + strings.TrimSuffix(targetPath, "/") + path
 		req, err := http.NewRequest("GET", fullURL, nil)
 		if err != nil {
 			errors = append(errors, err.Error())
@@ -55,14 +63,12 @@ func (fastapiLib *FastAPILibrary) ModuleRun(target string, config *webscan.Detec
 			continue
 		}
 
-		// Read response body
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			attempt.AttemptInfo = append(attempt.AttemptInfo, &webscan.DetectAttemptInfo{Request: &request, Errors: []string{err.Error()}})
 			continue
 		}
 
-		// Convert body to string
 		bodyStr := string(body)
 		err = resp.Body.Close()
 		if err != nil {
@@ -70,7 +76,6 @@ func (fastapiLib *FastAPILibrary) ModuleRun(target string, config *webscan.Detec
 			continue
 		}
 
-		// Create response info
 		headers := make(map[string]string)
 		for key, values := range resp.Header {
 			headers[key] = values[0]
@@ -85,7 +90,6 @@ func (fastapiLib *FastAPILibrary) ModuleRun(target string, config *webscan.Detec
 
 		attempt.AttemptInfo = append(attempt.AttemptInfo, &webscan.DetectAttemptInfo{Request: &request, Response: responseInfo})
 
-		// If we detect FastAPI, mark as found and continue checking other endpoints
 		if fastapiLib.AnalyzeResponse(responseInfo) {
 			attempt.Finding = true
 		}

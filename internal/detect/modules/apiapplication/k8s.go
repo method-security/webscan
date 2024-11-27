@@ -2,31 +2,39 @@ package apiapplication
 
 import (
 	"crypto/tls"
+	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"time"
 
-	helper "github.com/Method-Security/webscan/configs"
 	webscan "github.com/Method-Security/webscan/generated/go"
 )
 
 type K8sLibrary struct{}
 
 func (k8sLib *K8sLibrary) ModuleRun(target string, config *webscan.DetectConfig) (*webscan.DetectAttempt, []string) {
-	// Initialize structs
 	attempt := webscan.DetectAttempt{
 		Name:      webscan.NewDetectResourceModuleFromApiApplicationModule(webscan.ApiApplicationModuleK8S),
 		Timestamp: time.Now(),
 	}
+	// Parse target URL to separate base URL and path
+	parsedURL, err := url.Parse(target)
+	baseURL := target
+	targetpath := "/"
+	if err == nil && parsedURL.Path != "" {
+		baseURL = parsedURL.Scheme + "://" + parsedURL.Host
+		targetpath = parsedURL.Path
+	}
+
 	request := webscan.DetectRequestInfo{
-		BaseUrl: target,
-		Path:    helper.ExtractURLPath(target),
+		BaseUrl: baseURL,
+		Path:    targetpath,
 		Method:  webscan.HttpMethodGet,
 	}
 	attempt.AttemptInfo = append(attempt.AttemptInfo, &webscan.DetectAttemptInfo{Request: &request})
 	errors := []string{}
 
-	// Create HTTP client with TLS skip verify
 	client := &http.Client{
 		Timeout: time.Duration(config.Timeout) * time.Second,
 		Transport: &http.Transport{
@@ -34,14 +42,15 @@ func (k8sLib *K8sLibrary) ModuleRun(target string, config *webscan.DetectConfig)
 		},
 	}
 
-	// Make request to target
-	req, err := http.NewRequest("GET", target, nil)
+	fullURL := baseURL + targetpath
+	req, err := http.NewRequest("GET", fullURL, nil)
 	if err != nil {
 		errors = append(errors, err.Error())
 		attempt.AttemptInfo[0].Errors = errors
 		attempt.Finding = false
 		return &attempt, errors
 	}
+	fmt.Println(fullURL)
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -51,7 +60,6 @@ func (k8sLib *K8sLibrary) ModuleRun(target string, config *webscan.DetectConfig)
 		return &attempt, errors
 	}
 
-	// Read response body
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		errors = append(errors, err.Error())
@@ -60,7 +68,6 @@ func (k8sLib *K8sLibrary) ModuleRun(target string, config *webscan.DetectConfig)
 		return &attempt, errors
 	}
 
-	// Convert body to string
 	bodyStr := string(body)
 	err = resp.Body.Close()
 	if err != nil {
@@ -70,7 +77,6 @@ func (k8sLib *K8sLibrary) ModuleRun(target string, config *webscan.DetectConfig)
 		return &attempt, errors
 	}
 
-	// Create response info
 	headers := make(map[string]string)
 	for key, values := range resp.Header {
 		headers[key] = values[0]
@@ -83,7 +89,6 @@ func (k8sLib *K8sLibrary) ModuleRun(target string, config *webscan.DetectConfig)
 		ResponseBody:    &bodyStr,
 	}
 
-	// Analyze response for K8s headers
 	attempt.AttemptInfo[0].Response = responseInfo
 	attempt.Finding = k8sLib.AnalyzeResponse(responseInfo)
 

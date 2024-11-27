@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -13,20 +14,27 @@ import (
 type GrpcLibrary struct{}
 
 func (grpcLib *GrpcLibrary) ModuleRun(target string, config *webscan.DetectConfig) (*webscan.DetectAttempt, []string) {
-	// Initialize structs
 	attempt := webscan.DetectAttempt{
 		Name:      webscan.NewDetectResourceModuleFromApiApplicationModule(webscan.ApiApplicationModuleGrpc),
 		Timestamp: time.Now(),
 	}
 	errors := []string{}
-	isGrpc := false
 
-	// Create HTTP client with TLS skip verify
 	client := &http.Client{
 		Timeout: time.Duration(config.Timeout) * time.Second,
 		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			TLSClientConfig:   &tls.Config{InsecureSkipVerify: true},
+			ForceAttemptHTTP2: true,
 		},
+	}
+
+	// Parse target URL to separate base URL and path
+	parsedURL, err := url.Parse(target)
+	baseURL := strings.TrimSuffix(target, "/")
+	targetPath := "/"
+	if err == nil && parsedURL.Path != "" {
+		baseURL = parsedURL.Scheme + "://" + parsedURL.Host
+		targetPath = parsedURL.Path
 	}
 
 	// Common gRPC health check paths
@@ -42,13 +50,15 @@ func (grpcLib *GrpcLibrary) ModuleRun(target string, config *webscan.DetectConfi
 	}
 
 	for _, path := range grpcPaths {
+		bodyParams := "{}"
 		request := webscan.DetectRequestInfo{
-			BaseUrl: target,
-			Path:    path,
-			Method:  webscan.HttpMethodPost,
+			BaseUrl:    baseURL,
+			Path:       strings.TrimSuffix(targetPath, "/") + path,
+			Method:     webscan.HttpMethodPost,
+			BodyParams: &bodyParams,
 		}
-		fullURL := strings.TrimSuffix(target, "/") + path
-		req, err := http.NewRequest("POST", fullURL, strings.NewReader("{}"))
+		fullURL := baseURL + strings.TrimSuffix(targetPath, "/") + path
+		req, err := http.NewRequest("POST", fullURL, strings.NewReader(bodyParams))
 		if err != nil {
 			errors = append(errors, err.Error())
 			continue
@@ -60,14 +70,12 @@ func (grpcLib *GrpcLibrary) ModuleRun(target string, config *webscan.DetectConfi
 			continue
 		}
 
-		// Read response body
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			attempt.AttemptInfo = append(attempt.AttemptInfo, &webscan.DetectAttemptInfo{Request: &request, Errors: []string{err.Error()}})
 			continue
 		}
 
-		// Convert body to string
 		bodyStr := string(body)
 		err = resp.Body.Close()
 		if err != nil {
@@ -75,7 +83,6 @@ func (grpcLib *GrpcLibrary) ModuleRun(target string, config *webscan.DetectConfi
 			continue
 		}
 
-		// Create response info
 		headers := make(map[string]string)
 		for key, values := range resp.Header {
 			headers[key] = values[0]
@@ -90,13 +97,11 @@ func (grpcLib *GrpcLibrary) ModuleRun(target string, config *webscan.DetectConfi
 
 		attempt.AttemptInfo = append(attempt.AttemptInfo, &webscan.DetectAttemptInfo{Request: &request, Response: responseInfo})
 
-		// If we detect gRPC, return immediately
 		if grpcLib.AnalyzeResponse(responseInfo) {
 			attempt.Finding = true
 		}
 	}
 
-	attempt.Finding = isGrpc
 	return &attempt, errors
 }
 

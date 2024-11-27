@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -13,20 +14,28 @@ import (
 type AwsS3Library struct{}
 
 func (awsLib *AwsS3Library) ModuleRun(target string, config *webscan.DetectConfig) (*webscan.DetectAttempt, []string) {
-	// Initialize structs
 	attempt := webscan.DetectAttempt{
 		Name:      webscan.NewDetectResourceModuleFromCloudBucketModule(webscan.CloudBucketModuleAwss3),
 		Timestamp: time.Now(),
 	}
+
+	// Parse target URL to separate base URL and path
+	parsedURL, err := url.Parse(target)
+	baseURL := target
+	targetpath := "/"
+	if err == nil && parsedURL.Path != "" {
+		baseURL = parsedURL.Scheme + "://" + parsedURL.Host
+		targetpath = parsedURL.Path
+	}
+
 	request := webscan.DetectRequestInfo{
-		BaseUrl: target,
-		Path:    "/",
+		BaseUrl: baseURL,
+		Path:    targetpath,
 		Method:  webscan.HttpMethodGet,
 	}
 	attempt.AttemptInfo = append(attempt.AttemptInfo, &webscan.DetectAttemptInfo{Request: &request})
 	errors := []string{}
 
-	// Create HTTP client with TLS skip verify
 	client := &http.Client{
 		Timeout: time.Duration(config.Timeout) * time.Second,
 		Transport: &http.Transport{
@@ -34,8 +43,8 @@ func (awsLib *AwsS3Library) ModuleRun(target string, config *webscan.DetectConfi
 		},
 	}
 
-	// Make request to target
-	req, err := http.NewRequest("GET", target, nil)
+	fullURL := baseURL + targetpath
+	req, err := http.NewRequest("GET", fullURL, nil)
 	if err != nil {
 		errors = append(errors, err.Error())
 		attempt.AttemptInfo[0].Errors = errors
@@ -51,7 +60,6 @@ func (awsLib *AwsS3Library) ModuleRun(target string, config *webscan.DetectConfi
 		return &attempt, errors
 	}
 
-	// Read response body
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		errors = append(errors, err.Error())
@@ -60,7 +68,6 @@ func (awsLib *AwsS3Library) ModuleRun(target string, config *webscan.DetectConfi
 		return &attempt, errors
 	}
 
-	// Convert body to string
 	bodyStr := string(body)
 	err = resp.Body.Close()
 	if err != nil {
@@ -70,7 +77,6 @@ func (awsLib *AwsS3Library) ModuleRun(target string, config *webscan.DetectConfi
 		return &attempt, errors
 	}
 
-	// Create response info
 	headers := make(map[string]string)
 	for key, values := range resp.Header {
 		headers[key] = values[0]

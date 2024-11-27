@@ -92,6 +92,492 @@ func (t TlsVersion) Ptr() *TlsVersion {
 	return &t
 }
 
+type ApiApplicationModule string
+
+const (
+	ApiApplicationModuleFastapi ApiApplicationModule = "FASTAPI"
+	ApiApplicationModuleGraphql ApiApplicationModule = "GRAPHQL"
+	ApiApplicationModuleGrpc    ApiApplicationModule = "GRPC"
+	ApiApplicationModuleSwagger ApiApplicationModule = "SWAGGER"
+	ApiApplicationModuleK8S     ApiApplicationModule = "K8S"
+)
+
+func NewApiApplicationModuleFromString(s string) (ApiApplicationModule, error) {
+	switch s {
+	case "FASTAPI":
+		return ApiApplicationModuleFastapi, nil
+	case "GRAPHQL":
+		return ApiApplicationModuleGraphql, nil
+	case "GRPC":
+		return ApiApplicationModuleGrpc, nil
+	case "SWAGGER":
+		return ApiApplicationModuleSwagger, nil
+	case "K8S":
+		return ApiApplicationModuleK8S, nil
+	}
+	var t ApiApplicationModule
+	return "", fmt.Errorf("%s is not a valid %T", s, t)
+}
+
+func (a ApiApplicationModule) Ptr() *ApiApplicationModule {
+	return &a
+}
+
+type CloudBucketModule string
+
+const (
+	CloudBucketModuleAwss3     CloudBucketModule = "AWSS3"
+	CloudBucketModuleAzureblob CloudBucketModule = "AZUREBLOB"
+)
+
+func NewCloudBucketModuleFromString(s string) (CloudBucketModule, error) {
+	switch s {
+	case "AWSS3":
+		return CloudBucketModuleAwss3, nil
+	case "AZUREBLOB":
+		return CloudBucketModuleAzureblob, nil
+	}
+	var t CloudBucketModule
+	return "", fmt.Errorf("%s is not a valid %T", s, t)
+}
+
+func (c CloudBucketModule) Ptr() *CloudBucketModule {
+	return &c
+}
+
+type DetectAttempt struct {
+	Name        *DetectResourceModule `json:"name,omitempty" url:"name,omitempty"`
+	Timestamp   time.Time             `json:"timestamp" url:"timestamp"`
+	AttemptInfo []*DetectAttemptInfo  `json:"AttemptInfo,omitempty" url:"AttemptInfo,omitempty"`
+	Finding     bool                  `json:"finding" url:"finding"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (d *DetectAttempt) GetExtraProperties() map[string]interface{} {
+	return d.extraProperties
+}
+
+func (d *DetectAttempt) UnmarshalJSON(data []byte) error {
+	type embed DetectAttempt
+	var unmarshaler = struct {
+		embed
+		Timestamp *core.DateTime `json:"timestamp"`
+	}{
+		embed: embed(*d),
+	}
+	if err := json.Unmarshal(data, &unmarshaler); err != nil {
+		return err
+	}
+	*d = DetectAttempt(unmarshaler.embed)
+	d.Timestamp = unmarshaler.Timestamp.Time()
+
+	extraProperties, err := core.ExtractExtraProperties(data, *d)
+	if err != nil {
+		return err
+	}
+	d.extraProperties = extraProperties
+
+	d._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (d *DetectAttempt) MarshalJSON() ([]byte, error) {
+	type embed DetectAttempt
+	var marshaler = struct {
+		embed
+		Timestamp *core.DateTime `json:"timestamp"`
+	}{
+		embed:     embed(*d),
+		Timestamp: core.NewDateTime(d.Timestamp),
+	}
+	return json.Marshal(marshaler)
+}
+
+func (d *DetectAttempt) String() string {
+	if len(d._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(d._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(d); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", d)
+}
+
+type DetectAttemptInfo struct {
+	Request  *DetectRequestInfo  `json:"request,omitempty" url:"request,omitempty"`
+	Response *DetectResponseInfo `json:"response,omitempty" url:"response,omitempty"`
+	Errors   []string            `json:"errors,omitempty" url:"errors,omitempty"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (d *DetectAttemptInfo) GetExtraProperties() map[string]interface{} {
+	return d.extraProperties
+}
+
+func (d *DetectAttemptInfo) UnmarshalJSON(data []byte) error {
+	type unmarshaler DetectAttemptInfo
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*d = DetectAttemptInfo(value)
+
+	extraProperties, err := core.ExtractExtraProperties(data, *d)
+	if err != nil {
+		return err
+	}
+	d.extraProperties = extraProperties
+
+	d._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (d *DetectAttemptInfo) String() string {
+	if len(d._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(d._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(d); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", d)
+}
+
+type DetectConfig struct {
+	Targets        []string                `json:"targets,omitempty" url:"targets,omitempty"`
+	Modules        []*DetectResourceModule `json:"modules,omitempty" url:"modules,omitempty"`
+	ResourceType   DetectResourceType      `json:"resourceType" url:"resourceType"`
+	Timeout        int                     `json:"timeout" url:"timeout"`
+	SuccessfulOnly bool                    `json:"successfulOnly" url:"successfulOnly"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (d *DetectConfig) GetExtraProperties() map[string]interface{} {
+	return d.extraProperties
+}
+
+func (d *DetectConfig) UnmarshalJSON(data []byte) error {
+	type unmarshaler DetectConfig
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*d = DetectConfig(value)
+
+	extraProperties, err := core.ExtractExtraProperties(data, *d)
+	if err != nil {
+		return err
+	}
+	d.extraProperties = extraProperties
+
+	d._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (d *DetectConfig) String() string {
+	if len(d._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(d._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(d); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", d)
+}
+
+type DetectReport struct {
+	ResourseType DetectResourceType    `json:"resourseType" url:"resourseType"`
+	Resourses    []*DetectResourceInfo `json:"resourses,omitempty" url:"resourses,omitempty"`
+	Config       *DetectConfig         `json:"config,omitempty" url:"config,omitempty"`
+	Errors       []string              `json:"errors,omitempty" url:"errors,omitempty"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (d *DetectReport) GetExtraProperties() map[string]interface{} {
+	return d.extraProperties
+}
+
+func (d *DetectReport) UnmarshalJSON(data []byte) error {
+	type unmarshaler DetectReport
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*d = DetectReport(value)
+
+	extraProperties, err := core.ExtractExtraProperties(data, *d)
+	if err != nil {
+		return err
+	}
+	d.extraProperties = extraProperties
+
+	d._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (d *DetectReport) String() string {
+	if len(d._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(d._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(d); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", d)
+}
+
+type DetectRequestInfo struct {
+	BaseUrl    string     `json:"baseUrl" url:"baseUrl"`
+	Path       string     `json:"path" url:"path"`
+	Method     HttpMethod `json:"method" url:"method"`
+	BodyParams *string    `json:"bodyParams,omitempty" url:"bodyParams,omitempty"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (d *DetectRequestInfo) GetExtraProperties() map[string]interface{} {
+	return d.extraProperties
+}
+
+func (d *DetectRequestInfo) UnmarshalJSON(data []byte) error {
+	type unmarshaler DetectRequestInfo
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*d = DetectRequestInfo(value)
+
+	extraProperties, err := core.ExtractExtraProperties(data, *d)
+	if err != nil {
+		return err
+	}
+	d.extraProperties = extraProperties
+
+	d._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (d *DetectRequestInfo) String() string {
+	if len(d._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(d._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(d); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", d)
+}
+
+type DetectResourceInfo struct {
+	Target   string           `json:"target" url:"target"`
+	Attempts []*DetectAttempt `json:"attempts,omitempty" url:"attempts,omitempty"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (d *DetectResourceInfo) GetExtraProperties() map[string]interface{} {
+	return d.extraProperties
+}
+
+func (d *DetectResourceInfo) UnmarshalJSON(data []byte) error {
+	type unmarshaler DetectResourceInfo
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*d = DetectResourceInfo(value)
+
+	extraProperties, err := core.ExtractExtraProperties(data, *d)
+	if err != nil {
+		return err
+	}
+	d.extraProperties = extraProperties
+
+	d._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (d *DetectResourceInfo) String() string {
+	if len(d._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(d._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(d); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", d)
+}
+
+type DetectResourceModule struct {
+	Type                 string
+	ApiApplicationModule ApiApplicationModule
+	CloudBucketModule    CloudBucketModule
+}
+
+func NewDetectResourceModuleFromApiApplicationModule(value ApiApplicationModule) *DetectResourceModule {
+	return &DetectResourceModule{Type: "ApiApplicationModule", ApiApplicationModule: value}
+}
+
+func NewDetectResourceModuleFromCloudBucketModule(value CloudBucketModule) *DetectResourceModule {
+	return &DetectResourceModule{Type: "CloudBucketModule", CloudBucketModule: value}
+}
+
+func (d *DetectResourceModule) UnmarshalJSON(data []byte) error {
+	var unmarshaler struct {
+		Type string `json:"type"`
+	}
+	if err := json.Unmarshal(data, &unmarshaler); err != nil {
+		return err
+	}
+	d.Type = unmarshaler.Type
+	if unmarshaler.Type == "" {
+		return fmt.Errorf("%T did not include discriminant type", d)
+	}
+	switch unmarshaler.Type {
+	case "ApiApplicationModule":
+		var valueUnmarshaler struct {
+			ApiApplicationModule ApiApplicationModule `json:"value"`
+		}
+		if err := json.Unmarshal(data, &valueUnmarshaler); err != nil {
+			return err
+		}
+		d.ApiApplicationModule = valueUnmarshaler.ApiApplicationModule
+	case "CloudBucketModule":
+		var valueUnmarshaler struct {
+			CloudBucketModule CloudBucketModule `json:"value"`
+		}
+		if err := json.Unmarshal(data, &valueUnmarshaler); err != nil {
+			return err
+		}
+		d.CloudBucketModule = valueUnmarshaler.CloudBucketModule
+	}
+	return nil
+}
+
+func (d DetectResourceModule) MarshalJSON() ([]byte, error) {
+	switch d.Type {
+	default:
+		return nil, fmt.Errorf("invalid type %s in %T", d.Type, d)
+	case "ApiApplicationModule":
+		var marshaler = struct {
+			Type                 string               `json:"type"`
+			ApiApplicationModule ApiApplicationModule `json:"value"`
+		}{
+			Type:                 "ApiApplicationModule",
+			ApiApplicationModule: d.ApiApplicationModule,
+		}
+		return json.Marshal(marshaler)
+	case "CloudBucketModule":
+		var marshaler = struct {
+			Type              string            `json:"type"`
+			CloudBucketModule CloudBucketModule `json:"value"`
+		}{
+			Type:              "CloudBucketModule",
+			CloudBucketModule: d.CloudBucketModule,
+		}
+		return json.Marshal(marshaler)
+	}
+}
+
+type DetectResourceModuleVisitor interface {
+	VisitApiApplicationModule(ApiApplicationModule) error
+	VisitCloudBucketModule(CloudBucketModule) error
+}
+
+func (d *DetectResourceModule) Accept(visitor DetectResourceModuleVisitor) error {
+	switch d.Type {
+	default:
+		return fmt.Errorf("invalid type %s in %T", d.Type, d)
+	case "ApiApplicationModule":
+		return visitor.VisitApiApplicationModule(d.ApiApplicationModule)
+	case "CloudBucketModule":
+		return visitor.VisitCloudBucketModule(d.CloudBucketModule)
+	}
+}
+
+type DetectResourceType string
+
+const (
+	DetectResourceTypeApiapplication DetectResourceType = "APIAPPLICATION"
+	DetectResourceTypeCloudbucket    DetectResourceType = "CLOUDBUCKET"
+)
+
+func NewDetectResourceTypeFromString(s string) (DetectResourceType, error) {
+	switch s {
+	case "APIAPPLICATION":
+		return DetectResourceTypeApiapplication, nil
+	case "CLOUDBUCKET":
+		return DetectResourceTypeCloudbucket, nil
+	}
+	var t DetectResourceType
+	return "", fmt.Errorf("%s is not a valid %T", s, t)
+}
+
+func (d DetectResourceType) Ptr() *DetectResourceType {
+	return &d
+}
+
+type DetectResponseInfo struct {
+	StatusCode      *int              `json:"statusCode,omitempty" url:"statusCode,omitempty"`
+	ResponseHeaders map[string]string `json:"responseHeaders,omitempty" url:"responseHeaders,omitempty"`
+	ResponseBody    *string           `json:"responseBody,omitempty" url:"responseBody,omitempty"`
+	Errors          []string          `json:"errors,omitempty" url:"errors,omitempty"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (d *DetectResponseInfo) GetExtraProperties() map[string]interface{} {
+	return d.extraProperties
+}
+
+func (d *DetectResponseInfo) UnmarshalJSON(data []byte) error {
+	type unmarshaler DetectResponseInfo
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*d = DetectResponseInfo(value)
+
+	extraProperties, err := core.ExtractExtraProperties(data, *d)
+	if err != nil {
+		return err
+	}
+	d.extraProperties = extraProperties
+
+	d._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (d *DetectResponseInfo) String() string {
+	if len(d._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(d._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(d); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", d)
+}
+
 type Certificate struct {
 	SubjectCommonName  *string             `json:"subjectCommonName,omitempty" url:"subjectCommonName,omitempty"`
 	IssuerCommonName   *string             `json:"issuerCommonName,omitempty" url:"issuerCommonName,omitempty"`
@@ -964,7 +1450,6 @@ type K8SPathInfo struct {
 	ResponseStatus  *int              `json:"response_status,omitempty" url:"response_status,omitempty"`
 	ResponseHeaders map[string]string `json:"response_headers,omitempty" url:"response_headers,omitempty"`
 	ResponseBody    *string           `json:"response_body,omitempty" url:"response_body,omitempty"`
-	Finding         bool              `json:"finding" url:"finding"`
 	Timestamp       time.Time         `json:"timestamp" url:"timestamp"`
 
 	extraProperties map[string]interface{}
@@ -1024,10 +1509,9 @@ func (k *K8SPathInfo) String() string {
 }
 
 type K8SReport struct {
-	Target    string         `json:"target" url:"target"`
-	K8SPaths  []*K8SPathInfo `json:"k8sPaths,omitempty" url:"k8sPaths,omitempty"`
-	IsCluster bool           `json:"isCluster" url:"isCluster"`
-	Errors    []string       `json:"errors,omitempty" url:"errors,omitempty"`
+	Target   string         `json:"target" url:"target"`
+	K8SPaths []*K8SPathInfo `json:"k8sPaths,omitempty" url:"k8sPaths,omitempty"`
+	Errors   []string       `json:"errors,omitempty" url:"errors,omitempty"`
 
 	extraProperties map[string]interface{}
 	_rawJSON        json.RawMessage

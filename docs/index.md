@@ -32,7 +32,7 @@ webscan spider --targets https://example.com,https://example.dev
 ```
 
 ```bash
-webscan vuln --severity INFO --tags swagger --tags fastapi --tags api --target example.com
+webscan path fuzz --targets example.com
 ```
 
 ## Contributing

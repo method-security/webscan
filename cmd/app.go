@@ -1,6 +1,10 @@
 package cmd
 
 import (
+	"strings"
+
+	webscan "github.com/Method-Security/webscan/generated/go"
+	"github.com/Method-Security/webscan/internal/detect"
 	"github.com/Method-Security/webscan/internal/graphql"
 	"github.com/Method-Security/webscan/internal/grpc"
 	"github.com/Method-Security/webscan/internal/k8s"
@@ -13,11 +17,85 @@ func (a *WebScan) InitAppCommand() {
 	a.AppCmd = &cobra.Command{
 		Use:   "app",
 		Short: "Perform various application scans",
-		Long:  `Perform various application scans such as fingerprinting and enumeration`,
+		Long:  `Perform various application scans such as detect and enumeration`,
 	}
 
 	a.RootCmd.AddCommand(a.AppCmd)
+	a.initDetectCommand()
 	a.initEnumerateCommand()
+}
+
+func (a *WebScan) initDetectCommand() {
+	detectCmd := &cobra.Command{
+		Use:   "detect",
+		Short: "Perform a detection scan against a target",
+		Long: `Perform a detection scan against a target using specified types.
+		
+The detection command identifies the type of web application running on the target URL.
+It supports detecting different resource types including API applications (FastAPI, Swagger, gRPC, GraphQL, K8s), and 
+cloud buckets (AWSS3, AzureBlob). The command accepts a list of modules to run
+for the specified resource type.`,
+		Run: func(cmd *cobra.Command, args []string) {
+			targets, err := cmd.Flags().GetStringSlice("targets")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			resourceType, err := cmd.Flags().GetString("resourcetype")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			resourceTypeEnum, err := validateDetectResourceType(resourceType)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			modules, err := cmd.Flags().GetStringSlice("modules")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			moduleEnums, err := validateDetectResourseModuleSelection(*resourceTypeEnum, modules)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			timeout, err := cmd.Flags().GetInt("timeout")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			successfulOnly, err := cmd.Flags().GetBool("successfulonly")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			config, err := newDetectConfig(targets, *resourceTypeEnum, moduleEnums, timeout, successfulOnly)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			engine := detect.NewEngine(config)
+			report, err := engine.Launch(cmd.Context())
+			if err != nil {
+				a.OutputSignal.AddError(err)
+			}
+			a.OutputSignal.Content = report
+		},
+	}
+
+	detectCmd.Flags().StringSlice("targets", []string{}, "URL target to perform detect against")
+	detectCmd.Flags().String("resourcetype", "", "Resource type to detect")
+	detectCmd.Flags().StringSlice("modules", []string{}, "Modules to run")
+	detectCmd.Flags().Int("timeout", 5, "Timeout per request (seconds)")
+	detectCmd.Flags().Bool("successfulonly", false, "Only show successful attempts")
+
+	_ = detectCmd.MarkFlagRequired("targets")
+	_ = detectCmd.MarkFlagRequired("resoursetype")
+
+	a.AppCmd.AddCommand(detectCmd)
 }
 
 func (a *WebScan) initEnumerateCommand() {
@@ -118,7 +196,7 @@ func (a *WebScan) initK8sEnumerateCommand() *cobra.Command {
 		},
 	}
 
-	k8sCmd.Flags().Int("timeout", 3000, "Timeout per request (milliseconds)")
+	k8sCmd.Flags().Int("timeout", 5, "Timeout per request (seconds)")
 	k8sCmd.Flags().String("target", "", "URL target to perform K8s enumeration against")
 
 	_ = k8sCmd.MarkFlagRequired("target")
@@ -159,4 +237,54 @@ HTTP methods, query parameters, and authentication mechanisms.`,
 	_ = swaggerCmd.MarkFlagRequired("target")
 
 	return swaggerCmd
+}
+
+func validateDetectResourceType(resourceType string) (*webscan.DetectResourceType, error) {
+	resourceTypeEnum, err := webscan.NewDetectResourceTypeFromString(strings.ToUpper(resourceType))
+	if err != nil {
+		return nil, err
+	}
+	return &resourceTypeEnum, nil
+}
+
+func validateDetectResourseModuleSelection(resourceType webscan.DetectResourceType, modules []string) ([]*webscan.DetectResourceModule, error) {
+	moduleEnums := []*webscan.DetectResourceModule{}
+	if len(modules) == 0 {
+		return nil, nil
+	}
+	if resourceType == webscan.DetectResourceTypeApiapplication {
+		for _, module := range modules {
+			moduleName, err := webscan.NewApiApplicationModuleFromString(strings.ToUpper(module))
+			if err != nil {
+				return nil, err
+			}
+			moduleEnum := webscan.NewDetectResourceModuleFromApiApplicationModule(moduleName)
+			moduleEnums = append(moduleEnums, moduleEnum)
+		}
+	} else if resourceType == webscan.DetectResourceTypeCloudbucket {
+		for _, module := range modules {
+			moduleName, err := webscan.NewCloudBucketModuleFromString(strings.ToUpper(module))
+			if err != nil {
+				return nil, err
+			}
+			moduleEnum := webscan.NewDetectResourceModuleFromCloudBucketModule(moduleName)
+			moduleEnums = append(moduleEnums, moduleEnum)
+		}
+	}
+
+	return moduleEnums, nil
+}
+
+func newDetectConfig(targets []string, resourceEnum webscan.DetectResourceType, moduleEnums []*webscan.DetectResourceModule, timeout int, successfulOnly bool) (*webscan.DetectConfig, error) {
+	config := &webscan.DetectConfig{
+		Targets:        targets,
+		ResourceType:   resourceEnum,
+		Modules:        moduleEnums,
+		Timeout:        timeout,
+		SuccessfulOnly: successfulOnly,
+	}
+	if config.Timeout < 1 {
+		config.Timeout = 0
+	}
+	return config, nil
 }

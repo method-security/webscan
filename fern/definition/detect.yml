@@ -1,0 +1,66 @@
+imports:
+  common: ./common.yml
+types:
+  # DetectEnums
+  ApiApplicationModule:
+    enum:
+      - FASTAPI
+      - GRAPHQL
+      - GRPC
+      - SWAGGER
+      - K8S
+  CloudBucketModule:
+    enum:
+      - AWSS3
+      - AZUREBLOB
+  DetectResourceModule:
+    union:
+      ApiApplicationModule: ApiApplicationModule
+      CloudBucketModule: CloudBucketModule
+  DetectResourceType:
+    enum:
+      - APIAPPLICATION
+      - CLOUDBUCKET
+# Detect Config Struct
+  DetectConfig:
+    properties:
+      targets: list<string>
+      modules: list<DetectResourceModule>
+      resourceType: DetectResourceType
+      timeout: integer
+      successfulOnly: boolean
+# Request/Response Structs
+  DetectResponseInfo:
+    properties:
+      statusCode: optional<integer>
+      responseHeaders: optional<map<string, string>>
+      responseBody: optional<string>
+      errors: optional<list<string>>
+  DetectRequestInfo:
+    properties:
+      baseUrl: string
+      path: string
+      method: common.HttpMethod
+      bodyParams: optional<string>
+# Detect Report Struct
+  DetectAttemptInfo:
+    properties:
+      request: DetectRequestInfo
+      response: optional<DetectResponseInfo>
+      errors: optional<list<string>>
+  DetectAttempt:
+    properties:
+      name: DetectResourceModule
+      timestamp: datetime
+      AttemptInfo: optional<list<DetectAttemptInfo>>
+      finding : boolean
+  DetectResourceInfo:
+    properties:
+      target: string
+      attempts: list<DetectAttempt>
+  DetectReport:
+    properties:
+      resourseType: DetectResourceType
+      resourses: optional<list<DetectResourceInfo>>
+      config: DetectConfig
+      errors: optional<list<string>>

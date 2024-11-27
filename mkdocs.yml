@@ -17,7 +17,6 @@ nav:
         - Fuzzing: docs/fuzz.md
         - Probe: docs/probe.md
         - Spider: docs/spider.md
-        - Vulnerability Scan: docs/vuln.md
         - Fingerprint: docs/fingerprint.md
         - Pagecapture: docs/pagecapture.md
         - Routecapture: docs/routecapture.md

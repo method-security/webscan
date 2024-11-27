@@ -9,6 +9,492 @@ import (
 	time "time"
 )
 
+type ApiApplicationModule string
+
+const (
+	ApiApplicationModuleFastapi ApiApplicationModule = "FASTAPI"
+	ApiApplicationModuleGraphql ApiApplicationModule = "GRAPHQL"
+	ApiApplicationModuleGrpc    ApiApplicationModule = "GRPC"
+	ApiApplicationModuleSwagger ApiApplicationModule = "SWAGGER"
+	ApiApplicationModuleK8S     ApiApplicationModule = "K8S"
+)
+
+func NewApiApplicationModuleFromString(s string) (ApiApplicationModule, error) {
+	switch s {
+	case "FASTAPI":
+		return ApiApplicationModuleFastapi, nil
+	case "GRAPHQL":
+		return ApiApplicationModuleGraphql, nil
+	case "GRPC":
+		return ApiApplicationModuleGrpc, nil
+	case "SWAGGER":
+		return ApiApplicationModuleSwagger, nil
+	case "K8S":
+		return ApiApplicationModuleK8S, nil
+	}
+	var t ApiApplicationModule
+	return "", fmt.Errorf("%s is not a valid %T", s, t)
+}
+
+func (a ApiApplicationModule) Ptr() *ApiApplicationModule {
+	return &a
+}
+
+type AppFingerprintAttempt struct {
+	Name        *AppFingerprintResourceModule `json:"name,omitempty" url:"name,omitempty"`
+	Timestamp   time.Time                     `json:"timestamp" url:"timestamp"`
+	AttemptInfo []*AppFingerprintAttemptInfo  `json:"AttemptInfo,omitempty" url:"AttemptInfo,omitempty"`
+	Finding     bool                          `json:"finding" url:"finding"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (a *AppFingerprintAttempt) GetExtraProperties() map[string]interface{} {
+	return a.extraProperties
+}
+
+func (a *AppFingerprintAttempt) UnmarshalJSON(data []byte) error {
+	type embed AppFingerprintAttempt
+	var unmarshaler = struct {
+		embed
+		Timestamp *core.DateTime `json:"timestamp"`
+	}{
+		embed: embed(*a),
+	}
+	if err := json.Unmarshal(data, &unmarshaler); err != nil {
+		return err
+	}
+	*a = AppFingerprintAttempt(unmarshaler.embed)
+	a.Timestamp = unmarshaler.Timestamp.Time()
+
+	extraProperties, err := core.ExtractExtraProperties(data, *a)
+	if err != nil {
+		return err
+	}
+	a.extraProperties = extraProperties
+
+	a._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (a *AppFingerprintAttempt) MarshalJSON() ([]byte, error) {
+	type embed AppFingerprintAttempt
+	var marshaler = struct {
+		embed
+		Timestamp *core.DateTime `json:"timestamp"`
+	}{
+		embed:     embed(*a),
+		Timestamp: core.NewDateTime(a.Timestamp),
+	}
+	return json.Marshal(marshaler)
+}
+
+func (a *AppFingerprintAttempt) String() string {
+	if len(a._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(a._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(a); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", a)
+}
+
+type AppFingerprintAttemptInfo struct {
+	Request  *AppFingerprintRequestInfo  `json:"request,omitempty" url:"request,omitempty"`
+	Response *AppFingerprintResponseInfo `json:"response,omitempty" url:"response,omitempty"`
+	Errors   []string                    `json:"errors,omitempty" url:"errors,omitempty"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (a *AppFingerprintAttemptInfo) GetExtraProperties() map[string]interface{} {
+	return a.extraProperties
+}
+
+func (a *AppFingerprintAttemptInfo) UnmarshalJSON(data []byte) error {
+	type unmarshaler AppFingerprintAttemptInfo
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*a = AppFingerprintAttemptInfo(value)
+
+	extraProperties, err := core.ExtractExtraProperties(data, *a)
+	if err != nil {
+		return err
+	}
+	a.extraProperties = extraProperties
+
+	a._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (a *AppFingerprintAttemptInfo) String() string {
+	if len(a._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(a._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(a); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", a)
+}
+
+type AppFingerprintConfig struct {
+	Targets        []string                        `json:"targets,omitempty" url:"targets,omitempty"`
+	Modules        []*AppFingerprintResourceModule `json:"modules,omitempty" url:"modules,omitempty"`
+	ResourceType   AppFingerprintResourceType      `json:"resourceType" url:"resourceType"`
+	Timeout        int                             `json:"timeout" url:"timeout"`
+	SuccessfulOnly bool                            `json:"successfulOnly" url:"successfulOnly"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (a *AppFingerprintConfig) GetExtraProperties() map[string]interface{} {
+	return a.extraProperties
+}
+
+func (a *AppFingerprintConfig) UnmarshalJSON(data []byte) error {
+	type unmarshaler AppFingerprintConfig
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*a = AppFingerprintConfig(value)
+
+	extraProperties, err := core.ExtractExtraProperties(data, *a)
+	if err != nil {
+		return err
+	}
+	a.extraProperties = extraProperties
+
+	a._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (a *AppFingerprintConfig) String() string {
+	if len(a._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(a._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(a); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", a)
+}
+
+type AppFingerprintReport struct {
+	ResourseType AppFingerprintResourceType    `json:"resourseType" url:"resourseType"`
+	Resourses    []*AppFingerprintResourceInfo `json:"resourses,omitempty" url:"resourses,omitempty"`
+	Config       *AppFingerprintConfig         `json:"config,omitempty" url:"config,omitempty"`
+	Errors       []string                      `json:"errors,omitempty" url:"errors,omitempty"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (a *AppFingerprintReport) GetExtraProperties() map[string]interface{} {
+	return a.extraProperties
+}
+
+func (a *AppFingerprintReport) UnmarshalJSON(data []byte) error {
+	type unmarshaler AppFingerprintReport
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*a = AppFingerprintReport(value)
+
+	extraProperties, err := core.ExtractExtraProperties(data, *a)
+	if err != nil {
+		return err
+	}
+	a.extraProperties = extraProperties
+
+	a._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (a *AppFingerprintReport) String() string {
+	if len(a._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(a._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(a); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", a)
+}
+
+type AppFingerprintRequestInfo struct {
+	BaseUrl    string     `json:"baseUrl" url:"baseUrl"`
+	Path       string     `json:"path" url:"path"`
+	Method     HttpMethod `json:"method" url:"method"`
+	BodyParams *string    `json:"bodyParams,omitempty" url:"bodyParams,omitempty"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (a *AppFingerprintRequestInfo) GetExtraProperties() map[string]interface{} {
+	return a.extraProperties
+}
+
+func (a *AppFingerprintRequestInfo) UnmarshalJSON(data []byte) error {
+	type unmarshaler AppFingerprintRequestInfo
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*a = AppFingerprintRequestInfo(value)
+
+	extraProperties, err := core.ExtractExtraProperties(data, *a)
+	if err != nil {
+		return err
+	}
+	a.extraProperties = extraProperties
+
+	a._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (a *AppFingerprintRequestInfo) String() string {
+	if len(a._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(a._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(a); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", a)
+}
+
+type AppFingerprintResourceInfo struct {
+	Target   string                   `json:"target" url:"target"`
+	Attempts []*AppFingerprintAttempt `json:"attempts,omitempty" url:"attempts,omitempty"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (a *AppFingerprintResourceInfo) GetExtraProperties() map[string]interface{} {
+	return a.extraProperties
+}
+
+func (a *AppFingerprintResourceInfo) UnmarshalJSON(data []byte) error {
+	type unmarshaler AppFingerprintResourceInfo
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*a = AppFingerprintResourceInfo(value)
+
+	extraProperties, err := core.ExtractExtraProperties(data, *a)
+	if err != nil {
+		return err
+	}
+	a.extraProperties = extraProperties
+
+	a._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (a *AppFingerprintResourceInfo) String() string {
+	if len(a._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(a._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(a); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", a)
+}
+
+type AppFingerprintResourceModule struct {
+	Type                 string
+	ApiApplicationModule ApiApplicationModule
+	CloudBucketModule    CloudBucketModule
+}
+
+func NewAppFingerprintResourceModuleFromApiApplicationModule(value ApiApplicationModule) *AppFingerprintResourceModule {
+	return &AppFingerprintResourceModule{Type: "ApiApplicationModule", ApiApplicationModule: value}
+}
+
+func NewAppFingerprintResourceModuleFromCloudBucketModule(value CloudBucketModule) *AppFingerprintResourceModule {
+	return &AppFingerprintResourceModule{Type: "CloudBucketModule", CloudBucketModule: value}
+}
+
+func (a *AppFingerprintResourceModule) UnmarshalJSON(data []byte) error {
+	var unmarshaler struct {
+		Type string `json:"type"`
+	}
+	if err := json.Unmarshal(data, &unmarshaler); err != nil {
+		return err
+	}
+	a.Type = unmarshaler.Type
+	if unmarshaler.Type == "" {
+		return fmt.Errorf("%T did not include discriminant type", a)
+	}
+	switch unmarshaler.Type {
+	case "ApiApplicationModule":
+		var valueUnmarshaler struct {
+			ApiApplicationModule ApiApplicationModule `json:"value"`
+		}
+		if err := json.Unmarshal(data, &valueUnmarshaler); err != nil {
+			return err
+		}
+		a.ApiApplicationModule = valueUnmarshaler.ApiApplicationModule
+	case "CloudBucketModule":
+		var valueUnmarshaler struct {
+			CloudBucketModule CloudBucketModule `json:"value"`
+		}
+		if err := json.Unmarshal(data, &valueUnmarshaler); err != nil {
+			return err
+		}
+		a.CloudBucketModule = valueUnmarshaler.CloudBucketModule
+	}
+	return nil
+}
+
+func (a AppFingerprintResourceModule) MarshalJSON() ([]byte, error) {
+	switch a.Type {
+	default:
+		return nil, fmt.Errorf("invalid type %s in %T", a.Type, a)
+	case "ApiApplicationModule":
+		var marshaler = struct {
+			Type                 string               `json:"type"`
+			ApiApplicationModule ApiApplicationModule `json:"value"`
+		}{
+			Type:                 "ApiApplicationModule",
+			ApiApplicationModule: a.ApiApplicationModule,
+		}
+		return json.Marshal(marshaler)
+	case "CloudBucketModule":
+		var marshaler = struct {
+			Type              string            `json:"type"`
+			CloudBucketModule CloudBucketModule `json:"value"`
+		}{
+			Type:              "CloudBucketModule",
+			CloudBucketModule: a.CloudBucketModule,
+		}
+		return json.Marshal(marshaler)
+	}
+}
+
+type AppFingerprintResourceModuleVisitor interface {
+	VisitApiApplicationModule(ApiApplicationModule) error
+	VisitCloudBucketModule(CloudBucketModule) error
+}
+
+func (a *AppFingerprintResourceModule) Accept(visitor AppFingerprintResourceModuleVisitor) error {
+	switch a.Type {
+	default:
+		return fmt.Errorf("invalid type %s in %T", a.Type, a)
+	case "ApiApplicationModule":
+		return visitor.VisitApiApplicationModule(a.ApiApplicationModule)
+	case "CloudBucketModule":
+		return visitor.VisitCloudBucketModule(a.CloudBucketModule)
+	}
+}
+
+type AppFingerprintResourceType string
+
+const (
+	AppFingerprintResourceTypeApiapplication AppFingerprintResourceType = "APIAPPLICATION"
+	AppFingerprintResourceTypeCloudbucket    AppFingerprintResourceType = "CLOUDBUCKET"
+)
+
+func NewAppFingerprintResourceTypeFromString(s string) (AppFingerprintResourceType, error) {
+	switch s {
+	case "APIAPPLICATION":
+		return AppFingerprintResourceTypeApiapplication, nil
+	case "CLOUDBUCKET":
+		return AppFingerprintResourceTypeCloudbucket, nil
+	}
+	var t AppFingerprintResourceType
+	return "", fmt.Errorf("%s is not a valid %T", s, t)
+}
+
+func (a AppFingerprintResourceType) Ptr() *AppFingerprintResourceType {
+	return &a
+}
+
+type AppFingerprintResponseInfo struct {
+	StatusCode      *int              `json:"statusCode,omitempty" url:"statusCode,omitempty"`
+	ResponseHeaders map[string]string `json:"responseHeaders,omitempty" url:"responseHeaders,omitempty"`
+	ResponseBody    *string           `json:"responseBody,omitempty" url:"responseBody,omitempty"`
+	Errors          []string          `json:"errors,omitempty" url:"errors,omitempty"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (a *AppFingerprintResponseInfo) GetExtraProperties() map[string]interface{} {
+	return a.extraProperties
+}
+
+func (a *AppFingerprintResponseInfo) UnmarshalJSON(data []byte) error {
+	type unmarshaler AppFingerprintResponseInfo
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*a = AppFingerprintResponseInfo(value)
+
+	extraProperties, err := core.ExtractExtraProperties(data, *a)
+	if err != nil {
+		return err
+	}
+	a.extraProperties = extraProperties
+
+	a._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (a *AppFingerprintResponseInfo) String() string {
+	if len(a._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(a._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(a); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", a)
+}
+
+type CloudBucketModule string
+
+const (
+	CloudBucketModuleAwss3     CloudBucketModule = "AWSS3"
+	CloudBucketModuleAzureblob CloudBucketModule = "AZUREBLOB"
+)
+
+func NewCloudBucketModuleFromString(s string) (CloudBucketModule, error) {
+	switch s {
+	case "AWSS3":
+		return CloudBucketModuleAwss3, nil
+	case "AZUREBLOB":
+		return CloudBucketModuleAzureblob, nil
+	}
+	var t CloudBucketModule
+	return "", fmt.Errorf("%s is not a valid %T", s, t)
+}
+
+func (c CloudBucketModule) Ptr() *CloudBucketModule {
+	return &c
+}
+
 type HttpMethod string
 
 const (
@@ -964,7 +1450,6 @@ type K8SPathInfo struct {
 	ResponseStatus  *int              `json:"response_status,omitempty" url:"response_status,omitempty"`
 	ResponseHeaders map[string]string `json:"response_headers,omitempty" url:"response_headers,omitempty"`
 	ResponseBody    *string           `json:"response_body,omitempty" url:"response_body,omitempty"`
-	Finding         bool              `json:"finding" url:"finding"`
 	Timestamp       time.Time         `json:"timestamp" url:"timestamp"`
 
 	extraProperties map[string]interface{}
@@ -1024,10 +1509,9 @@ func (k *K8SPathInfo) String() string {
 }
 
 type K8SReport struct {
-	Target    string         `json:"target" url:"target"`
-	K8SPaths  []*K8SPathInfo `json:"k8sPaths,omitempty" url:"k8sPaths,omitempty"`
-	IsCluster bool           `json:"isCluster" url:"isCluster"`
-	Errors    []string       `json:"errors,omitempty" url:"errors,omitempty"`
+	Target   string         `json:"target" url:"target"`
+	K8SPaths []*K8SPathInfo `json:"k8sPaths,omitempty" url:"k8sPaths,omitempty"`
+	Errors   []string       `json:"errors,omitempty" url:"errors,omitempty"`
 
 	extraProperties map[string]interface{}
 	_rawJSON        json.RawMessage

@@ -25,7 +25,6 @@ types:
       CommandInjectionType: CommandInjectionType
       HeaderInjectionType: HeaderInjectionType
       MisconfigurationType: MisconfigurationType
-
   RequestReport:
     properties:
       baseUrl: string

@@ -12,17 +12,11 @@ RUN \
   mkdir -p /opt/method/${CLI_NAME}/var/data && \
   mkdir -p /opt/method/${CLI_NAME}/var/data/tmp && \
   mkdir -p /opt/method/${CLI_NAME}/var/conf && \
-  mkdir -p /opt/method/${CLI_NAME}/var/conf/templates && \
-  mkdir -p /opt/method/${CLI_NAME}/var/conf/templates/default && \
-  mkdir -p /opt/method/${CLI_NAME}/var/conf/templates/custom && \
   mkdir -p /opt/method/${CLI_NAME}/var/log && \
   mkdir -p /opt/method/${CLI_NAME}/service/bin && \
   mkdir -p /mnt/output
 
 COPY configs/configs/*                  /opt/method/${CLI_NAME}/var/conf/
-COPY configs/configs/templates/default  /opt/method/${CLI_NAME}/var/conf/templates/default
-COPY configs/configs/templates/custom  /opt/method/${CLI_NAME}/var/conf/templates/custom
-COPY configs/nuclei-ignore-file.txt /root/.config/nuclei/.nuclei-ignore
 
 COPY ${CLI_NAME} /opt/method/${CLI_NAME}/service/bin/${CLI_NAME}
 

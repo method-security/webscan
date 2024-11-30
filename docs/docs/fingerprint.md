@@ -1,4 +1,4 @@
-# Spider
+# Fingerprint
 
 The `webscan fingerprint` command fingerprints a URL by collecting its HTTP Options, TLS Config, and Certificates.
 
@@ -26,4 +26,5 @@ Global Flags:
   -f, --output-file string   Path to output file. If blank, will output to STDOUT
   -q, --quiet                Suppress output
   -v, --verbose              Verbose output
+
 ```

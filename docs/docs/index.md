@@ -2,12 +2,14 @@
 
 webscan offers a variety of scanning techniques to security teams working to gain a better handle on what web applications they have deployed across cloud providers and on-premise environments. Each of the below pages offers you an in depth look at a webscan capability related to a unique scanning technique.
 
-- [Fuzz](./fuzz.md)
-- [Probe](./probe.md)
-- [Spider](./spider.md)
+- [App](./app.md)
 - [Fingerprint](./fingerprint.md)
+- [Fuzz](./fuzz.md)
 - [Pagecapture](./pagecapture.md)
+- [Requests](./requests.md)
 - [Routecapture](./routecapture.md)
+- [Spider](./spider.md)
+- [Webserver](./webserver.md)
 
 ## Top Level Flags
 

@@ -13,7 +13,7 @@ func (a *WebScan) InitRequestsCommand() {
 	requestsCmd := &cobra.Command{
 		Use:   "requests",
 		Short: "Perform a custom request against a target",
-		Long:  `Perform a custom reques against a target using specified parameters`,
+		Long:  `Perform a custom request against a target using specified parameters`,
 		Run: func(cmd *cobra.Command, args []string) {
 			defer a.OutputSignal.PanicHandler(cmd.Context())
 

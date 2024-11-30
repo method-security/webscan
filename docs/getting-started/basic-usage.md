@@ -7,7 +7,7 @@ Running as a binary allows you to skip dealing with any container related networ
 You can validate that the binary is working by scanning the publicly available `scanme.sh`.
 
 ```bash
-webscan probe webserver --targets scanme.sh
+webscan webserver probe --targets scanme.sh
 ```
 
 ## Docker
@@ -18,6 +18,6 @@ If you're running on a Docker container on a MacOS machine and you are trying to
 
 ```bash
 docker run ghcr.io/method-security/webscan \
-  probe webserver \
+  webserver probe \
   --targets scanme.sh
 ```

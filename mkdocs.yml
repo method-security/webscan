@@ -14,12 +14,14 @@ nav:
   - Docs:
       - Overview: docs/index.md
       - Capabilities:
-        - Fuzzing: docs/fuzz.md
-        - Probe: docs/probe.md
-        - Spider: docs/spider.md
+        - App: docs/app.md
         - Fingerprint: docs/fingerprint.md
+        - Fuzz: docs/fuzz.md
         - Pagecapture: docs/pagecapture.md
+        - Requests: docs/requests.md
         - Routecapture: docs/routecapture.md
+        - Spider: docs/spider.md
+        - Webserver: docs/webserver.md
   - Contributing:
       - How to contribute: community/community.md
       - Development:

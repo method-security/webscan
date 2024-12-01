@@ -34,7 +34,7 @@ func PerformPathFuzz(ctx context.Context, config *webscan.FuzzPathConfig) (*webs
 	// Loop through targets
 	var targets []*webscan.TargetInfo
 	for _, target := range config.Targets {
-		targetInfo := webscan.TargetInfo{Target: target}
+		targetInfo := webscan.TargetInfo{Target: target, RequestCount: len(config.Paths) * config.Retries, StartTimestamp: time.Now()}
 
 		// Get baseline
 		baselineSize, baselineWords, err := baseLine(target)
@@ -104,6 +104,7 @@ func PerformPathFuzz(ctx context.Context, config *webscan.FuzzPathConfig) (*webs
 			}
 		}
 		targetInfo.FuzzAttempts = fuzzAttempts
+		targetInfo.EndTimestamp = time.Now()
 		targets = append(targets, &targetInfo)
 	}
 

@@ -1153,8 +1153,11 @@ func (r *ResponseInfo) String() string {
 }
 
 type TargetInfo struct {
-	Target       string             `json:"target" url:"target"`
-	FuzzAttempts []*FuzzAttemptInfo `json:"fuzzAttempts,omitempty" url:"fuzzAttempts,omitempty"`
+	Target         string             `json:"target" url:"target"`
+	StartTimestamp time.Time          `json:"startTimestamp" url:"startTimestamp"`
+	EndTimestamp   time.Time          `json:"endTimestamp" url:"endTimestamp"`
+	RequestCount   int                `json:"requestCount" url:"requestCount"`
+	FuzzAttempts   []*FuzzAttemptInfo `json:"fuzzAttempts,omitempty" url:"fuzzAttempts,omitempty"`
 
 	extraProperties map[string]interface{}
 	_rawJSON        json.RawMessage
@@ -1165,12 +1168,20 @@ func (t *TargetInfo) GetExtraProperties() map[string]interface{} {
 }
 
 func (t *TargetInfo) UnmarshalJSON(data []byte) error {
-	type unmarshaler TargetInfo
-	var value unmarshaler
-	if err := json.Unmarshal(data, &value); err != nil {
+	type embed TargetInfo
+	var unmarshaler = struct {
+		embed
+		StartTimestamp *core.DateTime `json:"startTimestamp"`
+		EndTimestamp   *core.DateTime `json:"endTimestamp"`
+	}{
+		embed: embed(*t),
+	}
+	if err := json.Unmarshal(data, &unmarshaler); err != nil {
 		return err
 	}
-	*t = TargetInfo(value)
+	*t = TargetInfo(unmarshaler.embed)
+	t.StartTimestamp = unmarshaler.StartTimestamp.Time()
+	t.EndTimestamp = unmarshaler.EndTimestamp.Time()
 
 	extraProperties, err := core.ExtractExtraProperties(data, *t)
 	if err != nil {
@@ -1180,6 +1191,20 @@ func (t *TargetInfo) UnmarshalJSON(data []byte) error {
 
 	t._rawJSON = json.RawMessage(data)
 	return nil
+}
+
+func (t *TargetInfo) MarshalJSON() ([]byte, error) {
+	type embed TargetInfo
+	var marshaler = struct {
+		embed
+		StartTimestamp *core.DateTime `json:"startTimestamp"`
+		EndTimestamp   *core.DateTime `json:"endTimestamp"`
+	}{
+		embed:          embed(*t),
+		StartTimestamp: core.NewDateTime(t.StartTimestamp),
+		EndTimestamp:   core.NewDateTime(t.EndTimestamp),
+	}
+	return json.Marshal(marshaler)
 }
 
 func (t *TargetInfo) String() string {

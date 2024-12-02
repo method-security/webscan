@@ -32,6 +32,9 @@ types:
   TargetInfo:
     properties:
       target: string
+      startTimestamp: datetime
+      endTimestamp: datetime
+      requestCount: integer
       fuzzAttempts: list<FuzzAttemptInfo>
   FuzzPathReport:
     properties:

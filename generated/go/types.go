@@ -1219,6 +1219,222 @@ func (t *TargetInfo) String() string {
 	return fmt.Sprintf("%#v", t)
 }
 
+type FuzzRateLimitConfig struct {
+	MaxRequests int `json:"maxRequests" url:"maxRequests"`
+	Timespan    int `json:"timespan" url:"timespan"`
+	Timeout     int `json:"timeout" url:"timeout"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (f *FuzzRateLimitConfig) GetExtraProperties() map[string]interface{} {
+	return f.extraProperties
+}
+
+func (f *FuzzRateLimitConfig) UnmarshalJSON(data []byte) error {
+	type unmarshaler FuzzRateLimitConfig
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*f = FuzzRateLimitConfig(value)
+
+	extraProperties, err := core.ExtractExtraProperties(data, *f)
+	if err != nil {
+		return err
+	}
+	f.extraProperties = extraProperties
+
+	f._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (f *FuzzRateLimitConfig) String() string {
+	if len(f._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(f._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(f); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", f)
+}
+
+type FuzzRateLimitReport struct {
+	Targets []*RateLimitAttempt  `json:"targets,omitempty" url:"targets,omitempty"`
+	Config  *FuzzRateLimitConfig `json:"config,omitempty" url:"config,omitempty"`
+	Errors  []string             `json:"errors,omitempty" url:"errors,omitempty"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (f *FuzzRateLimitReport) GetExtraProperties() map[string]interface{} {
+	return f.extraProperties
+}
+
+func (f *FuzzRateLimitReport) UnmarshalJSON(data []byte) error {
+	type unmarshaler FuzzRateLimitReport
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*f = FuzzRateLimitReport(value)
+
+	extraProperties, err := core.ExtractExtraProperties(data, *f)
+	if err != nil {
+		return err
+	}
+	f.extraProperties = extraProperties
+
+	f._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (f *FuzzRateLimitReport) String() string {
+	if len(f._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(f._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(f); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", f)
+}
+
+type RateLimitAttempt struct {
+	Target         string                 `json:"target" url:"target"`
+	StartTimestamp time.Time              `json:"startTimestamp" url:"startTimestamp"`
+	EndTimestamp   time.Time              `json:"endTimestamp" url:"endTimestamp"`
+	Detected       *RateLimitDetectedInfo `json:"detected,omitempty" url:"detected,omitempty"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (r *RateLimitAttempt) GetExtraProperties() map[string]interface{} {
+	return r.extraProperties
+}
+
+func (r *RateLimitAttempt) UnmarshalJSON(data []byte) error {
+	type embed RateLimitAttempt
+	var unmarshaler = struct {
+		embed
+		StartTimestamp *core.DateTime `json:"startTimestamp"`
+		EndTimestamp   *core.DateTime `json:"endTimestamp"`
+	}{
+		embed: embed(*r),
+	}
+	if err := json.Unmarshal(data, &unmarshaler); err != nil {
+		return err
+	}
+	*r = RateLimitAttempt(unmarshaler.embed)
+	r.StartTimestamp = unmarshaler.StartTimestamp.Time()
+	r.EndTimestamp = unmarshaler.EndTimestamp.Time()
+
+	extraProperties, err := core.ExtractExtraProperties(data, *r)
+	if err != nil {
+		return err
+	}
+	r.extraProperties = extraProperties
+
+	r._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (r *RateLimitAttempt) MarshalJSON() ([]byte, error) {
+	type embed RateLimitAttempt
+	var marshaler = struct {
+		embed
+		StartTimestamp *core.DateTime `json:"startTimestamp"`
+		EndTimestamp   *core.DateTime `json:"endTimestamp"`
+	}{
+		embed:          embed(*r),
+		StartTimestamp: core.NewDateTime(r.StartTimestamp),
+		EndTimestamp:   core.NewDateTime(r.EndTimestamp),
+	}
+	return json.Marshal(marshaler)
+}
+
+func (r *RateLimitAttempt) String() string {
+	if len(r._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(r._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(r); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", r)
+}
+
+type RateLimitDetectedInfo struct {
+	RequestNumber   int               `json:"requestNumber" url:"requestNumber"`
+	Timestamp       time.Time         `json:"timestamp" url:"timestamp"`
+	ResponseCode    *int              `json:"responseCode,omitempty" url:"responseCode,omitempty"`
+	ResponseHeaders map[string]string `json:"responseHeaders,omitempty" url:"responseHeaders,omitempty"`
+	ResponseBody    *string           `json:"responseBody,omitempty" url:"responseBody,omitempty"`
+	Error           *string           `json:"error,omitempty" url:"error,omitempty"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (r *RateLimitDetectedInfo) GetExtraProperties() map[string]interface{} {
+	return r.extraProperties
+}
+
+func (r *RateLimitDetectedInfo) UnmarshalJSON(data []byte) error {
+	type embed RateLimitDetectedInfo
+	var unmarshaler = struct {
+		embed
+		Timestamp *core.DateTime `json:"timestamp"`
+	}{
+		embed: embed(*r),
+	}
+	if err := json.Unmarshal(data, &unmarshaler); err != nil {
+		return err
+	}
+	*r = RateLimitDetectedInfo(unmarshaler.embed)
+	r.Timestamp = unmarshaler.Timestamp.Time()
+
+	extraProperties, err := core.ExtractExtraProperties(data, *r)
+	if err != nil {
+		return err
+	}
+	r.extraProperties = extraProperties
+
+	r._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (r *RateLimitDetectedInfo) MarshalJSON() ([]byte, error) {
+	type embed RateLimitDetectedInfo
+	var marshaler = struct {
+		embed
+		Timestamp *core.DateTime `json:"timestamp"`
+	}{
+		embed:     embed(*r),
+		Timestamp: core.NewDateTime(r.Timestamp),
+	}
+	return json.Marshal(marshaler)
+}
+
+func (r *RateLimitDetectedInfo) String() string {
+	if len(r._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(r._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(r); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", r)
+}
+
 type GraphQlData struct {
 	Schema *GraphQlSchemaData `json:"__schema,omitempty" url:"__schema,omitempty"`
 

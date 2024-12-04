@@ -1,0 +1,25 @@
+types:
+  FuzzRateLimitConfig:
+    properties:
+      maxRequests: integer
+      timespan: integer
+      timeout: integer
+  RateLimitDetectedInfo:
+    properties:
+      requestNumber: integer
+      timestamp: datetime
+      responseCode: optional<integer>
+      responseHeaders: optional<map<string, string>>
+      responseBody: optional<string>
+      error: optional<string>
+  RateLimitAttempt:
+    properties:
+      target: string
+      startTimestamp: datetime
+      endTimestamp: datetime
+      detected: optional<RateLimitDetectedInfo>
+  FuzzRateLimitReport:
+    properties:
+      targets: optional<list<RateLimitAttempt>>
+      config: FuzzRateLimitConfig
+      errors: optional<list<string>>

@@ -85,8 +85,8 @@ func (a *WebScan) InitFuzzCommand() {
 				return
 			}
 
-			// Load configuration using LoadPathFuzzConfig
-			config, err := LoadPathFuzzConfig(targets, allPaths, responseCodes, ignoreBase, timeout, sleep, retries, successfulOnly)
+			// Load configuration using LoadFuzzPathConfig
+			config, err := LoadFuzzPathConfig(targets, allPaths, responseCodes, ignoreBase, timeout, sleep, retries, successfulOnly)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -116,11 +116,64 @@ func (a *WebScan) InitFuzzCommand() {
 
 	// Add the path command to fuzz and the root command
 	fuzzCmd.AddCommand(pathCmd)
+
+	ratelimitCmd := &cobra.Command{
+		Use:   "ratelimit",
+		Short: "Perform a rate limit fuzz against a target",
+		Long:  `Perform a rate limit fuzz against a target`,
+		Run: func(cmd *cobra.Command, args []string) {
+			defer a.OutputSignal.PanicHandler(cmd.Context())
+
+			targets, err := cmd.Flags().GetStringSlice("targets")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			maxRequests, err := cmd.Flags().GetInt("maxrequests")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			timespan, err := cmd.Flags().GetInt("timespan")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			timeout, err := cmd.Flags().GetInt("timeout")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Load configuration using LoadFuzzRatelimitConfig
+			config := LoadFuzzRatelimitConfig(maxRequests, timespan, timeout)
+
+			report, err := fuzz.PerformRateLimitFuzz(cmd.Context(), targets, config)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			a.OutputSignal.Content = report
+		},
+	}
+
+	ratelimitCmd.Flags().StringSlice("targets", []string{}, "URL of target")
+	ratelimitCmd.Flags().Int("maxrequests", 0, "Number of requests to perform")
+	ratelimitCmd.Flags().Int("timespan", 0, "Length of time to send the requests (Seconds)")
+	ratelimitCmd.Flags().Int("timeout", 3, "Timeout per request (Seconds)")
+
+	_ = ratelimitCmd.MarkFlagRequired("targets")
+	_ = ratelimitCmd.MarkFlagRequired("maxrequests")
+
+	fuzzCmd.AddCommand(ratelimitCmd)
 	a.RootCmd.AddCommand(fuzzCmd)
 }
 
-// LoadPathFuzzConfig loads the configuration for a path-based fuzzing run.
-func LoadPathFuzzConfig(targets, paths []string, responseCodes string, ignoreBaseContent bool, timeout, sleep, retries int, successfulOnly bool) (*webscan.FuzzPathConfig, error) {
+// LoadFuzzPathConfig loads the configuration for a path-based fuzzing run.
+func LoadFuzzPathConfig(targets, paths []string, responseCodes string, ignoreBaseContent bool, timeout, sleep, retries int, successfulOnly bool) (*webscan.FuzzPathConfig, error) {
 	config := &webscan.FuzzPathConfig{
 		Targets:           targets,
 		Paths:             paths,
@@ -164,4 +217,13 @@ func isValidResponseCodeRange(responseCodes string) bool {
 		}
 	}
 	return true
+}
+
+func LoadFuzzRatelimitConfig(maxRequests int, timespan int, timeout int) *webscan.FuzzRateLimitConfig {
+	config := &webscan.FuzzRateLimitConfig{
+		MaxRequests: maxRequests,
+		Timespan:    timespan,
+		Timeout:     timeout,
+	}
+	return config
 }

@@ -24,7 +24,7 @@ require (
 	github.com/ysmood/gson v0.7.3
 	golang.org/x/net v0.32.0
 	google.golang.org/grpc v1.56.3
-	google.golang.org/protobuf v1.33.0
+	google.golang.org/protobuf v1.35.2
 	gopkg.in/yaml.v3 v3.0.1
 )
 

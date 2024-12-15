@@ -1,31 +1,16 @@
-// Package webserver contains the logic and data structures necessary for the `webcan probe` command
-package webserver
+package webapplication
 
 import (
 	"context"
-	"strings"
 	"time"
 
+	webscan "github.com/Method-Security/webscan/generated/go/webserver"
 	"github.com/projectdiscovery/httpx/runner"
 )
 
-// URLDetails represents the data returned from a probe of a singular URL.
-type URLDetails struct {
-	URL    string `json:"url" yaml:"url"`
-	Status int    `json:"status" yaml:"status"`
-	Title  string `json:"title" yaml:"title"`
-}
-
-// A ProbeReport represents a holistic report of all the URLs that were probed during a web server probe operation,
-type ProbeReport struct {
-	Targets []string     `json:"targets" yaml:"targets"`
-	URLs    []URLDetails `json:"urls" yaml:"urls"`
-	Errors  []string     `json:"errors" yaml:"errors"`
-}
-
-func performWebServerProbe(ctx context.Context, targets []string, timeout time.Duration) ([]URLDetails, []string, error) {
+func performWebserverProbe(ctx context.Context, targets []string, timeout time.Duration) ([]*webscan.WebserverProbeUrlDetails, []string, error) {
 	errors := []string{}
-	urls := []URLDetails{}
+	urls := []*webscan.WebserverProbeUrlDetails{}
 
 	// Create a new context with timeout
 	ctx, cancel := context.WithTimeout(ctx, timeout)
@@ -39,12 +24,12 @@ func performWebServerProbe(ctx context.Context, targets []string, timeout time.D
 			if r.Err != nil {
 				errors = append(errors, r.Err.Error())
 			}
-			urlDetails := URLDetails{
-				URL:    r.URL,
+			urlDetails := webscan.WebserverProbeUrlDetails{
+				Url:    r.URL,
 				Status: r.StatusCode,
 				Title:  r.Title,
 			}
-			urls = append(urls, urlDetails)
+			urls = append(urls, &urlDetails)
 		},
 	}
 
@@ -76,23 +61,18 @@ func performWebServerProbe(ctx context.Context, targets []string, timeout time.D
 	}
 }
 
-// PerformWebServerProbe performs a web server probe against the provided targets, returning a ProbeReport with the
+// PerformWebserverProbe performs a server probe against the provided targets, returning a ProbeReport with the
 // results of the probe.
-func PerformWebServerProbe(ctx context.Context, targets string, timeout time.Duration) (ProbeReport, error) {
-	// 1. Parse target list
-	targetList := strings.Split(targets, ",")
-
-	// 2. Perform web server probe with timeout
-	urls, errors, err := performWebServerProbe(ctx, targetList, timeout)
+func PerformWebserverProbe(ctx context.Context, config *webscan.WebserverProbeConfig) *webscan.WebserverProbeReport {
+	urls, errors, err := performWebserverProbe(ctx, config.Targets, time.Duration(config.Timeout)*time.Second)
 	if err != nil {
 		errors = append(errors, err.Error())
 	}
 
-	// 3. Create report
-	report := ProbeReport{
-		Targets: targetList,
-		URLs:    urls,
+	report := webscan.WebserverProbeReport{
+		Targets: config.Targets,
+		Urls:    urls,
 		Errors:  errors,
 	}
-	return report, nil
+	return &report
 }

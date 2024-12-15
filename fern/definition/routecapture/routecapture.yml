@@ -1,0 +1,30 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/fern-api/fern/main/fern.schema.json
+imports:
+  requests: ../common/requests.yml
+types:
+  BodyParams:
+    properties:
+      name: string
+      exampleValues: optional<list<string>>
+  QueryParams:
+    properties:
+      name: string
+      exampleValues: optional<list<string>>
+  WebRoute:
+    properties:
+      url: string
+      path: optional<string>
+      method: optional<requests.HttpMethod>
+      queryParams: optional<list<QueryParams>>
+      bodyParams: optional<list<BodyParams>>
+  PageCaptureMethod:
+    enum:
+      - REQUEST
+      - BROWSER
+      - BROWSERBASE
+  RouteCaptureReport:
+    properties:
+      target: string
+      routes: optional<list<WebRoute>>
+      urls: optional<list<string>>
+      errors: optional<list<string>>

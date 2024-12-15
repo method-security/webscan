@@ -5,7 +5,7 @@ import (
 	"encoding/base64"
 	"time"
 
-	webscan "github.com/Method-Security/webscan/generated/go"
+	webscan "github.com/Method-Security/webscan/generated/go/pagecapture"
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"

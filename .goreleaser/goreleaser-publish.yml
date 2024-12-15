@@ -68,8 +68,6 @@ dockers:
       - "--label=org.opencontainers.image.url=https://method.security"
       - "--label=org.opencontainers.image.documentation=https://github.com/method-security/webscan"
       - "--platform=linux/amd64"
-    extra_files:
-      - configs/
   - image_templates:
       - "ghcr.io/method-security/webscan:{{ .Version }}-arm64"
       - "ghcr.io/method-security/webscan:latest-arm64"
@@ -91,8 +89,6 @@ dockers:
       - "--label=org.opencontainers.image.url=https://method.security"
       - "--label=org.opencontainers.image.documentation=https://github.com/method-security/webscan"
       - "--platform=linux/arm64"
-    extra_files:
-      - configs/
 
 docker_manifests:
   - name_template: 'ghcr.io/method-security/webscan:{{ .Version }}'

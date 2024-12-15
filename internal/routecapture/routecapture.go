@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	webscan "github.com/Method-Security/webscan/generated/go"
+	webscan "github.com/Method-Security/webscan/generated/go/routecapture"
 	"github.com/Method-Security/webscan/internal/browserbase"
 	capture "github.com/Method-Security/webscan/internal/capture"
 	"github.com/PuerkitoBio/goquery"

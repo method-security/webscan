@@ -14,25 +14,26 @@ func (a *WebScan) InitSpiderCommand() {
 		Long:  `Perform a web web spider crawl against URL targets`,
 		Run: func(cmd *cobra.Command, args []string) {
 			defer a.OutputSignal.PanicHandler(cmd.Context())
-			targets, err := cmd.Flags().GetString("targets")
+
+			// Target flag
+			targets, err := cmd.Flags().GetStringSlice("targets")
 			if err != nil {
-				errorMessage := err.Error()
-				a.OutputSignal.ErrorMessage = &errorMessage
-				a.OutputSignal.Status = 1
+				a.OutputSignal.AddError(err)
 				return
 			}
 
-			report, err := spider.PerformWebSpider(cmd.Context(), targets)
-			if err != nil {
-				errorMessage := err.Error()
-				a.OutputSignal.ErrorMessage = &errorMessage
+			// Generate report
+			report := spider.PerformWebSpider(cmd.Context(), targets)
+			if len(report.Errors) > 0 {
 				a.OutputSignal.Status = 1
 			}
 			a.OutputSignal.Content = report
 		},
 	}
 
-	spiderCmd.Flags().String("targets", "", "Url targets to perform web spidering, comma delimited list")
+	spiderCmd.Flags().StringSlice("targets", []string{}, "Url targets to perform web spidering, comma delimited list")
+
+	_ = spiderCmd.MarkFlagRequired("targets")
 
 	a.RootCmd.AddCommand(spiderCmd)
 }

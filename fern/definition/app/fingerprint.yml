@@ -1,0 +1,46 @@
+imports:
+  requests: ../common/requests.yml
+types:
+  # AppFingerprint Enums
+  ApiApplicationModule:
+    enum:
+      - FASTAPI
+      - GRAPHQL
+      - GRPC
+      - SWAGGER
+      - K8S
+  CloudBucketModule:
+    enum:
+      - AWSS3
+      - AZUREBLOB
+  AppFingerprintResourceModule:
+    union:
+      ApiApplicationModule: ApiApplicationModule
+      CloudBucketModule: CloudBucketModule
+  AppFingerprintResourceType:
+    enum:
+      - APIAPPLICATION
+      - CLOUDBUCKET
+  # Config Struct
+  AppFingerprintConfig:
+    properties:
+      targets: list<string>
+      modules: list<AppFingerprintResourceModule>
+      resourceType: AppFingerprintResourceType
+      timeout: integer
+      successfulOnly: boolean
+  # AppFingerprint Struct
+  AppFingerprintAttemptInfo:
+    properties:
+      name: AppFingerprintResourceModule
+      requests: optional<list<requests.RequestInfo>>
+      finding : boolean
+  AppFingerprintTargetInfo:
+    properties:
+      target: string
+      attempts: list<AppFingerprintAttemptInfo>
+  AppFingerprintReport:
+    properties:
+      targets: optional<list<AppFingerprintTargetInfo>>
+      config: AppFingerprintConfig
+      errors: optional<list<string>>

@@ -1,0 +1,26 @@
+imports:
+  requests: ../common/requests.yml
+types:
+  # Config Struct
+  WebserverRateLimitConfig:
+    properties:
+      targets: list<string>
+      maxRequests: integer
+      timespan: integer
+      timeout: integer
+  # WebserverRateLimit Struct
+  WebserverRateLimitAttemptInfo:
+    properties:
+      requestNumber: integer
+      request: requests.RequestInfo
+  WebserverRateLimitTargetInfo:
+    properties:
+      target: string
+      startTimestamp: datetime
+      endTimestamp: datetime
+      detectedRequest: optional<WebserverRateLimitAttemptInfo>
+  WebserverRateLimitReport:
+    properties:
+      targets: optional<list<WebserverRateLimitTargetInfo>>
+      config: WebserverRateLimitConfig
+      errors: optional<list<string>>

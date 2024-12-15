@@ -1,0 +1,17 @@
+types:
+  # Config Struct
+  WebserverProbeConfig:
+    properties:
+      targets: list<string>
+      timeout: integer
+  # WebserverProbeUrl Struct
+  WebserverProbeUrlDetails:
+    properties:
+      url: string 
+      status: integer
+      title: string
+  WebserverProbeReport:
+    properties:
+      targets: list<string>
+      urls: list<WebserverProbeUrlDetails>
+      errors: optional<list<string>>

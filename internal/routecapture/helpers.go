@@ -7,7 +7,7 @@ import (
 	"path"
 	"strings"
 
-	webscan "github.com/Method-Security/webscan/generated/go"
+	webscan "github.com/Method-Security/webscan/generated/go/routecapture"
 )
 
 // setToListString converts a set of strings to a list of strings.

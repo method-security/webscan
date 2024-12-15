@@ -10,44 +10,25 @@ webscan pagecapture [command]
 
 ## Commmands
 
-### HTML Request
+### HTML
 
 #### Usage
 
 ```bash
-webscan pagecapture html request --target https://example.com
+webscan pagecapture html [command]
 ```
 
-#### Help Text
+#### Commands
 
-```bash
-Perform a webpage HTML capture using a basic HTTP/HTTPS request
+##### Browser
 
-Usage:
-  webscan pagecapture html request [flags]
-
-Flags:
-  -h, --help       help for request
-      --insecure   Allow insecure connections
-
-Global Flags:
-  -o, --output string        Output format (signal, json, yaml). Default value is signal (default "signal")
-  -f, --output-file string   Path to output file. If blank, will output to STDOUT
-  -q, --quiet                Suppress output
-      --target string        URL target to perform webpage capture
-      --timeout int          Timeout in seconds for the capture (default 30)
-  -v, --verbose              Verbose output
-```
-
-### HTML Browser
-
-#### Usage
+###### Usage
 
 ```bash
 webscan pagecapture html browser --target https://example.com
 ```
 
-#### Help Text
+###### Help Text
 
 ```bash
 Perform a fully rendered webpage HTML capture using a headless browser
@@ -68,15 +49,15 @@ Global Flags:
   -v, --verbose              Verbose output
 ```
 
-### HTML Browserbase
+##### Browserbase
 
-#### Usage
+###### Usage
 
 ```bash
 webscan pagecapture html browserbase --target https://example.com
 ```
 
-#### Help Text
+###### Help Text
 
 ```bash
 Perform a fully rendered webpage HTML capture using Browserbase. Useful for avoiding bot detection or maintaining stealth
@@ -101,15 +82,56 @@ Global Flags:
   -v, --verbose              Verbose output
 ```
 
-### Screenshot Browser
+##### Request
+
+###### Usage
+
+```bash
+webscan pagecapture html request --target https://example.com
+```
+
+###### Help Text
+
+```bash
+webscan pagecapture html request -h
+Perform a webpage HTML capture using a basic HTTP/HTTPS request
+
+Usage:
+  webscan pagecapture html request [flags]
+
+Flags:
+  -h, --help       help for request
+      --insecure   Allow insecure connections
+
+Global Flags:
+      --minDOMStabalizeTime int   Minimum time in seconds to wait for DOM to stabilize, currently only used in screenshots (default 5)
+  -o, --output string             Output format (signal, json, yaml). Default value is signal (default "signal")
+  -f, --output-file string        Path to output file. If blank, will output to STDOUT
+  -q, --quiet                     Suppress output
+      --target string             URL target to perform webpage capture
+      --timeout int               Timeout in seconds for the capture (default 30)
+  -v, --verbose                   Verbose output
+```
+
+### Screenshot
 
 #### Usage
+
+```bash
+webscan pagecapture screenshot [command]
+```
+
+#### Commands
+
+##### Browser
+
+###### Usage
 
 ```bash
 webscan pagecapture screenshot browser --target https://example.com
 ```
 
-#### Help Text
+###### Help Text
 
 ```bash
 Perform a fully rendered webpage screenshot and HTML capture using a headless browser
@@ -131,15 +153,15 @@ Global Flags:
   -v, --verbose              Verbose output
 ```
 
-### Screenshot Browserbase
+##### Browserbase
 
-#### Usage
+###### Usage
 
 ```bash
-webscan pagecapture screenshot browser --target https://example.com
+webscan pagecapture screenshot browserbase --target https://example.com
 ```
 
-#### Help Text
+###### Help Text
 
 ```bash
 Perform a fully rendered webpage screenshot and HTML capture using Browserbase. Useful for avoiding bot detection or maintaining stealth

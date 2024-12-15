@@ -4,7 +4,8 @@ import (
 	"net/url"
 	"strings"
 
-	webscan "github.com/Method-Security/webscan/generated/go"
+	common "github.com/Method-Security/webscan/generated/go/common"
+	webscan "github.com/Method-Security/webscan/generated/go/routecapture"
 	"github.com/PuerkitoBio/goquery"
 )
 
@@ -50,7 +51,7 @@ func extractFormRoutes(doc *goquery.Document, baseURL string, baseURLsOnly bool,
 		} else {
 			method = strings.ToUpper(method)
 		}
-		route.Method = webscan.HttpMethod(method).Ptr()
+		route.Method = common.HttpMethod(method).Ptr()
 
 		// Get the path from the full URL and set it
 		parsedURL, err := url.Parse(fullURL)
@@ -122,7 +123,7 @@ func extractAnchorRoutes(doc *goquery.Document, baseURL string, baseURLsOnly boo
 			route := &webscan.WebRoute{
 				Url:    urlNoQuery,
 				Path:   &parsedURL.Path,
-				Method: webscan.HttpMethodGet.Ptr(), // Anchor links are accessed via GET
+				Method: common.HttpMethodGet.Ptr(), // Anchor links are accessed via GET
 			}
 
 			routes = append(routes, route)
@@ -166,7 +167,7 @@ func extractLinkRoutes(doc *goquery.Document, baseURL string, baseURLsOnly bool,
 			route := &webscan.WebRoute{
 				Url:    urlNoQuery,
 				Path:   &parsedURL.Path,
-				Method: webscan.HttpMethodGet.Ptr(), // Link elements are accessed via GET
+				Method: common.HttpMethodGet.Ptr(), // Link elements are accessed via GET
 			}
 
 			routes = append(routes, route)

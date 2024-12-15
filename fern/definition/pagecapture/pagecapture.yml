@@ -1,0 +1,13 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/fern-api/fern/main/fern.schema.json
+types:
+  PageCaptureReport:
+    properties:
+      target: string
+      html_encoded: optional<string>
+      errors: optional<list<string>>
+  PageScreenshotReport:
+    properties:
+      target: string
+      html_encoded: optional<string>
+      screenshot: optional<base64>
+      errors: optional<list<string>>

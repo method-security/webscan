@@ -21,8 +21,8 @@ github.com/Mzack9999/gcache/internal/list
 # github.com/Mzack9999/go-http-digest-auth-client v0.6.1-0.20220414142836-eb8883508809
 ## explicit; go 1.17
 github.com/Mzack9999/go-http-digest-auth-client
-# github.com/PuerkitoBio/goquery v1.9.3
-## explicit; go 1.18
+# github.com/PuerkitoBio/goquery v1.10.0
+## explicit; go 1.23
 github.com/PuerkitoBio/goquery
 # github.com/VividCortex/ewma v1.2.0
 ## explicit; go 1.12

@@ -19,7 +19,7 @@ require (
 	github.com/projectdiscovery/katana v1.1.0
 	github.com/robertkrimen/otto v0.4.0
 	github.com/spf13/cobra v1.8.0
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 	github.com/valyala/fasthttp v1.57.0
 	github.com/ysmood/gson v0.7.3
 	golang.org/x/net v0.32.0

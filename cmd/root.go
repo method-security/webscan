@@ -20,18 +20,12 @@ import (
 // invoked during the execution of the CLI. It also is responsible for managing the output configuration as well as the
 // output signal itself, which will be written after the execution of the invoked command's Run function.
 type WebScan struct {
-	Version         string
-	RootFlags       config.RootFlags
-	OutputConfig    writer.OutputConfig
-	OutputSignal    signal.Signal
-	RootCmd         *cobra.Command
-	VersionCmd      *cobra.Command
-	AppCmd          *cobra.Command
-	PagecaptureCmd  *cobra.Command
-	RoutecaptureCmd *cobra.Command
-	SpiderCmd       *cobra.Command
-	URLCmd          *cobra.Command
-	WebserverCmd    *cobra.Command
+	Version      string
+	RootFlags    config.RootFlags
+	OutputConfig writer.OutputConfig
+	OutputSignal signal.Signal
+	RootCmd      *cobra.Command
+	VersionCmd   *cobra.Command
 }
 
 // NewWebScan creates a new WebScan struct with the provided version string. The Webscan struct is used throughout the

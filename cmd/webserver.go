@@ -8,7 +8,7 @@ import (
 
 // InitWebserverCommand initializes the webserver command for the webscan CLI. This command is used to perform detection tests for web applications.
 func (a *WebScan) InitWebserverCommand() {
-	a.WebserverCmd = &cobra.Command{
+	webserverCmd := &cobra.Command{
 		Use:   "webserver",
 		Short: "Perform detection tests for web applications",
 		Long:  `Perform detection tests for web applications`,
@@ -67,7 +67,7 @@ func (a *WebScan) InitWebserverCommand() {
 	_ = ratelimitCmd.MarkFlagRequired("targets")
 	_ = ratelimitCmd.MarkFlagRequired("maxrequests")
 
-	a.WebserverCmd.AddCommand(ratelimitCmd)
+	webserverCmd.AddCommand(ratelimitCmd)
 
 	probeCmd := &cobra.Command{
 		Use:   "probe",
@@ -107,7 +107,7 @@ func (a *WebScan) InitWebserverCommand() {
 
 	_ = probeCmd.MarkFlagRequired("targets")
 
-	a.WebserverCmd.AddCommand(probeCmd)
+	webserverCmd.AddCommand(probeCmd)
 
 	headergrabCmd := &cobra.Command{
 		Use:   "headergrab",
@@ -148,9 +148,9 @@ func (a *WebScan) InitWebserverCommand() {
 
 	_ = headergrabCmd.MarkFlagRequired("targets")
 
-	a.WebserverCmd.AddCommand(headergrabCmd)
+	webserverCmd.AddCommand(headergrabCmd)
 
-	a.RootCmd.AddCommand(a.WebserverCmd)
+	a.RootCmd.AddCommand(webserverCmd)
 }
 
 func LoadWebserverProbeConfig(targets []string, timeout int) *webscan.WebserverProbeConfig {

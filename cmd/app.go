@@ -12,7 +12,7 @@ import (
 
 // InitAppCommand initializes the app command for the webscan CLI.
 func (a *WebScan) InitAppCommand() {
-	a.AppCmd = &cobra.Command{
+	appCmd := &cobra.Command{
 		Use:   "app",
 		Short: "Perform various application scans",
 		Long:  `Perform various application scans such as fingerprinting and enumeration`,
@@ -109,7 +109,7 @@ for the specified resource type.`,
 	_ = fingerprintCmd.MarkFlagRequired("targets")
 	_ = fingerprintCmd.MarkFlagRequired("resoursetype")
 
-	a.AppCmd.AddCommand(fingerprintCmd)
+	appCmd.AddCommand(fingerprintCmd)
 
 	enumerateCmd := &cobra.Command{
 		Use:   "enumerate",
@@ -260,9 +260,9 @@ HTTP methods, query parameters, and authentication mechanisms.`,
 
 	enumerateCmd.AddCommand(enumerateSwaggerCmd)
 
-	a.AppCmd.AddCommand(enumerateCmd)
+	appCmd.AddCommand(enumerateCmd)
 
-	a.RootCmd.AddCommand(a.AppCmd)
+	a.RootCmd.AddCommand(appCmd)
 }
 
 func validateFingerprintResourceType(resourceType string) (*webscan.AppFingerprintResourceType, error) {

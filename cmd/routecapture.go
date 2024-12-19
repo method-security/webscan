@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	webscan "github.com/Method-Security/webscan/generated/go"
+	webscan "github.com/Method-Security/webscan/generated/go/routecapture"
 	"github.com/Method-Security/webscan/internal/browserbase"
 	routecapture "github.com/Method-Security/webscan/internal/routecapture"
 	"github.com/spf13/cobra"

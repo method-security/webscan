@@ -32,7 +32,7 @@ webscan spider --targets https://example.com,https://example.dev
 ```
 
 ```bash
-webscan path fuzz --targets example.com
+webscan webserver probe --targets example.com
 ```
 
 ## Contributing

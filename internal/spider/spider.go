@@ -5,7 +5,6 @@ package spider
 import (
 	"context"
 	"math"
-	"strings"
 
 	"github.com/projectdiscovery/katana/pkg/engine/standard"
 	"github.com/projectdiscovery/katana/pkg/output"
@@ -72,21 +71,18 @@ func performWebSpider(targets []string) ([]LinkDetails, []string, error) {
 
 // PerformWebSpider performs a web spider operation against the provided targets, returning a WebSpiderReport with the
 // results of the spider.
-func PerformWebSpider(ctx context.Context, targets string) (WebSpiderReport, error) {
-	// 1. Parse target list
-	targetList := strings.Split(targets, ",")
-
-	// 2. Perform web spider
-	links, errors, err := performWebSpider(targetList)
+func PerformWebSpider(ctx context.Context, targets []string) WebSpiderReport {
+	// 1. Perform web spider
+	links, errors, err := performWebSpider(targets)
 	if err != nil {
 		errors = append(errors, err.Error())
 	}
 
-	// 3. Create report
+	// 2. Create report
 	report := WebSpiderReport{
-		Targets: targetList,
+		Targets: targets,
 		Links:   links,
 		Errors:  errors,
 	}
-	return report, nil
+	return report
 }

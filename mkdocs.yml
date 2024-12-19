@@ -15,12 +15,10 @@ nav:
       - Overview: docs/index.md
       - Capabilities:
         - App: docs/app.md
-        - Fingerprint: docs/fingerprint.md
-        - Fuzz: docs/fuzz.md
         - Pagecapture: docs/pagecapture.md
-        - Requests: docs/requests.md
         - Routecapture: docs/routecapture.md
         - Spider: docs/spider.md
+        - URL: docs/url.md
         - Webserver: docs/webserver.md
   - Contributing:
       - How to contribute: community/community.md

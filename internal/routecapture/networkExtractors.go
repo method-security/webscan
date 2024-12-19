@@ -5,7 +5,8 @@ import (
 	"net/url"
 	"time"
 
-	webscan "github.com/Method-Security/webscan/generated/go"
+	common "github.com/Method-Security/webscan/generated/go/common"
+	webscan "github.com/Method-Security/webscan/generated/go/routecapture"
 	capture "github.com/Method-Security/webscan/internal/capture"
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/proto"
@@ -117,7 +118,7 @@ func extractNetworkRoutes(ctx context.Context, b *capture.BrowserPageCapturer, t
 		webRoute := &webscan.WebRoute{
 			Url:    urlNoQuery,
 			Path:   &parsedURL.Path,
-			Method: webscan.HttpMethod(request.Method).Ptr(),
+			Method: common.HttpMethod(request.Method).Ptr(),
 		}
 
 		// Capture query parameters

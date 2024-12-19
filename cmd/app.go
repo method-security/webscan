@@ -4,29 +4,20 @@ import (
 	"fmt"
 	"strings"
 
-	webscan "github.com/Method-Security/webscan/generated/go"
-	"github.com/Method-Security/webscan/internal/appfingerprint"
-	"github.com/Method-Security/webscan/internal/graphql"
-	"github.com/Method-Security/webscan/internal/grpc"
-	"github.com/Method-Security/webscan/internal/k8s"
-	"github.com/Method-Security/webscan/internal/swagger"
+	webscan "github.com/Method-Security/webscan/generated/go/app"
+	"github.com/Method-Security/webscan/internal/app/enumerate"
+	fingerprint "github.com/Method-Security/webscan/internal/app/fingerprint"
 	"github.com/spf13/cobra"
 )
 
 // InitAppCommand initializes the app command for the webscan CLI.
 func (a *WebScan) InitAppCommand() {
-	a.AppCmd = &cobra.Command{
+	appCmd := &cobra.Command{
 		Use:   "app",
 		Short: "Perform various application scans",
 		Long:  `Perform various application scans such as fingerprinting and enumeration`,
 	}
 
-	a.RootCmd.AddCommand(a.AppCmd)
-	a.initFingerprintCommand()
-	a.initEnumerateCommand()
-}
-
-func (a *WebScan) initFingerprintCommand() {
 	fingerprintCmd := &cobra.Command{
 		Use:   "fingerprint",
 		Short: "Perform a fingerprinting scan against a target",
@@ -37,11 +28,16 @@ It supports fingerprinting different resource types including API applications (
 cloud buckets (AWSS3, AzureBlob). The command accepts a list of modules to run
 for the specified resource type.`,
 		Run: func(cmd *cobra.Command, args []string) {
+			defer a.OutputSignal.PanicHandler(cmd.Context())
+
+			// Target flag
 			targets, err := cmd.Flags().GetStringSlice("targets")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
+
+			// Config flags
 			resourceType, err := cmd.Flags().GetString("resourcetype")
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -78,7 +74,7 @@ for the specified resource type.`,
 				return
 			}
 
-			engine := appfingerprint.NewEngine(config)
+			engine := fingerprint.NewEngine(config)
 			report, err := engine.Launch(cmd.Context())
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -107,16 +103,14 @@ for the specified resource type.`,
 	fingerprintCmd.Flags().StringSlice("targets", []string{}, "URL target to perform fingerprint against")
 	fingerprintCmd.Flags().String("resourcetype", "", fmt.Sprintf("Resource type to fingerprint (%s)", resourceTypes))
 	fingerprintCmd.Flags().StringSlice("modules", []string{}, fmt.Sprintf("Modules to run (APIApplication: %s; CloudBucket: %s)", apiApplicationModules, cloudBucketModules))
-	fingerprintCmd.Flags().Int("timeout", 5, "Timeout per request (seconds)")
+	fingerprintCmd.Flags().Int("timeout", 30, "Timeout per request (seconds)")
 	fingerprintCmd.Flags().Bool("successfulonly", false, "Only show successful attempts")
 
 	_ = fingerprintCmd.MarkFlagRequired("targets")
 	_ = fingerprintCmd.MarkFlagRequired("resoursetype")
 
-	a.AppCmd.AddCommand(fingerprintCmd)
-}
+	appCmd.AddCommand(fingerprintCmd)
 
-func (a *WebScan) initEnumerateCommand() {
 	enumerateCmd := &cobra.Command{
 		Use:   "enumerate",
 		Short: "Perform enumeration scans against a target",
@@ -126,16 +120,7 @@ The enumerate command details the routes and endpoints for an API application.
 It extracts information such as available endpoints, HTTP methods, query parameters, and authentication mechanisms.`,
 	}
 
-	enumerateCmd.AddCommand(a.initGraphqlEnumerateCommand())
-	enumerateCmd.AddCommand(a.initGrpcEnumerateCommand())
-	enumerateCmd.AddCommand(a.initK8sEnumerateCommand())
-	enumerateCmd.AddCommand(a.initSwaggerEnumerateCommand())
-
-	a.AppCmd.AddCommand(enumerateCmd)
-}
-
-func (a *WebScan) initGraphqlEnumerateCommand() *cobra.Command {
-	graphqlCmd := &cobra.Command{
+	enumerateGraphqlCmd := &cobra.Command{
 		Use:   "graphql",
 		Short: "Perform a GraphQL enumeration scan against a target",
 		Long: `Perform a GraphQL enumeration scan against a target.
@@ -144,26 +129,30 @@ This involves querying the GraphQL schema to discover available types, queries, 
 and extracting details about the fields and their types.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			defer a.OutputSignal.PanicHandler(cmd.Context())
+
+			// Target flag
 			target, err := cmd.Flags().GetString("target")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
 
-			report := graphql.PerformGraphQLScan(cmd.Context(), target)
+			// Generate report
+			report := enumerate.PerformAppEnumerateGraphQL(cmd.Context(), target)
+			if len(report.Errors) > 0 {
+				a.OutputSignal.Status = 1
+			}
 			a.OutputSignal.Content = report
 		},
 	}
 
-	graphqlCmd.Flags().String("target", "", "URL target to perform GraphQL enumeration against")
+	enumerateGraphqlCmd.Flags().String("target", "", "URL target to perform GraphQL enumeration against")
 
-	_ = graphqlCmd.MarkFlagRequired("target")
+	_ = enumerateGraphqlCmd.MarkFlagRequired("target")
 
-	return graphqlCmd
-}
+	enumerateCmd.AddCommand(enumerateGraphqlCmd)
 
-func (a *WebScan) initGrpcEnumerateCommand() *cobra.Command {
-	grpcCmd := &cobra.Command{
+	enumerateGrpcCmd := &cobra.Command{
 		Use:   "grpc",
 		Short: "Perform a gRPC enumeration scan against a target",
 		Long: `Perform a gRPC enumeration scan against a target.
@@ -172,58 +161,66 @@ This involves connecting to the gRPC server, using reflection to discover availa
 and extracting details about the methods, including their input and output types.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			defer a.OutputSignal.PanicHandler(cmd.Context())
+
+			// Target flag
 			target, err := cmd.Flags().GetString("target")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
 
-			report := grpc.PerformGRPCScan(cmd.Context(), target)
+			// Generate report
+			report := enumerate.PerformAppEnumerateGrpc(cmd.Context(), target)
+			if len(report.Errors) > 0 {
+				a.OutputSignal.Status = 1
+			}
 			a.OutputSignal.Content = report
 		},
 	}
 
-	grpcCmd.Flags().String("target", "", "URL target to perform gRPC enumeration against")
+	enumerateGrpcCmd.Flags().String("target", "", "URL target to perform gRPC enumeration against")
 
-	_ = grpcCmd.MarkFlagRequired("target")
+	_ = enumerateGrpcCmd.MarkFlagRequired("target")
 
-	return grpcCmd
-}
+	enumerateCmd.AddCommand(enumerateGrpcCmd)
 
-func (a *WebScan) initK8sEnumerateCommand() *cobra.Command {
-	k8sCmd := &cobra.Command{
+	enumerateK8sCmd := &cobra.Command{
 		Use:   "k8s",
 		Short: "Perform a K8s enumeration scan against a target",
 		Long:  `Perform a K8s enumeration scan against a target.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			defer a.OutputSignal.PanicHandler(cmd.Context())
+
+			// Target flag
 			target, err := cmd.Flags().GetString("target")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
 
+			// Timeout flag
 			timeout, err := cmd.Flags().GetInt("timeout")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
 
-			report := k8s.PerformK8sScan(cmd.Context(), target, timeout)
+			// Generate report
+			report := enumerate.PerformAppEnumerateK8s(cmd.Context(), target, timeout)
+			if len(report.Errors) > 0 {
+				a.OutputSignal.Status = 1
+			}
 			a.OutputSignal.Content = report
 		},
 	}
 
-	k8sCmd.Flags().Int("timeout", 5, "Timeout per request (seconds)")
-	k8sCmd.Flags().String("target", "", "URL target to perform K8s enumeration against")
+	enumerateK8sCmd.Flags().String("target", "", "URL target to perform K8s enumeration against")
+	enumerateK8sCmd.Flags().Int("timeout", 30, "Timeout per request (seconds)")
 
-	_ = k8sCmd.MarkFlagRequired("target")
+	_ = enumerateK8sCmd.MarkFlagRequired("target")
 
-	return k8sCmd
-}
-
-func (a *WebScan) initSwaggerEnumerateCommand() *cobra.Command {
-	swaggerCmd := &cobra.Command{
+	enumerateCmd.AddCommand(enumerateK8sCmd)
+	enumerateSwaggerCmd := &cobra.Command{
 		Use:   "swagger",
 		Short: "Perform a Swagger enumeration scan against a target",
 		Long: `Perform a Swagger enumeration scan against a target.
@@ -232,29 +229,40 @@ This involves fetching and parsing the Swagger (OpenAPI) documentation to extrac
 HTTP methods, query parameters, and authentication mechanisms.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			defer a.OutputSignal.PanicHandler(cmd.Context())
+
+			// Target flags
 			target, err := cmd.Flags().GetString("target")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
 
+			// Config flags
 			noSandbox, err := cmd.Flags().GetBool("no-sandbox")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
 
-			report := swagger.PerformSwaggerScan(cmd.Context(), target, noSandbox)
+			// Generate report
+			report := enumerate.PerformAppEnumerateSwagger(cmd.Context(), target, noSandbox)
+			if len(report.Errors) > 0 {
+				a.OutputSignal.Status = 1
+			}
 			a.OutputSignal.Content = report
 		},
 	}
 
-	swaggerCmd.Flags().String("target", "", "URL target to perform Swagger enumeration against")
-	swaggerCmd.Flags().Bool("no-sandbox", false, "Disable sandbox mode for Swagger scan")
+	enumerateSwaggerCmd.Flags().String("target", "", "URL target to perform Swagger enumeration against")
+	enumerateSwaggerCmd.Flags().Bool("no-sandbox", false, "Disable sandbox mode for Swagger scan")
 
-	_ = swaggerCmd.MarkFlagRequired("target")
+	_ = enumerateSwaggerCmd.MarkFlagRequired("target")
 
-	return swaggerCmd
+	enumerateCmd.AddCommand(enumerateSwaggerCmd)
+
+	appCmd.AddCommand(enumerateCmd)
+
+	a.RootCmd.AddCommand(appCmd)
 }
 
 func validateFingerprintResourceType(resourceType string) (*webscan.AppFingerprintResourceType, error) {

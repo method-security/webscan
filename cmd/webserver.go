@@ -1,251 +1,180 @@
 package cmd
 
 import (
-	"fmt"
-	"strings"
-	"time"
-
-	webscan "github.com/Method-Security/webscan/generated/go"
+	webscan "github.com/Method-Security/webscan/generated/go/webserver"
 	webserver "github.com/Method-Security/webscan/internal/webserver"
 	"github.com/spf13/cobra"
 )
 
-// InitWebServerCommand initializes the probe command for the webscan CLI. This command is used to perform a web probe against
-// targets to identify the existence of web servers.
-func (a *WebScan) InitWebServerCommand() {
-	webServerCmd := &cobra.Command{
+// InitWebserverCommand initializes the webserver command for the webscan CLI. This command is used to perform detection tests for web applications.
+func (a *WebScan) InitWebserverCommand() {
+	webserverCmd := &cobra.Command{
 		Use:   "webserver",
-		Short: "Perform webserver analysis",
-		Long:  `Perform webserver analysis`,
+		Short: "Perform detection tests for web applications",
+		Long:  `Perform detection tests for web applications`,
 	}
+
+	ratelimitCmd := &cobra.Command{
+		Use:   "ratelimit",
+		Short: "Perform detection tests for rate limiting",
+		Long:  `Perform detection tests for rate limiting`,
+		Run: func(cmd *cobra.Command, args []string) {
+			defer a.OutputSignal.PanicHandler(cmd.Context())
+
+			// Target flags
+			targets, err := cmd.Flags().GetStringSlice("targets")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Configuration flags
+			maxRequests, err := cmd.Flags().GetInt("maxrequests")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			timespan, err := cmd.Flags().GetInt("timespan")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			timeout, err := cmd.Flags().GetInt("timeout")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Load configuration
+			config := LoadWebserverRatelimitConfig(targets, maxRequests, timespan, timeout)
+
+			// Generate report
+			report := webserver.PerformWebserverRatelimit(cmd.Context(), config)
+			if len(report.Errors) > 0 {
+				a.OutputSignal.Status = 1
+			}
+			a.OutputSignal.Content = report
+		},
+	}
+
+	ratelimitCmd.Flags().StringSlice("targets", []string{}, "URL of target")
+	ratelimitCmd.Flags().Int("maxrequests", 0, "Number of requests to perform")
+	ratelimitCmd.Flags().Int("timespan", 0, "Length of time to send the requests (seconds)")
+	ratelimitCmd.Flags().Int("timeout", 30, "Timeout per request (seconds)")
+
+	_ = ratelimitCmd.MarkFlagRequired("targets")
+	_ = ratelimitCmd.MarkFlagRequired("maxrequests")
+
+	webserverCmd.AddCommand(ratelimitCmd)
 
 	probeCmd := &cobra.Command{
 		Use:   "probe",
-		Short: "Perform a web probe against targets to identify existence of web servers",
-		Long:  `Perform a web probe against targets to identify existence of web servers`,
+		Short: "Perform a web probe against targets to identify existence of web applications",
+		Long:  `Perform a web probe against targets to identify existence of web applications`,
 		Run: func(cmd *cobra.Command, args []string) {
 			defer a.OutputSignal.PanicHandler(cmd.Context())
-			targets, err := cmd.Flags().GetString("targets")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
 
-			timeout, err := cmd.Flags().GetInt("timeout")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-
-			report, err := webserver.PerformWebServerProbe(cmd.Context(), targets, time.Duration(timeout)*time.Second)
-			if err != nil {
-				a.OutputSignal.AddError(err)
-			}
-			a.OutputSignal.Content = report
-
-		},
-	}
-
-	probeCmd.Flags().String("targets", "", "Address targets to perform webserver probing agains, comma delimited list")
-	probeCmd.Flags().Int("timeout", 30, "Timeout limit in seconds")
-
-	webServerCmd.AddCommand(probeCmd)
-
-	enumerationCmd := &cobra.Command{
-		Use:   "enumerate",
-		Short: "Enumerate a specific type of web server",
-		Long:  `Enumerate a specific type of web server`,
-		Run: func(cmd *cobra.Command, args []string) {
-			defer a.OutputSignal.PanicHandler(cmd.Context())
-			// Targets
+			// Target flags
 			targets, err := cmd.Flags().GetStringSlice("targets")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			updatedTargets := addSchemesToTargets(targets)
 
-			// ServerType
-			server, err := cmd.Flags().GetString("server")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			serverEnum, err := webscan.NewServerTypeFromString(strings.ToUpper(server))
-			if err != nil {
-				a.OutputSignal.AddError(fmt.Errorf("invalid server type '%s': must be either 'APACHE' or 'NGINX'", server))
-				return
-			}
-
-			// Modules
-			modules, err := cmd.Flags().GetStringSlice("modules")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			moduleEnums, err := validateModuleSelection(modules)
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-
-			// Run Configs
+			// Configuration flags
 			timeout, err := cmd.Flags().GetInt("timeout")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			successfulOnly, err := cmd.Flags().GetBool("successfulonly")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			config, err := newLoadWebserverTypeConfig(updatedTargets, serverEnum, moduleEnums, webscan.ProbeTypeEnumerate, timeout, successfulOnly)
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
 
-			engine := webserver.NewEngine(config)
-			report, err := engine.Launch(cmd.Context())
-			if err != nil {
-				a.OutputSignal.AddError(err)
+			// Load configuration
+			config := LoadWebserverProbeConfig(targets, timeout)
+
+			// Generate report
+			report := webserver.PerformWebserverProbe(cmd.Context(), config)
+			if len(report.Errors) > 0 {
+				a.OutputSignal.Status = 1
 			}
 			a.OutputSignal.Content = report
 		},
 	}
 
-	enumerationCmd.Flags().StringSlice("targets", []string{}, "Address of target")
-	enumerationCmd.Flags().String("server", "", "Server type to target (nginx, apache)")
-	enumerationCmd.Flags().StringSlice("modules", []string{}, "Server specfic modules to run (default all)")
-	enumerationCmd.Flags().Int("timeout", 5000, "Timeout limit in milliseconds")
-	enumerationCmd.Flags().Bool("successfulonly", false, "Only show successful attempts")
+	probeCmd.Flags().StringSlice("targets", []string{}, "Address targets to perform web application probing agains, comma delimited list")
+	probeCmd.Flags().Int("timeout", 30, "Timeout limit (seconds)")
 
-	_ = enumerationCmd.MarkFlagRequired("targets")
-	_ = enumerationCmd.MarkFlagRequired("server")
+	_ = probeCmd.MarkFlagRequired("targets")
 
-	webServerCmd.AddCommand(enumerationCmd)
+	webserverCmd.AddCommand(probeCmd)
 
-	a.RootCmd.AddCommand(webServerCmd)
-
-	validationCmd := &cobra.Command{
-		Use:   "validate",
-		Short: "Preform validation against a specific type of web server",
-		Long:  `Preform validation against a specific type of web server`,
+	headergrabCmd := &cobra.Command{
+		Use:   "headergrab",
+		Short: "Grab the headers of the webserver",
+		Long:  `Grab the headers of the webserver`,
 		Run: func(cmd *cobra.Command, args []string) {
 			defer a.OutputSignal.PanicHandler(cmd.Context())
-			// Targets
+
+			// Target flags
 			targets, err := cmd.Flags().GetStringSlice("targets")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			updatedTargets := addSchemesToTargets(targets)
 
-			// ServerType
-			server, err := cmd.Flags().GetString("server")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			serverEnum, err := webscan.NewServerTypeFromString(strings.ToUpper(server))
-			if err != nil {
-				a.OutputSignal.AddError(fmt.Errorf("invalid server type '%s': must be either 'APACHE' or 'NGINX'", server))
-				return
-			}
-
-			// Modules
-			modules, err := cmd.Flags().GetStringSlice("modules")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			moduleEnums, err := validateModuleSelection(modules)
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-
-			// Run Configs
+			// Configuration flags
 			timeout, err := cmd.Flags().GetInt("timeout")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			successfulOnly, err := cmd.Flags().GetBool("successfulonly")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			config, err := newLoadWebserverTypeConfig(updatedTargets, serverEnum, moduleEnums, webscan.ProbeTypeValidate, timeout, successfulOnly)
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
+
+			// Load configuration
+			config := LoadWebserverHeadergrabConfig(targets, timeout)
+
+			// Generate report
+			report := webserver.PerformWebserverHeadergrab(cmd.Context(), config)
+			if len(report.Errors) > 0 {
+				a.OutputSignal.Status = 1
 			}
 
-			engine := webserver.NewEngine(config)
-			report, err := engine.Launch(cmd.Context())
-			if err != nil {
-				a.OutputSignal.AddError(err)
-			}
 			a.OutputSignal.Content = report
 		},
 	}
 
-	validationCmd.Flags().StringSlice("targets", []string{}, "Address of target")
-	validationCmd.Flags().String("server", "", "Server type to target (nginx, apache)")
-	validationCmd.Flags().StringSlice("modules", []string{}, "Server specfic modules to run (default all)")
-	validationCmd.Flags().Int("timeout", 5000, "Timeout limit in milliseconds")
-	validationCmd.Flags().Bool("successfulonly", false, "Only show successful attempts")
+	headergrabCmd.Flags().StringSlice("targets", []string{}, "URL of target")
+	headergrabCmd.Flags().Int("timeout", 30, "Timeout per request (seconds)")
 
-	_ = validationCmd.MarkFlagRequired("targets")
-	_ = validationCmd.MarkFlagRequired("server")
+	_ = headergrabCmd.MarkFlagRequired("targets")
 
-	webServerCmd.AddCommand(validationCmd)
+	webserverCmd.AddCommand(headergrabCmd)
 
-	a.RootCmd.AddCommand(webServerCmd)
+	a.RootCmd.AddCommand(webserverCmd)
 }
 
-func newLoadWebserverTypeConfig(targets []string, serverEnum webscan.ServerType, moduleEnums []webscan.ModuleName, probeEnum webscan.ProbeType, timeout int, successfulOnly bool) (*webscan.WebServerTypeConfig, error) {
-	config := &webscan.WebServerTypeConfig{
-		Targets:        targets,
-		Probe:          probeEnum,
-		Server:         serverEnum,
-		Modules:        moduleEnums,
-		Timeout:        timeout,
-		SuccessfulOnly: successfulOnly,
+func LoadWebserverProbeConfig(targets []string, timeout int) *webscan.WebserverProbeConfig {
+	config := &webscan.WebserverProbeConfig{
+		Targets: targets,
+		Timeout: timeout,
 	}
-	if config.Timeout < 1 {
-		config.Timeout = 0
-	}
-	return config, nil
+	return config
 }
 
-func addSchemesToTargets(targets []string) []string {
-	var updatedTargets []string
-	for _, target := range targets {
-		if strings.HasPrefix(target, "http://") || strings.HasPrefix(target, "https://") {
-			updatedTargets = append(updatedTargets, target)
-		} else {
-			updatedTargets = append(updatedTargets, "http://"+target)
-			updatedTargets = append(updatedTargets, "https://"+target)
-		}
+func LoadWebserverRatelimitConfig(targets []string, maxRequests int, timespan int, timeout int) *webscan.WebserverRateLimitConfig {
+	config := &webscan.WebserverRateLimitConfig{
+		Targets:     targets,
+		MaxRequests: maxRequests,
+		Timespan:    timespan,
+		Timeout:     timeout,
 	}
-	return updatedTargets
+	return config
 }
 
-func validateModuleSelection(modules []string) ([]webscan.ModuleName, error) {
-	moduleEnums := []webscan.ModuleName{}
-	if len(modules) == 0 {
-		return nil, nil
+func LoadWebserverHeadergrabConfig(targets []string, timeout int) *webscan.WebserverHeadergrabConfig {
+	config := &webscan.WebserverHeadergrabConfig{
+		Targets: targets,
+		Timeout: timeout,
 	}
-	for _, module := range modules {
-		moduleEnum, err := webscan.NewModuleNameFromString(strings.ToUpper(module))
-		if err != nil {
-			return nil, err
-		}
-		moduleEnums = append(moduleEnums, moduleEnum)
-	}
-
-	return moduleEnums, nil
+	return config
 }

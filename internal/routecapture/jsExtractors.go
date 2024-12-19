@@ -7,7 +7,8 @@ import (
 	"net/url"
 	"strings"
 
-	webscan "github.com/Method-Security/webscan/generated/go"
+	common "github.com/Method-Security/webscan/generated/go/common"
+	webscan "github.com/Method-Security/webscan/generated/go/routecapture"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/robertkrimen/otto/ast"
 	"github.com/robertkrimen/otto/parser"
@@ -128,7 +129,7 @@ func (v *visitor) addRoute(urlStr, method string, bodyParams []*webscan.BodyPara
 	route := &webscan.WebRoute{
 		Url:         urlNoQuery,
 		Path:        &parsedURL.Path,
-		Method:      webscan.HttpMethod(method).Ptr(),
+		Method:      common.HttpMethod(method).Ptr(),
 		BodyParams:  bodyParams,
 		QueryParams: queryParams,
 	}

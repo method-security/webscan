@@ -1,0 +1,39 @@
+types:
+  # Http Method Enum
+  HttpMethod:
+    enum:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - PATCH
+      - OPTIONS
+      - HEAD
+      - CONNECT
+      - TRACE
+  # Request Structure
+  RequestInfo:
+    properties:
+      baseUrl: string
+      path: string
+      method: HttpMethod
+      pathParams: optional<map<string, string>>
+      queryParams: optional<map<string, string>>
+      headerParams: optional<map<string, string>>
+      bodyParams: optional<string>
+      formParams: optional<map<string, string>>  
+      multipartParams: optional<map<string, string>>
+      statusCode: optional<integer>
+      responseBody: optional<string>
+      responseHeaders: optional<map<string, string>>
+      errors: optional<list<string>>
+      timestamp: datetime
+  # Request Params
+  RequestParams:
+    properties:
+      pathParams: map<string, string>
+      queryParams: map<string, string>
+      headerParams: map<string, string>
+      bodyParams: string
+      formParams: map<string, string>
+      multipartParams: map<string, string>

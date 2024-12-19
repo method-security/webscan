@@ -7,41 +7,10 @@ Routes are extracted from the rendered HTML, inline scripts, linked scripts, and
 ## Usage
 
 ```bash
-webscan pagecapture [command]
+webscan routecapture [command]
 ```
 
 ## Commmands
-
-### Request
-
-#### Usage
-
-```bash
-webscan routecapture request --target https://example.com
-```
-
-#### Help Text
-
-```bash
-Perform a webpage route capture using a basic HTTP/HTTPS request
-
-Usage:
-  webscan routecapture request [flags]
-
-Flags:
-  -h, --help       help for request
-      --insecure   Allow insecure connections
-
-Global Flags:
-      --base-urls-only       Only match routes and urls that share the base URLs domain (default true)
-      --browserPath string   Path to a browser executable
-  -o, --output string        Output format (signal, json, yaml). Default value is signal (default "signal")
-  -f, --output-file string   Path to output file. If blank, will output to STDOUT
-  -q, --quiet                Suppress output
-      --target string        URL target to perform webpage capture
-      --timeout int          Timeout in seconds for the capture (default 30)
-  -v, --verbose              Verbose output
-```
 
 ### Browser
 
@@ -95,6 +64,37 @@ Flags:
       --project string        Browserbase project ID
       --proxy                 Instruct Browserbase to use a proxy
       --token string          Browserbase API token
+
+Global Flags:
+      --base-urls-only       Only match routes and urls that share the base URLs domain (default true)
+      --browserPath string   Path to a browser executable
+  -o, --output string        Output format (signal, json, yaml). Default value is signal (default "signal")
+  -f, --output-file string   Path to output file. If blank, will output to STDOUT
+  -q, --quiet                Suppress output
+      --target string        URL target to perform webpage capture
+      --timeout int          Timeout in seconds for the capture (default 30)
+  -v, --verbose              Verbose output
+```
+
+### Request
+
+#### Usage
+
+```bash
+webscan routecapture request --target https://example.com
+```
+
+#### Help Text
+
+```bash
+Perform a webpage route capture using a basic HTTP/HTTPS request
+
+Usage:
+  webscan routecapture request [flags]
+
+Flags:
+  -h, --help       help for request
+      --insecure   Allow insecure connections
 
 Global Flags:
       --base-urls-only       Only match routes and urls that share the base URLs domain (default true)

@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 
-	webscan "github.com/Method-Security/webscan/generated/go"
+	webscan "github.com/Method-Security/webscan/generated/go/pagecapture"
 )
 
 type Options struct{}

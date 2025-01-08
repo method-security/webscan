@@ -1,5 +1,5 @@
 # Dockerfile used for the compilation of the statically compiled webscan binary
-FROM golang:1.22.4-alpine3.20 as base
+FROM golang:1.22.4-alpine3.20 AS base
 ARG GORELEASER_VERSION="v2.0.1"
 ARG CLI_NAME="webscan"
 ARG TARGETARCH
@@ -11,7 +11,7 @@ RUN \
 
 WORKDIR /app/${CLI_NAME}
 
-FROM base as amd64
+FROM base AS amd64
 ARG CLI_NAME
 ARG GORELEASER_VERSION
 RUN \
@@ -20,7 +20,7 @@ RUN \
   mv goreleaser /usr/local/bin/goreleaser && \
   rm -rf goreleaser-pro_Linux_x86_64.tar.gz LICENSE.md README.md completions manpages
 
-FROM base as arm64
+FROM base AS arm64
 ARG CLI_NAME
 RUN \
   wget https://github.com/goreleaser/goreleaser-pro/releases/download/${GORELEASER_VERSION}-pro/goreleaser-pro_Linux_arm64.tar.gz && \

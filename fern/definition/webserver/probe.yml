@@ -13,5 +13,5 @@ types:
   WebserverProbeReport:
     properties:
       targets: list<string>
-      urls: list<WebserverProbeUrlDetails>
+      urls: optional<list<WebserverProbeUrlDetails>>
       errors: optional<list<string>>

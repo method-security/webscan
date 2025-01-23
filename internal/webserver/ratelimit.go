@@ -42,7 +42,7 @@ func PerformWebserverRatelimit(ctx context.Context, config *webscan.WebserverRat
 				break
 			}
 			// Mark if a 200 OK response was seen
-			if *request.StatusCode == http.StatusOK {
+			if request.StatusCode != nil && *request.StatusCode == http.StatusOK {
 				hasSeen200 = true
 			}
 			// Enforce the calculated request interval
@@ -61,6 +61,10 @@ func PerformWebserverRatelimit(ctx context.Context, config *webscan.WebserverRat
 // rateLimitDetected checks if a response explicitly indicates that a request was rate-limited
 // or if a 403 response is returned after a 200 response was previously seen.
 func rateLimitDetected(request *common.RequestInfo, hasSeen200 bool) bool {
+	if request == nil {
+		return false
+	}
+
 	if request.StatusCode != nil && *request.StatusCode == http.StatusTooManyRequests {
 		return true
 	}
@@ -68,11 +72,14 @@ func rateLimitDetected(request *common.RequestInfo, hasSeen200 bool) bool {
 		return true
 	}
 
-	if *request.StatusCode == http.StatusForbidden && hasSeen200 {
+	if request.StatusCode != nil && *request.StatusCode == http.StatusForbidden && hasSeen200 {
 		return true
 	}
 
 	// Check for specific header names and values
+	if request.ResponseHeaders == nil {
+		return false
+	}
 	for key, values := range request.ResponseHeaders {
 		if (strings.Contains(key, "Retry-After") && len(values) > 0 && string(values[0]) != "") ||
 			(strings.Contains(key, "RateLimit-Remaining") && len(values) > 0 && string(values[0]) == "0") {

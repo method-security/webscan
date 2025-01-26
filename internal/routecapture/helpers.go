@@ -118,12 +118,14 @@ func mergeBodyParams(params1 []*webscan.BodyParams, params2 []*webscan.BodyParam
 	}
 	for _, param := range params2 {
 		if _, exists := paramMap[param.Name]; !exists {
-			existingParam := paramMap[param.Name]
-			if existingParam.ExampleValues != nil && param.ExampleValues != nil {
-				existingParam.ExampleValues = append(existingParam.ExampleValues, param.ExampleValues...)
-			} else if param.ExampleValues != nil {
-				existingParam.ExampleValues = param.ExampleValues
-			} // else existingParam.ExampleValues is already set
+			existingParam, exists := paramMap[param.Name]
+			if exists {
+				if existingParam.ExampleValues != nil && param.ExampleValues != nil {
+					existingParam.ExampleValues = append(existingParam.ExampleValues, param.ExampleValues...)
+				} else if param.ExampleValues != nil {
+					existingParam.ExampleValues = param.ExampleValues
+				}
+			}
 			paramMap[param.Name] = existingParam
 		}
 	}

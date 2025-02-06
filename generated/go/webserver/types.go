@@ -138,8 +138,11 @@ func (w *WebserverHeadergrabReport) String() string {
 }
 
 type WebserverProbeConfig struct {
-	Targets []string `json:"targets,omitempty" url:"targets,omitempty"`
-	Timeout int      `json:"timeout" url:"timeout"`
+	Targets             []string             `json:"targets,omitempty" url:"targets,omitempty"`
+	Timeout             int                  `json:"timeout" url:"timeout"`
+	Method              WebserverProbeMethod `json:"method" url:"method"`
+	BrowserPath         *string              `json:"browserPath,omitempty" url:"browserPath,omitempty"`
+	MinDomStabalizeTime *int                 `json:"minDOMStabalizeTime,omitempty" url:"minDOMStabalizeTime,omitempty"`
 
 	extraProperties map[string]interface{}
 	_rawJSON        json.RawMessage
@@ -177,6 +180,28 @@ func (w *WebserverProbeConfig) String() string {
 		return value
 	}
 	return fmt.Sprintf("%#v", w)
+}
+
+type WebserverProbeMethod string
+
+const (
+	WebserverProbeMethodRequest     WebserverProbeMethod = "REQUEST"
+	WebserverProbeMethodBrowserbase WebserverProbeMethod = "BROWSERBASE"
+)
+
+func NewWebserverProbeMethodFromString(s string) (WebserverProbeMethod, error) {
+	switch s {
+	case "REQUEST":
+		return WebserverProbeMethodRequest, nil
+	case "BROWSERBASE":
+		return WebserverProbeMethodBrowserbase, nil
+	}
+	var t WebserverProbeMethod
+	return "", fmt.Errorf("%s is not a valid %T", s, t)
+}
+
+func (w WebserverProbeMethod) Ptr() *WebserverProbeMethod {
+	return &w
 }
 
 type WebserverProbeReport struct {
@@ -223,9 +248,9 @@ func (w *WebserverProbeReport) String() string {
 }
 
 type WebserverProbeUrlDetails struct {
-	Url    string `json:"url" url:"url"`
-	Status int    `json:"status" url:"status"`
-	Title  string `json:"title" url:"title"`
+	Url    string  `json:"url" url:"url"`
+	Status *int    `json:"status,omitempty" url:"status,omitempty"`
+	Title  *string `json:"title,omitempty" url:"title,omitempty"`
 
 	extraProperties map[string]interface{}
 	_rawJSON        json.RawMessage

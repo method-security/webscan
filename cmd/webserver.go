@@ -92,12 +92,12 @@ func (a *WebScan) InitWebserverCommand() {
 				return
 			}
 
-			method, err := cmd.Flags().GetString("method")
+			strategy, err := cmd.Flags().GetString("strategy")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			methodEnum, err := webscan.NewWebserverProbeMethodFromString(strings.ToUpper(method))
+			strategyEnum, err := webscan.NewWebserverProbeStrategyFromString(strings.ToUpper(strategy))
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -105,7 +105,7 @@ func (a *WebScan) InitWebserverCommand() {
 
 			var browserPath *string
 			var minDOMStabalizeTime *int
-			if methodEnum == webscan.WebserverProbeMethodBrowserbase {
+			if strategyEnum == webscan.WebserverProbeStrategyBrowser {
 				bPath, err := cmd.Flags().GetString("browserpath")
 				if err != nil {
 					a.OutputSignal.AddError(err)
@@ -121,7 +121,7 @@ func (a *WebScan) InitWebserverCommand() {
 			}
 
 			// Load configuration
-			config := LoadWebserverProbeConfig(targets, timeout, methodEnum, browserPath, minDOMStabalizeTime)
+			config := LoadWebserverProbeConfig(targets, timeout, strategyEnum, browserPath, minDOMStabalizeTime)
 
 			// Generate report
 			report := webserver.PerformWebserverProbe(cmd.Context(), config)
@@ -134,7 +134,7 @@ func (a *WebScan) InitWebserverCommand() {
 
 	probeCmd.Flags().StringSlice("targets", []string{}, "Address targets to perform web application probing agains, comma delimited list")
 	probeCmd.Flags().Int("timeout", 30, "Timeout limit (seconds)")
-	probeCmd.Flags().String("method", "REQUEST", "Method to use for probing")
+	probeCmd.Flags().String("strategy", "REQUEST", "Strategy to use for probing")
 	probeCmd.Flags().String("browserpath", "", "Path to a browser executable")
 	probeCmd.Flags().Int("mindomstabalizetime", 5, "Minimum time in seconds to wait for DOM to stabilize")
 
@@ -186,11 +186,11 @@ func (a *WebScan) InitWebserverCommand() {
 	a.RootCmd.AddCommand(webserverCmd)
 }
 
-func LoadWebserverProbeConfig(targets []string, timeout int, method webscan.WebserverProbeMethod, browserPath *string, minDOMStabalizeTime *int) *webscan.WebserverProbeConfig {
+func LoadWebserverProbeConfig(targets []string, timeout int, strategy webscan.WebserverProbeStrategy, browserPath *string, minDOMStabalizeTime *int) *webscan.WebserverProbeConfig {
 	config := &webscan.WebserverProbeConfig{
 		Targets:             targets,
 		Timeout:             timeout,
-		Method:              method,
+		Strategy:            strategy,
 		BrowserPath:         browserPath,
 		MinDomStabalizeTime: minDOMStabalizeTime,
 	}

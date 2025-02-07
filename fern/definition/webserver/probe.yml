@@ -1,14 +1,14 @@
 types:
   # Config Struct
-  WebserverProbeMethod:
+  WebserverProbeStrategy:
     enum:
       - REQUEST
-      - BROWSERBASE
+      - BROWSER
   WebserverProbeConfig:
     properties:
       targets: list<string>
       timeout: integer
-      method: WebserverProbeMethod
+      strategy: WebserverProbeStrategy
       browserPath: optional<string>
       minDOMStabalizeTime: optional<integer>
   # WebserverProbeUrl Struct

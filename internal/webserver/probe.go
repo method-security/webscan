@@ -10,9 +10,9 @@ import (
 	"github.com/projectdiscovery/httpx/runner"
 )
 
-func performWebserverProbe(ctx context.Context, targets []string, timeout time.Duration, method webscan.WebserverProbeMethod, browserPath *string, minDOMStabalizeTime *int) ([]*webscan.WebserverProbeUrlDetails, []string, error) {
+func performWebserverProbe(ctx context.Context, targets []string, timeout time.Duration, strategy webscan.WebserverProbeStrategy, browserPath *string, minDOMStabalizeTime *int) ([]*webscan.WebserverProbeUrlDetails, []string, error) {
 	// Toggle on method selected
-	if method == webscan.WebserverProbeMethodBrowserbase {
+	if strategy == webscan.WebserverProbeStrategyBrowser {
 		return performBrowserProbe(ctx, targets, timeout, browserPath, *minDOMStabalizeTime)
 	}
 	return performHttpxProbe(ctx, targets, timeout)
@@ -116,7 +116,7 @@ func performBrowserProbe(ctx context.Context, targets []string, timeout time.Dur
 func PerformWebserverProbe(ctx context.Context, config *webscan.WebserverProbeConfig) *webscan.WebserverProbeReport {
 
 	urls, errors, err := performWebserverProbe(ctx, config.Targets, time.Duration(config.Timeout)*time.Second,
-		config.Method, config.BrowserPath, config.MinDomStabalizeTime)
+		config.Strategy, config.BrowserPath, config.MinDomStabalizeTime)
 	if err != nil {
 		errors = append(errors, err.Error())
 	}

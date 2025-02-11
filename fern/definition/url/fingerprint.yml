@@ -1,67 +1,5 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/fern-api/fern/main/fern.schema.json
 types:
-  TlsVersion:
-    enum:
-      - SSL10
-      - SSL20
-      - SSL30
-      - TLS10
-      - TLS11
-      - TLS12
-      - TLS13
-      - UNKNOWN
-  SignatureAlgorithm:
-    enum:
-      - MD2RSA
-      - MD5RSA
-      - MD5ECDSA
-      - SHA1RSA
-      - SHA256RSA
-      - SHA384RSA
-      - SHA512RSA
-      - DSASHA1
-      - DSASHA256
-      - ECDSASHA1
-      - ECDSASHA256
-      - ECDSASHA384
-      - ECDSASHA512
-      - SHA256RSAPSS
-      - SHA384RSAPSS
-      - SHA512RSAPSS
-      - Ed25519
-  PublicKeyAlgorithm:
-    enum:
-      - DES
-      - DH1024
-      - DH512
-      - DH768
-      - DSA
-      - DSA1024
-      - ECDSA
-      - ECDSASHA1
-      - ECDHSHA1
-      - Ed25519
-      - RC4
-      - RSA
-      - RSA1024
-      - Unknown
-  Certificate:
-    properties:
-      subjectCommonName: optional<string>
-      issuerCommonName: optional<string>
-      validFrom: optional<datetime>
-      validTo: optional<datetime>
-      version: optional<integer>
-      serialNumber: optional<string>
-      certificate: optional<string>
-      signature: optional<string>
-      signatureAlgorithm: optional<SignatureAlgorithm>
-      publicKeyAlgorithm: optional<PublicKeyAlgorithm>
-  TLSInfo:
-    properties:
-      version: optional<TlsVersion>
-      cipherSuite: optional<string>
-      certificates: optional<list<Certificate>>
   HTTPHeaders:
     properties:
       location: optional<string>
@@ -77,8 +15,6 @@ types:
     properties:
       target: string
       httpHeaders: optional<HTTPHeaders>
-      tlsInfo: optional<TLSInfo>
       redirectUrl: optional<string>
       redirectHttpHeaders: optional<HTTPHeaders>
-      redirectTlsInfo: optional<TLSInfo>
       errors: optional<list<string>>

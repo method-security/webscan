@@ -22,7 +22,7 @@ webscan url fingerprint --targets https://example.com
 
 ```bash
 webscan url fingerprint -h
-Perform a fingerprint scan against a URL target
+Given a URL target, grab the HTTP headers to enable further analysis on specific headers and their values.
 
 Usage:
   webscan url fingerprint [flags]
@@ -36,4 +36,5 @@ Global Flags:
   -f, --output-file string   Path to output file. If blank, will output to STDOUT
   -q, --quiet                Suppress output
   -v, --verbose              Verbose output
+
 ```

@@ -16,8 +16,8 @@ func (a *WebScan) InitURLCommand() {
 
 	fingerprintCmd := &cobra.Command{
 		Use:   "fingerprint",
-		Short: "Perform a fingerprint scan against a URL target",
-		Long:  `Perform a fingerprint scan against a URL target`,
+		Short: "Given a URL target, grab the HTTP headers to enable further analysis on specific headers and their values.",
+		Long:  `Given a URL target, grab the HTTP headers to enable further analysis on specific headers and their values.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			defer a.OutputSignal.PanicHandler(cmd.Context())
 

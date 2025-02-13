@@ -38,6 +38,8 @@ func NewWebScan(version string) *WebScan {
 			Quiet:   false,
 			Verbose: false,
 		},
+		OutputConfig: writer.NewOutputConfig(nil, writer.NewFormat(writer.SIGNAL)),
+		OutputSignal: signal.NewSignal(nil, datetime.DateTime(time.Now()), nil, 0, nil),
 	}
 	return &webscan
 }

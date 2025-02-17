@@ -37,41 +37,21 @@ func (awsLib *AwsS3Library) AnalyzeResponse(response *common.RequestInfo) bool {
 		return false
 	}
 
-	// Check status code (200 or 403 as per yaml template)
-	if response.StatusCode != nil {
-		if *response.StatusCode != 200 && *response.StatusCode != 403 {
-			return false
+	if response.StatusCode == nil || response.ResponseHeaders == nil {
+		return false
+	}
+
+	// Check for Amazon S3 server header
+	for key, headerValue := range response.ResponseHeaders {
+		if strings.EqualFold(key, "Server") {
+			if strings.Contains(strings.ToLower(strings.TrimSpace(headerValue)), "amazons3") {
+				return true
+			}
 		}
 	}
 
-	// Check for AWS S3 specific headers and server
-	if response.ResponseHeaders != nil {
-		// Check for Amazon S3 server header
-		server, exists := response.ResponseHeaders["Server"]
-		if !exists || !strings.Contains(strings.ToLower(server), "amazons3") {
-			return false
-		}
+	// Check for AWS bucket region header
+	_, hasRegionHeader := response.ResponseHeaders["x-amz-bucket-region"]
 
-		// Check for required AWS headers
-		requiredHeaders := []string{
-			"x-amz-bucket-region",
-		}
-
-		for _, header := range requiredHeaders {
-			found := false
-			for key := range response.ResponseHeaders {
-				if strings.EqualFold(key, header) {
-					found = true
-					break
-				}
-			}
-			if !found {
-				return false
-			}
-		}
-
-		return true
-	}
-
-	return false
+	return hasRegionHeader
 }

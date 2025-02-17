@@ -33,11 +33,11 @@ func (awsLib *AwsS3Library) ModuleRun(target string, config *webscan.AppFingerpr
 }
 
 func (awsLib *AwsS3Library) AnalyzeResponse(response *common.RequestInfo) bool {
-	if response == nil {
+	if response == nil || response.StatusCode == nil || response.ResponseHeaders == nil {
 		return false
 	}
 
-	if response.StatusCode == nil || response.ResponseHeaders == nil {
+	if *response.StatusCode != 200 && *response.StatusCode != 403 {
 		return false
 	}
 

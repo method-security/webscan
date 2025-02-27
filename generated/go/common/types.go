@@ -5,8 +5,9 @@ package common
 import (
 	json "encoding/json"
 	fmt "fmt"
-	core "github.com/Method-Security/webscan/generated/go/core"
 	time "time"
+
+	core "github.com/Method-Security/webscan/generated/go/core"
 )
 
 type HttpMethod string

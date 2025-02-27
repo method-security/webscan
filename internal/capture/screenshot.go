@@ -36,6 +36,11 @@ func (b *BrowserPageCapturer) CaptureScreenshot(ctx context.Context, url string,
 		encodedBodyString = base64.StdEncoding.EncodeToString(captureResult.Content)
 	}
 
+	var headers map[string]string
+	if captureResult.Headers != nil {
+		headers = captureResult.Headers
+	}
+
 	if b.Browser == nil {
 		log.Debug("Initializing browser")
 		b.InitializeBrowser()
@@ -86,5 +91,6 @@ func (b *BrowserPageCapturer) CaptureScreenshot(ctx context.Context, url string,
 
 	report.Screenshot = &img
 	report.HtmlEncoded = &encodedBodyString
+	report.ResponseHeaders = headers
 	return report
 }

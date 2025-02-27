@@ -9,10 +9,11 @@ import (
 
 type Options struct{}
 type Result struct {
-	Content    []byte   `json:"content,omitempty" yaml:"content,omitempty"`
-	StatusCode *int     `json:"statusCode,omitempty" yaml:"statusCode,omitempty"`
-	URL        string   `json:"url,omitempty" yaml:"url,omitempty"`
-	Errors     []string `json:"errors,omitempty" yaml:"errors,omitempty"`
+	Content    []byte            `json:"content,omitempty" yaml:"content,omitempty"`
+	Headers    map[string]string `json:"headers,omitempty" yaml:"headers,omitempty"`
+	StatusCode *int              `json:"statusCode,omitempty" yaml:"statusCode,omitempty"`
+	URL        string            `json:"url,omitempty" yaml:"url,omitempty"`
+	Errors     []string          `json:"errors,omitempty" yaml:"errors,omitempty"`
 }
 
 type PageCapturer interface {
@@ -30,9 +31,10 @@ func NewCaptureResult(URL string) *Result {
 
 func (r *Result) ToPageCaptureReport() webscan.PageCaptureReport {
 	report := webscan.PageCaptureReport{
-		Target:      r.URL,
-		Errors:      r.Errors,
-		HtmlEncoded: nil,
+		Target:          r.URL,
+		Errors:          r.Errors,
+		HtmlEncoded:     nil,
+		ResponseHeaders: r.Headers,
 	}
 
 	if r.Content != nil {

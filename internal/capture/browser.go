@@ -48,9 +48,24 @@ func (b *BrowserPageCapturer) Capture(ctx context.Context, url string, options *
 	pageCtx, cancel := context.WithTimeout(ctx, time.Duration(b.TimeoutSeconds)*time.Second)
 	defer cancel()
 
+	headers := map[string]string{}
+
 	var page *rod.Page
 	err := rod.Try(func() {
 		page = b.Browser.MustPage(url).Context(pageCtx)
+
+		// Subscribe to Network.responseReceived events before navigation
+		page.EachEvent(func(e *proto.NetworkResponseReceived) {
+			if e.Response.URL == url {
+				for k, v := range e.Response.Headers {
+					if existing, ok := headers[k]; ok {
+						headers[k] = existing + ", " + v.String()
+					} else {
+						headers[k] = v.String()
+					}
+				}
+			}
+		})()
 	})
 	if err != nil {
 		log.Error("Failed to create page", svc1log.SafeParam("url", url), svc1log.SafeParam("error", err))
@@ -79,6 +94,7 @@ func (b *BrowserPageCapturer) Capture(ctx context.Context, url string, options *
 	}
 
 	result.Content = []byte(htmlContent)
+	result.Headers = headers
 	return result, nil
 }
 

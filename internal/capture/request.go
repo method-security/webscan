@@ -44,7 +44,10 @@ func (r *RequestPageCapturer) Capture(ctx context.Context, url string, options *
 		return result, err
 	}
 	result.StatusCode = &resp.StatusCode
-
+	result.Headers = map[string]string{}
+	for k, v := range resp.Header {
+		result.Headers[k] = v[0]
+	}
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		result.Errors = append(result.Errors, err.Error())

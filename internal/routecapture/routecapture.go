@@ -98,7 +98,7 @@ func PerformRouteCapture(ctx context.Context, target string, captureMethod websc
 			return report
 		}
 		log.Info("Page capture successful")
-		htmlContent = string(result.Content)
+		htmlContent = *result.Request.ResponseBody
 
 		// Extract the routes and urls
 		routes, urls, errors = extractRoutes(ctx, target, htmlContent, baseURLsOnly, captureStaticAssets, timeout, webscan.PageCaptureMethodRequest, nil)
@@ -115,7 +115,7 @@ func PerformRouteCapture(ctx context.Context, target string, captureMethod websc
 		}
 
 		log.Info("Page capture successful")
-		htmlContent = string(result.Content)
+		htmlContent = *result.Request.ResponseBody
 
 		// Extract the routes and urls
 		routes, urls, errors = extractRoutes(ctx, target, htmlContent, baseURLsOnly, captureStaticAssets, timeout, webscan.PageCaptureMethodBrowser, capturer)
@@ -132,7 +132,7 @@ func PerformRouteCapture(ctx context.Context, target string, captureMethod websc
 			return report
 		}
 		log.Info("Page capture successful")
-		htmlContent = string(result.Content)
+		htmlContent = *result.Request.ResponseBody
 
 		// Extract the routes and urls
 		routes, urls, errors = extractRoutes(ctx, target, htmlContent, baseURLsOnly, captureStaticAssets, timeout, webscan.PageCaptureMethodBrowserbase, capturer.Capturer)

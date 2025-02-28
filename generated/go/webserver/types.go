@@ -5,9 +5,10 @@ package webserver
 import (
 	json "encoding/json"
 	fmt "fmt"
+	time "time"
+
 	common "github.com/Method-Security/webscan/generated/go/common"
 	core "github.com/Method-Security/webscan/generated/go/core"
-	time "time"
 )
 
 type WebserverHeadergrabAttemptInfo struct {

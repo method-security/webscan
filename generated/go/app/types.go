@@ -5,6 +5,7 @@ package app
 import (
 	json "encoding/json"
 	fmt "fmt"
+
 	common "github.com/Method-Security/webscan/generated/go/common"
 	core "github.com/Method-Security/webscan/generated/go/core"
 )

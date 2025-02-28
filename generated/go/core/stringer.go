@@ -1,6 +1,8 @@
 package core
 
-import "encoding/json"
+import (
+	"encoding/json"
+)
 
 // StringifyJSON returns a pretty JSON string representation of
 // the given value.

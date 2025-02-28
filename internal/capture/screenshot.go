@@ -68,7 +68,11 @@ func (b *BrowserPageCapturer) CaptureScreenshot(ctx context.Context, url string,
 
 		// Capture response status and headers using CDP
 		router := page.HijackRequests()
-		defer router.Stop()
+		defer func() {
+			if err := router.Stop(); err != nil {
+				log.Error("Error stopping router", svc1log.SafeParam("error", err))
+			}
+		}()
 
 		router.MustAdd("*", func(ctx *rod.Hijack) {
 			ctx.MustLoadResponse()

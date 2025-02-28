@@ -2,25 +2,22 @@ package capture
 
 import (
 	"context"
-	"encoding/base64"
 	"time"
 
 	webscan "github.com/Method-Security/webscan/generated/go/pagecapture"
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
+	urlutil "github.com/projectdiscovery/utils/url"
 	"github.com/ysmood/gson"
 )
 
-func (b *BrowserbasePageCapturer) CaptureScreenshot(ctx context.Context, url string, options *Options) webscan.PageScreenshotReport {
+func (b *BrowserbasePageCapturer) CaptureScreenshot(ctx context.Context, url string, options *Options) *webscan.PageScreenshotReport {
 	return b.Capturer.CaptureScreenshot(ctx, url, options)
 }
 
-func (b *BrowserPageCapturer) CaptureScreenshot(ctx context.Context, url string, options *Options) webscan.PageScreenshotReport {
-	report := webscan.PageScreenshotReport{
-		Target: url,
-		Errors: []string{},
-	}
+func (b *BrowserPageCapturer) CaptureScreenshot(ctx context.Context, url string, options *Options) *webscan.PageScreenshotReport {
+	report := NewPageScreenshotReport(url)
 	log := svc1log.FromContext(ctx)
 
 	// Call the Capture function to get the HTML content
@@ -31,9 +28,15 @@ func (b *BrowserPageCapturer) CaptureScreenshot(ctx context.Context, url string,
 		return report
 	}
 
-	var encodedBodyString string
-	if captureResult.Content != nil {
-		encodedBodyString = base64.StdEncoding.EncodeToString(captureResult.Content)
+	// Update report with capture results
+	if captureResult.Request.ResponseBody != nil {
+		report.Request.ResponseBody = captureResult.Request.ResponseBody
+	}
+	if captureResult.Request.ResponseHeaders != nil {
+		report.Request.ResponseHeaders = captureResult.Request.ResponseHeaders
+	}
+	if captureResult.Request.StatusCode != nil {
+		report.Request.StatusCode = captureResult.Request.StatusCode
 	}
 
 	if b.Browser == nil {
@@ -47,6 +50,44 @@ func (b *BrowserPageCapturer) CaptureScreenshot(ctx context.Context, url string,
 	var page *rod.Page
 	err = rod.Try(func() {
 		page = b.Browser.MustPage(url).Context(pageCtx)
+
+		// Get the final URL after any redirects and parse it
+		finalURL := page.MustInfo().URL
+		parsedURL, err := urlutil.Parse(finalURL)
+		if err == nil {
+			report.Request.BaseUrl = parsedURL.URL.String()
+			report.Request.Path = parsedURL.Path
+			parsedURL.Query().Iterate(func(key string, value []string) bool {
+				report.Request.QueryParams[key] = value[0]
+				return true
+			})
+		} else {
+			report.Request.BaseUrl = finalURL
+			log.Error("Failed to parse URL", svc1log.SafeParam("url", finalURL), svc1log.SafeParam("error", err))
+		}
+
+		// Capture response status and headers using CDP
+		router := page.HijackRequests()
+		defer func() {
+			if err := router.Stop(); err != nil {
+				log.Error("Error stopping router", svc1log.SafeParam("error", err))
+			}
+		}()
+
+		router.MustAdd("*", func(ctx *rod.Hijack) {
+			ctx.MustLoadResponse()
+			response := ctx.Response
+			statusCode := response.Payload().ResponseCode
+			report.Request.StatusCode = &statusCode
+
+			// Capture response headers
+			for k, v := range response.Headers() {
+				if len(v) > 0 {
+					report.Request.ResponseHeaders[k] = v[0]
+				}
+			}
+		})
+		router.Run()
 	})
 	if err != nil {
 		log.Error("Failed to create page", svc1log.SafeParam("url", url), svc1log.SafeParam("error", err))
@@ -85,6 +126,5 @@ func (b *BrowserPageCapturer) CaptureScreenshot(ctx context.Context, url string,
 	log.Debug("Screenshot captured")
 
 	report.Screenshot = &img
-	report.HtmlEncoded = &encodedBodyString
 	return report
 }

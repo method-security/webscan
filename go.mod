@@ -17,6 +17,7 @@ require (
 	github.com/pb33f/libopenapi v0.16.11
 	github.com/projectdiscovery/httpx v1.6.6
 	github.com/projectdiscovery/katana v1.1.0
+	github.com/projectdiscovery/utils v0.2.1
 	github.com/robertkrimen/otto v0.4.0
 	github.com/spf13/cobra v1.9.1
 	github.com/stretchr/testify v1.10.0
@@ -141,7 +142,6 @@ require (
 	github.com/projectdiscovery/retryablehttp-go v1.0.68 // indirect
 	github.com/projectdiscovery/tlsx v1.1.6 // indirect
 	github.com/projectdiscovery/useragent v0.0.60 // indirect
-	github.com/projectdiscovery/utils v0.2.1 // indirect
 	github.com/projectdiscovery/wappalyzergo v0.1.10 // indirect
 	github.com/refraction-networking/utls v1.6.6 // indirect
 	github.com/remeh/sizedwaitgroup v1.0.0 // indirect

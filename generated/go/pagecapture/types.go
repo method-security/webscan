@@ -5,13 +5,13 @@ package pagecapture
 import (
 	json "encoding/json"
 	fmt "fmt"
+	common "github.com/Method-Security/webscan/generated/go/common"
 	core "github.com/Method-Security/webscan/generated/go/core"
 )
 
 type PageCaptureReport struct {
-	Target      string   `json:"target" url:"target"`
-	HtmlEncoded *string  `json:"html_encoded,omitempty" url:"html_encoded,omitempty"`
-	Errors      []string `json:"errors,omitempty" url:"errors,omitempty"`
+	Request *common.RequestInfo `json:"request,omitempty" url:"request,omitempty"`
+	Errors  []string            `json:"errors,omitempty" url:"errors,omitempty"`
 
 	extraProperties map[string]interface{}
 	_rawJSON        json.RawMessage
@@ -52,10 +52,9 @@ func (p *PageCaptureReport) String() string {
 }
 
 type PageScreenshotReport struct {
-	Target      string   `json:"target" url:"target"`
-	HtmlEncoded *string  `json:"html_encoded,omitempty" url:"html_encoded,omitempty"`
-	Screenshot  *[]byte  `json:"screenshot,omitempty" url:"screenshot,omitempty"`
-	Errors      []string `json:"errors,omitempty" url:"errors,omitempty"`
+	Request    *common.RequestInfo `json:"request,omitempty" url:"request,omitempty"`
+	Screenshot *[]byte             `json:"screenshot,omitempty" url:"screenshot,omitempty"`
+	Errors     []string            `json:"errors,omitempty" url:"errors,omitempty"`
 
 	extraProperties map[string]interface{}
 	_rawJSON        json.RawMessage

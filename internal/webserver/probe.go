@@ -100,7 +100,7 @@ func performBrowserProbe(ctx context.Context, targets []string, timeout time.Dur
 
 		urlDetails := &webscan.WebserverProbeUrlDetails{
 			Url:    targetURL,
-			Status: result.StatusCode,
+			Status: result.Request.StatusCode,
 		}
 
 		urls = append(urls, urlDetails)

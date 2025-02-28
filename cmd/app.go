@@ -94,6 +94,7 @@ for the specified resource type.`,
 		string(webscan.ApiApplicationModuleGrpc),
 		string(webscan.ApiApplicationModuleSwagger),
 		string(webscan.ApiApplicationModuleK8S),
+		string(webscan.ApiApplicationModuleWordpress),
 	}, ", ")
 	cloudBucketModules := strings.Join([]string{
 		string(webscan.CloudBucketModuleAwss3),

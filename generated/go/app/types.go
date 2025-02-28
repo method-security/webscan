@@ -12,11 +12,12 @@ import (
 type ApiApplicationModule string
 
 const (
-	ApiApplicationModuleFastapi ApiApplicationModule = "FASTAPI"
-	ApiApplicationModuleGraphql ApiApplicationModule = "GRAPHQL"
-	ApiApplicationModuleGrpc    ApiApplicationModule = "GRPC"
-	ApiApplicationModuleSwagger ApiApplicationModule = "SWAGGER"
-	ApiApplicationModuleK8S     ApiApplicationModule = "K8S"
+	ApiApplicationModuleFastapi   ApiApplicationModule = "FASTAPI"
+	ApiApplicationModuleGraphql   ApiApplicationModule = "GRAPHQL"
+	ApiApplicationModuleGrpc      ApiApplicationModule = "GRPC"
+	ApiApplicationModuleSwagger   ApiApplicationModule = "SWAGGER"
+	ApiApplicationModuleK8S       ApiApplicationModule = "K8S"
+	ApiApplicationModuleWordpress ApiApplicationModule = "WORDPRESS"
 )
 
 func NewApiApplicationModuleFromString(s string) (ApiApplicationModule, error) {
@@ -31,6 +32,8 @@ func NewApiApplicationModuleFromString(s string) (ApiApplicationModule, error) {
 		return ApiApplicationModuleSwagger, nil
 	case "K8S":
 		return ApiApplicationModuleK8S, nil
+	case "WORDPRESS":
+		return ApiApplicationModuleWordpress, nil
 	}
 	var t ApiApplicationModule
 	return "", fmt.Errorf("%s is not a valid %T", s, t)

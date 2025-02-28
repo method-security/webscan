@@ -27,11 +27,12 @@ func NewEngine(config *webscan.AppFingerprintConfig) *Engine {
 		Config: config,
 		Modules: map[webscan.AppFingerprintResourceType]map[webscan.AppFingerprintResourceModule]Module{
 			webscan.AppFingerprintResourceTypeApiapplication: {
-				*webscan.NewAppFingerprintResourceModuleFromApiApplicationModule(webscan.ApiApplicationModuleK8S):     &apiapplication.K8sLibrary{},
-				*webscan.NewAppFingerprintResourceModuleFromApiApplicationModule(webscan.ApiApplicationModuleGrpc):    &apiapplication.GrpcLibrary{},
-				*webscan.NewAppFingerprintResourceModuleFromApiApplicationModule(webscan.ApiApplicationModuleSwagger): &apiapplication.SwaggerLibrary{},
-				*webscan.NewAppFingerprintResourceModuleFromApiApplicationModule(webscan.ApiApplicationModuleGraphql): &apiapplication.GraphQLLibrary{},
-				*webscan.NewAppFingerprintResourceModuleFromApiApplicationModule(webscan.ApiApplicationModuleFastapi): &apiapplication.FastAPILibrary{},
+				*webscan.NewAppFingerprintResourceModuleFromApiApplicationModule(webscan.ApiApplicationModuleK8S):       &apiapplication.K8sLibrary{},
+				*webscan.NewAppFingerprintResourceModuleFromApiApplicationModule(webscan.ApiApplicationModuleGrpc):      &apiapplication.GrpcLibrary{},
+				*webscan.NewAppFingerprintResourceModuleFromApiApplicationModule(webscan.ApiApplicationModuleSwagger):   &apiapplication.SwaggerLibrary{},
+				*webscan.NewAppFingerprintResourceModuleFromApiApplicationModule(webscan.ApiApplicationModuleGraphql):   &apiapplication.GraphQLLibrary{},
+				*webscan.NewAppFingerprintResourceModuleFromApiApplicationModule(webscan.ApiApplicationModuleFastapi):   &apiapplication.FastAPILibrary{},
+				*webscan.NewAppFingerprintResourceModuleFromApiApplicationModule(webscan.ApiApplicationModuleWordpress): &apiapplication.WordPressLibrary{},
 			},
 			webscan.AppFingerprintResourceTypeCloudbucket: {
 				*webscan.NewAppFingerprintResourceModuleFromCloudBucketModule(webscan.CloudBucketModuleAzureblob): &cloudbucket.AzureBlobLibrary{},

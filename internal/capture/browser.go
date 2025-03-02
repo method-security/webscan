@@ -2,13 +2,16 @@ package capture
 
 import (
 	"context"
+	"encoding/base64"
 	"time"
 
+	webscan "github.com/Method-Security/webscan/generated/go/pagecapture"
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/cdp"
 	"github.com/go-rod/rod/lib/launcher"
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
+	urlutil "github.com/projectdiscovery/utils/url"
 )
 
 type BrowserPageCapturer struct {
@@ -36,9 +39,9 @@ func NewBrowserPageCapturerWithClient(client *cdp.Client, timeout int, minDOMSta
 	}
 }
 
-func (b *BrowserPageCapturer) Capture(ctx context.Context, url string, options *Options) (*Result, error) {
-	result := NewCaptureResult(url)
+func (b *BrowserPageCapturer) Capture(ctx context.Context, url string, options *Options) (*webscan.PageCaptureReport, error) {
 	log := svc1log.FromContext(ctx)
+	report := NewPageCaptureReport(url)
 
 	if b.Browser == nil {
 		log.Debug("Initializing browser")
@@ -51,11 +54,21 @@ func (b *BrowserPageCapturer) Capture(ctx context.Context, url string, options *
 	var page *rod.Page
 	err := rod.Try(func() {
 		page = b.Browser.MustPage(url).Context(pageCtx)
+
+		// Subscribe to Network.responseReceived events before navigation
+		page.EachEvent(func(e *proto.NetworkResponseReceived) {
+			if e.Response.URL == url {
+				for k, v := range e.Response.Headers {
+					report.Request.ResponseHeaders[k] = v.String()
+				}
+				report.Request.StatusCode = &e.Response.Status
+			}
+		})()
 	})
 	if err != nil {
 		log.Error("Failed to create page", svc1log.SafeParam("url", url), svc1log.SafeParam("error", err))
-		result.Errors = append(result.Errors, err.Error())
-		return result, err
+		report.Errors = append(report.Errors, err.Error())
+		return report, err
 	}
 	log.Debug("Successfully connected to page")
 
@@ -63,23 +76,33 @@ func (b *BrowserPageCapturer) Capture(ctx context.Context, url string, options *
 	page.WaitNavigation(proto.PageLifecycleEventNameDOMContentLoaded)
 
 	// Wait for the DOM to be stable
-	// Important for capturing dynamic content
 	err = page.WaitDOMStable(time.Duration(b.MinDOMStabalizeTimeSeconds)*time.Second, .1)
 	if err != nil {
 		log.Debug("Failed to wait for page load", svc1log.SafeParam("url", url), svc1log.SafeParam("error", err))
-		result.Errors = append(result.Errors, err.Error())
-		return result, err
+		report.Errors = append(report.Errors, err.Error())
+		return report, err
 	}
 
 	htmlContent, err := page.HTML()
 	if err != nil {
 		log.Error("Failed to evaluate page content", svc1log.SafeParam("url", url), svc1log.SafeParam("error", err))
-		result.Errors = append(result.Errors, err.Error())
-		return result, err
+		report.Errors = append(report.Errors, err.Error())
+		return report, err
 	}
 
-	result.Content = []byte(htmlContent)
-	return result, nil
+	encodedBody := base64.StdEncoding.EncodeToString([]byte(htmlContent))
+	report.Request.ResponseBody = &encodedBody
+
+	// Parse URL to get path and query parameters
+	if parsedURL, err := urlutil.Parse(url); err == nil {
+		report.Request.Path = parsedURL.Path
+		parsedURL.Query().Iterate(func(key string, value []string) bool {
+			report.Request.QueryParams[key] = value[0]
+			return true
+		})
+	}
+
+	return report, nil
 }
 
 func (b *BrowserPageCapturer) InitializeBrowser() {

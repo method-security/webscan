@@ -164,14 +164,14 @@ func (a *WebScan) InitPagecaptureCommand() {
 			timeout, _ := cmd.Flags().GetInt("timeout")
 
 			capturer := capture.NewRequestPageCapturer(insecure, timeout)
-			result, err := capturer.Capture(cmd.Context(), target, &capture.Options{})
+			report, err := capturer.Capture(cmd.Context(), target, &capture.Options{})
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				// Don't return here because valid content may still be available
 			}
 			_ = capturer.Close(cmd.Context())
 			log.Info("Page capture successful", svc1log.SafeParam("target", target))
-			a.OutputSignal.Content = result.ToPageCaptureReport()
+			a.OutputSignal.Content = report
 		},
 	}
 	requestCaptureCmd.Flags().Bool("insecure", false, "Allow insecure connections")
@@ -205,7 +205,7 @@ func (a *WebScan) InitPagecaptureCommand() {
 			minDOMStabalizeTime, _ := cmd.Flags().GetInt("minDOMStabalizeTime")
 
 			capturer := capture.NewBrowserPageCapturer(browserPath, timeout, minDOMStabalizeTime)
-			result, err := capturer.Capture(cmd.Context(), target, &capture.Options{})
+			report, err := capturer.Capture(cmd.Context(), target, &capture.Options{})
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				// Don't return here because valid content may still be available
@@ -213,7 +213,7 @@ func (a *WebScan) InitPagecaptureCommand() {
 			_ = capturer.Close(cmd.Context())
 			log.Info("Page capture successful", svc1log.SafeParam("target", target))
 
-			a.OutputSignal.Content = result.ToPageCaptureReport()
+			a.OutputSignal.Content = report
 		},
 	}
 	browserCaptureCmd.PersistentFlags().String("browserPath", "", "Path to a browser executable")
@@ -269,7 +269,7 @@ func (a *WebScan) InitPagecaptureCommand() {
 				return
 			}
 
-			result, err := capturer.Capture(cmd.Context(), target, &capture.Options{})
+			report, err := capturer.Capture(cmd.Context(), target, &capture.Options{})
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				// Don't return here because valid content may still be available
@@ -281,7 +281,7 @@ func (a *WebScan) InitPagecaptureCommand() {
 				// Don't return here because valid content may still be available
 			}
 			log.Info("Page capture successful", svc1log.SafeParam("target", target))
-			a.OutputSignal.Content = result.ToPageCaptureReport()
+			a.OutputSignal.Content = report
 		},
 	}
 	browserbaseCaptureCmd.Flags().String("token", "", "Browserbase API token")

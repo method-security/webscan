@@ -3,9 +3,13 @@ package capture
 import (
 	"context"
 	"crypto/tls"
+	"encoding/base64"
 	"io"
 	"net/http"
 	"time"
+
+	webscan "github.com/Method-Security/webscan/generated/go/pagecapture"
+	urlutil "github.com/projectdiscovery/utils/url"
 )
 
 type RequestPageCapturer struct {
@@ -25,13 +29,13 @@ func NewRequestPageCapturer(insecure bool, timeout int) *RequestPageCapturer {
 	}
 }
 
-func (r *RequestPageCapturer) Capture(ctx context.Context, url string, options *Options) (*Result, error) {
-	result := NewCaptureResult(url)
-	resp, err := r.Client.Get(url)
+func (r *RequestPageCapturer) Capture(ctx context.Context, url string, options *Options) (*webscan.PageCaptureReport, error) {
+	report := NewPageCaptureReport(url)
 
+	resp, err := r.Client.Get(url)
 	if err != nil {
-		result.Errors = append(result.Errors, err.Error())
-		return result, err
+		report.Errors = append(report.Errors, err.Error())
+		return report, err
 	}
 	defer func() {
 		if cerr := resp.Body.Close(); cerr != nil {
@@ -39,20 +43,29 @@ func (r *RequestPageCapturer) Capture(ctx context.Context, url string, options *
 		}
 	}()
 
-	if err != nil {
-		result.Errors = append(result.Errors, err.Error())
-		return result, err
+	report.Request.StatusCode = &resp.StatusCode
+	for k, v := range resp.Header {
+		report.Request.ResponseHeaders[k] = v[0]
 	}
-	result.StatusCode = &resp.StatusCode
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		result.Errors = append(result.Errors, err.Error())
+		report.Errors = append(report.Errors, err.Error())
 	} else {
-		result.Content = body
+		encodedBody := base64.StdEncoding.EncodeToString(body)
+		report.Request.ResponseBody = &encodedBody
 	}
 
-	return result, nil
+	// Parse URL to get path and query parameters
+	if parsedURL, err := urlutil.Parse(url); err == nil {
+		report.Request.Path = parsedURL.Path
+		parsedURL.Query().Iterate(func(key string, value []string) bool {
+			report.Request.QueryParams[key] = value[0]
+			return true
+		})
+	}
+
+	return report, nil
 }
 
 func (r *RequestPageCapturer) Close(ctx context.Context) error {

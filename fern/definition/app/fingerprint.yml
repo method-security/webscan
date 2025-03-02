@@ -9,6 +9,7 @@ types:
       - GRPC
       - SWAGGER
       - K8S
+      - WORDPRESS
   CloudBucketModule:
     enum:
       - AWSS3

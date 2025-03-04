@@ -2,6 +2,7 @@ package capture
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	webscan "github.com/Method-Security/webscan/generated/go/pagecapture"
@@ -40,7 +41,7 @@ func (b *BrowserPageCapturer) CaptureScreenshot(ctx context.Context, url string,
 	}
 
 	if b.Browser == nil {
-		log.Debug("Initializing browser")
+		log.Info("Initializing browser")
 		b.InitializeBrowser()
 	}
 
@@ -49,6 +50,7 @@ func (b *BrowserPageCapturer) CaptureScreenshot(ctx context.Context, url string,
 
 	var page *rod.Page
 	err = rod.Try(func() {
+		log.Info("Creating page", svc1log.SafeParam("url", url))
 		page = b.Browser.MustPage(url).Context(pageCtx)
 
 		// Get the final URL after any redirects and parse it
@@ -66,65 +68,55 @@ func (b *BrowserPageCapturer) CaptureScreenshot(ctx context.Context, url string,
 			log.Error("Failed to parse URL", svc1log.SafeParam("url", finalURL), svc1log.SafeParam("error", err))
 		}
 
-		// Capture response status and headers using CDP
-		router := page.HijackRequests()
-		defer func() {
-			if err := router.Stop(); err != nil {
-				log.Error("Error stopping router", svc1log.SafeParam("error", err))
-			}
-		}()
+		// Wait for any navigation for redirect(s) to complete
+		log.Info("Waiting navigation to complete for redirects or DOM loading")
+		page.MustNavigate(url)
+		log.Info("Navigation complete")
 
-		router.MustAdd("*", func(ctx *rod.Hijack) {
-			ctx.MustLoadResponse()
-			response := ctx.Response
-			statusCode := response.Payload().ResponseCode
-			report.Request.StatusCode = &statusCode
+		// Wait for the DOM to be stable
+		// Important for capturing dynamic content
+		log.Info("Waiting for DOM to stabilize")
+		err = page.WaitDOMStable(time.Duration(b.MinDOMStabalizeTimeSeconds)*time.Second, .1)
+		if err != nil {
+			log.Error("Failed to wait for page load", svc1log.SafeParam("url", url), svc1log.SafeParam("error", err))
+			report.Errors = append(report.Errors, err.Error())
+		}
+		log.Info("DOM stabilized")
 
-			// Capture response headers
-			for k, v := range response.Headers() {
-				if len(v) > 0 {
-					report.Request.ResponseHeaders[k] = v[0]
-				}
-			}
+		// Wait for response received event
+		log.Info("Waiting for response received event")
+		var e = proto.NetworkResponseReceived{}
+		wait := page.WaitEvent(&e)
+		wait()
+
+		// Process response headers from the event
+		log.Info("Processing response headers")
+		headers := make(map[string]string)
+		for k, v := range e.Response.Headers {
+			headers[k] = fmt.Sprint(v)
+		}
+		report.Request.ResponseHeaders = headers
+		report.Request.StatusCode = &e.Response.Status
+
+		// Capture the screenshot
+		log.Info("Capturing screenshot")
+		img, err := page.Screenshot(true, &proto.PageCaptureScreenshot{
+			Format:  proto.PageCaptureScreenshotFormatPng,
+			Quality: gson.Int(100),
 		})
-		router.Run()
+
+		if err != nil {
+			log.Error("Failed to capture screenshot", svc1log.SafeParam("url", url), svc1log.SafeParam("error", err))
+			report.Errors = append(report.Errors, err.Error())
+			return
+		}
+		log.Info("Screenshot captured")
+
+		report.Screenshot = &img
 	})
 	if err != nil {
 		log.Error("Failed to create page", svc1log.SafeParam("url", url), svc1log.SafeParam("error", err))
 		report.Errors = append(report.Errors, err.Error())
-		return report
 	}
-	log.Debug("Successfully connected to page")
-
-	// Wait for any navigation for redirect(s) to complete
-	log.Debug("Waiting navigation to complete for redirects or DOM loading")
-	page.WaitNavigation(proto.PageLifecycleEventNameDOMContentLoaded)
-	log.Debug("Navigation complete")
-
-	// Wait for the DOM to be stable
-	// Important for capturing dynamic content
-	log.Debug("Waiting for DOM to stabilize")
-	err = page.WaitDOMStable(time.Duration(b.MinDOMStabalizeTimeSeconds)*time.Second, .1)
-	if err != nil {
-		log.Debug("Failed to wait for page load", svc1log.SafeParam("url", url), svc1log.SafeParam("error", err))
-		report.Errors = append(report.Errors, err.Error())
-	}
-	log.Debug("DOM stabilized")
-
-	// Capture the screenshot
-	log.Debug("Capturing screenshot")
-	img, err := page.Screenshot(true, &proto.PageCaptureScreenshot{
-		Format:  proto.PageCaptureScreenshotFormatPng,
-		Quality: gson.Int(100),
-	})
-
-	if err != nil {
-		log.Debug("Failed to capture screenshot", svc1log.SafeParam("url", url), svc1log.SafeParam("error", err))
-		report.Errors = append(report.Errors, err.Error())
-		return report
-	}
-	log.Debug("Screenshot captured")
-
-	report.Screenshot = &img
 	return report
 }

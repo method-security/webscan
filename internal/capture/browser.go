@@ -3,6 +3,7 @@ package capture
 import (
 	"context"
 	"encoding/base64"
+	"fmt"
 	"time"
 
 	webscan "github.com/Method-Security/webscan/generated/go/pagecapture"
@@ -44,7 +45,7 @@ func (b *BrowserPageCapturer) Capture(ctx context.Context, url string, options *
 	report := NewPageCaptureReport(url)
 
 	if b.Browser == nil {
-		log.Debug("Initializing browser")
+		log.Info("Initializing browser")
 		b.InitializeBrowser()
 	}
 
@@ -53,17 +54,31 @@ func (b *BrowserPageCapturer) Capture(ctx context.Context, url string, options *
 
 	var page *rod.Page
 	err := rod.Try(func() {
+		log.Info("Creating page", svc1log.SafeParam("url", url))
 		page = b.Browser.MustPage(url).Context(pageCtx)
 
 		// Subscribe to Network.responseReceived events before navigation
-		page.EachEvent(func(e *proto.NetworkResponseReceived) {
-			if e.Response.URL == url {
-				for k, v := range e.Response.Headers {
-					report.Request.ResponseHeaders[k] = v.String()
-				}
-				report.Request.StatusCode = &e.Response.Status
-			}
-		})()
+		var e = proto.NetworkResponseReceived{}
+		wait := page.WaitEvent(&e)
+
+		// Wait for any navigation for redirect(s) to complete
+		log.Info("Waiting for navigation to complete")
+		page.MustNavigate(url)
+
+		log.Info("Waiting for DOM to be stable")
+		page.WaitDOMStable(time.Duration(b.MinDOMStabalizeTimeSeconds)*time.Second, .1)
+
+		log.Info("Waiting for response received event")
+		wait()
+
+		log.Info("Processing response received event")
+		headers := make(map[string]string)
+		for k, v := range e.Response.Headers {
+			headers[k] = fmt.Sprint(v)
+		}
+		report.Request.ResponseHeaders = headers
+		report.Request.StatusCode = &e.Response.Status
+		log.Info("Event URL", svc1log.SafeParam("url", e.Response.URL))
 	})
 	if err != nil {
 		log.Error("Failed to create page", svc1log.SafeParam("url", url), svc1log.SafeParam("error", err))
@@ -72,17 +87,7 @@ func (b *BrowserPageCapturer) Capture(ctx context.Context, url string, options *
 	}
 	log.Debug("Successfully connected to page")
 
-	// Wait for any navigation for redirect(s) to complete
-	page.WaitNavigation(proto.PageLifecycleEventNameDOMContentLoaded)
-
-	// Wait for the DOM to be stable
-	err = page.WaitDOMStable(time.Duration(b.MinDOMStabalizeTimeSeconds)*time.Second, .1)
-	if err != nil {
-		log.Debug("Failed to wait for page load", svc1log.SafeParam("url", url), svc1log.SafeParam("error", err))
-		report.Errors = append(report.Errors, err.Error())
-		return report, err
-	}
-
+	log.Info("Evaluating page content")
 	htmlContent, err := page.HTML()
 	if err != nil {
 		log.Error("Failed to evaluate page content", svc1log.SafeParam("url", url), svc1log.SafeParam("error", err))
@@ -90,10 +95,11 @@ func (b *BrowserPageCapturer) Capture(ctx context.Context, url string, options *
 		return report, err
 	}
 
+	log.Info("Encoding page content")
 	encodedBody := base64.StdEncoding.EncodeToString([]byte(htmlContent))
 	report.Request.ResponseBody = &encodedBody
 
-	// Parse URL to get path and query parameters
+	log.Info("Parsing URL to get path and query parameters")
 	if parsedURL, err := urlutil.Parse(url); err == nil {
 		report.Request.Path = parsedURL.Path
 		parsedURL.Query().Iterate(func(key string, value []string) bool {

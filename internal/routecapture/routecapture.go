@@ -2,6 +2,7 @@ package routecapture
 
 import (
 	"context"
+	"encoding/base64"
 	"net/http"
 	"strings"
 	"time"
@@ -14,63 +15,64 @@ import (
 )
 
 func extractRoutes(ctx context.Context, target string, htmlContent string, baseURLsOnly bool, captureStaticAssets bool, timeout int, captureMethod webscan.PageCaptureMethod, browserCapturer *capture.BrowserPageCapturer) ([]*webscan.WebRoute, []string, []string) {
+	log := svc1log.FromContext(ctx)
 	routes := []*webscan.WebRoute{}
 	urls := make(map[string]struct{})
 	errors := []string{}
 
-	// Parse the HTML content using goquery
+	log.Info("Parsing HTML content using goquery")
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlContent))
 	if err != nil {
+		log.Error("Failed to parse HTML content", svc1log.SafeParam("error", err))
 		errors = append(errors, err.Error())
 		return routes, setToListString(urls), errors
 	}
 
-	// Initialize an HTTP client for getting javascript content
+	log.Info("Initializing HTTP client")
 	httpClient := &http.Client{
 		Timeout: time.Duration(timeout) * time.Second,
 	}
 
-	// Extract routes from form elements
+	log.Info("Extracting routes from form elements")
 	formRoutes, formUrls, formErrors := extractFormRoutes(doc, target, baseURLsOnly, captureStaticAssets)
 	routes = append(routes, formRoutes...)
 	urls = addListToSetString(urls, formUrls)
 	errors = append(errors, formErrors...)
 
-	// Extract routes from anchor elements
+	log.Info("Extracting routes from anchor elements")
 	anchorRoutes, anchorUrls, anchorErrors := extractAnchorRoutes(doc, target, baseURLsOnly, captureStaticAssets)
 	routes = append(routes, anchorRoutes...)
 	urls = addListToSetString(urls, anchorUrls)
 	errors = append(errors, anchorErrors...)
 
-	// Extract routes from link elements
+	log.Info("Extracting routes from link elements")
 	linkRoutes, linkUrls, linkErrors := extractLinkRoutes(doc, target, baseURLsOnly, captureStaticAssets)
 	routes = append(routes, linkRoutes...)
 	urls = addListToSetString(urls, linkUrls)
 	errors = append(errors, linkErrors...)
 
-	// Extract routes from script elements
-	// This fetches script file contents and extracts routes from them
+	log.Info("Extracting routes from script elements")
 	scriptRoutes, scriptUrls, scriptErrors := extractScriptRoutes(doc, target, baseURLsOnly, captureStaticAssets, httpClient)
 	routes = append(routes, scriptRoutes...)
 	urls = addListToSetString(urls, scriptUrls)
 	errors = append(errors, scriptErrors...)
 
-	// Extract routes from inline script elements
+	log.Info("Extracting routes from inline script elements")
 	inlineScriptRoutes, inlineScriptUrls, inlineScriptErrors := extractInlineScriptRoutes(doc, target, baseURLsOnly, captureStaticAssets)
 	routes = append(routes, inlineScriptRoutes...)
 	urls = addListToSetString(urls, inlineScriptUrls)
 	errors = append(errors, inlineScriptErrors...)
 
-	// Extract routes from inspecting network calls
 	// Only to be performed if captureMethod is of type Browser or Browserbase
 	if captureMethod == webscan.PageCaptureMethodBrowser || captureMethod == webscan.PageCaptureMethodBrowserbase {
+		log.Info("Extracting routes from inspecting network calls")
 		networkRoutes, networkUrls, networkErrors := extractNetworkRoutes(ctx, browserCapturer, target, baseURLsOnly, captureStaticAssets)
 		routes = append(routes, networkRoutes...)
 		urls = addListToSetString(urls, networkUrls)
 		errors = append(errors, networkErrors...)
 	}
 
-	// Return results
+	log.Info("Returning results")
 	mergedRoutes := mergeWebRoutes(routes) // For uniqueness across techniques
 	return mergedRoutes, setToListString(urls), errors
 }
@@ -98,7 +100,12 @@ func PerformRouteCapture(ctx context.Context, target string, captureMethod websc
 			return report
 		}
 		log.Info("Page capture successful")
-		htmlContent = *result.Request.ResponseBody
+		decodedContent, err := base64.StdEncoding.DecodeString(*result.Request.ResponseBody)
+		if err != nil {
+			report.Errors = append(report.Errors, "Failed to decode base64 response: "+err.Error())
+			return report
+		}
+		htmlContent = string(decodedContent)
 
 		// Extract the routes and urls
 		routes, urls, errors = extractRoutes(ctx, target, htmlContent, baseURLsOnly, captureStaticAssets, timeout, webscan.PageCaptureMethodRequest, nil)
@@ -115,7 +122,12 @@ func PerformRouteCapture(ctx context.Context, target string, captureMethod websc
 		}
 
 		log.Info("Page capture successful")
-		htmlContent = *result.Request.ResponseBody
+		decodedContent, err := base64.StdEncoding.DecodeString(*result.Request.ResponseBody)
+		if err != nil {
+			report.Errors = append(report.Errors, "Failed to decode base64 response: "+err.Error())
+			return report
+		}
+		htmlContent = string(decodedContent)
 
 		// Extract the routes and urls
 		routes, urls, errors = extractRoutes(ctx, target, htmlContent, baseURLsOnly, captureStaticAssets, timeout, webscan.PageCaptureMethodBrowser, capturer)
@@ -132,7 +144,12 @@ func PerformRouteCapture(ctx context.Context, target string, captureMethod websc
 			return report
 		}
 		log.Info("Page capture successful")
-		htmlContent = *result.Request.ResponseBody
+		decodedContent, err := base64.StdEncoding.DecodeString(*result.Request.ResponseBody)
+		if err != nil {
+			report.Errors = append(report.Errors, "Failed to decode base64 response: "+err.Error())
+			return report
+		}
+		htmlContent = string(decodedContent)
 
 		// Extract the routes and urls
 		routes, urls, errors = extractRoutes(ctx, target, htmlContent, baseURLsOnly, captureStaticAssets, timeout, webscan.PageCaptureMethodBrowserbase, capturer.Capturer)

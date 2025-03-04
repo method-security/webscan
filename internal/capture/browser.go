@@ -66,7 +66,11 @@ func (b *BrowserPageCapturer) Capture(ctx context.Context, url string, options *
 		page.MustNavigate(url)
 
 		log.Info("Waiting for DOM to be stable")
-		page.WaitDOMStable(time.Duration(b.MinDOMStabalizeTimeSeconds)*time.Second, .1)
+		if err := page.WaitDOMStable(time.Duration(b.MinDOMStabalizeTimeSeconds)*time.Second, .1); err != nil {
+			log.Error("Failed waiting for DOM to stabilize", svc1log.SafeParam("error", err))
+			report.Errors = append(report.Errors, err.Error())
+			return
+		}
 
 		log.Info("Waiting for response received event")
 		wait()

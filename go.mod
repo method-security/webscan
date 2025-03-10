@@ -1,8 +1,7 @@
 module github.com/Method-Security/webscan
 
 go 1.22
-
-toolchain go1.22.5
+toolchain go1.24.1
 
 require (
 	github.com/Method-Security/pkg v0.0.3
@@ -13,7 +12,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/palantir/pkg/datetime v1.1.0
 	github.com/palantir/pkg/safejson v1.1.0
-	github.com/palantir/witchcraft-go-logging v1.57.0
+	github.com/palantir/witchcraft-go-logging v1.59.0
 	github.com/pb33f/libopenapi v0.16.11
 	github.com/projectdiscovery/httpx v1.6.6
 	github.com/projectdiscovery/katana v1.1.0
@@ -113,9 +112,9 @@ require (
 	github.com/palantir/pkg/safelong v1.1.0 // indirect
 	github.com/palantir/pkg/safeyaml v1.1.0 // indirect
 	github.com/palantir/pkg/transform v1.1.0 // indirect
-	github.com/palantir/witchcraft-go-error v1.38.0 // indirect
-	github.com/palantir/witchcraft-go-params v1.35.0 // indirect
-	github.com/palantir/witchcraft-go-tracing v1.37.0 // indirect
+	github.com/palantir/witchcraft-go-error v1.40.0 // indirect
+	github.com/palantir/witchcraft-go-params v1.37.0 // indirect
+	github.com/palantir/witchcraft-go-tracing v1.39.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.21 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect

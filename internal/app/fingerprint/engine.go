@@ -9,6 +9,7 @@ import (
 	common "github.com/Method-Security/webscan/generated/go/common"
 	apiapplication "github.com/Method-Security/webscan/internal/app/fingerprint/modules/apiapplication"
 	cloudbucket "github.com/Method-Security/webscan/internal/app/fingerprint/modules/cloudbucket"
+	"github.com/Method-Security/webscan/internal/app/fingerprint/modules/webapplication"
 )
 
 type Module interface {
@@ -38,6 +39,10 @@ func NewEngine(config *webscan.AppFingerprintConfig) *Engine {
 				*webscan.NewAppFingerprintResourceModuleFromCloudBucketModule(webscan.CloudBucketModuleAzureblob): &cloudbucket.AzureBlobLibrary{},
 				*webscan.NewAppFingerprintResourceModuleFromCloudBucketModule(webscan.CloudBucketModuleAwss3):     &cloudbucket.AwsS3Library{},
 			},
+			webscan.AppFingerprintResourceTypeWebapplication: {
+				*webscan.NewAppFingerprintResourceModuleFromWebApplicationModule(webscan.WebApplicationModuleApache): &webapplication.ApacheLibrary{},
+				*webscan.NewAppFingerprintResourceModuleFromWebApplicationModule(webscan.WebApplicationModuleNginx):  &webapplication.NginxLibrary{},
+			},
 		},
 	}
 }
@@ -64,8 +69,10 @@ func (e *Engine) GetModules() ([]Module, error) {
 		appendModules(e.Modules[webscan.AppFingerprintResourceTypeApiapplication])
 	case webscan.AppFingerprintResourceTypeCloudbucket:
 		appendModules(e.Modules[webscan.AppFingerprintResourceTypeCloudbucket])
+	case webscan.AppFingerprintResourceTypeWebapplication:
+		appendModules(e.Modules[webscan.AppFingerprintResourceTypeWebapplication])
 	default:
-		return nil, fmt.Errorf("unsupported server type: %s", e.Config.ResourceType)
+		return nil, fmt.Errorf("unsupported module type: %s", e.Config.ResourceType)
 	}
 
 	return moduleLibs, nil

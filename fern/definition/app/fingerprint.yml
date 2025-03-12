@@ -14,14 +14,20 @@ types:
     enum:
       - AWSS3
       - AZUREBLOB
+  WebApplicationModule:
+    enum:
+      - APACHE
+      - NGINX
   AppFingerprintResourceModule:
     union:
       ApiApplicationModule: ApiApplicationModule
       CloudBucketModule: CloudBucketModule
+      WebApplicationModule: WebApplicationModule
   AppFingerprintResourceType:
     enum:
       - APIAPPLICATION
       - CLOUDBUCKET
+      - WEBAPPLICATION
   # Config Struct
   AppFingerprintConfig:
     properties:

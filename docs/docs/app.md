@@ -39,11 +39,11 @@ Usage:
 
 Flags:
   -h, --help                  help for fingerprint
-      --modules strings       Modules to run (APIApplication: FASTAPI, GRAPHQL, GRPC, SWAGGER, K8S; CloudBucket: AWSS3, AZUREBLOB)
-      --resourcetype string   Resource type to fingerprint (APIAPPLICATION, CLOUDBUCKET)
+      --modules strings       Modules to run (APIApplication: FASTAPI, GRAPHQL, GRPC, SWAGGER, K8S, WORDPRESS; CloudBucket: AWSS3, AZUREBLOB; WebApplication: APACHE, NGINX)
+      --resourcetype string   Resource type to fingerprint (APIAPPLICATION, CLOUDBUCKET, WEBAPPLICATION)
       --successfulonly        Only show successful attempts
       --targets strings       URL target to perform fingerprint against
-      --timeout int           Timeout per request (seconds) (default 5)
+      --timeout int           Timeout per request (seconds) (default 30)
 
 Global Flags:
   -o, --output string        Output format (signal, json, yaml). Default value is signal (default "signal")

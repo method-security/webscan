@@ -87,6 +87,7 @@ for the specified resource type.`,
 	resourceTypes := strings.Join([]string{
 		string(webscan.AppFingerprintResourceTypeApiapplication),
 		string(webscan.AppFingerprintResourceTypeCloudbucket),
+		string(webscan.AppFingerprintResourceTypeWebapplication),
 	}, ", ")
 	apiApplicationModules := strings.Join([]string{
 		string(webscan.ApiApplicationModuleFastapi),
@@ -100,10 +101,14 @@ for the specified resource type.`,
 		string(webscan.CloudBucketModuleAwss3),
 		string(webscan.CloudBucketModuleAzureblob),
 	}, ", ")
+	webApplicationModules := strings.Join([]string{
+		string(webscan.WebApplicationModuleApache),
+		string(webscan.WebApplicationModuleNginx),
+	}, ", ")
 
 	fingerprintCmd.Flags().StringSlice("targets", []string{}, "URL target to perform fingerprint against")
 	fingerprintCmd.Flags().String("resourcetype", "", fmt.Sprintf("Resource type to fingerprint (%s)", resourceTypes))
-	fingerprintCmd.Flags().StringSlice("modules", []string{}, fmt.Sprintf("Modules to run (APIApplication: %s; CloudBucket: %s)", apiApplicationModules, cloudBucketModules))
+	fingerprintCmd.Flags().StringSlice("modules", []string{}, fmt.Sprintf("Modules to run (APIApplication: %s; CloudBucket: %s; WebApplication: %s)", apiApplicationModules, cloudBucketModules, webApplicationModules))
 	fingerprintCmd.Flags().Int("timeout", 30, "Timeout per request (seconds)")
 	fingerprintCmd.Flags().Bool("successfulonly", false, "Only show successful attempts")
 
@@ -295,6 +300,15 @@ func validateFingerprintResourseModuleSelection(resourceType webscan.AppFingerpr
 				return nil, err
 			}
 			moduleEnum := webscan.NewAppFingerprintResourceModuleFromCloudBucketModule(moduleName)
+			moduleEnums = append(moduleEnums, moduleEnum)
+		}
+	} else if resourceType == webscan.AppFingerprintResourceTypeWebapplication {
+		for _, module := range modules {
+			moduleName, err := webscan.NewWebApplicationModuleFromString(strings.ToUpper(module))
+			if err != nil {
+				return nil, err
+			}
+			moduleEnum := webscan.NewAppFingerprintResourceModuleFromWebApplicationModule(moduleName)
 			moduleEnums = append(moduleEnums, moduleEnum)
 		}
 	}

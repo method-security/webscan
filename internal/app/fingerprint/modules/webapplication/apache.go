@@ -49,7 +49,7 @@ func (apLib *ApacheLibrary) ModuleRun(target string, config *webscan.AppFingerpr
 }
 
 func (apLib *ApacheLibrary) AnalyzeResponse(response *common.RequestInfo) bool {
-	if response == nil || response.StatusCode == nil || response.ResponseBody == nil || response.ResponseHeaders == nil {
+	if response == nil || response.StatusCode == nil || response.ResponseHeaders == nil {
 		return false
 	}
 
@@ -63,6 +63,10 @@ func (apLib *ApacheLibrary) AnalyzeResponse(response *common.RequestInfo) bool {
 				return true
 			}
 		}
+	}
+
+	if response.ResponseBody == nil {
+		return false
 	}
 
 	// Check body for Apache indicators

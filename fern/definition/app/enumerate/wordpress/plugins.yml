@@ -1,0 +1,29 @@
+types:
+  AppEnumerateWordpressPluginsConfig:
+    properties:
+      targets: list<string>
+      plugins: optional<list<string>>
+      timeout: integer
+  DetectionSource:
+    enum:
+      - CSS_REFERENCE
+      - HTML
+      - README_TXT
+      - REGISTERED_SCRIPT
+      - REST_API_DIRECT
+      - REST_API_NAMESPACE
+  WordpressPlugin:
+    properties:
+      name: string
+      version: optional<string>
+      description: optional<string>
+      source: list<DetectionSource>
+  AppEnumerateWordpressPluginsTargetInfo:
+    properties:
+      target: string
+      plugins: optional<list<WordpressPlugin>>
+  AppEnumerateWordpressPluginsReport:
+    properties:
+      targets: optional<list<AppEnumerateWordpressPluginsTargetInfo>>
+      config: AppEnumerateWordpressPluginsConfig
+      errors: optional<list<string>>

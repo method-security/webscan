@@ -1,12 +1,16 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
 	webscan "github.com/Method-Security/webscan/generated/go/app"
+	enumerateWordpressFern "github.com/Method-Security/webscan/generated/go/app/enumerate/wordpress"
 	"github.com/Method-Security/webscan/internal/app/enumerate"
+	enumerateWordpress "github.com/Method-Security/webscan/internal/app/enumerate/wordpress"
 	fingerprint "github.com/Method-Security/webscan/internal/app/fingerprint"
+	"github.com/Method-Security/webscan/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -270,6 +274,80 @@ HTTP methods, query parameters, and authentication mechanisms.`,
 
 	enumerateCmd.AddCommand(enumerateSwaggerCmd)
 
+	enumerateWordpressCmd := &cobra.Command{
+		Use:   "wordpress",
+		Short: "Perform WordPress specific enumeration scans against a target",
+		Long:  `Perform WordPress specific enumeration scans against a target.`,
+	}
+
+	enumerateWordpressPluginsCmd := &cobra.Command{
+		Use:   "plugins",
+		Short: "Attempt to enumerate WordPress plugins on a target",
+		Long:  `Attempt to enumerate WordPress plugins on a target.`,
+		Run: func(cmd *cobra.Command, args []string) {
+			defer a.OutputSignal.PanicHandler(cmd.Context())
+
+			// Target flag
+			targets, err := cmd.Flags().GetStringSlice("targets")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Get common plugins
+			plugins, err := cmd.Flags().GetStringSlice("plugins")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			pluginsFiles, err := cmd.Flags().GetStringSlice("plugins-file-paths")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			if len(pluginsFiles) > 0 {
+				entries, err := utils.GetEntriesFromFiles(pluginsFiles)
+				if err != nil {
+					a.OutputSignal.AddError(err)
+					return
+				}
+				plugins = append(plugins, entries...)
+			}
+			if len(plugins) == 0 {
+				a.OutputSignal.AddError(errors.New("no plugins provided"))
+				return
+			}
+
+			// Timeout flag
+			timeout, err := cmd.Flags().GetInt("timeout")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Generate config
+			config := newEnumerateWordpressPluginsConfig(targets, plugins, timeout)
+
+			// Generate report
+			report := enumerateWordpress.PerformAppEnumerateWordpressPlugins(cmd.Context(), config)
+			if len(report.Errors) > 0 {
+				a.OutputSignal.Status = 1
+			}
+			a.OutputSignal.Content = report
+		},
+	}
+
+	enumerateWordpressPluginsCmd.Flags().StringSlice("targets", []string{}, "URL targets to perform WordPress plugins enumeration against")
+	enumerateWordpressPluginsCmd.Flags().StringSlice("plugins", []string{}, "WordPress plugins to try to detect")
+	enumerateWordpressPluginsCmd.Flags().StringSlice("plugins-file-paths", []string{"configs/wordpress/wordpress_plugins_small.txt"}, "File paths containing common WordPress plugins to use for enumeration")
+	enumerateWordpressPluginsCmd.Flags().Int("timeout", 30, "Timeout per request (seconds)")
+
+	_ = enumerateWordpressPluginsCmd.MarkFlagRequired("targets")
+
+	enumerateWordpressCmd.AddCommand(enumerateWordpressPluginsCmd)
+
+	enumerateCmd.AddCommand(enumerateWordpressCmd)
+
 	appCmd.AddCommand(enumerateCmd)
 
 	a.RootCmd.AddCommand(appCmd)
@@ -341,4 +419,13 @@ func newFingerprintConfig(targets []string, resourceEnum webscan.AppFingerprintR
 		config.Timeout = 0
 	}
 	return config, nil
+}
+
+func newEnumerateWordpressPluginsConfig(targets []string, plugins []string, timeout int) *enumerateWordpressFern.AppEnumerateWordpressPluginsConfig {
+	config := &enumerateWordpressFern.AppEnumerateWordpressPluginsConfig{
+		Targets: targets,
+		Plugins: plugins,
+		Timeout: timeout,
+	}
+	return config
 }

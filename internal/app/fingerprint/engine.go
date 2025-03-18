@@ -11,11 +11,15 @@ import (
 	cloudbucket "github.com/Method-Security/webscan/internal/app/fingerprint/modules/cloudbucket"
 	"github.com/Method-Security/webscan/internal/app/fingerprint/modules/remoteaccess"
 	"github.com/Method-Security/webscan/internal/app/fingerprint/modules/webapplication"
+	"github.com/Method-Security/webscan/utils"
 )
 
 type Module interface {
-	ModuleRun(target string, config *webscan.AppFingerprintConfig) (*webscan.AppFingerprintAttemptInfo, []string)
-	AnalyzeResponse(request *common.RequestInfo) bool
+	Name() *webscan.AppFingerprintResourceModule
+	Paths() []string
+	RequestParams() (common.HttpMethod, common.RequestParams)
+	BodyIndicators() []string
+	HeaderIndicators() map[string][]string
 }
 
 type Engine struct {
@@ -46,6 +50,8 @@ func NewEngine(config *webscan.AppFingerprintConfig) *Engine {
 			},
 			webscan.AppFingerprintResourceTypeRemoteaccess: {
 				*webscan.NewAppFingerprintResourceModuleFromRemoteAccessModule(webscan.RemoteAccessModuleCitrixgateway): &remoteaccess.CitrixGatewayLibrary{},
+				*webscan.NewAppFingerprintResourceModuleFromRemoteAccessModule(webscan.RemoteAccessModuleWindowsrdp):    &remoteaccess.WindowsRDPLibrary{},
+				*webscan.NewAppFingerprintResourceModuleFromRemoteAccessModule(webscan.RemoteAccessModuleVmwarehorizon): &remoteaccess.VMwareHorizonLibrary{},
 			},
 		},
 	}
@@ -53,7 +59,6 @@ func NewEngine(config *webscan.AppFingerprintConfig) *Engine {
 
 func (e *Engine) GetModules() ([]Module, error) {
 	var moduleLibs []Module
-
 	appendModules := func(resourceModules map[webscan.AppFingerprintResourceModule]Module) {
 		if len(e.Config.Modules) == 0 {
 			for _, module := range resourceModules {
@@ -84,9 +89,80 @@ func (e *Engine) GetModules() ([]Module, error) {
 	return moduleLibs, nil
 }
 
-func (e *Engine) Run(ctx context.Context, target string) (*webscan.AppFingerprintAttemptInfo, []string) {
-	attempt, errs := e.Library.ModuleRun(target, e.Config)
-	return attempt, errs
+func (e *Engine) AnalyzeResponse(response *common.RequestInfo) bool {
+	if response == nil || response.StatusCode == nil {
+		return false
+	}
+
+	// Anaylsis Response Headers
+	if response.ResponseHeaders == nil {
+		return false
+	}
+	headerIndicators := e.Library.HeaderIndicators()
+	// Loop through response headers
+	for responseHeader, responseHeaderValue := range response.ResponseHeaders {
+		// Loop through header indicators
+		for headerIndicator, headerIndicatorValues := range headerIndicators {
+			if strings.EqualFold(responseHeader, headerIndicator) {
+				if len(headerIndicatorValues) == 0 {
+					return true // If empty array, the header presence alone is an indicator
+				}
+				// Loop through header values
+				for _, headerIndicatorValue := range headerIndicatorValues {
+					if strings.Contains(strings.ToLower(responseHeaderValue), strings.ToLower(headerIndicatorValue)) {
+						return true
+					}
+				}
+			}
+		}
+	}
+
+	// Anaylsis Response Body
+	if response.ResponseBody == nil {
+		return false
+	}
+	bodyIndicators := e.Library.BodyIndicators()
+	lowerBody := strings.ToLower(*response.ResponseBody)
+	for _, indicator := range bodyIndicators {
+		if strings.Contains(lowerBody, indicator) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (e *Engine) Run(ctx context.Context, target string, timeout int) (*webscan.AppFingerprintAttemptInfo, []string) {
+	attempt := webscan.AppFingerprintAttemptInfo{
+		Name:    e.Library.Name(),
+		Finding: false,
+	}
+	errors := []string{}
+
+	baseURL, parsedTargetPath, err := utils.SplitTarget(target)
+	if err != nil {
+		errors = append(errors, err.Error())
+		return &attempt, errors
+	}
+
+	requests := []*common.RequestInfo{}
+	for _, path := range e.Library.Paths() {
+		// Request Configuration
+		fullPath := parsedTargetPath + path
+		method, params := e.Library.RequestParams()
+
+		// Perform Request
+		request := utils.PerformRequestScan(baseURL, fullPath, method, params, timeout)
+		errors = append(errors, request.Errors...)
+
+		requests = append(requests, &request)
+		if e.AnalyzeResponse(&request) {
+			attempt.Finding = true
+		}
+	}
+
+	attempt.Requests = requests
+	return &attempt, errors
 }
 
 func (e *Engine) Launch(ctx context.Context) (*webscan.AppFingerprintReport, error) {
@@ -111,12 +187,12 @@ func (e *Engine) Launch(ctx context.Context) (*webscan.AppFingerprintReport, err
 				schemes := []string{"http://", "https://"}
 				for _, scheme := range schemes {
 					schemeTarget := scheme + target
-					attempt, errs := e.Run(ctx, schemeTarget)
+					attempt, errs := e.Run(ctx, schemeTarget, e.Config.Timeout)
 					attempts = append(attempts, attempt)
 					errors = append(errors, errs...)
 				}
 			} else {
-				attempt, errs := e.Run(ctx, target)
+				attempt, errs := e.Run(ctx, target, e.Config.Timeout)
 				attempts = append(attempts, attempt)
 				errors = append(errors, errs...)
 			}

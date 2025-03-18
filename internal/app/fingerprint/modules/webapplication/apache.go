@@ -1,76 +1,41 @@
 package webapplication
 
 import (
-	"strings"
-
 	webscan "github.com/Method-Security/webscan/generated/go/app"
 	common "github.com/Method-Security/webscan/generated/go/common"
-	"github.com/Method-Security/webscan/utils"
 )
 
 type ApacheLibrary struct{}
 
-var apachePaths = []string{
-	"", // Root
-	"/server-status",
-	"/icons/",
-	"/manual/",
-	"/cgi-bin/",
-	"/.htaccess",
+func (apLib *ApacheLibrary) Name() *webscan.AppFingerprintResourceModule {
+	return webscan.NewAppFingerprintResourceModuleFromWebApplicationModule(webscan.WebApplicationModuleApache)
 }
 
-func (apLib *ApacheLibrary) ModuleRun(target string, config *webscan.AppFingerprintConfig) (*webscan.AppFingerprintAttemptInfo, []string) {
-	attempt := webscan.AppFingerprintAttemptInfo{
-		Name:    webscan.NewAppFingerprintResourceModuleFromWebApplicationModule(webscan.WebApplicationModuleApache),
-		Finding: false,
+func (apLib *ApacheLibrary) Paths() []string {
+	paths := []string{
+		"", // Root
+		"/server-status",
+		"/icons",
+		"/manual",
+		"/cgi-bin",
+		"/.htaccess",
 	}
-	errors := []string{}
-
-	baseURL, parsedTargetPath, err := utils.SplitTarget(target)
-	if err != nil {
-		errors = append(errors, err.Error())
-		return &attempt, errors
-	}
-
-	requests := []*common.RequestInfo{}
-
-	for _, path := range apachePaths {
-		request := utils.PerformRequestScan(baseURL, parsedTargetPath+path, common.HttpMethodGet, common.RequestParams{}, config.Timeout)
-		errors = append(errors, request.Errors...)
-
-		requests = append(requests, &request)
-		if apLib.AnalyzeResponse(&request) {
-			attempt.Finding = true
-		}
-	}
-
-	attempt.Requests = requests
-	return &attempt, errors
+	return paths
 }
 
-func (apLib *ApacheLibrary) AnalyzeResponse(response *common.RequestInfo) bool {
-	if response == nil || response.StatusCode == nil || response.ResponseHeaders == nil {
-		return false
+func (apLib *ApacheLibrary) RequestParams() (common.HttpMethod, common.RequestParams) {
+	return common.HttpMethodGet, common.RequestParams{}
+}
+
+func (apLib *ApacheLibrary) HeaderIndicators() map[string][]string {
+	return map[string][]string{
+		"server":       {"apache"},
+		"x-powered-by": {""},
 	}
+}
 
-	// We're interested in responses even if they're not 200 OK
-	// Apache often reveals itself in error pages too
-
-	// Check headers for Apache indicators
-	for _, headerKey := range []string{"Server", "server", "X-Powered-By", "x-powered-by"} {
-		if serverHeader, ok := response.ResponseHeaders[headerKey]; ok {
-			if strings.Contains(strings.ToLower(serverHeader), "apache") {
-				return true
-			}
-		}
-	}
-
-	if response.ResponseBody == nil {
-		return false
-	}
-
-	// Check body for Apache indicators
-	apacheBodyIndicators := []string{
+func (apLib *ApacheLibrary) BodyIndicators() []string {
+	return []string{
 		"<address>apache",
 		"apache server at",
 		"powered by apache",
@@ -79,13 +44,4 @@ func (apLib *ApacheLibrary) AnalyzeResponse(response *common.RequestInfo) bool {
 		"<title>apache status</title>",
 		"apache tomcat",
 	}
-
-	body := strings.ToLower(*response.ResponseBody)
-	for _, indicator := range apacheBodyIndicators {
-		if strings.Contains(body, strings.ToLower(indicator)) {
-			return true
-		}
-	}
-
-	return false
 }

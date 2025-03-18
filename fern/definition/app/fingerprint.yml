@@ -18,16 +18,23 @@ types:
     enum:
       - APACHE
       - NGINX
+  RemoteAccessModule:
+    enum:
+      - CITRIXGATEWAY
+      - WINDOWSRDP
+      - VMWAREHORIZON
   AppFingerprintResourceModule:
     union:
       ApiApplicationModule: ApiApplicationModule
       CloudBucketModule: CloudBucketModule
       WebApplicationModule: WebApplicationModule
+      RemoteAccessModule: RemoteAccessModule
   AppFingerprintResourceType:
     enum:
       - APIAPPLICATION
       - CLOUDBUCKET
       - WEBAPPLICATION
+      - REMOTEACCESS
   # Config Struct
   AppFingerprintConfig:
     properties:

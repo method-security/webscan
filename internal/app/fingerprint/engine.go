@@ -9,6 +9,7 @@ import (
 	common "github.com/Method-Security/webscan/generated/go/common"
 	apiapplication "github.com/Method-Security/webscan/internal/app/fingerprint/modules/apiapplication"
 	cloudbucket "github.com/Method-Security/webscan/internal/app/fingerprint/modules/cloudbucket"
+	"github.com/Method-Security/webscan/internal/app/fingerprint/modules/remoteaccess"
 	"github.com/Method-Security/webscan/internal/app/fingerprint/modules/webapplication"
 )
 
@@ -43,6 +44,9 @@ func NewEngine(config *webscan.AppFingerprintConfig) *Engine {
 				*webscan.NewAppFingerprintResourceModuleFromWebApplicationModule(webscan.WebApplicationModuleApache): &webapplication.ApacheLibrary{},
 				*webscan.NewAppFingerprintResourceModuleFromWebApplicationModule(webscan.WebApplicationModuleNginx):  &webapplication.NginxLibrary{},
 			},
+			webscan.AppFingerprintResourceTypeRemoteaccess: {
+				*webscan.NewAppFingerprintResourceModuleFromRemoteAccessModule(webscan.RemoteAccessModuleCitrixgateway): &remoteaccess.CitrixGatewayLibrary{},
+			},
 		},
 	}
 }
@@ -71,6 +75,8 @@ func (e *Engine) GetModules() ([]Module, error) {
 		appendModules(e.Modules[webscan.AppFingerprintResourceTypeCloudbucket])
 	case webscan.AppFingerprintResourceTypeWebapplication:
 		appendModules(e.Modules[webscan.AppFingerprintResourceTypeWebapplication])
+	case webscan.AppFingerprintResourceTypeRemoteaccess:
+		appendModules(e.Modules[webscan.AppFingerprintResourceTypeRemoteaccess])
 	default:
 		return nil, fmt.Errorf("unsupported module type: %s", e.Config.ResourceType)
 	}

@@ -179,6 +179,7 @@ type AppFingerprintResourceModule struct {
 	ApiApplicationModule ApiApplicationModule
 	CloudBucketModule    CloudBucketModule
 	WebApplicationModule WebApplicationModule
+	RemoteAccessModule   RemoteAccessModule
 }
 
 func NewAppFingerprintResourceModuleFromApiApplicationModule(value ApiApplicationModule) *AppFingerprintResourceModule {
@@ -191,6 +192,10 @@ func NewAppFingerprintResourceModuleFromCloudBucketModule(value CloudBucketModul
 
 func NewAppFingerprintResourceModuleFromWebApplicationModule(value WebApplicationModule) *AppFingerprintResourceModule {
 	return &AppFingerprintResourceModule{Type: "WebApplicationModule", WebApplicationModule: value}
+}
+
+func NewAppFingerprintResourceModuleFromRemoteAccessModule(value RemoteAccessModule) *AppFingerprintResourceModule {
+	return &AppFingerprintResourceModule{Type: "RemoteAccessModule", RemoteAccessModule: value}
 }
 
 func (a *AppFingerprintResourceModule) UnmarshalJSON(data []byte) error {
@@ -229,6 +234,14 @@ func (a *AppFingerprintResourceModule) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		a.WebApplicationModule = valueUnmarshaler.WebApplicationModule
+	case "RemoteAccessModule":
+		var valueUnmarshaler struct {
+			RemoteAccessModule RemoteAccessModule `json:"value"`
+		}
+		if err := json.Unmarshal(data, &valueUnmarshaler); err != nil {
+			return err
+		}
+		a.RemoteAccessModule = valueUnmarshaler.RemoteAccessModule
 	}
 	return nil
 }
@@ -264,6 +277,15 @@ func (a AppFingerprintResourceModule) MarshalJSON() ([]byte, error) {
 			WebApplicationModule: a.WebApplicationModule,
 		}
 		return json.Marshal(marshaler)
+	case "RemoteAccessModule":
+		var marshaler = struct {
+			Type               string             `json:"type"`
+			RemoteAccessModule RemoteAccessModule `json:"value"`
+		}{
+			Type:               "RemoteAccessModule",
+			RemoteAccessModule: a.RemoteAccessModule,
+		}
+		return json.Marshal(marshaler)
 	}
 }
 
@@ -271,6 +293,7 @@ type AppFingerprintResourceModuleVisitor interface {
 	VisitApiApplicationModule(ApiApplicationModule) error
 	VisitCloudBucketModule(CloudBucketModule) error
 	VisitWebApplicationModule(WebApplicationModule) error
+	VisitRemoteAccessModule(RemoteAccessModule) error
 }
 
 func (a *AppFingerprintResourceModule) Accept(visitor AppFingerprintResourceModuleVisitor) error {
@@ -283,6 +306,8 @@ func (a *AppFingerprintResourceModule) Accept(visitor AppFingerprintResourceModu
 		return visitor.VisitCloudBucketModule(a.CloudBucketModule)
 	case "WebApplicationModule":
 		return visitor.VisitWebApplicationModule(a.WebApplicationModule)
+	case "RemoteAccessModule":
+		return visitor.VisitRemoteAccessModule(a.RemoteAccessModule)
 	}
 }
 
@@ -292,6 +317,7 @@ const (
 	AppFingerprintResourceTypeApiapplication AppFingerprintResourceType = "APIAPPLICATION"
 	AppFingerprintResourceTypeCloudbucket    AppFingerprintResourceType = "CLOUDBUCKET"
 	AppFingerprintResourceTypeWebapplication AppFingerprintResourceType = "WEBAPPLICATION"
+	AppFingerprintResourceTypeRemoteaccess   AppFingerprintResourceType = "REMOTEACCESS"
 )
 
 func NewAppFingerprintResourceTypeFromString(s string) (AppFingerprintResourceType, error) {
@@ -302,6 +328,8 @@ func NewAppFingerprintResourceTypeFromString(s string) (AppFingerprintResourceTy
 		return AppFingerprintResourceTypeCloudbucket, nil
 	case "WEBAPPLICATION":
 		return AppFingerprintResourceTypeWebapplication, nil
+	case "REMOTEACCESS":
+		return AppFingerprintResourceTypeRemoteaccess, nil
 	}
 	var t AppFingerprintResourceType
 	return "", fmt.Errorf("%s is not a valid %T", s, t)
@@ -373,6 +401,31 @@ func NewCloudBucketModuleFromString(s string) (CloudBucketModule, error) {
 
 func (c CloudBucketModule) Ptr() *CloudBucketModule {
 	return &c
+}
+
+type RemoteAccessModule string
+
+const (
+	RemoteAccessModuleCitrixgateway RemoteAccessModule = "CITRIXGATEWAY"
+	RemoteAccessModuleWindowsrdp    RemoteAccessModule = "WINDOWSRDP"
+	RemoteAccessModuleVmwarehorizon RemoteAccessModule = "VMWAREHORIZON"
+)
+
+func NewRemoteAccessModuleFromString(s string) (RemoteAccessModule, error) {
+	switch s {
+	case "CITRIXGATEWAY":
+		return RemoteAccessModuleCitrixgateway, nil
+	case "WINDOWSRDP":
+		return RemoteAccessModuleWindowsrdp, nil
+	case "VMWAREHORIZON":
+		return RemoteAccessModuleVmwarehorizon, nil
+	}
+	var t RemoteAccessModule
+	return "", fmt.Errorf("%s is not a valid %T", s, t)
+}
+
+func (r RemoteAccessModule) Ptr() *RemoteAccessModule {
+	return &r
 }
 
 type WebApplicationModule string

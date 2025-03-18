@@ -12,6 +12,7 @@ type AppEnumerateWordpressPluginsConfig struct {
 	Targets []string `json:"targets,omitempty" url:"targets,omitempty"`
 	Plugins []string `json:"plugins,omitempty" url:"plugins,omitempty"`
 	Timeout int      `json:"timeout" url:"timeout"`
+	Threads *int     `json:"threads,omitempty" url:"threads,omitempty"`
 
 	extraProperties map[string]interface{}
 	_rawJSON        json.RawMessage

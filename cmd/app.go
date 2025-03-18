@@ -318,15 +318,20 @@ HTTP methods, query parameters, and authentication mechanisms.`,
 				return
 			}
 
-			// Timeout flag
+			// Config flags
 			timeout, err := cmd.Flags().GetInt("timeout")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			threads, err := cmd.Flags().GetInt("threads")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
 
 			// Generate config
-			config := newEnumerateWordpressPluginsConfig(targets, plugins, timeout)
+			config := newEnumerateWordpressPluginsConfig(targets, plugins, timeout, threads)
 
 			// Generate report
 			report := enumerateWordpress.PerformAppEnumerateWordpressPlugins(cmd.Context(), config)
@@ -341,6 +346,7 @@ HTTP methods, query parameters, and authentication mechanisms.`,
 	enumerateWordpressPluginsCmd.Flags().StringSlice("plugins", []string{}, "WordPress plugins to try to detect")
 	enumerateWordpressPluginsCmd.Flags().StringSlice("plugins-file-paths", []string{"configs/wordpress/wordpress_plugins_small.txt"}, "File paths containing common WordPress plugins to use for enumeration")
 	enumerateWordpressPluginsCmd.Flags().Int("timeout", 30, "Timeout per request (seconds)")
+	enumerateWordpressPluginsCmd.Flags().Int("threads", 0, "Number of threads to use during enumeration (default is number of CPUs)")
 
 	_ = enumerateWordpressPluginsCmd.MarkFlagRequired("targets")
 
@@ -421,11 +427,15 @@ func newFingerprintConfig(targets []string, resourceEnum webscan.AppFingerprintR
 	return config, nil
 }
 
-func newEnumerateWordpressPluginsConfig(targets []string, plugins []string, timeout int) *enumerateWordpressFern.AppEnumerateWordpressPluginsConfig {
+func newEnumerateWordpressPluginsConfig(targets []string, plugins []string, timeout int, threads int) *enumerateWordpressFern.AppEnumerateWordpressPluginsConfig {
 	config := &enumerateWordpressFern.AppEnumerateWordpressPluginsConfig{
 		Targets: targets,
 		Plugins: plugins,
 		Timeout: timeout,
+	}
+
+	if threads > 0 {
+		config.Threads = &threads
 	}
 	return config
 }

@@ -4,6 +4,7 @@ types:
       targets: list<string>
       plugins: optional<list<string>>
       timeout: integer
+      threads: optional<integer>
   DetectionSource:
     enum:
       - CSS_REFERENCE

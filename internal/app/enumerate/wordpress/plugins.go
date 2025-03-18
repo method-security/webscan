@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"runtime"
 	"strings"
 	"sync"
 
@@ -30,11 +31,26 @@ func PerformAppEnumerateWordpressPlugins(ctx context.Context, config *enumerateW
 	// Create a wait group to wait for all goroutines to finish
 	var wg sync.WaitGroup
 
+	// Determine number of concurrent goroutines
+	maxGoroutines := runtime.GOMAXPROCS(0) // Default to number of CPUs
+	if config.Threads != nil {
+		maxGoroutines = *config.Threads
+	}
+
+	// Create a semaphore to limit concurrent goroutines
+	semaphore := make(chan struct{}, maxGoroutines)
+
 	// Process each target concurrently
 	for _, target := range config.Targets {
 		wg.Add(1)
+
+		// Acquire semaphore (blocks if maxGoroutines are running)
+		semaphore <- struct{}{}
+
 		go func(target string) {
 			defer wg.Done()
+			defer func() { <-semaphore }() // Release semaphore when done
+
 			result, errs := scanTarget(target, config.Plugins, config.Timeout)
 			resultsChan <- &result
 			if len(errs) > 0 {

@@ -158,7 +158,7 @@ func (e *Engine) Run(ctx context.Context, target string, timeout int) (*webscan.
 		method, params := e.Library.RequestParams()
 
 		// Perform Request
-		request := utils.PerformRequestScan(baseURL, fullPath, method, params, timeout)
+		request := utils.PerformRequestScan(baseURL, fullPath, method, params, timeout, false)
 		errors = append(errors, request.Errors...)
 
 		requests = append(requests, &request)

@@ -32,7 +32,7 @@ func PerformWebserverRatelimit(ctx context.Context, config *webscan.WebserverRat
 		// Track if a 200 OK response was previously detected for this target
 		var hasSeen200 bool
 		for requestNumber := 1; requestNumber <= config.MaxRequests; requestNumber++ {
-			request := utils.PerformRequestScan(baseURL, parsedTargetPath, common.HttpMethodGet, common.RequestParams{}, config.Timeout)
+			request := utils.PerformRequestScan(baseURL, parsedTargetPath, common.HttpMethodGet, common.RequestParams{}, config.Timeout, true)
 
 			if rateLimitDetected(&request, hasSeen200) {
 				targetInfo.DetectedRequest = &webscan.WebserverRateLimitAttemptInfo{

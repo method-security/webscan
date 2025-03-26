@@ -16,7 +16,7 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
-func PerformRequestScan(baseURL, path string, method common.HttpMethod, params common.RequestParams, timeout int) common.RequestInfo {
+func PerformRequestScan(baseURL, path string, method common.HttpMethod, params common.RequestParams, timeout int, followRedirects bool) common.RequestInfo {
 	normalizedPath := strings.TrimRight(path, "/")
 	if normalizedPath == "" {
 		normalizedPath = "/"
@@ -61,7 +61,7 @@ func PerformRequestScan(baseURL, path string, method common.HttpMethod, params c
 	responseHeader := make(map[string]string)
 	// Create and send the request based on the presence of escape characters
 	if !hasEscapeChars {
-		resp, err := sendRequest(method, fullURL.String(), reqBody, contentType, params.HeaderParams, timeout)
+		resp, err := sendRequest(method, fullURL.String(), reqBody, contentType, params.HeaderParams, timeout, followRedirects)
 		if err != nil {
 			request.Errors = append(request.Errors, err.Error())
 			return request
@@ -87,7 +87,7 @@ func PerformRequestScan(baseURL, path string, method common.HttpMethod, params c
 		}
 	} else {
 		// Use sendFastHTTPRequest if escape characters are present
-		resp, err := sendFastHTTPRequest(string(method), fullURL.String(), responseBody, contentType, params.HeaderParams)
+		resp, err := sendFastHTTPRequest(string(method), fullURL.String(), responseBody, contentType, params.HeaderParams, followRedirects)
 		if err != nil {
 			request.Errors = append(request.Errors, err.Error())
 			return request
@@ -162,7 +162,7 @@ func prepareRequestBody(params common.RequestParams) (io.Reader, string, error) 
 	return nil, "", nil
 }
 
-func sendRequest(method common.HttpMethod, url string, body io.Reader, contentType string, headers map[string]string, timeout int) (*http.Response, error) {
+func sendRequest(method common.HttpMethod, url string, body io.Reader, contentType string, headers map[string]string, timeout int, followRedirects bool) (*http.Response, error) {
 	req, err := http.NewRequest(string(method), url, body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %v", err)
@@ -180,6 +180,12 @@ func sendRequest(method common.HttpMethod, url string, body io.Reader, contentTy
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		},
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if !followRedirects {
+				return http.ErrUseLastResponse
+			}
+			return nil
+		},
 	}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -189,7 +195,7 @@ func sendRequest(method common.HttpMethod, url string, body io.Reader, contentTy
 	return resp, nil
 }
 
-func sendFastHTTPRequest(method, url string, body string, contentType string, headers map[string]string) (*fasthttp.Response, error) {
+func sendFastHTTPRequest(method, url string, body string, contentType string, headers map[string]string, followRedirects bool) (*fasthttp.Response, error) {
 	// Prepare the fasthttp request and response objects
 	req := fasthttp.AcquireRequest()
 	defer fasthttp.ReleaseRequest(req)
@@ -208,7 +214,12 @@ func sendFastHTTPRequest(method, url string, body string, contentType string, he
 		req.Header.Set(key, value)
 	}
 
-	err := fasthttp.Do(req, resp)
+	var err error
+	if followRedirects {
+		err = fasthttp.DoRedirects(req, resp, 10) // Follow up to 10 redirects
+	} else {
+		err = fasthttp.Do(req, resp)
+	}
 	if err != nil {
 		fasthttp.ReleaseResponse(resp)
 		return nil, fmt.Errorf("failed to perform request: %v", err)

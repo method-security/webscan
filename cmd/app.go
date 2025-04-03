@@ -112,6 +112,7 @@ for the specified resource type.`,
 	webApplicationModules := strings.Join([]string{
 		string(webscan.WebApplicationModuleApache),
 		string(webscan.WebApplicationModuleNginx),
+                string(webscan.WebApplicationModuleIis),
 	}, ", ")
 
 	fingerprintCmd.Flags().StringSlice("targets", []string{}, "URL target to perform fingerprint against")

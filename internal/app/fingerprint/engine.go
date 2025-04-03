@@ -56,6 +56,7 @@ func NewEngine(config *webscan.AppFingerprintConfig) *Engine {
 			webscan.AppFingerprintResourceTypeWebapplication: {
 				*webscan.NewAppFingerprintResourceModuleFromWebApplicationModule(webscan.WebApplicationModuleApache): &webapplication.ApacheLibrary{},
 				*webscan.NewAppFingerprintResourceModuleFromWebApplicationModule(webscan.WebApplicationModuleNginx):  &webapplication.NginxLibrary{},
+				*webscan.NewAppFingerprintResourceModuleFromWebApplicationModule(webscan.WebApplicationModuleIis):    &webapplication.IISLibrary{},
 			},
 		},
 	}

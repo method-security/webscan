@@ -26,6 +26,7 @@ types:
     enum:
       - APACHE
       - NGINX
+      - IIS
   AppFingerprintResourceModule:
     union:
       ApiApplicationModule: ApiApplicationModule

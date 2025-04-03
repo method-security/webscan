@@ -480,6 +480,7 @@ type WebApplicationModule string
 const (
 	WebApplicationModuleApache WebApplicationModule = "APACHE"
 	WebApplicationModuleNginx  WebApplicationModule = "NGINX"
+	WebApplicationModuleIis    WebApplicationModule = "IIS"
 )
 
 func NewWebApplicationModuleFromString(s string) (WebApplicationModule, error) {
@@ -488,6 +489,8 @@ func NewWebApplicationModuleFromString(s string) (WebApplicationModule, error) {
 		return WebApplicationModuleApache, nil
 	case "NGINX":
 		return WebApplicationModuleNginx, nil
+	case "IIS":
+		return WebApplicationModuleIis, nil
 	}
 	var t WebApplicationModule
 	return "", fmt.Errorf("%s is not a valid %T", s, t)

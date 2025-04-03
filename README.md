@@ -52,6 +52,8 @@ webscan vuln --severity INFO --tags swagger --tags fastapi --tags api --target e
 
 6. OR run command without shell example: `docker run webscan:local app enumerate graphql --target https://countries.trevorblades.com/ -o json`
 
+### Fern
+If updating the fern yaml configuration you need to [install](https://buildwithfern.com/learn/cli-reference/overview) Fern CLI. After installation you can execute `fern generate` to generate the updates.
 
 ### Note:
 This tool runs on a headless-shell base image to support chrome/chromium browser automation. The dockerfile uses debian-based install tools. 

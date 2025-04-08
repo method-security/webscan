@@ -22,7 +22,7 @@ func PerformWebserverHeadergrab(ctx context.Context, config *webscan.WebserverHe
 			continue
 		}
 
-		request := utils.PerformRequestScan(baseURL, parsedTargetPath, common.HttpMethodGet, common.RequestParams{}, config.Timeout)
+		request := utils.PerformRequestScan(baseURL, parsedTargetPath, common.HttpMethodGet, common.RequestParams{}, config.Timeout, false)
 
 		if request.Errors != nil {
 			errors = append(errors, request.Errors...)

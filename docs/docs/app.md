@@ -39,7 +39,7 @@ Usage:
 
 Flags:
   -h, --help                  help for fingerprint
-      --modules strings       Modules to run (APIApplication: FASTAPI, GRAPHQL, GRPC, SWAGGER, K8S, WORDPRESS; CloudBucket: AWSS3, AZUREBLOB; WebApplication: APACHE, NGINX)
+      --modules strings       Modules to run (APIApplication: FASTAPI, GRAPHQL, GRPC, SWAGGER, K8S, WORDPRESS; CloudBucket: AWSS3, AZUREBLOB; WebApplication: APACHE, NGINX, IIS)
       --resourcetype string   Resource type to fingerprint (APIAPPLICATION, CLOUDBUCKET, WEBAPPLICATION)
       --successfulonly        Only show successful attempts
       --targets strings       URL target to perform fingerprint against

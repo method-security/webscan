@@ -9,8 +9,9 @@ import (
 	common "github.com/Method-Security/webscan/generated/go/common"
 	apiapplication "github.com/Method-Security/webscan/internal/app/fingerprint/modules/apiapplication"
 	cloudbucket "github.com/Method-Security/webscan/internal/app/fingerprint/modules/cloudbucket"
-	"github.com/Method-Security/webscan/internal/app/fingerprint/modules/remoteaccess"
-	"github.com/Method-Security/webscan/internal/app/fingerprint/modules/webapplication"
+	framework "github.com/Method-Security/webscan/internal/app/fingerprint/modules/frameworks"
+	remoteaccess "github.com/Method-Security/webscan/internal/app/fingerprint/modules/remoteaccess"
+	webapplication "github.com/Method-Security/webscan/internal/app/fingerprint/modules/webapplication"
 	"github.com/Method-Security/webscan/utils"
 )
 
@@ -44,14 +45,18 @@ func NewEngine(config *webscan.AppFingerprintConfig) *Engine {
 				*webscan.NewAppFingerprintResourceModuleFromCloudBucketModule(webscan.CloudBucketModuleAzureblob): &cloudbucket.AzureBlobLibrary{},
 				*webscan.NewAppFingerprintResourceModuleFromCloudBucketModule(webscan.CloudBucketModuleAwss3):     &cloudbucket.AwsS3Library{},
 			},
-			webscan.AppFingerprintResourceTypeWebapplication: {
-				*webscan.NewAppFingerprintResourceModuleFromWebApplicationModule(webscan.WebApplicationModuleApache): &webapplication.ApacheLibrary{},
-				*webscan.NewAppFingerprintResourceModuleFromWebApplicationModule(webscan.WebApplicationModuleNginx):  &webapplication.NginxLibrary{},
+			webscan.AppFingerprintResourceTypeFramework: {
+				*webscan.NewAppFingerprintResourceModuleFromFrameworkModule(webscan.FrameworkModuleNextjs): &framework.NextJsLibrary{},
 			},
 			webscan.AppFingerprintResourceTypeRemoteaccess: {
 				*webscan.NewAppFingerprintResourceModuleFromRemoteAccessModule(webscan.RemoteAccessModuleCitrixgateway): &remoteaccess.CitrixGatewayLibrary{},
 				*webscan.NewAppFingerprintResourceModuleFromRemoteAccessModule(webscan.RemoteAccessModuleWindowsrdp):    &remoteaccess.WindowsRDPLibrary{},
 				*webscan.NewAppFingerprintResourceModuleFromRemoteAccessModule(webscan.RemoteAccessModuleVmwarehorizon): &remoteaccess.VMwareHorizonLibrary{},
+			},
+			webscan.AppFingerprintResourceTypeWebapplication: {
+				*webscan.NewAppFingerprintResourceModuleFromWebApplicationModule(webscan.WebApplicationModuleApache): &webapplication.ApacheLibrary{},
+				*webscan.NewAppFingerprintResourceModuleFromWebApplicationModule(webscan.WebApplicationModuleNginx):  &webapplication.NginxLibrary{},
+				*webscan.NewAppFingerprintResourceModuleFromWebApplicationModule(webscan.WebApplicationModuleIis):    &webapplication.IISLibrary{},
 			},
 		},
 	}
@@ -78,10 +83,12 @@ func (e *Engine) GetModules() ([]Module, error) {
 		appendModules(e.Modules[webscan.AppFingerprintResourceTypeApiapplication])
 	case webscan.AppFingerprintResourceTypeCloudbucket:
 		appendModules(e.Modules[webscan.AppFingerprintResourceTypeCloudbucket])
-	case webscan.AppFingerprintResourceTypeWebapplication:
-		appendModules(e.Modules[webscan.AppFingerprintResourceTypeWebapplication])
+	case webscan.AppFingerprintResourceTypeFramework:
+		appendModules(e.Modules[webscan.AppFingerprintResourceTypeFramework])
 	case webscan.AppFingerprintResourceTypeRemoteaccess:
 		appendModules(e.Modules[webscan.AppFingerprintResourceTypeRemoteaccess])
+	case webscan.AppFingerprintResourceTypeWebapplication:
+		appendModules(e.Modules[webscan.AppFingerprintResourceTypeWebapplication])
 	default:
 		return nil, fmt.Errorf("unsupported module type: %s", e.Config.ResourceType)
 	}
@@ -152,7 +159,7 @@ func (e *Engine) Run(ctx context.Context, target string, timeout int) (*webscan.
 		method, params := e.Library.RequestParams()
 
 		// Perform Request
-		request := utils.PerformRequestScan(baseURL, fullPath, method, params, timeout)
+		request := utils.PerformRequestScan(baseURL, fullPath, method, params, timeout, false)
 		errors = append(errors, request.Errors...)
 
 		requests = append(requests, &request)

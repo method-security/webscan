@@ -105,18 +105,23 @@ for the specified resource type.`,
 		string(webscan.CloudBucketModuleAwss3),
 		string(webscan.CloudBucketModuleAzureblob),
 	}, ", ")
-	webApplicationModules := strings.Join([]string{
-		string(webscan.WebApplicationModuleApache),
-		string(webscan.WebApplicationModuleNginx),
+	frameworkModules := strings.Join([]string{
+		string(webscan.FrameworkModuleNextjs),
 	}, ", ")
 	remoteAccessModules := strings.Join([]string{
 		string(webscan.RemoteAccessModuleCitrixgateway),
 		string(webscan.RemoteAccessModuleWindowsrdp),
 		string(webscan.RemoteAccessModuleVmwarehorizon),
 	}, ", ")
+	webApplicationModules := strings.Join([]string{
+		string(webscan.WebApplicationModuleApache),
+		string(webscan.WebApplicationModuleNginx),
+		string(webscan.WebApplicationModuleIis),
+	}, ", ")
+
 	fingerprintCmd.Flags().StringSlice("targets", []string{}, "URL target to perform fingerprint against")
 	fingerprintCmd.Flags().String("resourcetype", "", fmt.Sprintf("Resource type to fingerprint (%s)", resourceTypes))
-	fingerprintCmd.Flags().StringSlice("modules", []string{}, fmt.Sprintf("Modules to run (APIApplication: %s; CloudBucket: %s; WebApplication: %s; RemoteAccess: %s)", apiApplicationModules, cloudBucketModules, webApplicationModules, remoteAccessModules))
+	fingerprintCmd.Flags().StringSlice("modules", []string{}, fmt.Sprintf("Modules to run (APIApplication: %s; CloudBucket: %s; Framework: %s; RemoteAccess: %s, WebApplication: %s; )", apiApplicationModules, cloudBucketModules, frameworkModules, remoteAccessModules, webApplicationModules))
 	fingerprintCmd.Flags().Int("timeout", 30, "Timeout per request (seconds)")
 	fingerprintCmd.Flags().Bool("successfulonly", false, "Only show successful attempts")
 
@@ -390,13 +395,13 @@ func validateFingerprintResourseModuleSelection(resourceType webscan.AppFingerpr
 			moduleEnum := webscan.NewAppFingerprintResourceModuleFromCloudBucketModule(moduleName)
 			moduleEnums = append(moduleEnums, moduleEnum)
 		}
-	} else if resourceType == webscan.AppFingerprintResourceTypeWebapplication {
+	} else if resourceType == webscan.AppFingerprintResourceTypeFramework {
 		for _, module := range modules {
-			moduleName, err := webscan.NewWebApplicationModuleFromString(strings.ToUpper(module))
+			moduleName, err := webscan.NewFrameworkModuleFromString(strings.ToUpper(module))
 			if err != nil {
 				return nil, err
 			}
-			moduleEnum := webscan.NewAppFingerprintResourceModuleFromWebApplicationModule(moduleName)
+			moduleEnum := webscan.NewAppFingerprintResourceModuleFromFrameworkModule(moduleName)
 			moduleEnums = append(moduleEnums, moduleEnum)
 		}
 	} else if resourceType == webscan.AppFingerprintResourceTypeRemoteaccess {
@@ -408,8 +413,16 @@ func validateFingerprintResourseModuleSelection(resourceType webscan.AppFingerpr
 			moduleEnum := webscan.NewAppFingerprintResourceModuleFromRemoteAccessModule(moduleName)
 			moduleEnums = append(moduleEnums, moduleEnum)
 		}
+	} else if resourceType == webscan.AppFingerprintResourceTypeWebapplication {
+		for _, module := range modules {
+			moduleName, err := webscan.NewWebApplicationModuleFromString(strings.ToUpper(module))
+			if err != nil {
+				return nil, err
+			}
+			moduleEnum := webscan.NewAppFingerprintResourceModuleFromWebApplicationModule(moduleName)
+			moduleEnums = append(moduleEnums, moduleEnum)
+		}
 	}
-
 	return moduleEnums, nil
 }
 

@@ -14,27 +14,33 @@ types:
     enum:
       - AWSS3
       - AZUREBLOB
-  WebApplicationModule:
+  FrameworkModule:
     enum:
-      - APACHE
-      - NGINX
+      - NEXTJS
   RemoteAccessModule:
     enum:
       - CITRIXGATEWAY
       - WINDOWSRDP
       - VMWAREHORIZON
+  WebApplicationModule:
+    enum:
+      - APACHE
+      - NGINX
+      - IIS
   AppFingerprintResourceModule:
     union:
       ApiApplicationModule: ApiApplicationModule
       CloudBucketModule: CloudBucketModule
-      WebApplicationModule: WebApplicationModule
+      FrameworkModule: FrameworkModule
       RemoteAccessModule: RemoteAccessModule
+      WebApplicationModule: WebApplicationModule
   AppFingerprintResourceType:
     enum:
       - APIAPPLICATION
       - CLOUDBUCKET
-      - WEBAPPLICATION
+      - FRAMEWORK
       - REMOTEACCESS
+      - WEBAPPLICATION
   # Config Struct
   AppFingerprintConfig:
     properties:

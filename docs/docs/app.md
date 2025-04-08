@@ -188,3 +188,50 @@ Global Flags:
   -q, --quiet                Suppress output
   -v, --verbose              Verbose output
 ```
+
+##### Wordpress
+
+Perform WordPress specific enumeration scans against a target
+
+###### Usage
+
+```bash
+webscan app enumerate wordpress [command]
+```
+
+###### Commands
+
+####### Plugins
+
+Attempt to enumerate WordPress plugins on a target.
+
+
+######## Usage
+
+```bash
+webscan app enumerate wordpress plugins --target https://example.com
+```
+
+######### Help Text
+
+```bash
+
+Attempt to enumerate WordPress plugins on a target.
+
+Usage:
+  webscan app enumerate wordpress plugins [flags]
+
+Flags:
+      --plugins strings                     WordPress plugins to use for enumeration
+      --plugins-file-paths strings          File paths containing WordPress plugins to use for enumeration (default [configs/wordpress_plugins.txt])
+  -h, --help                                help for plugins
+      --targets strings                     URL targets to perform WordPress plugins enumeration against
+      --timeout int                         Timeout per request (seconds) (default 30)
+      --threads int                         Number of threads to use during enumeration (default is number of CPUs)
+
+Global Flags:
+  -o, --output string        Output format (signal, json, yaml). Default value is signal (default "signal")
+  -f, --output-file string   Path to output file. If blank, will output to STDOUT
+  -q, --quiet                Suppress output
+  -v, --verbose              Verbose output
+```

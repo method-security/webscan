@@ -1,4 +1,4 @@
-package apiapplication
+package framework
 
 import (
 	webscan "github.com/Method-Security/webscan/generated/go/app"
@@ -8,7 +8,7 @@ import (
 type FastAPILibrary struct{}
 
 func (fastapiLib *FastAPILibrary) Name() *webscan.AppFingerprintResourceModule {
-	return webscan.NewAppFingerprintResourceModuleFromApiApplicationModule(webscan.ApiApplicationModuleFastapi)
+	return webscan.NewAppFingerprintResourceModuleFromFrameworkModule(webscan.FrameworkModuleFastapi)
 }
 
 func (fastapiLib *FastAPILibrary) Paths() []string {

@@ -1,4 +1,4 @@
-package webapplication
+package framework
 
 import (
 	webscan "github.com/Method-Security/webscan/generated/go/app"

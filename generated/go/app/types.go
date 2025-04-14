@@ -12,28 +12,22 @@ import (
 type ApiApplicationModule string
 
 const (
-	ApiApplicationModuleFastapi   ApiApplicationModule = "FASTAPI"
-	ApiApplicationModuleGraphql   ApiApplicationModule = "GRAPHQL"
-	ApiApplicationModuleGrpc      ApiApplicationModule = "GRPC"
-	ApiApplicationModuleSwagger   ApiApplicationModule = "SWAGGER"
-	ApiApplicationModuleK8S       ApiApplicationModule = "K8S"
-	ApiApplicationModuleWordpress ApiApplicationModule = "WORDPRESS"
+	ApiApplicationModuleGraphql ApiApplicationModule = "GRAPHQL"
+	ApiApplicationModuleGrpc    ApiApplicationModule = "GRPC"
+	ApiApplicationModuleK8S     ApiApplicationModule = "K8S"
+	ApiApplicationModuleSwagger ApiApplicationModule = "SWAGGER"
 )
 
 func NewApiApplicationModuleFromString(s string) (ApiApplicationModule, error) {
 	switch s {
-	case "FASTAPI":
-		return ApiApplicationModuleFastapi, nil
 	case "GRAPHQL":
 		return ApiApplicationModuleGraphql, nil
 	case "GRPC":
 		return ApiApplicationModuleGrpc, nil
-	case "SWAGGER":
-		return ApiApplicationModuleSwagger, nil
 	case "K8S":
 		return ApiApplicationModuleK8S, nil
-	case "WORDPRESS":
-		return ApiApplicationModuleWordpress, nil
+	case "SWAGGER":
+		return ApiApplicationModuleSwagger, nil
 	}
 	var t ApiApplicationModule
 	return "", fmt.Errorf("%s is not a valid %T", s, t)
@@ -175,12 +169,13 @@ func (a *AppFingerprintReport) String() string {
 }
 
 type AppFingerprintResourceModule struct {
-	Type                 string
-	ApiApplicationModule ApiApplicationModule
-	CloudBucketModule    CloudBucketModule
-	FrameworkModule      FrameworkModule
-	RemoteAccessModule   RemoteAccessModule
-	WebApplicationModule WebApplicationModule
+	Type                          string
+	ApiApplicationModule          ApiApplicationModule
+	CloudBucketModule             CloudBucketModule
+	ContentManagementSystemModule ContentManagementSystemModule
+	FrameworkModule               FrameworkModule
+	RemoteAccessModule            RemoteAccessModule
+	WebServerModule               WebServerModule
 }
 
 func NewAppFingerprintResourceModuleFromApiApplicationModule(value ApiApplicationModule) *AppFingerprintResourceModule {
@@ -191,6 +186,10 @@ func NewAppFingerprintResourceModuleFromCloudBucketModule(value CloudBucketModul
 	return &AppFingerprintResourceModule{Type: "CloudBucketModule", CloudBucketModule: value}
 }
 
+func NewAppFingerprintResourceModuleFromContentManagementSystemModule(value ContentManagementSystemModule) *AppFingerprintResourceModule {
+	return &AppFingerprintResourceModule{Type: "ContentManagementSystemModule", ContentManagementSystemModule: value}
+}
+
 func NewAppFingerprintResourceModuleFromFrameworkModule(value FrameworkModule) *AppFingerprintResourceModule {
 	return &AppFingerprintResourceModule{Type: "FrameworkModule", FrameworkModule: value}
 }
@@ -199,8 +198,8 @@ func NewAppFingerprintResourceModuleFromRemoteAccessModule(value RemoteAccessMod
 	return &AppFingerprintResourceModule{Type: "RemoteAccessModule", RemoteAccessModule: value}
 }
 
-func NewAppFingerprintResourceModuleFromWebApplicationModule(value WebApplicationModule) *AppFingerprintResourceModule {
-	return &AppFingerprintResourceModule{Type: "WebApplicationModule", WebApplicationModule: value}
+func NewAppFingerprintResourceModuleFromWebServerModule(value WebServerModule) *AppFingerprintResourceModule {
+	return &AppFingerprintResourceModule{Type: "WebServerModule", WebServerModule: value}
 }
 
 func (a *AppFingerprintResourceModule) UnmarshalJSON(data []byte) error {
@@ -231,6 +230,14 @@ func (a *AppFingerprintResourceModule) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		a.CloudBucketModule = valueUnmarshaler.CloudBucketModule
+	case "ContentManagementSystemModule":
+		var valueUnmarshaler struct {
+			ContentManagementSystemModule ContentManagementSystemModule `json:"value"`
+		}
+		if err := json.Unmarshal(data, &valueUnmarshaler); err != nil {
+			return err
+		}
+		a.ContentManagementSystemModule = valueUnmarshaler.ContentManagementSystemModule
 	case "FrameworkModule":
 		var valueUnmarshaler struct {
 			FrameworkModule FrameworkModule `json:"value"`
@@ -247,14 +254,14 @@ func (a *AppFingerprintResourceModule) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		a.RemoteAccessModule = valueUnmarshaler.RemoteAccessModule
-	case "WebApplicationModule":
+	case "WebServerModule":
 		var valueUnmarshaler struct {
-			WebApplicationModule WebApplicationModule `json:"value"`
+			WebServerModule WebServerModule `json:"value"`
 		}
 		if err := json.Unmarshal(data, &valueUnmarshaler); err != nil {
 			return err
 		}
-		a.WebApplicationModule = valueUnmarshaler.WebApplicationModule
+		a.WebServerModule = valueUnmarshaler.WebServerModule
 	}
 	return nil
 }
@@ -281,6 +288,15 @@ func (a AppFingerprintResourceModule) MarshalJSON() ([]byte, error) {
 			CloudBucketModule: a.CloudBucketModule,
 		}
 		return json.Marshal(marshaler)
+	case "ContentManagementSystemModule":
+		var marshaler = struct {
+			Type                          string                        `json:"type"`
+			ContentManagementSystemModule ContentManagementSystemModule `json:"value"`
+		}{
+			Type:                          "ContentManagementSystemModule",
+			ContentManagementSystemModule: a.ContentManagementSystemModule,
+		}
+		return json.Marshal(marshaler)
 	case "FrameworkModule":
 		var marshaler = struct {
 			Type            string          `json:"type"`
@@ -299,13 +315,13 @@ func (a AppFingerprintResourceModule) MarshalJSON() ([]byte, error) {
 			RemoteAccessModule: a.RemoteAccessModule,
 		}
 		return json.Marshal(marshaler)
-	case "WebApplicationModule":
+	case "WebServerModule":
 		var marshaler = struct {
-			Type                 string               `json:"type"`
-			WebApplicationModule WebApplicationModule `json:"value"`
+			Type            string          `json:"type"`
+			WebServerModule WebServerModule `json:"value"`
 		}{
-			Type:                 "WebApplicationModule",
-			WebApplicationModule: a.WebApplicationModule,
+			Type:            "WebServerModule",
+			WebServerModule: a.WebServerModule,
 		}
 		return json.Marshal(marshaler)
 	}
@@ -314,9 +330,10 @@ func (a AppFingerprintResourceModule) MarshalJSON() ([]byte, error) {
 type AppFingerprintResourceModuleVisitor interface {
 	VisitApiApplicationModule(ApiApplicationModule) error
 	VisitCloudBucketModule(CloudBucketModule) error
+	VisitContentManagementSystemModule(ContentManagementSystemModule) error
 	VisitFrameworkModule(FrameworkModule) error
 	VisitRemoteAccessModule(RemoteAccessModule) error
-	VisitWebApplicationModule(WebApplicationModule) error
+	VisitWebServerModule(WebServerModule) error
 }
 
 func (a *AppFingerprintResourceModule) Accept(visitor AppFingerprintResourceModuleVisitor) error {
@@ -327,23 +344,26 @@ func (a *AppFingerprintResourceModule) Accept(visitor AppFingerprintResourceModu
 		return visitor.VisitApiApplicationModule(a.ApiApplicationModule)
 	case "CloudBucketModule":
 		return visitor.VisitCloudBucketModule(a.CloudBucketModule)
+	case "ContentManagementSystemModule":
+		return visitor.VisitContentManagementSystemModule(a.ContentManagementSystemModule)
 	case "FrameworkModule":
 		return visitor.VisitFrameworkModule(a.FrameworkModule)
 	case "RemoteAccessModule":
 		return visitor.VisitRemoteAccessModule(a.RemoteAccessModule)
-	case "WebApplicationModule":
-		return visitor.VisitWebApplicationModule(a.WebApplicationModule)
+	case "WebServerModule":
+		return visitor.VisitWebServerModule(a.WebServerModule)
 	}
 }
 
 type AppFingerprintResourceType string
 
 const (
-	AppFingerprintResourceTypeApiapplication AppFingerprintResourceType = "APIAPPLICATION"
-	AppFingerprintResourceTypeCloudbucket    AppFingerprintResourceType = "CLOUDBUCKET"
-	AppFingerprintResourceTypeFramework      AppFingerprintResourceType = "FRAMEWORK"
-	AppFingerprintResourceTypeRemoteaccess   AppFingerprintResourceType = "REMOTEACCESS"
-	AppFingerprintResourceTypeWebapplication AppFingerprintResourceType = "WEBAPPLICATION"
+	AppFingerprintResourceTypeApiapplication          AppFingerprintResourceType = "APIAPPLICATION"
+	AppFingerprintResourceTypeCloudbucket             AppFingerprintResourceType = "CLOUDBUCKET"
+	AppFingerprintResourceTypeContentmanagementsystem AppFingerprintResourceType = "CONTENTMANAGEMENTSYSTEM"
+	AppFingerprintResourceTypeFramework               AppFingerprintResourceType = "FRAMEWORK"
+	AppFingerprintResourceTypeRemoteaccess            AppFingerprintResourceType = "REMOTEACCESS"
+	AppFingerprintResourceTypeWebserver               AppFingerprintResourceType = "WEBSERVER"
 )
 
 func NewAppFingerprintResourceTypeFromString(s string) (AppFingerprintResourceType, error) {
@@ -352,12 +372,14 @@ func NewAppFingerprintResourceTypeFromString(s string) (AppFingerprintResourceTy
 		return AppFingerprintResourceTypeApiapplication, nil
 	case "CLOUDBUCKET":
 		return AppFingerprintResourceTypeCloudbucket, nil
+	case "CONTENTMANAGEMENTSYSTEM":
+		return AppFingerprintResourceTypeContentmanagementsystem, nil
 	case "FRAMEWORK":
 		return AppFingerprintResourceTypeFramework, nil
 	case "REMOTEACCESS":
 		return AppFingerprintResourceTypeRemoteaccess, nil
-	case "WEBAPPLICATION":
-		return AppFingerprintResourceTypeWebapplication, nil
+	case "WEBSERVER":
+		return AppFingerprintResourceTypeWebserver, nil
 	}
 	var t AppFingerprintResourceType
 	return "", fmt.Errorf("%s is not a valid %T", s, t)
@@ -431,14 +453,36 @@ func (c CloudBucketModule) Ptr() *CloudBucketModule {
 	return &c
 }
 
+type ContentManagementSystemModule string
+
+const (
+	ContentManagementSystemModuleWordpress ContentManagementSystemModule = "WORDPRESS"
+)
+
+func NewContentManagementSystemModuleFromString(s string) (ContentManagementSystemModule, error) {
+	switch s {
+	case "WORDPRESS":
+		return ContentManagementSystemModuleWordpress, nil
+	}
+	var t ContentManagementSystemModule
+	return "", fmt.Errorf("%s is not a valid %T", s, t)
+}
+
+func (c ContentManagementSystemModule) Ptr() *ContentManagementSystemModule {
+	return &c
+}
+
 type FrameworkModule string
 
 const (
-	FrameworkModuleNextjs FrameworkModule = "NEXTJS"
+	FrameworkModuleFastapi FrameworkModule = "FASTAPI"
+	FrameworkModuleNextjs  FrameworkModule = "NEXTJS"
 )
 
 func NewFrameworkModuleFromString(s string) (FrameworkModule, error) {
 	switch s {
+	case "FASTAPI":
+		return FrameworkModuleFastapi, nil
 	case "NEXTJS":
 		return FrameworkModuleNextjs, nil
 	}
@@ -454,18 +498,18 @@ type RemoteAccessModule string
 
 const (
 	RemoteAccessModuleCitrixgateway RemoteAccessModule = "CITRIXGATEWAY"
-	RemoteAccessModuleWindowsrdp    RemoteAccessModule = "WINDOWSRDP"
 	RemoteAccessModuleVmwarehorizon RemoteAccessModule = "VMWAREHORIZON"
+	RemoteAccessModuleWindowsrdp    RemoteAccessModule = "WINDOWSRDP"
 )
 
 func NewRemoteAccessModuleFromString(s string) (RemoteAccessModule, error) {
 	switch s {
 	case "CITRIXGATEWAY":
 		return RemoteAccessModuleCitrixgateway, nil
-	case "WINDOWSRDP":
-		return RemoteAccessModuleWindowsrdp, nil
 	case "VMWAREHORIZON":
 		return RemoteAccessModuleVmwarehorizon, nil
+	case "WINDOWSRDP":
+		return RemoteAccessModuleWindowsrdp, nil
 	}
 	var t RemoteAccessModule
 	return "", fmt.Errorf("%s is not a valid %T", s, t)
@@ -475,27 +519,27 @@ func (r RemoteAccessModule) Ptr() *RemoteAccessModule {
 	return &r
 }
 
-type WebApplicationModule string
+type WebServerModule string
 
 const (
-	WebApplicationModuleApache WebApplicationModule = "APACHE"
-	WebApplicationModuleNginx  WebApplicationModule = "NGINX"
-	WebApplicationModuleIis    WebApplicationModule = "IIS"
+	WebServerModuleApache WebServerModule = "APACHE"
+	WebServerModuleNginx  WebServerModule = "NGINX"
+	WebServerModuleIis    WebServerModule = "IIS"
 )
 
-func NewWebApplicationModuleFromString(s string) (WebApplicationModule, error) {
+func NewWebServerModuleFromString(s string) (WebServerModule, error) {
 	switch s {
 	case "APACHE":
-		return WebApplicationModuleApache, nil
+		return WebServerModuleApache, nil
 	case "NGINX":
-		return WebApplicationModuleNginx, nil
+		return WebServerModuleNginx, nil
 	case "IIS":
-		return WebApplicationModuleIis, nil
+		return WebServerModuleIis, nil
 	}
-	var t WebApplicationModule
+	var t WebServerModule
 	return "", fmt.Errorf("%s is not a valid %T", s, t)
 }
 
-func (w WebApplicationModule) Ptr() *WebApplicationModule {
+func (w WebServerModule) Ptr() *WebServerModule {
 	return &w
 }

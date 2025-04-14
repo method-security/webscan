@@ -4,11 +4,12 @@ types:
   # AppFingerprint Enums
   ApiApplicationModule:
     enum:
-      - FASTAPI
       - GRAPHQL
       - GRPC
-      - SWAGGER
       - K8S
+      - SWAGGER
+  ContentManagementSystemModule:
+    enum:
       - WORDPRESS
   CloudBucketModule:
     enum:
@@ -16,13 +17,14 @@ types:
       - AZUREBLOB
   FrameworkModule:
     enum:
+      - FASTAPI
       - NEXTJS
   RemoteAccessModule:
     enum:
       - CITRIXGATEWAY
-      - WINDOWSRDP
       - VMWAREHORIZON
-  WebApplicationModule:
+      - WINDOWSRDP
+  WebServerModule:
     enum:
       - APACHE
       - NGINX
@@ -31,16 +33,18 @@ types:
     union:
       ApiApplicationModule: ApiApplicationModule
       CloudBucketModule: CloudBucketModule
+      ContentManagementSystemModule: ContentManagementSystemModule
       FrameworkModule: FrameworkModule
       RemoteAccessModule: RemoteAccessModule
-      WebApplicationModule: WebApplicationModule
+      WebServerModule: WebServerModule
   AppFingerprintResourceType:
     enum:
       - APIAPPLICATION
       - CLOUDBUCKET
+      - CONTENTMANAGEMENTSYSTEM
       - FRAMEWORK
       - REMOTEACCESS
-      - WEBAPPLICATION
+      - WEBSERVER
   # Config Struct
   AppFingerprintConfig:
     properties:

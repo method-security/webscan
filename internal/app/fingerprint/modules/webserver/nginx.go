@@ -1,4 +1,4 @@
-package webapplication
+package webserver
 
 import (
 	webscan "github.com/Method-Security/webscan/generated/go/app"
@@ -8,7 +8,7 @@ import (
 type NginxLibrary struct{}
 
 func (ngLib *NginxLibrary) Name() *webscan.AppFingerprintResourceModule {
-	return webscan.NewAppFingerprintResourceModuleFromWebApplicationModule(webscan.WebApplicationModuleNginx)
+	return webscan.NewAppFingerprintResourceModuleFromWebServerModule(webscan.WebServerModuleNginx)
 }
 
 func (ngLib *NginxLibrary) Paths() []string {

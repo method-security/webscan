@@ -1,4 +1,4 @@
-package webapplication
+package webserver
 
 import (
 	webscan "github.com/Method-Security/webscan/generated/go/app"
@@ -8,7 +8,7 @@ import (
 type ApacheLibrary struct{}
 
 func (apLib *ApacheLibrary) Name() *webscan.AppFingerprintResourceModule {
-	return webscan.NewAppFingerprintResourceModuleFromWebApplicationModule(webscan.WebApplicationModuleApache)
+	return webscan.NewAppFingerprintResourceModuleFromWebServerModule(webscan.WebServerModuleApache)
 }
 
 func (apLib *ApacheLibrary) Paths() []string {

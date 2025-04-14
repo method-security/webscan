@@ -1,4 +1,4 @@
-package apiapplication
+package contentmanagementsystem
 
 import (
 	webscan "github.com/Method-Security/webscan/generated/go/app"
@@ -8,7 +8,7 @@ import (
 type WordPressLibrary struct{}
 
 func (wpLib *WordPressLibrary) Name() *webscan.AppFingerprintResourceModule {
-	return webscan.NewAppFingerprintResourceModuleFromApiApplicationModule(webscan.ApiApplicationModuleWordpress)
+	return webscan.NewAppFingerprintResourceModuleFromContentManagementSystemModule(webscan.ContentManagementSystemModuleWordpress)
 }
 
 func (wpLib *WordPressLibrary) Paths() []string {

@@ -1,4 +1,4 @@
-package webapplication
+package webserver
 
 import (
 	webscan "github.com/Method-Security/webscan/generated/go/app"
@@ -8,7 +8,7 @@ import (
 type IISLibrary struct{}
 
 func (iisLib *IISLibrary) Name() *webscan.AppFingerprintResourceModule {
-	return webscan.NewAppFingerprintResourceModuleFromWebApplicationModule(webscan.WebApplicationModuleIis)
+	return webscan.NewAppFingerprintResourceModuleFromWebServerModule(webscan.WebServerModuleIis)
 }
 
 func (iisLib *IISLibrary) Paths() []string {

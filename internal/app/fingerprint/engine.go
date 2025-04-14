@@ -30,7 +30,7 @@ type Engine struct {
 	Modules map[webscan.AppFingerprintResourceType]map[webscan.AppFingerprintResourceModule]Module
 }
 
-var followRedirects = false
+var followRedirects = true
 
 func NewEngine(config *webscan.AppFingerprintConfig) *Engine {
 	return &Engine{

@@ -51,31 +51,6 @@ func (b *BodyParams) String() string {
 	return fmt.Sprintf("%#v", b)
 }
 
-type PageCaptureMethod string
-
-const (
-	PageCaptureMethodRequest     PageCaptureMethod = "REQUEST"
-	PageCaptureMethodBrowser     PageCaptureMethod = "BROWSER"
-	PageCaptureMethodBrowserbase PageCaptureMethod = "BROWSERBASE"
-)
-
-func NewPageCaptureMethodFromString(s string) (PageCaptureMethod, error) {
-	switch s {
-	case "REQUEST":
-		return PageCaptureMethodRequest, nil
-	case "BROWSER":
-		return PageCaptureMethodBrowser, nil
-	case "BROWSERBASE":
-		return PageCaptureMethodBrowserbase, nil
-	}
-	var t PageCaptureMethod
-	return "", fmt.Errorf("%s is not a valid %T", s, t)
-}
-
-func (p PageCaptureMethod) Ptr() *PageCaptureMethod {
-	return &p
-}
-
 type QueryParams struct {
 	Name          string   `json:"name" url:"name"`
 	ExampleValues []string `json:"exampleValues,omitempty" url:"exampleValues,omitempty"`

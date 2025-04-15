@@ -1,8 +1,8 @@
 package cmd
 
 import (
-	webscan "github.com/Method-Security/webscan/generated/go/routecapture"
-	"github.com/Method-Security/webscan/internal/browserbase"
+	common "github.com/Method-Security/webscan/generated/go/common"
+	"github.com/Method-Security/webscan/internal/pagecapture/helpers/browserbase"
 	routecapture "github.com/Method-Security/webscan/internal/routecapture"
 	"github.com/spf13/cobra"
 )
@@ -53,7 +53,7 @@ func (a *WebScan) InitRoutecaptureCommand() {
 			minDOMStabalizeTime, _ := cmd.Flags().GetInt("minDOMStabalizeTime")
 
 			// Extract the routes and links
-			report := routecapture.PerformRouteCapture(cmd.Context(), target, webscan.PageCaptureMethodRequest, baseURLsOnly, captureStaticAssets, timeout, minDOMStabalizeTime, insecure, browserPath, nil, nil, nil)
+			report := routecapture.PerformRouteCapture(cmd.Context(), target, common.CaptureMethodRequest, baseURLsOnly, captureStaticAssets, timeout, minDOMStabalizeTime, insecure, browserPath, nil, nil, nil)
 			a.OutputSignal.Content = report
 		},
 	}
@@ -89,7 +89,7 @@ func (a *WebScan) InitRoutecaptureCommand() {
 			minDOMStabalizeTime, _ := cmd.Flags().GetInt("minDOMStabalizeTime")
 
 			// Extract the routes and links
-			report := routecapture.PerformRouteCapture(cmd.Context(), target, webscan.PageCaptureMethodBrowser, baseURLsOnly, captureStaticAssets, timeout, minDOMStabalizeTime, false, browserPath, nil, nil, nil)
+			report := routecapture.PerformRouteCapture(cmd.Context(), target, common.CaptureMethodBrowser, baseURLsOnly, captureStaticAssets, timeout, minDOMStabalizeTime, false, browserPath, nil, nil, nil)
 			a.OutputSignal.Content = report
 		},
 	}
@@ -141,7 +141,7 @@ func (a *WebScan) InitRoutecaptureCommand() {
 			}
 
 			// Extract the routes and links
-			report := routecapture.PerformRouteCapture(cmd.Context(), target, webscan.PageCaptureMethodBrowserbase, baseURLsOnly, captureStaticAssets, timeout, minDOMStabalizeTime, false, nil, &token, &project, &options)
+			report := routecapture.PerformRouteCapture(cmd.Context(), target, common.CaptureMethodBrowserbase, baseURLsOnly, captureStaticAssets, timeout, minDOMStabalizeTime, false, nil, &token, &project, &options)
 			a.OutputSignal.Content = report
 		},
 	}

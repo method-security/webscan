@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/Method-Security/webscan/internal/browserbase"
-	capture "github.com/Method-Security/webscan/internal/capture"
+	common "github.com/Method-Security/webscan/generated/go/common"
+	"github.com/Method-Security/webscan/internal/pagecapture"
+	"github.com/Method-Security/webscan/internal/pagecapture/helpers/browserbase"
 	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 	"github.com/spf13/cobra"
 )
@@ -56,10 +57,7 @@ func (a *WebScan) InitPagecaptureCommand() {
 			timeout, _ := cmd.Flags().GetInt("timeout")
 			minDOMStabalizeTime, _ := cmd.Flags().GetInt("minDOMStabalizeTime")
 
-			capturer := capture.NewBrowserPageCapturer(browserPath, timeout, minDOMStabalizeTime)
-			report := capturer.CaptureScreenshot(cmd.Context(), target, &capture.Options{})
-
-			_ = capturer.Close(cmd.Context())
+			report := pagecapture.PerformScreenshotPageCapture(cmd.Context(), target, common.CaptureMethodBrowser, false, false, timeout, minDOMStabalizeTime, false, browserPath, nil, nil, nil)
 			log.Info("Screenshot capture successful", svc1log.SafeParam("target", target))
 
 			a.OutputSignal.Content = report
@@ -111,22 +109,7 @@ func (a *WebScan) InitPagecaptureCommand() {
 				options = append(options, browserbase.WithProxy())
 			}
 
-			client := browserbase.NewBrowserbaseClient(token, project, browserbase.NewBrowserbaseOptions(cmd.Context(), options...))
-			capturer := capture.NewBrowserbasePageCapturer(cmd.Context(), timeout, minDOMStabalizeTime, client)
-
-			if capturer == nil {
-				a.OutputSignal.AddError(fmt.Errorf("failed to create browserbase capturer"))
-				return
-			}
-
-			report := capturer.CaptureScreenshot(cmd.Context(), target, &capture.Options{})
-
-			err = capturer.Close(cmd.Context())
-			if err != nil {
-				log.Debug("Failed to close browserbase capturer", svc1log.SafeParam("error", err.Error()))
-				a.OutputSignal.AddError(err)
-				// Don't return here because valid content may still be available
-			}
+			report := pagecapture.PerformScreenshotPageCapture(cmd.Context(), target, common.CaptureMethodBrowserbase, false, false, timeout, minDOMStabalizeTime, false, nil, &token, &project, &options)
 			log.Info("Screenshot capture successful", svc1log.SafeParam("target", target))
 			a.OutputSignal.Content = report
 		},
@@ -163,13 +146,7 @@ func (a *WebScan) InitPagecaptureCommand() {
 
 			timeout, _ := cmd.Flags().GetInt("timeout")
 
-			capturer := capture.NewRequestPageCapturer(insecure, timeout)
-			report, err := capturer.Capture(cmd.Context(), target, &capture.Options{})
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				// Don't return here because valid content may still be available
-			}
-			_ = capturer.Close(cmd.Context())
+			report := pagecapture.PerformHTMLPageCapture(cmd.Context(), target, common.CaptureMethodRequest, false, false, timeout, 0, insecure, nil, nil, nil, nil)
 			log.Info("Page capture successful", svc1log.SafeParam("target", target))
 			a.OutputSignal.Content = report
 		},
@@ -204,13 +181,7 @@ func (a *WebScan) InitPagecaptureCommand() {
 			timeout, _ := cmd.Flags().GetInt("timeout")
 			minDOMStabalizeTime, _ := cmd.Flags().GetInt("minDOMStabalizeTime")
 
-			capturer := capture.NewBrowserPageCapturer(browserPath, timeout, minDOMStabalizeTime)
-			report, err := capturer.Capture(cmd.Context(), target, &capture.Options{})
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				// Don't return here because valid content may still be available
-			}
-			_ = capturer.Close(cmd.Context())
+			report := pagecapture.PerformHTMLPageCapture(cmd.Context(), target, common.CaptureMethodBrowser, false, false, timeout, minDOMStabalizeTime, false, browserPath, nil, nil, nil)
 			log.Info("Page capture successful", svc1log.SafeParam("target", target))
 
 			a.OutputSignal.Content = report
@@ -261,25 +232,7 @@ func (a *WebScan) InitPagecaptureCommand() {
 				options = append(options, browserbase.WithProxy())
 			}
 
-			client := browserbase.NewBrowserbaseClient(token, project, browserbase.NewBrowserbaseOptions(cmd.Context(), options...))
-			capturer := capture.NewBrowserbasePageCapturer(cmd.Context(), timeout, minDOMStabalizeTime, client)
-
-			if capturer == nil {
-				a.OutputSignal.AddError(fmt.Errorf("failed to create browserbase capturer"))
-				return
-			}
-
-			report, err := capturer.Capture(cmd.Context(), target, &capture.Options{})
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				// Don't return here because valid content may still be available
-			}
-			err = capturer.Close(cmd.Context())
-			if err != nil {
-				log.Debug("Failed to close browserbase capturer", svc1log.SafeParam("error", err.Error()))
-				a.OutputSignal.AddError(err)
-				// Don't return here because valid content may still be available
-			}
+			report := pagecapture.PerformHTMLPageCapture(cmd.Context(), target, common.CaptureMethodBrowserbase, false, false, timeout, minDOMStabalizeTime, false, nil, &token, &project, &options)
 			log.Info("Page capture successful", svc1log.SafeParam("target", target))
 			a.OutputSignal.Content = report
 		},

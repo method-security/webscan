@@ -1,0 +1,45 @@
+imports:
+  - requests: ../common/requests.yml
+types:
+  AppEnumerateIISConfig:
+    properties:
+      targets: list<string> (IP Addresses)
+      timeout: integer (seconds)
+      threads: optional<integer> (1-100)
+  IISBinding:
+    properties:
+      hostname: string
+      port: integer (1-65535)
+      protocol: WebProtocol
+      ssl: boolean
+      sni: boolean
+      ip: string (IP Address)
+      certificateInfo: optional<list<string>> (from SSL/TLS handshake)
+  IISSite:
+    properties:
+      hostname: string
+      path: string
+      bindings: optional<list<IISBinding>>
+      serverHeader: optional<string>
+      serverVersion: optional<string> (from server header)
+      aspnetVersion: optional<string> (from X-Powered-By header)
+      frameworks: optional<list<string>> (from response headers)
+      defaultDocuments: optional<list<string>> (from directory listing)
+      directoryBrowsing: boolean
+      authenticationMethods: optional<list<string>>
+  IISError:
+    properties:
+      code: string
+      message: string
+      target: optional<string>
+  AppEnumerateIISTargetInfo:
+    properties:
+      target: string (IP Address)
+      sites: optional<list<IISSite>>
+      bindings: optional<list<IISBinding>>
+      iisErrors: optional<list<IISError>>
+  AppEnumerateIISReport:
+    properties:
+      targets: optional<list<AppEnumerateIISTargetInfo>>
+      config: AppEnumerateIISConfig
+      errors: optional<list<string>>

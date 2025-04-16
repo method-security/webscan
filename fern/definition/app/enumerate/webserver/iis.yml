@@ -6,20 +6,24 @@ types:
       targets: list<string>
       timeout: integer
       threads: optional<integer>
+  ServerInfo:
+    properties:
+      name: string
+      version: optional<string>
+  FrameworkInfo:
+    properties:
+      name: string
+      version: optional<string>
   IISSite:
     properties:
-      hostname: string
-      path: string
-      serverHeader: optional<string>
-      serverVersion: optional<string> # Server header
-      aspnetVersion: optional<string> # X-AspNet-Version header
-      frameworks: optional<list<string>> # X-Powered-By header
-      defaultDocuments: optional<list<string>> # Directory listing
+      server: ServerInfo
+      frameworks: optional<list<FrameworkInfo>>
       authenticationMethods: optional<list<string>> # WWW-Authenticate headers
+      defaultDocuments: optional<list<string>>
       customErrors: optional<boolean>
   AppEnumerateIISTargetInfo:
     properties:
-      target: string # IP Address
+      target: string
       sites: optional<list<IISSite>>
       requests: optional<list<requests.RequestInfo>>
   AppEnumerateIISReport:

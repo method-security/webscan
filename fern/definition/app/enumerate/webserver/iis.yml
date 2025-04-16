@@ -6,38 +6,22 @@ types:
       targets: list<string>
       timeout: integer
       threads: optional<integer>
-  IISBinding:
-    properties:
-      hostname: string
-      port: integer
-      protocol: requests.WebProtocol
-      ssl: boolean
-      sni: boolean
-      ip: string
-      certificateInfo: optional<list<string>>
   IISSite:
     properties:
       hostname: string
       path: string
-      bindings: optional<list<IISBinding>>
       serverHeader: optional<string>
       serverVersion: optional<string> # Server header
-      aspnetVersion: optional<string> # X-Powered-By header
-      frameworks: optional<list<string>> # Response headers
+      aspnetVersion: optional<string> # X-AspNet-Version header
+      frameworks: optional<list<string>> # X-Powered-By header
       defaultDocuments: optional<list<string>> # Directory listing
-      directoryBrowsing: boolean
-      authenticationMethods: optional<list<string>> # Response headers
-  IISError:
-    properties:
-      code: string
-      message: string
-      target: optional<string>
+      authenticationMethods: optional<list<string>> # WWW-Authenticate headers
+      customErrors: optional<boolean>
   AppEnumerateIISTargetInfo:
     properties:
       target: string # IP Address
       sites: optional<list<IISSite>>
-      bindings: optional<list<IISBinding>>
-      iisErrors: optional<list<IISError>>
+      requests: optional<list<requests.RequestInfo>>
   AppEnumerateIISReport:
     properties:
       targets: optional<list<AppEnumerateIISTargetInfo>>

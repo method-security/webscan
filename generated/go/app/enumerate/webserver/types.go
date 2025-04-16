@@ -96,10 +96,9 @@ func (a *AppEnumerateIisReport) String() string {
 }
 
 type AppEnumerateIisTargetInfo struct {
-	Target    string        `json:"target" url:"target"`
-	Sites     []*IisSite    `json:"sites,omitempty" url:"sites,omitempty"`
-	Bindings  []*IisBinding `json:"bindings,omitempty" url:"bindings,omitempty"`
-	IisErrors []*IisError   `json:"iisErrors,omitempty" url:"iisErrors,omitempty"`
+	Target   string                `json:"target" url:"target"`
+	Sites    []*IisSite            `json:"sites,omitempty" url:"sites,omitempty"`
+	Requests []*common.RequestInfo `json:"requests,omitempty" url:"requests,omitempty"`
 
 	extraProperties map[string]interface{}
 	_rawJSON        json.RawMessage
@@ -139,107 +138,16 @@ func (a *AppEnumerateIisTargetInfo) String() string {
 	return fmt.Sprintf("%#v", a)
 }
 
-type IisBinding struct {
-	Hostname        string             `json:"hostname" url:"hostname"`
-	Port            int                `json:"port" url:"port"`
-	Protocol        common.WebProtocol `json:"protocol" url:"protocol"`
-	Ssl             bool               `json:"ssl" url:"ssl"`
-	Sni             bool               `json:"sni" url:"sni"`
-	Ip              string             `json:"ip" url:"ip"`
-	CertificateInfo []string           `json:"certificateInfo,omitempty" url:"certificateInfo,omitempty"`
-
-	extraProperties map[string]interface{}
-	_rawJSON        json.RawMessage
-}
-
-func (i *IisBinding) GetExtraProperties() map[string]interface{} {
-	return i.extraProperties
-}
-
-func (i *IisBinding) UnmarshalJSON(data []byte) error {
-	type unmarshaler IisBinding
-	var value unmarshaler
-	if err := json.Unmarshal(data, &value); err != nil {
-		return err
-	}
-	*i = IisBinding(value)
-
-	extraProperties, err := core.ExtractExtraProperties(data, *i)
-	if err != nil {
-		return err
-	}
-	i.extraProperties = extraProperties
-
-	i._rawJSON = json.RawMessage(data)
-	return nil
-}
-
-func (i *IisBinding) String() string {
-	if len(i._rawJSON) > 0 {
-		if value, err := core.StringifyJSON(i._rawJSON); err == nil {
-			return value
-		}
-	}
-	if value, err := core.StringifyJSON(i); err == nil {
-		return value
-	}
-	return fmt.Sprintf("%#v", i)
-}
-
-type IisError struct {
-	Code    string  `json:"code" url:"code"`
-	Message string  `json:"message" url:"message"`
-	Target  *string `json:"target,omitempty" url:"target,omitempty"`
-
-	extraProperties map[string]interface{}
-	_rawJSON        json.RawMessage
-}
-
-func (i *IisError) GetExtraProperties() map[string]interface{} {
-	return i.extraProperties
-}
-
-func (i *IisError) UnmarshalJSON(data []byte) error {
-	type unmarshaler IisError
-	var value unmarshaler
-	if err := json.Unmarshal(data, &value); err != nil {
-		return err
-	}
-	*i = IisError(value)
-
-	extraProperties, err := core.ExtractExtraProperties(data, *i)
-	if err != nil {
-		return err
-	}
-	i.extraProperties = extraProperties
-
-	i._rawJSON = json.RawMessage(data)
-	return nil
-}
-
-func (i *IisError) String() string {
-	if len(i._rawJSON) > 0 {
-		if value, err := core.StringifyJSON(i._rawJSON); err == nil {
-			return value
-		}
-	}
-	if value, err := core.StringifyJSON(i); err == nil {
-		return value
-	}
-	return fmt.Sprintf("%#v", i)
-}
-
 type IisSite struct {
-	Hostname              string        `json:"hostname" url:"hostname"`
-	Path                  string        `json:"path" url:"path"`
-	Bindings              []*IisBinding `json:"bindings,omitempty" url:"bindings,omitempty"`
-	ServerHeader          *string       `json:"serverHeader,omitempty" url:"serverHeader,omitempty"`
-	ServerVersion         *string       `json:"serverVersion,omitempty" url:"serverVersion,omitempty"`
-	AspnetVersion         *string       `json:"aspnetVersion,omitempty" url:"aspnetVersion,omitempty"`
-	Frameworks            []string      `json:"frameworks,omitempty" url:"frameworks,omitempty"`
-	DefaultDocuments      []string      `json:"defaultDocuments,omitempty" url:"defaultDocuments,omitempty"`
-	DirectoryBrowsing     bool          `json:"directoryBrowsing" url:"directoryBrowsing"`
-	AuthenticationMethods []string      `json:"authenticationMethods,omitempty" url:"authenticationMethods,omitempty"`
+	Hostname              string   `json:"hostname" url:"hostname"`
+	Path                  string   `json:"path" url:"path"`
+	ServerHeader          *string  `json:"serverHeader,omitempty" url:"serverHeader,omitempty"`
+	ServerVersion         *string  `json:"serverVersion,omitempty" url:"serverVersion,omitempty"`
+	AspnetVersion         *string  `json:"aspnetVersion,omitempty" url:"aspnetVersion,omitempty"`
+	Frameworks            []string `json:"frameworks,omitempty" url:"frameworks,omitempty"`
+	DefaultDocuments      []string `json:"defaultDocuments,omitempty" url:"defaultDocuments,omitempty"`
+	AuthenticationMethods []string `json:"authenticationMethods,omitempty" url:"authenticationMethods,omitempty"`
+	CustomErrors          *bool    `json:"customErrors,omitempty" url:"customErrors,omitempty"`
 
 	extraProperties map[string]interface{}
 	_rawJSON        json.RawMessage

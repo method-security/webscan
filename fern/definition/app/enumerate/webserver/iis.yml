@@ -1,32 +1,32 @@
 imports:
-  requests: ../common/requests.yml
+  requests: ../../../common/requests.yml
 types:
   AppEnumerateIISConfig:
     properties:
-      targets: list<string> (IP Addresses)
-      timeout: integer (seconds)
-      threads: optional<integer> (1-100)
+      targets: list<string>
+      timeout: integer
+      threads: optional<integer>
   IISBinding:
     properties:
       hostname: string
-      port: integer (1-65535)
-      protocol: WebProtocol
+      port: integer
+      protocol: requests.WebProtocol
       ssl: boolean
       sni: boolean
-      ip: string (IP Address)
-      certificateInfo: optional<list<string>> (from SSL/TLS handshake)
+      ip: string
+      certificateInfo: optional<list<string>>
   IISSite:
     properties:
       hostname: string
       path: string
       bindings: optional<list<IISBinding>>
       serverHeader: optional<string>
-      serverVersion: optional<string> (from server header)
-      aspnetVersion: optional<string> (from X-Powered-By header)
-      frameworks: optional<list<string>> (from response headers)
-      defaultDocuments: optional<list<string>> (from directory listing)
+      serverVersion: optional<string> # Server header
+      aspnetVersion: optional<string> # X-Powered-By header
+      frameworks: optional<list<string>> # Response headers
+      defaultDocuments: optional<list<string>> # Directory listing
       directoryBrowsing: boolean
-      authenticationMethods: optional<list<string>>
+      authenticationMethods: optional<list<string>> # Response headers
   IISError:
     properties:
       code: string
@@ -34,7 +34,7 @@ types:
       target: optional<string>
   AppEnumerateIISTargetInfo:
     properties:
-      target: string (IP Address)
+      target: string # IP Address
       sites: optional<list<IISSite>>
       bindings: optional<list<IISBinding>>
       iisErrors: optional<list<IISError>>

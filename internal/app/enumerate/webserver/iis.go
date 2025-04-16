@@ -166,61 +166,20 @@ func checkIISSite(targetURL string, timeout int, config *webscan.AppEnumerateIis
 				Name: serverName,
 			}
 		}
-
-		// Check for PHP version in Server header (common in IIS configurations)
-		rePhp := regexp.MustCompile(`PHP/(\d+\.\d+\.\d+|\d+\.\d+)`)
-		if phpMatches := rePhp.FindStringSubmatch(serverHeader); len(phpMatches) > 1 {
-			phpVersion := phpMatches[1]
-
-			// Add PHP to frameworks if not already added
-			addFramework(site, "PHP", &phpVersion)
-		}
 	}
 
-	// Framework detection
-	// 1. ASP.NET - Check X-AspNet-Version header
+	// Check for ASP.NET framework
 	aspnetVer := getHeader(&reqInfo, "X-AspNet-Version")
 	if aspnetVer != "" {
-		// Add ASP.NET to frameworks
-		addFramework(site, "ASP.NET", &aspnetVer)
-	}
-
-	// 2. Plesk - Check for specific headers
-	if getHeader(&reqInfo, "X-Powered-By-Plesk") != "" {
-		addFramework(site, "Plesk", nil)
-	}
-
-	// 3. Check for other frameworks in X-Powered-By header
-	xpb := getHeader(&reqInfo, "X-Powered-By")
-	if xpb != "" {
-		// Split by commas if multiple values
-		parts := strings.Split(xpb, ",")
-
-		for _, part := range parts {
-			part = strings.TrimSpace(part)
-			if part == "" {
-				continue
-			}
-
-			// Common patterns: ASP.NET, PHP/7.4.1, JBoss-5.0/jbossas-5.0.5.Final
-			framework := part
-			var version *string
-
-			// Try to extract version if in format "Framework/X.Y.Z"
-			if slash := strings.Index(part, "/"); slash > 0 {
-				framework = part[:slash]
-				versionStr := part[slash+1:]
-				version = &versionStr
-			}
-
-			addFramework(site, framework, version)
+		// Initialize frameworks slice if needed
+		if site.Frameworks == nil {
+			site.Frameworks = []*webscan.FrameworkInfo{}
 		}
-	}
-
-	// Check for Node.js/Express
-	if getHeader(&reqInfo, "X-Powered-By") == "Express" ||
-		strings.Contains(getHeader(&reqInfo, "X-Powered-By"), "Node") {
-		addFramework(site, "Node.js", nil)
+		// Add ASP.NET to frameworks
+		site.Frameworks = append(site.Frameworks, &webscan.FrameworkInfo{
+			Name:    "ASP.NET",
+			Version: &aspnetVer,
+		})
 	}
 
 	// Check for default documents if enabled
@@ -274,31 +233,6 @@ func checkDefaultDocuments(baseURL string, timeout int) ([]string, []*common.Req
 	}
 
 	return foundDocs, requests
-}
-
-// Helper function to add a framework to the site if it doesn't already exist
-func addFramework(site *webscan.IisSite, name string, version *string) {
-	// Initialize if needed
-	if site.Frameworks == nil {
-		site.Frameworks = []*webscan.FrameworkInfo{}
-	}
-
-	// Check if framework already exists
-	for _, f := range site.Frameworks {
-		if strings.EqualFold(f.Name, name) {
-			return // Already exists
-		}
-	}
-
-	// Add the framework
-	framework := &webscan.FrameworkInfo{
-		Name: name,
-	}
-	if version != nil {
-		framework.Version = version
-	}
-
-	site.Frameworks = append(site.Frameworks, framework)
 }
 
 // Helper function to safely get a header value from RequestInfo

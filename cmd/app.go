@@ -403,8 +403,18 @@ It extracts information such as server version, enabled modules, and more.`,
 				return
 			}
 
+			// Config flags
+			enumDefaultDocuments, err := cmd.Flags().GetBool("enum-default-documents")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
 			// Generate config
 			config := newEnumerateWebserverIISConfig(targets, threads, timeout)
+
+			// Set the new fields directly
+			config.EnumDefaultDocuments = &enumDefaultDocuments
 
 			// Generate report
 			report := enumerateWebserver.PerformAppEnumerateWebserverIIS(cmd.Context(), config)
@@ -418,6 +428,7 @@ It extracts information such as server version, enabled modules, and more.`,
 	enumerateWebserverIISCmd.Flags().StringSlice("targets", []string{}, "URL targets to perform IIS enumeration against")
 	enumerateWebserverIISCmd.Flags().Int("timeout", 30, "Timeout per request (seconds)")
 	enumerateWebserverIISCmd.Flags().Int("threads", 0, "Number of threads to use during enumeration (default is number of CPUs)")
+	enumerateWebserverIISCmd.Flags().Bool("enum-default-documents", false, "Enable enumeration of default documents")
 
 	_ = enumerateWebserverIISCmd.MarkFlagRequired("targets")
 

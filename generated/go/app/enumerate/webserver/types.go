@@ -10,9 +10,10 @@ import (
 )
 
 type AppEnumerateIisConfig struct {
-	Targets []string `json:"targets,omitempty" url:"targets,omitempty"`
-	Timeout int      `json:"timeout" url:"timeout"`
-	Threads *int     `json:"threads,omitempty" url:"threads,omitempty"`
+	Targets              []string `json:"targets,omitempty" url:"targets,omitempty"`
+	Timeout              int      `json:"timeout" url:"timeout"`
+	Threads              *int     `json:"threads,omitempty" url:"threads,omitempty"`
+	EnumDefaultDocuments *bool    `json:"enumDefaultDocuments,omitempty" url:"enumDefaultDocuments,omitempty"`
 
 	extraProperties map[string]interface{}
 	_rawJSON        json.RawMessage
@@ -185,7 +186,6 @@ type IisSite struct {
 	Frameworks            []*FrameworkInfo `json:"frameworks,omitempty" url:"frameworks,omitempty"`
 	AuthenticationMethods []string         `json:"authenticationMethods,omitempty" url:"authenticationMethods,omitempty"`
 	DefaultDocuments      []string         `json:"defaultDocuments,omitempty" url:"defaultDocuments,omitempty"`
-	CustomErrors          *bool            `json:"customErrors,omitempty" url:"customErrors,omitempty"`
 
 	extraProperties map[string]interface{}
 	_rawJSON        json.RawMessage

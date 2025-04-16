@@ -3,12 +3,11 @@ package enumerate
 import (
 	"context"
 	"fmt"
-	"log"
+	"net/url"
 	"regexp"
 	"runtime"
 	"strings"
 	"sync"
-	"time"
 
 	webscan "github.com/Method-Security/webscan/generated/go/app/enumerate/webserver"
 	common "github.com/Method-Security/webscan/generated/go/common"
@@ -17,9 +16,6 @@ import (
 
 // PerformAppEnumerateWebserverIIS is the main entry point for enumerating IIS targets.
 func PerformAppEnumerateWebserverIIS(ctx context.Context, config *webscan.AppEnumerateIisConfig) webscan.AppEnumerateIisReport {
-	startTime := time.Now()
-	log.Printf("[DEBUG] Starting IIS enumeration with %d targets", len(config.Targets))
-
 	report := webscan.AppEnumerateIisReport{Config: config}
 
 	// Channels for results and errors
@@ -34,7 +30,6 @@ func PerformAppEnumerateWebserverIIS(ctx context.Context, config *webscan.AppEnu
 	if config.Threads != nil {
 		maxGoroutines = *config.Threads
 	}
-	log.Printf("[DEBUG] Using %d concurrent threads for scanning", maxGoroutines)
 
 	// Semaphore to control concurrency
 	semaphore := make(chan struct{}, maxGoroutines)
@@ -45,19 +40,14 @@ func PerformAppEnumerateWebserverIIS(ctx context.Context, config *webscan.AppEnu
 		semaphore <- struct{}{} // Acquire a "slot"
 
 		go func(t string) {
-			targetStartTime := time.Now()
-			log.Printf("[DEBUG] Starting scan for target: %s", t)
-
 			defer wg.Done()
 			defer func() { <-semaphore }() // Release slot
 
-			result, errs := scanTarget(t, config.Timeout)
+			result, errs := scanTarget(t, config.Timeout, config)
 			resultsChan <- &result
 			if len(errs) > 0 {
 				errorsChan <- errs
 			}
-
-			log.Printf("[DEBUG] Completed scan for target: %s in %s", t, time.Since(targetStartTime))
 		}(target)
 	}
 
@@ -81,17 +71,11 @@ func PerformAppEnumerateWebserverIIS(ctx context.Context, config *webscan.AppEnu
 	report.Errors = errors
 	report.Targets = targetResults
 
-	log.Printf("[DEBUG] IIS enumeration completed in %s. Found %d results with %d errors",
-		time.Since(startTime), len(targetResults), len(errors))
-
 	return report
 }
 
 // scanTarget checks a single target (URL) for IIS.
-func scanTarget(target string, timeout int) (webscan.AppEnumerateIisTargetInfo, []string) {
-	startTime := time.Now()
-	log.Printf("[DEBUG] Scanning target URL: %s", target)
-
+func scanTarget(target string, timeout int, config *webscan.AppEnumerateIisConfig) (webscan.AppEnumerateIisTargetInfo, []string) {
 	result := webscan.AppEnumerateIisTargetInfo{
 		Target: target,
 	}
@@ -100,10 +84,9 @@ func scanTarget(target string, timeout int) (webscan.AppEnumerateIisTargetInfo, 
 	var allRequests []*common.RequestInfo
 
 	// Directly check the site using the target URL
-	site, reqs, errs := checkIISSite(target, timeout)
+	site, reqs, errs := checkIISSite(target, timeout, config)
 	if len(errs) > 0 {
 		allErrors = append(allErrors, errs...)
-		log.Printf("[DEBUG] Errors checking target %s: %v", target, errs)
 	}
 
 	// If we successfully enumerated anything, append results
@@ -112,72 +95,46 @@ func scanTarget(target string, timeout int) (webscan.AppEnumerateIisTargetInfo, 
 			result.Sites = []*webscan.IisSite{}
 		}
 		result.Sites = append(result.Sites, site)
-		log.Printf("[DEBUG] Found IIS site at URL: %s", target)
 	}
 	allRequests = append(allRequests, reqs...)
-
-	log.Printf("[DEBUG] Completed scan for target URL %s in %s. Found %d sites with %d requests",
-		target, time.Since(startTime), len(result.Sites), len(allRequests))
 
 	result.Requests = allRequests
 	return result, allErrors
 }
 
 // checkIISSite performs a simple HTTP(S) GET and extracts headers to populate IisSite.
-func checkIISSite(targetURL string, timeout int) (
+func checkIISSite(targetURL string, timeout int, config *webscan.AppEnumerateIisConfig) (
 	*webscan.IisSite,
 	[]*common.RequestInfo,
 	[]string,
 ) {
-	startTime := time.Now()
-	log.Printf("[DEBUG] Checking IIS site: %s", targetURL)
-
 	var (
 		site *webscan.IisSite
 		errs []string
+		reqs []*common.RequestInfo
 	)
 
-	log.Printf("[DEBUG] Using URL: %s", targetURL)
-
-	// Extract base URL and path
-	path := "/"
-	baseURL := targetURL
-
-	// Find the first "/" after the scheme and domain
-	// Start searching after "http://" or "https://"
-	schemeEndPos := strings.Index(targetURL, "://")
-	if schemeEndPos != -1 {
-		prefixLen := schemeEndPos + 3 // Length of "://" is 3
-
-		// Make sure the URL is long enough
-		if len(targetURL) > prefixLen {
-			if idx := strings.Index(targetURL[prefixLen:], "/"); idx > 0 {
-				baseURL = targetURL[:idx+prefixLen]
-				path = targetURL[idx+prefixLen:]
-			}
-		}
+	// Parse the URL to get baseURL and path
+	parsedURL, err := url.Parse(targetURL)
+	if err != nil {
+		errs = append(errs, fmt.Sprintf("failed to parse URL %s: %v", targetURL, err))
+		return nil, nil, errs
 	}
 
-	log.Printf("[DEBUG] Using baseURL: %s, path: %s", baseURL, path)
-
-	// Make a simple GET request using utils.PerformRequestScan
-	requestStartTime := time.Now()
-	log.Printf("[DEBUG] Starting HTTP request to %s", targetURL)
+	// Extract base URL (scheme + host) and path
+	baseURL := fmt.Sprintf("%s://%s", parsedURL.Scheme, parsedURL.Host)
+	path := parsedURL.Path
+	if path == "" {
+		path = "/"
+	}
 
 	reqInfo := utils.PerformRequestScan(baseURL, path, common.HttpMethodGet, common.RequestParams{}, timeout, true)
-	log.Printf("[DEBUG] PerformRequestScan completed in %s with status: %d",
-		time.Since(requestStartTime), reqInfo.StatusCode)
 
 	// If we couldn't connect, return early
 	if reqInfo.StatusCode == nil {
 		errs = append(errs, fmt.Sprintf("request failed for %s - no response", targetURL))
-		log.Printf("[DEBUG] HTTP request error: no response")
 		return nil, []*common.RequestInfo{&reqInfo}, errs
 	}
-
-	// Build a site object
-	processingStartTime := time.Now()
-	log.Printf("[DEBUG] Processing response headers")
 
 	site = &webscan.IisSite{}
 
@@ -197,20 +154,17 @@ func checkIISSite(targetURL string, timeout int) (
 					Name:    serverName,
 					Version: &version,
 				}
-				log.Printf("[DEBUG] Extracted server name: %s, version: %s", serverName, version)
 			} else {
 				// If regex didn't match but we know it's IIS, still set the server
 				site.Server = &webscan.ServerInfo{
 					Name: "Microsoft-IIS",
 				}
-				log.Printf("[DEBUG] Found IIS server, but couldn't extract version")
 			}
 		} else {
 			// Not an IIS server, just use the header as is
 			site.Server = &webscan.ServerInfo{
 				Name: serverName,
 			}
-			log.Printf("[DEBUG] Found non-IIS Server header: %s", serverName)
 		}
 
 		// Check for PHP version in Server header (common in IIS configurations)
@@ -220,7 +174,6 @@ func checkIISSite(targetURL string, timeout int) (
 
 			// Add PHP to frameworks if not already added
 			addFramework(site, "PHP", &phpVersion)
-			log.Printf("[DEBUG] Detected PHP version %s from Server header", phpVersion)
 		}
 	}
 
@@ -230,13 +183,11 @@ func checkIISSite(targetURL string, timeout int) (
 	if aspnetVer != "" {
 		// Add ASP.NET to frameworks
 		addFramework(site, "ASP.NET", &aspnetVer)
-		log.Printf("[DEBUG] Found ASP.NET version: %s", aspnetVer)
 	}
 
 	// 2. Plesk - Check for specific headers
 	if getHeader(&reqInfo, "X-Powered-By-Plesk") != "" {
 		addFramework(site, "Plesk", nil)
-		log.Printf("[DEBUG] Detected Plesk framework")
 	}
 
 	// 3. Check for other frameworks in X-Powered-By header
@@ -263,30 +214,22 @@ func checkIISSite(targetURL string, timeout int) (
 			}
 
 			addFramework(site, framework, version)
-
-			if version != nil {
-				log.Printf("[DEBUG] Added %s framework with version %s from X-Powered-By",
-					framework, *version)
-			} else {
-				log.Printf("[DEBUG] Added %s framework from X-Powered-By", framework)
-			}
 		}
-
-		log.Printf("[DEBUG] Found frameworks in X-Powered-By: %s", xpb)
 	}
 
 	// Check for Node.js/Express
 	if getHeader(&reqInfo, "X-Powered-By") == "Express" ||
 		strings.Contains(getHeader(&reqInfo, "X-Powered-By"), "Node") {
 		addFramework(site, "Node.js", nil)
-		log.Printf("[DEBUG] Detected Node.js framework")
 	}
 
-	// Check for custom errors
-	if *reqInfo.StatusCode >= 400 {
-		customErrors := true
-		site.CustomErrors = &customErrors
-		log.Printf("[DEBUG] Detected custom errors (status code: %d)", *reqInfo.StatusCode)
+	// Check for default documents if enabled
+	if config.EnumDefaultDocuments != nil && *config.EnumDefaultDocuments {
+		defaultDocs, docReqs := checkDefaultDocuments(baseURL, timeout)
+		if len(defaultDocs) > 0 {
+			site.DefaultDocuments = defaultDocs
+		}
+		reqs = append(reqs, docReqs...)
 	}
 
 	// If we had a 401, we might parse "WWW-Authenticate" headers to see auth methods
@@ -294,15 +237,43 @@ func checkIISSite(targetURL string, timeout int) (
 		authMethods := getHeaderValues(&reqInfo, "WWW-Authenticate")
 		if len(authMethods) > 0 {
 			site.AuthenticationMethods = authMethods
-			log.Printf("[DEBUG] Found authentication methods: %v", authMethods)
 		}
 	}
 
-	log.Printf("[DEBUG] Completed header processing in %s", time.Since(processingStartTime))
-	log.Printf("[DEBUG] Completed IIS site check for %s in %s",
-		targetURL, time.Since(startTime))
+	reqs = append([]*common.RequestInfo{&reqInfo}, reqs...)
+	return site, reqs, errs
+}
 
-	return site, []*common.RequestInfo{&reqInfo}, errs
+// checkDefaultDocuments tries to access common default documents
+func checkDefaultDocuments(baseURL string, timeout int) ([]string, []*common.RequestInfo) {
+	// Common default documents in IIS
+	potentialDefaults := []string{
+		"Default.asp",
+		"Default.aspx",
+		"index.htm",
+		"index.html",
+		"iisstart.htm",
+		"default.htm",
+	}
+
+	var foundDocs []string
+	var requests []*common.RequestInfo
+
+	for _, doc := range potentialDefaults {
+		// Extract base URL and path
+		path := "/" + doc
+
+		// Make request
+		reqInfo := utils.PerformRequestScan(baseURL, path, common.HttpMethodGet, common.RequestParams{}, timeout, true)
+		requests = append(requests, &reqInfo)
+
+		// If we got a 200 OK, it's likely a default document
+		if reqInfo.StatusCode != nil && *reqInfo.StatusCode == 200 {
+			foundDocs = append(foundDocs, doc)
+		}
+	}
+
+	return foundDocs, requests
 }
 
 // Helper function to add a framework to the site if it doesn't already exist

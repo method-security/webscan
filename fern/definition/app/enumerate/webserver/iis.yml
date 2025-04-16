@@ -6,6 +6,7 @@ types:
       targets: list<string>
       timeout: integer
       threads: optional<integer>
+      enumDefaultDocuments: optional<boolean>
   ServerInfo:
     properties:
       name: string
@@ -20,7 +21,6 @@ types:
       frameworks: optional<list<FrameworkInfo>>
       authenticationMethods: optional<list<string>> # WWW-Authenticate headers
       defaultDocuments: optional<list<string>>
-      customErrors: optional<boolean>
   AppEnumerateIISTargetInfo:
     properties:
       target: string

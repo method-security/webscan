@@ -1,5 +1,5 @@
 imports:
-  - requests: ../common/requests.yml
+  requests: ../common/requests.yml
 types:
   AppEnumerateIISConfig:
     properties:

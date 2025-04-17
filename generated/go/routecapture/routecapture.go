@@ -6,7 +6,7 @@ import (
 	json "encoding/json"
 	fmt "fmt"
 	common "github.com/Method-Security/webscan/generated/go/common"
-	core "github.com/Method-Security/webscan/generated/go/core"
+	internal "github.com/Method-Security/webscan/generated/go/internal"
 )
 
 type BodyParams struct {
@@ -14,7 +14,21 @@ type BodyParams struct {
 	ExampleValues []string `json:"exampleValues,omitempty" url:"exampleValues,omitempty"`
 
 	extraProperties map[string]interface{}
-	_rawJSON        json.RawMessage
+	rawJSON         json.RawMessage
+}
+
+func (b *BodyParams) GetName() string {
+	if b == nil {
+		return ""
+	}
+	return b.Name
+}
+
+func (b *BodyParams) GetExampleValues() []string {
+	if b == nil {
+		return nil
+	}
+	return b.ExampleValues
 }
 
 func (b *BodyParams) GetExtraProperties() map[string]interface{} {
@@ -28,24 +42,22 @@ func (b *BodyParams) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*b = BodyParams(value)
-
-	extraProperties, err := core.ExtractExtraProperties(data, *b)
+	extraProperties, err := internal.ExtractExtraProperties(data, *b)
 	if err != nil {
 		return err
 	}
 	b.extraProperties = extraProperties
-
-	b._rawJSON = json.RawMessage(data)
+	b.rawJSON = json.RawMessage(data)
 	return nil
 }
 
 func (b *BodyParams) String() string {
-	if len(b._rawJSON) > 0 {
-		if value, err := core.StringifyJSON(b._rawJSON); err == nil {
+	if len(b.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(b.rawJSON); err == nil {
 			return value
 		}
 	}
-	if value, err := core.StringifyJSON(b); err == nil {
+	if value, err := internal.StringifyJSON(b); err == nil {
 		return value
 	}
 	return fmt.Sprintf("%#v", b)
@@ -56,7 +68,21 @@ type QueryParams struct {
 	ExampleValues []string `json:"exampleValues,omitempty" url:"exampleValues,omitempty"`
 
 	extraProperties map[string]interface{}
-	_rawJSON        json.RawMessage
+	rawJSON         json.RawMessage
+}
+
+func (q *QueryParams) GetName() string {
+	if q == nil {
+		return ""
+	}
+	return q.Name
+}
+
+func (q *QueryParams) GetExampleValues() []string {
+	if q == nil {
+		return nil
+	}
+	return q.ExampleValues
 }
 
 func (q *QueryParams) GetExtraProperties() map[string]interface{} {
@@ -70,24 +96,22 @@ func (q *QueryParams) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*q = QueryParams(value)
-
-	extraProperties, err := core.ExtractExtraProperties(data, *q)
+	extraProperties, err := internal.ExtractExtraProperties(data, *q)
 	if err != nil {
 		return err
 	}
 	q.extraProperties = extraProperties
-
-	q._rawJSON = json.RawMessage(data)
+	q.rawJSON = json.RawMessage(data)
 	return nil
 }
 
 func (q *QueryParams) String() string {
-	if len(q._rawJSON) > 0 {
-		if value, err := core.StringifyJSON(q._rawJSON); err == nil {
+	if len(q.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(q.rawJSON); err == nil {
 			return value
 		}
 	}
-	if value, err := core.StringifyJSON(q); err == nil {
+	if value, err := internal.StringifyJSON(q); err == nil {
 		return value
 	}
 	return fmt.Sprintf("%#v", q)
@@ -100,7 +124,35 @@ type RouteCaptureReport struct {
 	Errors []string    `json:"errors,omitempty" url:"errors,omitempty"`
 
 	extraProperties map[string]interface{}
-	_rawJSON        json.RawMessage
+	rawJSON         json.RawMessage
+}
+
+func (r *RouteCaptureReport) GetTarget() string {
+	if r == nil {
+		return ""
+	}
+	return r.Target
+}
+
+func (r *RouteCaptureReport) GetRoutes() []*WebRoute {
+	if r == nil {
+		return nil
+	}
+	return r.Routes
+}
+
+func (r *RouteCaptureReport) GetUrls() []string {
+	if r == nil {
+		return nil
+	}
+	return r.Urls
+}
+
+func (r *RouteCaptureReport) GetErrors() []string {
+	if r == nil {
+		return nil
+	}
+	return r.Errors
 }
 
 func (r *RouteCaptureReport) GetExtraProperties() map[string]interface{} {
@@ -114,24 +166,22 @@ func (r *RouteCaptureReport) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*r = RouteCaptureReport(value)
-
-	extraProperties, err := core.ExtractExtraProperties(data, *r)
+	extraProperties, err := internal.ExtractExtraProperties(data, *r)
 	if err != nil {
 		return err
 	}
 	r.extraProperties = extraProperties
-
-	r._rawJSON = json.RawMessage(data)
+	r.rawJSON = json.RawMessage(data)
 	return nil
 }
 
 func (r *RouteCaptureReport) String() string {
-	if len(r._rawJSON) > 0 {
-		if value, err := core.StringifyJSON(r._rawJSON); err == nil {
+	if len(r.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(r.rawJSON); err == nil {
 			return value
 		}
 	}
-	if value, err := core.StringifyJSON(r); err == nil {
+	if value, err := internal.StringifyJSON(r); err == nil {
 		return value
 	}
 	return fmt.Sprintf("%#v", r)
@@ -145,7 +195,42 @@ type WebRoute struct {
 	BodyParams  []*BodyParams      `json:"bodyParams,omitempty" url:"bodyParams,omitempty"`
 
 	extraProperties map[string]interface{}
-	_rawJSON        json.RawMessage
+	rawJSON         json.RawMessage
+}
+
+func (w *WebRoute) GetUrl() string {
+	if w == nil {
+		return ""
+	}
+	return w.Url
+}
+
+func (w *WebRoute) GetPath() *string {
+	if w == nil {
+		return nil
+	}
+	return w.Path
+}
+
+func (w *WebRoute) GetMethod() *common.HttpMethod {
+	if w == nil {
+		return nil
+	}
+	return w.Method
+}
+
+func (w *WebRoute) GetQueryParams() []*QueryParams {
+	if w == nil {
+		return nil
+	}
+	return w.QueryParams
+}
+
+func (w *WebRoute) GetBodyParams() []*BodyParams {
+	if w == nil {
+		return nil
+	}
+	return w.BodyParams
 }
 
 func (w *WebRoute) GetExtraProperties() map[string]interface{} {
@@ -159,24 +244,22 @@ func (w *WebRoute) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*w = WebRoute(value)
-
-	extraProperties, err := core.ExtractExtraProperties(data, *w)
+	extraProperties, err := internal.ExtractExtraProperties(data, *w)
 	if err != nil {
 		return err
 	}
 	w.extraProperties = extraProperties
-
-	w._rawJSON = json.RawMessage(data)
+	w.rawJSON = json.RawMessage(data)
 	return nil
 }
 
 func (w *WebRoute) String() string {
-	if len(w._rawJSON) > 0 {
-		if value, err := core.StringifyJSON(w._rawJSON); err == nil {
+	if len(w.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(w.rawJSON); err == nil {
 			return value
 		}
 	}
-	if value, err := core.StringifyJSON(w); err == nil {
+	if value, err := internal.StringifyJSON(w); err == nil {
 		return value
 	}
 	return fmt.Sprintf("%#v", w)

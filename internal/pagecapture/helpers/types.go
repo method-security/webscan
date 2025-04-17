@@ -1,16 +1,16 @@
-package capture
+package pagecapture
 
 import (
 	"time"
 
 	common "github.com/Method-Security/webscan/generated/go/common"
-	webscan "github.com/Method-Security/webscan/generated/go/pagecapture"
+	pagecapturefern "github.com/Method-Security/webscan/generated/go/pagecapture"
 )
 
 type Options struct{}
 
-func NewPageCaptureReport(url string) *webscan.PageCaptureReport {
-	report := &webscan.PageCaptureReport{
+func NewPageCaptureReport(url string) *pagecapturefern.PageCaptureHtmlReport {
+	report := &pagecapturefern.PageCaptureHtmlReport{
 		Request: &common.RequestInfo{
 			BaseUrl:         url,
 			Path:            "",
@@ -29,8 +29,8 @@ func NewPageCaptureReport(url string) *webscan.PageCaptureReport {
 	return report
 }
 
-func NewPageScreenshotReport(url string) *webscan.PageScreenshotReport {
-	report := &webscan.PageScreenshotReport{
+func NewPageScreenshotReport(url string) *pagecapturefern.PageCaptureScreenshotReport {
+	report := &pagecapturefern.PageCaptureScreenshotReport{
 		Request: &common.RequestInfo{
 			BaseUrl:         url,
 			Path:            "",

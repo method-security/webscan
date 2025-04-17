@@ -17,11 +17,6 @@ types:
       method: optional<requests.HttpMethod>
       queryParams: optional<list<QueryParams>>
       bodyParams: optional<list<BodyParams>>
-  PageCaptureMethod:
-    enum:
-      - REQUEST
-      - BROWSER
-      - BROWSERBASE
   RouteCaptureReport:
     properties:
       target: string

@@ -1,0 +1,7 @@
+imports:
+  requests: ../common/requests.yml
+types:
+  PageCaptureHtmlReport:
+    properties:
+      request: requests.RequestInfo
+      errors: optional<list<string>>

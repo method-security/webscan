@@ -9,6 +9,31 @@ import (
 	time "time"
 )
 
+type CaptureMethod string
+
+const (
+	CaptureMethodRequest     CaptureMethod = "REQUEST"
+	CaptureMethodBrowser     CaptureMethod = "BROWSER"
+	CaptureMethodBrowserbase CaptureMethod = "BROWSERBASE"
+)
+
+func NewCaptureMethodFromString(s string) (CaptureMethod, error) {
+	switch s {
+	case "REQUEST":
+		return CaptureMethodRequest, nil
+	case "BROWSER":
+		return CaptureMethodBrowser, nil
+	case "BROWSERBASE":
+		return CaptureMethodBrowserbase, nil
+	}
+	var t CaptureMethod
+	return "", fmt.Errorf("%s is not a valid %T", s, t)
+}
+
+func (c CaptureMethod) Ptr() *CaptureMethod {
+	return &c
+}
+
 type HttpMethod string
 
 const (

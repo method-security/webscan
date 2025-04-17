@@ -1,11 +1,11 @@
-package capture
+package pagecapture
 
 import (
 	"context"
 	"fmt"
 	"time"
 
-	webscan "github.com/Method-Security/webscan/generated/go/pagecapture"
+	pagecapturefern "github.com/Method-Security/webscan/generated/go/pagecapture"
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
@@ -13,11 +13,11 @@ import (
 	"github.com/ysmood/gson"
 )
 
-func (b *BrowserbasePageCapturer) CaptureScreenshot(ctx context.Context, url string, options *Options) *webscan.PageScreenshotReport {
+func (b *BrowserbasePageCapturer) CaptureScreenshot(ctx context.Context, url string, options *Options) *pagecapturefern.PageCaptureScreenshotReport {
 	return b.Capturer.CaptureScreenshot(ctx, url, options)
 }
 
-func (b *BrowserPageCapturer) CaptureScreenshot(ctx context.Context, url string, options *Options) *webscan.PageScreenshotReport {
+func (b *BrowserPageCapturer) CaptureScreenshot(ctx context.Context, url string, options *Options) *pagecapturefern.PageCaptureScreenshotReport {
 	report := NewPageScreenshotReport(url)
 	log := svc1log.FromContext(ctx)
 

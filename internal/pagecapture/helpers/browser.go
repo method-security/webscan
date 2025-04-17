@@ -1,4 +1,4 @@
-package capture
+package pagecapture
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	webscan "github.com/Method-Security/webscan/generated/go/pagecapture"
+	pagecapturefern "github.com/Method-Security/webscan/generated/go/pagecapture"
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/cdp"
 	"github.com/go-rod/rod/lib/launcher"
@@ -40,7 +40,7 @@ func NewBrowserPageCapturerWithClient(client *cdp.Client, timeout int, minDOMSta
 	}
 }
 
-func (b *BrowserPageCapturer) Capture(ctx context.Context, url string, options *Options) (*webscan.PageCaptureReport, error) {
+func (b *BrowserPageCapturer) Capture(ctx context.Context, url string, options *Options) (*pagecapturefern.PageCaptureHtmlReport, error) {
 	log := svc1log.FromContext(ctx)
 	report := NewPageCaptureReport(url)
 

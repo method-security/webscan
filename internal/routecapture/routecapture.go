@@ -7,16 +7,17 @@ import (
 	"strings"
 	"time"
 
-	webscan "github.com/Method-Security/webscan/generated/go/routecapture"
-	"github.com/Method-Security/webscan/internal/browserbase"
-	capture "github.com/Method-Security/webscan/internal/capture"
+	common "github.com/Method-Security/webscan/generated/go/common"
+	routecapturefern "github.com/Method-Security/webscan/generated/go/routecapture"
+	pagecapture "github.com/Method-Security/webscan/internal/pagecapture/helpers"
+	"github.com/Method-Security/webscan/internal/pagecapture/helpers/browserbase"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
-func extractRoutes(ctx context.Context, target string, htmlContent string, baseURLsOnly bool, captureStaticAssets bool, timeout int, captureMethod webscan.PageCaptureMethod, browserCapturer *capture.BrowserPageCapturer) ([]*webscan.WebRoute, []string, []string) {
+func extractRoutes(ctx context.Context, target string, htmlContent string, baseURLsOnly bool, captureStaticAssets bool, timeout int, captureMethod common.CaptureMethod, browserCapturer *pagecapture.BrowserPageCapturer) ([]*routecapturefern.WebRoute, []string, []string) {
 	log := svc1log.FromContext(ctx)
-	routes := []*webscan.WebRoute{}
+	routes := []*routecapturefern.WebRoute{}
 	urls := make(map[string]struct{})
 	errors := []string{}
 
@@ -64,7 +65,7 @@ func extractRoutes(ctx context.Context, target string, htmlContent string, baseU
 	errors = append(errors, inlineScriptErrors...)
 
 	// Only to be performed if captureMethod is of type Browser or Browserbase
-	if captureMethod == webscan.PageCaptureMethodBrowser || captureMethod == webscan.PageCaptureMethodBrowserbase {
+	if captureMethod == common.CaptureMethodBrowser || captureMethod == common.CaptureMethodBrowserbase {
 		log.Info("Extracting routes from inspecting network calls")
 		networkRoutes, networkUrls, networkErrors := extractNetworkRoutes(ctx, browserCapturer, target, baseURLsOnly, captureStaticAssets)
 		routes = append(routes, networkRoutes...)
@@ -77,24 +78,24 @@ func extractRoutes(ctx context.Context, target string, htmlContent string, baseU
 	return mergedRoutes, setToListString(urls), errors
 }
 
-func PerformRouteCapture(ctx context.Context, target string, captureMethod webscan.PageCaptureMethod, baseURLsOnly bool, captureStaticAssets bool, timeout int, minDOMStabalizeTime int, insecure bool, browserPath *string, browserBaseToken *string, browserBaseProject *string, browserBaseOptions *[]browserbase.Option) webscan.RouteCaptureReport {
+func PerformRouteCapture(ctx context.Context, target string, captureMethod common.CaptureMethod, baseURLsOnly bool, captureStaticAssets bool, timeout int, minDOMStabalizeTime int, insecure bool, browserPath *string, browserBaseToken *string, browserBaseProject *string, browserBaseOptions *[]browserbase.Option) routecapturefern.RouteCaptureReport {
 	log := svc1log.FromContext(ctx)
 
-	report := webscan.RouteCaptureReport{
+	report := routecapturefern.RouteCaptureReport{
 		Target: target,
 		Errors: []string{},
 	}
 
 	// Get the HTML content with specified method
 	var htmlContent string
-	var routes []*webscan.WebRoute
+	var routes []*routecapturefern.WebRoute
 	var urls []string
 	var errors []string
 	switch captureMethod {
-	case webscan.PageCaptureMethodRequest:
+	case common.CaptureMethodRequest:
 		log.Info("Initiating page capture with request method", svc1log.SafeParam("target", target))
-		capturer := capture.NewRequestPageCapturer(insecure, timeout)
-		result, err := capturer.Capture(ctx, target, &capture.Options{})
+		capturer := pagecapture.NewRequestPageCapturer(insecure, timeout)
+		result, err := capturer.Capture(ctx, target, &pagecapture.Options{})
 		if err != nil {
 			report.Errors = append(report.Errors, err.Error())
 			return report
@@ -108,14 +109,14 @@ func PerformRouteCapture(ctx context.Context, target string, captureMethod websc
 		htmlContent = string(decodedContent)
 
 		// Extract the routes and urls
-		routes, urls, errors = extractRoutes(ctx, target, htmlContent, baseURLsOnly, captureStaticAssets, timeout, webscan.PageCaptureMethodRequest, nil)
+		routes, urls, errors = extractRoutes(ctx, target, htmlContent, baseURLsOnly, captureStaticAssets, timeout, common.CaptureMethodRequest, nil)
 
 		_ = capturer.Close(ctx)
 
-	case webscan.PageCaptureMethodBrowser:
+	case common.CaptureMethodBrowser:
 		log.Info("Initiating page capture with browser method", svc1log.SafeParam("target", target))
-		capturer := capture.NewBrowserPageCapturer(browserPath, timeout, minDOMStabalizeTime)
-		result, err := capturer.Capture(ctx, target, &capture.Options{})
+		capturer := pagecapture.NewBrowserPageCapturer(browserPath, timeout, minDOMStabalizeTime)
+		result, err := capturer.Capture(ctx, target, &pagecapture.Options{})
 		if err != nil {
 			report.Errors = append(report.Errors, err.Error())
 			return report
@@ -130,15 +131,15 @@ func PerformRouteCapture(ctx context.Context, target string, captureMethod websc
 		htmlContent = string(decodedContent)
 
 		// Extract the routes and urls
-		routes, urls, errors = extractRoutes(ctx, target, htmlContent, baseURLsOnly, captureStaticAssets, timeout, webscan.PageCaptureMethodBrowser, capturer)
+		routes, urls, errors = extractRoutes(ctx, target, htmlContent, baseURLsOnly, captureStaticAssets, timeout, common.CaptureMethodBrowser, capturer)
 
 		_ = capturer.Close(ctx)
 
-	case webscan.PageCaptureMethodBrowserbase:
+	case common.CaptureMethodBrowserbase:
 		log.Info("Initiating page capture with browserbase method", svc1log.SafeParam("target", target))
 		client := browserbase.NewBrowserbaseClient(*browserBaseToken, *browserBaseProject, browserbase.NewBrowserbaseOptions(ctx, *browserBaseOptions...))
-		capturer := capture.NewBrowserbasePageCapturer(ctx, timeout, minDOMStabalizeTime, client)
-		result, err := capturer.Capture(ctx, target, &capture.Options{})
+		capturer := pagecapture.NewBrowserbasePageCapturer(ctx, timeout, minDOMStabalizeTime, client)
+		result, err := capturer.Capture(ctx, target, &pagecapture.Options{})
 		if err != nil {
 			report.Errors = append(report.Errors, err.Error())
 			return report
@@ -152,7 +153,7 @@ func PerformRouteCapture(ctx context.Context, target string, captureMethod websc
 		htmlContent = string(decodedContent)
 
 		// Extract the routes and urls
-		routes, urls, errors = extractRoutes(ctx, target, htmlContent, baseURLsOnly, captureStaticAssets, timeout, webscan.PageCaptureMethodBrowserbase, capturer.Capturer)
+		routes, urls, errors = extractRoutes(ctx, target, htmlContent, baseURLsOnly, captureStaticAssets, timeout, common.CaptureMethodBrowserbase, capturer.Capturer)
 
 		_ = capturer.Close(ctx)
 

@@ -5,7 +5,7 @@ package url
 import (
 	json "encoding/json"
 	fmt "fmt"
-	core "github.com/Method-Security/webscan/generated/go/core"
+	internal "github.com/Method-Security/webscan/generated/go/internal"
 )
 
 type HttpHeaders struct {
@@ -20,7 +20,70 @@ type HttpHeaders struct {
 	AllowedHttpMethods        *string `json:"allowedHttpMethods,omitempty" url:"allowedHttpMethods,omitempty"`
 
 	extraProperties map[string]interface{}
-	_rawJSON        json.RawMessage
+	rawJSON         json.RawMessage
+}
+
+func (h *HttpHeaders) GetLocation() *string {
+	if h == nil {
+		return nil
+	}
+	return h.Location
+}
+
+func (h *HttpHeaders) GetServer() *string {
+	if h == nil {
+		return nil
+	}
+	return h.Server
+}
+
+func (h *HttpHeaders) GetXPoweredBy() *string {
+	if h == nil {
+		return nil
+	}
+	return h.XPoweredBy
+}
+
+func (h *HttpHeaders) GetXFrameOptions() *string {
+	if h == nil {
+		return nil
+	}
+	return h.XFrameOptions
+}
+
+func (h *HttpHeaders) GetXClusterName() *string {
+	if h == nil {
+		return nil
+	}
+	return h.XClusterName
+}
+
+func (h *HttpHeaders) GetCrossOriginResourcePolicy() *string {
+	if h == nil {
+		return nil
+	}
+	return h.CrossOriginResourcePolicy
+}
+
+func (h *HttpHeaders) GetAccessControlAllowOrigin() *string {
+	if h == nil {
+		return nil
+	}
+	return h.AccessControlAllowOrigin
+}
+
+func (h *HttpHeaders) GetXAspNetVersion() *string {
+	if h == nil {
+		return nil
+	}
+	return h.XAspNetVersion
+}
+
+func (h *HttpHeaders) GetAllowedHttpMethods() *string {
+	if h == nil {
+		return nil
+	}
+	return h.AllowedHttpMethods
 }
 
 func (h *HttpHeaders) GetExtraProperties() map[string]interface{} {
@@ -34,24 +97,22 @@ func (h *HttpHeaders) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*h = HttpHeaders(value)
-
-	extraProperties, err := core.ExtractExtraProperties(data, *h)
+	extraProperties, err := internal.ExtractExtraProperties(data, *h)
 	if err != nil {
 		return err
 	}
 	h.extraProperties = extraProperties
-
-	h._rawJSON = json.RawMessage(data)
+	h.rawJSON = json.RawMessage(data)
 	return nil
 }
 
 func (h *HttpHeaders) String() string {
-	if len(h._rawJSON) > 0 {
-		if value, err := core.StringifyJSON(h._rawJSON); err == nil {
+	if len(h.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(h.rawJSON); err == nil {
 			return value
 		}
 	}
-	if value, err := core.StringifyJSON(h); err == nil {
+	if value, err := internal.StringifyJSON(h); err == nil {
 		return value
 	}
 	return fmt.Sprintf("%#v", h)
@@ -65,7 +126,42 @@ type UrlFingerprintReport struct {
 	Errors              []string     `json:"errors,omitempty" url:"errors,omitempty"`
 
 	extraProperties map[string]interface{}
-	_rawJSON        json.RawMessage
+	rawJSON         json.RawMessage
+}
+
+func (u *UrlFingerprintReport) GetTarget() string {
+	if u == nil {
+		return ""
+	}
+	return u.Target
+}
+
+func (u *UrlFingerprintReport) GetHttpHeaders() *HttpHeaders {
+	if u == nil {
+		return nil
+	}
+	return u.HttpHeaders
+}
+
+func (u *UrlFingerprintReport) GetRedirectUrl() *string {
+	if u == nil {
+		return nil
+	}
+	return u.RedirectUrl
+}
+
+func (u *UrlFingerprintReport) GetRedirectHttpHeaders() *HttpHeaders {
+	if u == nil {
+		return nil
+	}
+	return u.RedirectHttpHeaders
+}
+
+func (u *UrlFingerprintReport) GetErrors() []string {
+	if u == nil {
+		return nil
+	}
+	return u.Errors
 }
 
 func (u *UrlFingerprintReport) GetExtraProperties() map[string]interface{} {
@@ -79,24 +175,22 @@ func (u *UrlFingerprintReport) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*u = UrlFingerprintReport(value)
-
-	extraProperties, err := core.ExtractExtraProperties(data, *u)
+	extraProperties, err := internal.ExtractExtraProperties(data, *u)
 	if err != nil {
 		return err
 	}
 	u.extraProperties = extraProperties
-
-	u._rawJSON = json.RawMessage(data)
+	u.rawJSON = json.RawMessage(data)
 	return nil
 }
 
 func (u *UrlFingerprintReport) String() string {
-	if len(u._rawJSON) > 0 {
-		if value, err := core.StringifyJSON(u._rawJSON); err == nil {
+	if len(u.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(u.rawJSON); err == nil {
 			return value
 		}
 	}
-	if value, err := core.StringifyJSON(u); err == nil {
+	if value, err := internal.StringifyJSON(u); err == nil {
 		return value
 	}
 	return fmt.Sprintf("%#v", u)

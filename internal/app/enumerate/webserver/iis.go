@@ -3,271 +3,210 @@ package enumerate
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"net/url"
 	"regexp"
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 
 	webscan "github.com/Method-Security/webscan/generated/go/app/enumerate/webserver"
 	common "github.com/Method-Security/webscan/generated/go/common"
 	"github.com/Method-Security/webscan/utils"
 )
 
-// PerformAppEnumerateWebserverIIS is the main entry point for enumerating IIS targets.
-func PerformAppEnumerateWebserverIIS(ctx context.Context, config *webscan.AppEnumerateIisConfig) webscan.AppEnumerateIisReport {
-	report := webscan.AppEnumerateIisReport{Config: config}
+// -----------------------------------------------------------------------------
+// Entry point exposed to the wider application
+// -----------------------------------------------------------------------------
 
-	// Channels for results and errors
-	resultsChan := make(chan *webscan.AppEnumerateIisTargetInfo, len(config.Targets))
-	errorsChan := make(chan []string, len(config.Targets))
+func PerformAppEnumerateWebserverIIS(ctx context.Context, cfg *webscan.AppEnumerateIisConfig) webscan.AppEnumerateIisReport {
+	rpt := webscan.AppEnumerateIisReport{Config: cfg}
 
-	// WaitGroup to wait for all goroutines
-	var wg sync.WaitGroup
-
-	// Concurrency limit (defaults to number of CPUs if Threads not set)
-	maxGoroutines := runtime.GOMAXPROCS(0)
-	if config.Threads != nil {
-		maxGoroutines = *config.Threads
+	// Concurrency controls
+	nWorkers := runtime.GOMAXPROCS(0)
+	if cfg.Threads != nil {
+		nWorkers = *cfg.Threads
 	}
+	sem := make(chan struct{}, nWorkers)
 
-	// Semaphore to control concurrency
-	semaphore := make(chan struct{}, maxGoroutines)
+	var wg sync.WaitGroup
+	resChan := make(chan *webscan.AppEnumerateIisTargetInfo, len(cfg.Targets))
+	errChan := make(chan []string, len(cfg.Targets))
 
-	// Process each target concurrently
-	for _, target := range config.Targets {
+	for _, tgt := range cfg.Targets {
 		wg.Add(1)
-		semaphore <- struct{}{} // Acquire a "slot"
-
+		sem <- struct{}{}
 		go func(t string) {
 			defer wg.Done()
-			defer func() { <-semaphore }() // Release slot
-
-			result, errs := scanTarget(t, config.Timeout, config)
-			resultsChan <- &result
-			if len(errs) > 0 {
-				errorsChan <- errs
+			defer func() { <-sem }()
+			r, e := enumerateTarget(t, cfg.Timeout)
+			resChan <- &r
+			if len(e) > 0 {
+				errChan <- e
 			}
-		}(target)
+		}(tgt)
 	}
 
-	// Wait for all goroutines
 	wg.Wait()
-	close(resultsChan)
-	close(errorsChan)
+	close(resChan)
+	close(errChan)
 
-	// Collect results and errors
-	var targetResults []*webscan.AppEnumerateIisTargetInfo
-	var errors []string
-
-	for result := range resultsChan {
-		targetResults = append(targetResults, result)
+	for r := range resChan {
+		rpt.Targets = append(rpt.Targets, r)
 	}
-
-	for errs := range errorsChan {
-		errors = append(errors, errs...)
+	for e := range errChan {
+		rpt.Errors = append(rpt.Errors, e...)
 	}
-
-	report.Errors = errors
-	report.Targets = targetResults
-
-	return report
+	return rpt
 }
 
-// scanTarget checks a single target (URL) for IIS.
-func scanTarget(target string, timeout int, config *webscan.AppEnumerateIisConfig) (webscan.AppEnumerateIisTargetInfo, []string) {
-	result := webscan.AppEnumerateIisTargetInfo{
-		Target: target,
-	}
+// -----------------------------------------------------------------------------
+// Per‑target routine – minimal probing
+// -----------------------------------------------------------------------------
 
-	var allErrors []string
-	var allRequests []*common.RequestInfo
+func enumerateTarget(target string, timeout int) (webscan.AppEnumerateIisTargetInfo, []string) {
+	out := webscan.AppEnumerateIisTargetInfo{Target: target}
+	var errs []string
+	var reqs []*common.RequestInfo
 
-	// Directly check the site using the target URL
-	site, reqs, errs := checkIISSite(target, timeout, config)
-	if len(errs) > 0 {
-		allErrors = append(allErrors, errs...)
-	}
+	site, rqs, es := enumerateSite(target, timeout)
+	reqs = append(reqs, rqs...)
+	errs = append(errs, es...)
 
-	// If we successfully enumerated anything, append results
 	if site != nil {
-		if result.Sites == nil {
-			result.Sites = []*webscan.IisSite{}
-		}
-		result.Sites = append(result.Sites, site)
+		out.Sites = []*webscan.IisSite{site}
 	}
-	allRequests = append(allRequests, reqs...)
-
-	result.Requests = allRequests
-	return result, allErrors
+	out.Requests = reqs
+	return out, errs
 }
 
-// checkIISSite performs a simple HTTP(S) GET and extracts headers to populate IisSite.
-func checkIISSite(targetURL string, timeout int, config *webscan.AppEnumerateIisConfig) (
-	*webscan.IisSite,
-	[]*common.RequestInfo,
-	[]string,
-) {
-	var (
-		site *webscan.IisSite
-		errs []string
-		reqs []*common.RequestInfo
-	)
+// -----------------------------------------------------------------------------
+// Core logic: grab headers, parse versions, optional 404 scrape, 401 auth list
+// -----------------------------------------------------------------------------
 
-	// Parse the URL to get baseURL and path
-	parsedURL, err := url.Parse(targetURL)
+func enumerateSite(target string, timeout int) (*webscan.IisSite, []*common.RequestInfo, []string) {
+	var errs []string
+	var reqs []*common.RequestInfo
+
+	// --------- Parse & normalise URL ---------
+	u, err := url.Parse(target)
 	if err != nil {
-		errs = append(errs, fmt.Sprintf("failed to parse URL %s: %v", targetURL, err))
-		return nil, nil, errs
+		return nil, nil, []string{fmt.Sprintf("invalid URL %s: %v", target, err)}
 	}
-
-	// Extract base URL (scheme + host) and path
-	baseURL := fmt.Sprintf("%s://%s", parsedURL.Scheme, parsedURL.Host)
-	path := parsedURL.Path
+	if u.Scheme == "" {
+		u.Scheme = "http"
+	}
+	baseURL := fmt.Sprintf("%s://%s", u.Scheme, u.Host)
+	path := u.Path
 	if path == "" {
 		path = "/"
 	}
 
-	reqInfo := utils.PerformRequestScan(baseURL, path, common.HttpMethodGet, common.RequestParams{}, timeout, true)
+	// --------- Baseline GET ---------
+	root := utils.PerformRequestScan(baseURL, path, common.HttpMethodGet, common.RequestParams{}, timeout, true)
+	reqs = append(reqs, &root)
 
-	// If we couldn't connect, return early
-	if reqInfo.StatusCode == nil {
-		errs = append(errs, fmt.Sprintf("request failed for %s - no response", targetURL))
-		return nil, []*common.RequestInfo{&reqInfo}, errs
+	if root.StatusCode == nil {
+		return nil, reqs, []string{fmt.Sprintf("no response from %s", target)}
 	}
 
-	site = &webscan.IisSite{}
+	site := &webscan.IisSite{}
+	parseBanners(site, &root) // Server & ASP.NET versions
 
-	// Check server header for IIS and possibly embedded framework info
-	serverHeader := getHeader(&reqInfo, "Server")
-	if serverHeader != "" {
-		// Create ServerInfo structure
-		serverName := serverHeader
-
-		// Extract IIS version number and clean server name
-		if strings.Contains(strings.ToLower(serverHeader), "microsoft-iis") {
-			re := regexp.MustCompile(`(Microsoft-IIS)/(\d+\.\d+)`)
-			if matches := re.FindStringSubmatch(serverHeader); len(matches) > 2 {
-				serverName = matches[1] // Just "Microsoft-IIS" without version
-				version := matches[2]
-				site.Server = &webscan.ServerInfo{
-					Name:    serverName,
-					Version: &version,
-				}
-			} else {
-				// If regex didn't match but we know it's IIS, still set the server
-				site.Server = &webscan.ServerInfo{
-					Name: "Microsoft-IIS",
-				}
-			}
-		} else {
-			// Not an IIS server, just use the header as is
-			site.Server = &webscan.ServerInfo{
-				Name: serverName,
+	// --------- If server version still unknown, scrape 404 page ---------
+	if site.Server == nil || site.Server.Version == nil {
+		r := rand.New(rand.NewSource(time.Now().UnixNano()))
+		nf := utils.PerformRequestScan(baseURL, fmt.Sprintf("/nonexistent_%d.aspx", r.Intn(9e6)), common.HttpMethodGet, common.RequestParams{}, timeout, true)
+		reqs = append(reqs, &nf)
+		if nf.ResponseBody != nil {
+			if v := parseIisVersionFromBody(*nf.ResponseBody); v != "" {
+				site.Server = &webscan.WebServerInfo{Name: "Microsoft-IIS", Version: &v}
 			}
 		}
 	}
 
-	// Check for ASP.NET framework
-	aspnetVer := getHeader(&reqInfo, "X-AspNet-Version")
-	if aspnetVer != "" {
-		// Initialize frameworks slice if needed
-		if site.Frameworks == nil {
-			site.Frameworks = []*webscan.FrameworkInfo{}
-		}
-		// Add ASP.NET to frameworks
-		site.Frameworks = append(site.Frameworks, &webscan.FrameworkInfo{
-			Name:    "ASP.NET",
-			Version: &aspnetVer,
-		})
-	}
-
-	// Check for default documents if enabled
-	if config.EnumDefaultDocuments != nil && *config.EnumDefaultDocuments {
-		defaultDocs, docReqs := checkDefaultDocuments(baseURL, timeout)
-		if len(defaultDocs) > 0 {
-			site.DefaultDocuments = defaultDocs
-		}
-		reqs = append(reqs, docReqs...)
-	}
-
-	// If we had a 401, we might parse "WWW-Authenticate" headers to see auth methods
-	if *reqInfo.StatusCode == 401 {
-		authMethods := getHeaderValues(&reqInfo, "WWW-Authenticate")
-		if len(authMethods) > 0 {
-			site.AuthenticationMethods = authMethods
+	// --------- Capture auth schemes when 401 ---------
+	if root.StatusCode != nil && *root.StatusCode == 401 {
+		auths := getHeaderValues(&root, "WWW-Authenticate")
+		if len(auths) > 0 {
+			site.AuthenticationMethods = auths
 		}
 	}
 
-	reqs = append([]*common.RequestInfo{&reqInfo}, reqs...)
 	return site, reqs, errs
 }
 
-// checkDefaultDocuments tries to access common default documents
-func checkDefaultDocuments(baseURL string, timeout int) ([]string, []*common.RequestInfo) {
-	// Common default documents in IIS
-	potentialDefaults := []string{
-		"Default.asp",
-		"Default.aspx",
-		"index.htm",
-		"index.html",
-		"iisstart.htm",
-		"default.htm",
-	}
+// -----------------------------------------------------------------------------
+// Helper: banner & header parsing
+// -----------------------------------------------------------------------------
 
-	var foundDocs []string
-	var requests []*common.RequestInfo
+var iisRe = regexp.MustCompile(`(?i)(Microsoft-IIS)/(\d+\.\d+)`)
 
-	for _, doc := range potentialDefaults {
-		// Extract base URL and path
-		path := "/" + doc
-
-		// Make request
-		reqInfo := utils.PerformRequestScan(baseURL, path, common.HttpMethodGet, common.RequestParams{}, timeout, true)
-		requests = append(requests, &reqInfo)
-
-		// If we got a 200 OK, it's likely a default document
-		if reqInfo.StatusCode != nil && *reqInfo.StatusCode == 200 {
-			foundDocs = append(foundDocs, doc)
+func parseBanners(s *webscan.IisSite, r *common.RequestInfo) {
+	serverHdr := getHeader(r, "Server")
+	if serverHdr != "" {
+		if matches := iisRe.FindStringSubmatch(serverHdr); len(matches) > 2 {
+			v := matches[2]
+			s.Server = &webscan.WebServerInfo{Name: "Microsoft-IIS", Version: &v}
+		} else {
+			s.Server = &webscan.WebServerInfo{Name: serverHdr}
 		}
 	}
 
-	return foundDocs, requests
+	// Get framework version from X-AspNet-Version
+	aspVer := getHeader(r, "X-AspNet-Version")
+	var version *string
+	if aspVer != "" {
+		version = &aspVer
+	}
+
+	// Get framework name from X-Powered-By
+	if xp := getHeader(r, "X-Powered-By"); xp != "" {
+		s.Frameworks = append(s.Frameworks, &webscan.WebFrameworkInfo{Name: xp, Version: version})
+	}
 }
 
-// Helper function to safely get a header value from RequestInfo
-func getHeader(req *common.RequestInfo, name string) string {
-	if req.ResponseHeaders == nil {
-		return ""
-	}
+// -----------------------------------------------------------------------------
+// Helper: scrape version string from default IIS error pages
+// -----------------------------------------------------------------------------
 
-	value, exists := req.ResponseHeaders[name]
-	if exists {
-		return value
-	}
+var bodyVerRe = regexp.MustCompile(`(?i)IIS\s*(\d+\.\d+)`)
 
-	// Try case-insensitive match
-	for headerName, headerValue := range req.ResponseHeaders {
-		if strings.EqualFold(headerName, name) {
-			return headerValue
-		}
+func parseIisVersionFromBody(b string) string {
+	if m := bodyVerRe.FindStringSubmatch(b); len(m) > 1 {
+		return m[1]
 	}
-
 	return ""
 }
 
-// Helper function to get all values for a header from RequestInfo
-func getHeaderValues(req *common.RequestInfo, name string) []string {
-	if req.ResponseHeaders == nil {
+// -----------------------------------------------------------------------------
+// Generic header helpers (case‑insensitive)
+// -----------------------------------------------------------------------------
+
+func getHeader(r *common.RequestInfo, name string) string {
+	if r.ResponseHeaders == nil {
+		return ""
+	}
+	if v, ok := r.ResponseHeaders[name]; ok {
+		return v
+	}
+	for hn, hv := range r.ResponseHeaders {
+		if strings.EqualFold(hn, name) {
+			return hv
+		}
+	}
+	return ""
+}
+
+func getHeaderValues(r *common.RequestInfo, name string) []string {
+	raw := getHeader(r, name)
+	if raw == "" {
 		return nil
 	}
-
-	// In the current struct, we don't have a way to get multiple values for the same header
-	// So we'll just return a single value if found
-	value := getHeader(req, name)
-	if value != "" {
-		return []string{value}
+	parts := strings.Split(raw, ",")
+	for i := range parts {
+		parts[i] = strings.TrimSpace(parts[i])
 	}
-
-	return nil
+	return parts
 }

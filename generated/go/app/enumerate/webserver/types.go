@@ -10,10 +10,9 @@ import (
 )
 
 type AppEnumerateIisConfig struct {
-	Targets              []string `json:"targets,omitempty" url:"targets,omitempty"`
-	Timeout              int      `json:"timeout" url:"timeout"`
-	Threads              *int     `json:"threads,omitempty" url:"threads,omitempty"`
-	EnumDefaultDocuments *bool    `json:"enumDefaultDocuments,omitempty" url:"enumDefaultDocuments,omitempty"`
+	Targets []string `json:"targets,omitempty" url:"targets,omitempty"`
+	Timeout int      `json:"timeout" url:"timeout"`
+	Threads *int     `json:"threads,omitempty" url:"threads,omitempty"`
 
 	extraProperties map[string]interface{}
 	_rawJSON        json.RawMessage
@@ -139,53 +138,10 @@ func (a *AppEnumerateIisTargetInfo) String() string {
 	return fmt.Sprintf("%#v", a)
 }
 
-type FrameworkInfo struct {
-	Name    string  `json:"name" url:"name"`
-	Version *string `json:"version,omitempty" url:"version,omitempty"`
-
-	extraProperties map[string]interface{}
-	_rawJSON        json.RawMessage
-}
-
-func (f *FrameworkInfo) GetExtraProperties() map[string]interface{} {
-	return f.extraProperties
-}
-
-func (f *FrameworkInfo) UnmarshalJSON(data []byte) error {
-	type unmarshaler FrameworkInfo
-	var value unmarshaler
-	if err := json.Unmarshal(data, &value); err != nil {
-		return err
-	}
-	*f = FrameworkInfo(value)
-
-	extraProperties, err := core.ExtractExtraProperties(data, *f)
-	if err != nil {
-		return err
-	}
-	f.extraProperties = extraProperties
-
-	f._rawJSON = json.RawMessage(data)
-	return nil
-}
-
-func (f *FrameworkInfo) String() string {
-	if len(f._rawJSON) > 0 {
-		if value, err := core.StringifyJSON(f._rawJSON); err == nil {
-			return value
-		}
-	}
-	if value, err := core.StringifyJSON(f); err == nil {
-		return value
-	}
-	return fmt.Sprintf("%#v", f)
-}
-
 type IisSite struct {
-	Server                *ServerInfo      `json:"server,omitempty" url:"server,omitempty"`
-	Frameworks            []*FrameworkInfo `json:"frameworks,omitempty" url:"frameworks,omitempty"`
-	AuthenticationMethods []string         `json:"authenticationMethods,omitempty" url:"authenticationMethods,omitempty"`
-	DefaultDocuments      []string         `json:"defaultDocuments,omitempty" url:"defaultDocuments,omitempty"`
+	Server                *WebServerInfo      `json:"server,omitempty" url:"server,omitempty"`
+	Frameworks            []*WebFrameworkInfo `json:"frameworks,omitempty" url:"frameworks,omitempty"`
+	AuthenticationMethods []string            `json:"authenticationMethods,omitempty" url:"authenticationMethods,omitempty"`
 
 	extraProperties map[string]interface{}
 	_rawJSON        json.RawMessage
@@ -225,7 +181,7 @@ func (i *IisSite) String() string {
 	return fmt.Sprintf("%#v", i)
 }
 
-type ServerInfo struct {
+type WebFrameworkInfo struct {
 	Name    string  `json:"name" url:"name"`
 	Version *string `json:"version,omitempty" url:"version,omitempty"`
 
@@ -233,36 +189,78 @@ type ServerInfo struct {
 	_rawJSON        json.RawMessage
 }
 
-func (s *ServerInfo) GetExtraProperties() map[string]interface{} {
-	return s.extraProperties
+func (w *WebFrameworkInfo) GetExtraProperties() map[string]interface{} {
+	return w.extraProperties
 }
 
-func (s *ServerInfo) UnmarshalJSON(data []byte) error {
-	type unmarshaler ServerInfo
+func (w *WebFrameworkInfo) UnmarshalJSON(data []byte) error {
+	type unmarshaler WebFrameworkInfo
 	var value unmarshaler
 	if err := json.Unmarshal(data, &value); err != nil {
 		return err
 	}
-	*s = ServerInfo(value)
+	*w = WebFrameworkInfo(value)
 
-	extraProperties, err := core.ExtractExtraProperties(data, *s)
+	extraProperties, err := core.ExtractExtraProperties(data, *w)
 	if err != nil {
 		return err
 	}
-	s.extraProperties = extraProperties
+	w.extraProperties = extraProperties
 
-	s._rawJSON = json.RawMessage(data)
+	w._rawJSON = json.RawMessage(data)
 	return nil
 }
 
-func (s *ServerInfo) String() string {
-	if len(s._rawJSON) > 0 {
-		if value, err := core.StringifyJSON(s._rawJSON); err == nil {
+func (w *WebFrameworkInfo) String() string {
+	if len(w._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(w._rawJSON); err == nil {
 			return value
 		}
 	}
-	if value, err := core.StringifyJSON(s); err == nil {
+	if value, err := core.StringifyJSON(w); err == nil {
 		return value
 	}
-	return fmt.Sprintf("%#v", s)
+	return fmt.Sprintf("%#v", w)
+}
+
+type WebServerInfo struct {
+	Name    string  `json:"name" url:"name"`
+	Version *string `json:"version,omitempty" url:"version,omitempty"`
+
+	extraProperties map[string]interface{}
+	_rawJSON        json.RawMessage
+}
+
+func (w *WebServerInfo) GetExtraProperties() map[string]interface{} {
+	return w.extraProperties
+}
+
+func (w *WebServerInfo) UnmarshalJSON(data []byte) error {
+	type unmarshaler WebServerInfo
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*w = WebServerInfo(value)
+
+	extraProperties, err := core.ExtractExtraProperties(data, *w)
+	if err != nil {
+		return err
+	}
+	w.extraProperties = extraProperties
+
+	w._rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (w *WebServerInfo) String() string {
+	if len(w._rawJSON) > 0 {
+		if value, err := core.StringifyJSON(w._rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := core.StringifyJSON(w); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", w)
 }

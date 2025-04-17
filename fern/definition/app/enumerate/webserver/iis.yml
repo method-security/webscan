@@ -6,21 +6,19 @@ types:
       targets: list<string>
       timeout: integer
       threads: optional<integer>
-      enumDefaultDocuments: optional<boolean>
-  ServerInfo:
+  WebServerInfo:
     properties:
       name: string
       version: optional<string>
-  FrameworkInfo:
+  WebFrameworkInfo:
     properties:
       name: string
       version: optional<string>
   IISSite:
     properties:
-      server: ServerInfo
-      frameworks: optional<list<FrameworkInfo>>
+      server: WebServerInfo
+      frameworks: optional<list<WebFrameworkInfo>>
       authenticationMethods: optional<list<string>> # WWW-Authenticate headers
-      defaultDocuments: optional<list<string>>
   AppEnumerateIISTargetInfo:
     properties:
       target: string

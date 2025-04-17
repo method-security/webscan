@@ -1,4 +1,4 @@
-package capture
+package pagecapture
 
 import (
 	"context"

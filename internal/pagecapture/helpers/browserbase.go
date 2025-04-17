@@ -1,10 +1,10 @@
-package capture
+package pagecapture
 
 import (
 	"context"
 
-	webscan "github.com/Method-Security/webscan/generated/go/pagecapture"
-	"github.com/Method-Security/webscan/internal/browserbase"
+	pagecapturefern "github.com/Method-Security/webscan/generated/go/pagecapture"
+	"github.com/Method-Security/webscan/internal/pagecapture/helpers/browserbase"
 	"github.com/go-rod/rod/lib/cdp"
 	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
@@ -34,7 +34,7 @@ func NewBrowserbasePageCapturer(
 	}
 }
 
-func (b *BrowserbasePageCapturer) Capture(ctx context.Context, url string, options *Options) (*webscan.PageCaptureReport, error) {
+func (b *BrowserbasePageCapturer) Capture(ctx context.Context, url string, options *Options) (*pagecapturefern.PageCaptureHtmlReport, error) {
 	return b.Capturer.Capture(ctx, url, options)
 }
 

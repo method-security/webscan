@@ -1,4 +1,4 @@
-package capture
+package pagecapture
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	webscan "github.com/Method-Security/webscan/generated/go/pagecapture"
+	pagecapturefern "github.com/Method-Security/webscan/generated/go/pagecapture"
 	urlutil "github.com/projectdiscovery/utils/url"
 )
 
@@ -29,7 +29,7 @@ func NewRequestPageCapturer(insecure bool, timeout int) *RequestPageCapturer {
 	}
 }
 
-func (r *RequestPageCapturer) Capture(ctx context.Context, url string, options *Options) (*webscan.PageCaptureReport, error) {
+func (r *RequestPageCapturer) Capture(ctx context.Context, url string, options *Options) (*pagecapturefern.PageCaptureHtmlReport, error) {
 	report := NewPageCaptureReport(url)
 
 	resp, err := r.Client.Get(url)

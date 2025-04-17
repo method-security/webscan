@@ -9,7 +9,7 @@ import (
 	core "github.com/Method-Security/webscan/generated/go/core"
 )
 
-type PageCaptureReport struct {
+type PageCaptureHtmlReport struct {
 	Request *common.RequestInfo `json:"request,omitempty" url:"request,omitempty"`
 	Errors  []string            `json:"errors,omitempty" url:"errors,omitempty"`
 
@@ -17,17 +17,17 @@ type PageCaptureReport struct {
 	_rawJSON        json.RawMessage
 }
 
-func (p *PageCaptureReport) GetExtraProperties() map[string]interface{} {
+func (p *PageCaptureHtmlReport) GetExtraProperties() map[string]interface{} {
 	return p.extraProperties
 }
 
-func (p *PageCaptureReport) UnmarshalJSON(data []byte) error {
-	type unmarshaler PageCaptureReport
+func (p *PageCaptureHtmlReport) UnmarshalJSON(data []byte) error {
+	type unmarshaler PageCaptureHtmlReport
 	var value unmarshaler
 	if err := json.Unmarshal(data, &value); err != nil {
 		return err
 	}
-	*p = PageCaptureReport(value)
+	*p = PageCaptureHtmlReport(value)
 
 	extraProperties, err := core.ExtractExtraProperties(data, *p)
 	if err != nil {
@@ -39,7 +39,7 @@ func (p *PageCaptureReport) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (p *PageCaptureReport) String() string {
+func (p *PageCaptureHtmlReport) String() string {
 	if len(p._rawJSON) > 0 {
 		if value, err := core.StringifyJSON(p._rawJSON); err == nil {
 			return value
@@ -51,7 +51,7 @@ func (p *PageCaptureReport) String() string {
 	return fmt.Sprintf("%#v", p)
 }
 
-type PageScreenshotReport struct {
+type PageCaptureScreenshotReport struct {
 	Request    *common.RequestInfo `json:"request,omitempty" url:"request,omitempty"`
 	Screenshot *[]byte             `json:"screenshot,omitempty" url:"screenshot,omitempty"`
 	Errors     []string            `json:"errors,omitempty" url:"errors,omitempty"`
@@ -60,17 +60,17 @@ type PageScreenshotReport struct {
 	_rawJSON        json.RawMessage
 }
 
-func (p *PageScreenshotReport) GetExtraProperties() map[string]interface{} {
+func (p *PageCaptureScreenshotReport) GetExtraProperties() map[string]interface{} {
 	return p.extraProperties
 }
 
-func (p *PageScreenshotReport) UnmarshalJSON(data []byte) error {
-	type unmarshaler PageScreenshotReport
+func (p *PageCaptureScreenshotReport) UnmarshalJSON(data []byte) error {
+	type unmarshaler PageCaptureScreenshotReport
 	var value unmarshaler
 	if err := json.Unmarshal(data, &value); err != nil {
 		return err
 	}
-	*p = PageScreenshotReport(value)
+	*p = PageCaptureScreenshotReport(value)
 
 	extraProperties, err := core.ExtractExtraProperties(data, *p)
 	if err != nil {
@@ -82,7 +82,7 @@ func (p *PageScreenshotReport) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (p *PageScreenshotReport) String() string {
+func (p *PageCaptureScreenshotReport) String() string {
 	if len(p._rawJSON) > 0 {
 		if value, err := core.StringifyJSON(p._rawJSON); err == nil {
 			return value

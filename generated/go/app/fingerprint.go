@@ -6,7 +6,7 @@ import (
 	json "encoding/json"
 	fmt "fmt"
 	common "github.com/Method-Security/webscan/generated/go/common"
-	core "github.com/Method-Security/webscan/generated/go/core"
+	internal "github.com/Method-Security/webscan/generated/go/internal"
 )
 
 type ApiApplicationModule string
@@ -43,7 +43,28 @@ type AppFingerprintAttemptInfo struct {
 	Finding  bool                          `json:"finding" url:"finding"`
 
 	extraProperties map[string]interface{}
-	_rawJSON        json.RawMessage
+	rawJSON         json.RawMessage
+}
+
+func (a *AppFingerprintAttemptInfo) GetName() *AppFingerprintResourceModule {
+	if a == nil {
+		return nil
+	}
+	return a.Name
+}
+
+func (a *AppFingerprintAttemptInfo) GetRequests() []*common.RequestInfo {
+	if a == nil {
+		return nil
+	}
+	return a.Requests
+}
+
+func (a *AppFingerprintAttemptInfo) GetFinding() bool {
+	if a == nil {
+		return false
+	}
+	return a.Finding
 }
 
 func (a *AppFingerprintAttemptInfo) GetExtraProperties() map[string]interface{} {
@@ -57,24 +78,22 @@ func (a *AppFingerprintAttemptInfo) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*a = AppFingerprintAttemptInfo(value)
-
-	extraProperties, err := core.ExtractExtraProperties(data, *a)
+	extraProperties, err := internal.ExtractExtraProperties(data, *a)
 	if err != nil {
 		return err
 	}
 	a.extraProperties = extraProperties
-
-	a._rawJSON = json.RawMessage(data)
+	a.rawJSON = json.RawMessage(data)
 	return nil
 }
 
 func (a *AppFingerprintAttemptInfo) String() string {
-	if len(a._rawJSON) > 0 {
-		if value, err := core.StringifyJSON(a._rawJSON); err == nil {
+	if len(a.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(a.rawJSON); err == nil {
 			return value
 		}
 	}
-	if value, err := core.StringifyJSON(a); err == nil {
+	if value, err := internal.StringifyJSON(a); err == nil {
 		return value
 	}
 	return fmt.Sprintf("%#v", a)
@@ -88,7 +107,42 @@ type AppFingerprintConfig struct {
 	SuccessfulOnly bool                            `json:"successfulOnly" url:"successfulOnly"`
 
 	extraProperties map[string]interface{}
-	_rawJSON        json.RawMessage
+	rawJSON         json.RawMessage
+}
+
+func (a *AppFingerprintConfig) GetTargets() []string {
+	if a == nil {
+		return nil
+	}
+	return a.Targets
+}
+
+func (a *AppFingerprintConfig) GetModules() []*AppFingerprintResourceModule {
+	if a == nil {
+		return nil
+	}
+	return a.Modules
+}
+
+func (a *AppFingerprintConfig) GetResourceType() AppFingerprintResourceType {
+	if a == nil {
+		return ""
+	}
+	return a.ResourceType
+}
+
+func (a *AppFingerprintConfig) GetTimeout() int {
+	if a == nil {
+		return 0
+	}
+	return a.Timeout
+}
+
+func (a *AppFingerprintConfig) GetSuccessfulOnly() bool {
+	if a == nil {
+		return false
+	}
+	return a.SuccessfulOnly
 }
 
 func (a *AppFingerprintConfig) GetExtraProperties() map[string]interface{} {
@@ -102,24 +156,22 @@ func (a *AppFingerprintConfig) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*a = AppFingerprintConfig(value)
-
-	extraProperties, err := core.ExtractExtraProperties(data, *a)
+	extraProperties, err := internal.ExtractExtraProperties(data, *a)
 	if err != nil {
 		return err
 	}
 	a.extraProperties = extraProperties
-
-	a._rawJSON = json.RawMessage(data)
+	a.rawJSON = json.RawMessage(data)
 	return nil
 }
 
 func (a *AppFingerprintConfig) String() string {
-	if len(a._rawJSON) > 0 {
-		if value, err := core.StringifyJSON(a._rawJSON); err == nil {
+	if len(a.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(a.rawJSON); err == nil {
 			return value
 		}
 	}
-	if value, err := core.StringifyJSON(a); err == nil {
+	if value, err := internal.StringifyJSON(a); err == nil {
 		return value
 	}
 	return fmt.Sprintf("%#v", a)
@@ -131,7 +183,28 @@ type AppFingerprintReport struct {
 	Errors  []string                    `json:"errors,omitempty" url:"errors,omitempty"`
 
 	extraProperties map[string]interface{}
-	_rawJSON        json.RawMessage
+	rawJSON         json.RawMessage
+}
+
+func (a *AppFingerprintReport) GetTargets() []*AppFingerprintTargetInfo {
+	if a == nil {
+		return nil
+	}
+	return a.Targets
+}
+
+func (a *AppFingerprintReport) GetConfig() *AppFingerprintConfig {
+	if a == nil {
+		return nil
+	}
+	return a.Config
+}
+
+func (a *AppFingerprintReport) GetErrors() []string {
+	if a == nil {
+		return nil
+	}
+	return a.Errors
 }
 
 func (a *AppFingerprintReport) GetExtraProperties() map[string]interface{} {
@@ -145,24 +218,22 @@ func (a *AppFingerprintReport) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*a = AppFingerprintReport(value)
-
-	extraProperties, err := core.ExtractExtraProperties(data, *a)
+	extraProperties, err := internal.ExtractExtraProperties(data, *a)
 	if err != nil {
 		return err
 	}
 	a.extraProperties = extraProperties
-
-	a._rawJSON = json.RawMessage(data)
+	a.rawJSON = json.RawMessage(data)
 	return nil
 }
 
 func (a *AppFingerprintReport) String() string {
-	if len(a._rawJSON) > 0 {
-		if value, err := core.StringifyJSON(a._rawJSON); err == nil {
+	if len(a.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(a.rawJSON); err == nil {
 			return value
 		}
 	}
-	if value, err := core.StringifyJSON(a); err == nil {
+	if value, err := internal.StringifyJSON(a); err == nil {
 		return value
 	}
 	return fmt.Sprintf("%#v", a)
@@ -200,6 +271,55 @@ func NewAppFingerprintResourceModuleFromRemoteAccessModule(value RemoteAccessMod
 
 func NewAppFingerprintResourceModuleFromWebServerModule(value WebServerModule) *AppFingerprintResourceModule {
 	return &AppFingerprintResourceModule{Type: "WebServerModule", WebServerModule: value}
+}
+
+func (a *AppFingerprintResourceModule) GetType() string {
+	if a == nil {
+		return ""
+	}
+	return a.Type
+}
+
+func (a *AppFingerprintResourceModule) GetApiApplicationModule() ApiApplicationModule {
+	if a == nil {
+		return ""
+	}
+	return a.ApiApplicationModule
+}
+
+func (a *AppFingerprintResourceModule) GetCloudBucketModule() CloudBucketModule {
+	if a == nil {
+		return ""
+	}
+	return a.CloudBucketModule
+}
+
+func (a *AppFingerprintResourceModule) GetContentManagementSystemModule() ContentManagementSystemModule {
+	if a == nil {
+		return ""
+	}
+	return a.ContentManagementSystemModule
+}
+
+func (a *AppFingerprintResourceModule) GetFrameworkModule() FrameworkModule {
+	if a == nil {
+		return ""
+	}
+	return a.FrameworkModule
+}
+
+func (a *AppFingerprintResourceModule) GetRemoteAccessModule() RemoteAccessModule {
+	if a == nil {
+		return ""
+	}
+	return a.RemoteAccessModule
+}
+
+func (a *AppFingerprintResourceModule) GetWebServerModule() WebServerModule {
+	if a == nil {
+		return ""
+	}
+	return a.WebServerModule
 }
 
 func (a *AppFingerprintResourceModule) UnmarshalJSON(data []byte) error {
@@ -267,6 +387,9 @@ func (a *AppFingerprintResourceModule) UnmarshalJSON(data []byte) error {
 }
 
 func (a AppFingerprintResourceModule) MarshalJSON() ([]byte, error) {
+	if err := a.validate(); err != nil {
+		return nil, err
+	}
 	switch a.Type {
 	default:
 		return nil, fmt.Errorf("invalid type %s in %T", a.Type, a)
@@ -355,6 +478,52 @@ func (a *AppFingerprintResourceModule) Accept(visitor AppFingerprintResourceModu
 	}
 }
 
+func (a *AppFingerprintResourceModule) validate() error {
+	if a == nil {
+		return fmt.Errorf("type %T is nil", a)
+	}
+	var fields []string
+	if a.ApiApplicationModule != "" {
+		fields = append(fields, "ApiApplicationModule")
+	}
+	if a.CloudBucketModule != "" {
+		fields = append(fields, "CloudBucketModule")
+	}
+	if a.ContentManagementSystemModule != "" {
+		fields = append(fields, "ContentManagementSystemModule")
+	}
+	if a.FrameworkModule != "" {
+		fields = append(fields, "FrameworkModule")
+	}
+	if a.RemoteAccessModule != "" {
+		fields = append(fields, "RemoteAccessModule")
+	}
+	if a.WebServerModule != "" {
+		fields = append(fields, "WebServerModule")
+	}
+	if len(fields) == 0 {
+		if a.Type != "" {
+			return fmt.Errorf("type %T defines a discriminant set to %q but the field is not set", a, a.Type)
+		}
+		return fmt.Errorf("type %T is empty", a)
+	}
+	if len(fields) > 1 {
+		return fmt.Errorf("type %T defines values for %s, but only one value is allowed", a, fields)
+	}
+	if a.Type != "" {
+		field := fields[0]
+		if a.Type != field {
+			return fmt.Errorf(
+				"type %T defines a discriminant set to %q, but it does not match the %T field; either remove or update the discriminant to match",
+				a,
+				a.Type,
+				a,
+			)
+		}
+	}
+	return nil
+}
+
 type AppFingerprintResourceType string
 
 const (
@@ -394,7 +563,21 @@ type AppFingerprintTargetInfo struct {
 	Attempts []*AppFingerprintAttemptInfo `json:"attempts,omitempty" url:"attempts,omitempty"`
 
 	extraProperties map[string]interface{}
-	_rawJSON        json.RawMessage
+	rawJSON         json.RawMessage
+}
+
+func (a *AppFingerprintTargetInfo) GetTarget() string {
+	if a == nil {
+		return ""
+	}
+	return a.Target
+}
+
+func (a *AppFingerprintTargetInfo) GetAttempts() []*AppFingerprintAttemptInfo {
+	if a == nil {
+		return nil
+	}
+	return a.Attempts
 }
 
 func (a *AppFingerprintTargetInfo) GetExtraProperties() map[string]interface{} {
@@ -408,24 +591,22 @@ func (a *AppFingerprintTargetInfo) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*a = AppFingerprintTargetInfo(value)
-
-	extraProperties, err := core.ExtractExtraProperties(data, *a)
+	extraProperties, err := internal.ExtractExtraProperties(data, *a)
 	if err != nil {
 		return err
 	}
 	a.extraProperties = extraProperties
-
-	a._rawJSON = json.RawMessage(data)
+	a.rawJSON = json.RawMessage(data)
 	return nil
 }
 
 func (a *AppFingerprintTargetInfo) String() string {
-	if len(a._rawJSON) > 0 {
-		if value, err := core.StringifyJSON(a._rawJSON); err == nil {
+	if len(a.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(a.rawJSON); err == nil {
 			return value
 		}
 	}
-	if value, err := core.StringifyJSON(a); err == nil {
+	if value, err := internal.StringifyJSON(a); err == nil {
 		return value
 	}
 	return fmt.Sprintf("%#v", a)

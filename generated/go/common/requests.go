@@ -5,34 +5,9 @@ package common
 import (
 	json "encoding/json"
 	fmt "fmt"
-	core "github.com/Method-Security/webscan/generated/go/core"
+	internal "github.com/Method-Security/webscan/generated/go/internal"
 	time "time"
 )
-
-type CaptureMethod string
-
-const (
-	CaptureMethodRequest     CaptureMethod = "REQUEST"
-	CaptureMethodBrowser     CaptureMethod = "BROWSER"
-	CaptureMethodBrowserbase CaptureMethod = "BROWSERBASE"
-)
-
-func NewCaptureMethodFromString(s string) (CaptureMethod, error) {
-	switch s {
-	case "REQUEST":
-		return CaptureMethodRequest, nil
-	case "BROWSER":
-		return CaptureMethodBrowser, nil
-	case "BROWSERBASE":
-		return CaptureMethodBrowserbase, nil
-	}
-	var t CaptureMethod
-	return "", fmt.Errorf("%s is not a valid %T", s, t)
-}
-
-func (c CaptureMethod) Ptr() *CaptureMethod {
-	return &c
-}
 
 type HttpMethod string
 
@@ -94,7 +69,105 @@ type RequestInfo struct {
 	Timestamp       time.Time         `json:"timestamp" url:"timestamp"`
 
 	extraProperties map[string]interface{}
-	_rawJSON        json.RawMessage
+	rawJSON         json.RawMessage
+}
+
+func (r *RequestInfo) GetBaseUrl() string {
+	if r == nil {
+		return ""
+	}
+	return r.BaseUrl
+}
+
+func (r *RequestInfo) GetPath() string {
+	if r == nil {
+		return ""
+	}
+	return r.Path
+}
+
+func (r *RequestInfo) GetMethod() HttpMethod {
+	if r == nil {
+		return ""
+	}
+	return r.Method
+}
+
+func (r *RequestInfo) GetPathParams() map[string]string {
+	if r == nil {
+		return nil
+	}
+	return r.PathParams
+}
+
+func (r *RequestInfo) GetQueryParams() map[string]string {
+	if r == nil {
+		return nil
+	}
+	return r.QueryParams
+}
+
+func (r *RequestInfo) GetHeaderParams() map[string]string {
+	if r == nil {
+		return nil
+	}
+	return r.HeaderParams
+}
+
+func (r *RequestInfo) GetBodyParams() *string {
+	if r == nil {
+		return nil
+	}
+	return r.BodyParams
+}
+
+func (r *RequestInfo) GetFormParams() map[string]string {
+	if r == nil {
+		return nil
+	}
+	return r.FormParams
+}
+
+func (r *RequestInfo) GetMultipartParams() map[string]string {
+	if r == nil {
+		return nil
+	}
+	return r.MultipartParams
+}
+
+func (r *RequestInfo) GetStatusCode() *int {
+	if r == nil {
+		return nil
+	}
+	return r.StatusCode
+}
+
+func (r *RequestInfo) GetResponseBody() *string {
+	if r == nil {
+		return nil
+	}
+	return r.ResponseBody
+}
+
+func (r *RequestInfo) GetResponseHeaders() map[string]string {
+	if r == nil {
+		return nil
+	}
+	return r.ResponseHeaders
+}
+
+func (r *RequestInfo) GetErrors() []string {
+	if r == nil {
+		return nil
+	}
+	return r.Errors
+}
+
+func (r *RequestInfo) GetTimestamp() time.Time {
+	if r == nil {
+		return time.Time{}
+	}
+	return r.Timestamp
 }
 
 func (r *RequestInfo) GetExtraProperties() map[string]interface{} {
@@ -105,7 +178,7 @@ func (r *RequestInfo) UnmarshalJSON(data []byte) error {
 	type embed RequestInfo
 	var unmarshaler = struct {
 		embed
-		Timestamp *core.DateTime `json:"timestamp"`
+		Timestamp *internal.DateTime `json:"timestamp"`
 	}{
 		embed: embed(*r),
 	}
@@ -114,14 +187,12 @@ func (r *RequestInfo) UnmarshalJSON(data []byte) error {
 	}
 	*r = RequestInfo(unmarshaler.embed)
 	r.Timestamp = unmarshaler.Timestamp.Time()
-
-	extraProperties, err := core.ExtractExtraProperties(data, *r)
+	extraProperties, err := internal.ExtractExtraProperties(data, *r)
 	if err != nil {
 		return err
 	}
 	r.extraProperties = extraProperties
-
-	r._rawJSON = json.RawMessage(data)
+	r.rawJSON = json.RawMessage(data)
 	return nil
 }
 
@@ -129,21 +200,21 @@ func (r *RequestInfo) MarshalJSON() ([]byte, error) {
 	type embed RequestInfo
 	var marshaler = struct {
 		embed
-		Timestamp *core.DateTime `json:"timestamp"`
+		Timestamp *internal.DateTime `json:"timestamp"`
 	}{
 		embed:     embed(*r),
-		Timestamp: core.NewDateTime(r.Timestamp),
+		Timestamp: internal.NewDateTime(r.Timestamp),
 	}
 	return json.Marshal(marshaler)
 }
 
 func (r *RequestInfo) String() string {
-	if len(r._rawJSON) > 0 {
-		if value, err := core.StringifyJSON(r._rawJSON); err == nil {
+	if len(r.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(r.rawJSON); err == nil {
 			return value
 		}
 	}
-	if value, err := core.StringifyJSON(r); err == nil {
+	if value, err := internal.StringifyJSON(r); err == nil {
 		return value
 	}
 	return fmt.Sprintf("%#v", r)
@@ -158,7 +229,49 @@ type RequestParams struct {
 	MultipartParams map[string]string `json:"multipartParams,omitempty" url:"multipartParams,omitempty"`
 
 	extraProperties map[string]interface{}
-	_rawJSON        json.RawMessage
+	rawJSON         json.RawMessage
+}
+
+func (r *RequestParams) GetPathParams() map[string]string {
+	if r == nil {
+		return nil
+	}
+	return r.PathParams
+}
+
+func (r *RequestParams) GetQueryParams() map[string]string {
+	if r == nil {
+		return nil
+	}
+	return r.QueryParams
+}
+
+func (r *RequestParams) GetHeaderParams() map[string]string {
+	if r == nil {
+		return nil
+	}
+	return r.HeaderParams
+}
+
+func (r *RequestParams) GetBodyParams() string {
+	if r == nil {
+		return ""
+	}
+	return r.BodyParams
+}
+
+func (r *RequestParams) GetFormParams() map[string]string {
+	if r == nil {
+		return nil
+	}
+	return r.FormParams
+}
+
+func (r *RequestParams) GetMultipartParams() map[string]string {
+	if r == nil {
+		return nil
+	}
+	return r.MultipartParams
 }
 
 func (r *RequestParams) GetExtraProperties() map[string]interface{} {
@@ -172,24 +285,22 @@ func (r *RequestParams) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*r = RequestParams(value)
-
-	extraProperties, err := core.ExtractExtraProperties(data, *r)
+	extraProperties, err := internal.ExtractExtraProperties(data, *r)
 	if err != nil {
 		return err
 	}
 	r.extraProperties = extraProperties
-
-	r._rawJSON = json.RawMessage(data)
+	r.rawJSON = json.RawMessage(data)
 	return nil
 }
 
 func (r *RequestParams) String() string {
-	if len(r._rawJSON) > 0 {
-		if value, err := core.StringifyJSON(r._rawJSON); err == nil {
+	if len(r.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(r.rawJSON); err == nil {
 			return value
 		}
 	}
-	if value, err := core.StringifyJSON(r); err == nil {
+	if value, err := internal.StringifyJSON(r); err == nil {
 		return value
 	}
 	return fmt.Sprintf("%#v", r)

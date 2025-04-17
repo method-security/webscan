@@ -5,7 +5,7 @@ package wordpress
 import (
 	json "encoding/json"
 	fmt "fmt"
-	core "github.com/Method-Security/webscan/generated/go/core"
+	internal "github.com/Method-Security/webscan/generated/go/internal"
 )
 
 type AppEnumerateWordpressPluginsConfig struct {
@@ -15,7 +15,35 @@ type AppEnumerateWordpressPluginsConfig struct {
 	Threads *int     `json:"threads,omitempty" url:"threads,omitempty"`
 
 	extraProperties map[string]interface{}
-	_rawJSON        json.RawMessage
+	rawJSON         json.RawMessage
+}
+
+func (a *AppEnumerateWordpressPluginsConfig) GetTargets() []string {
+	if a == nil {
+		return nil
+	}
+	return a.Targets
+}
+
+func (a *AppEnumerateWordpressPluginsConfig) GetPlugins() []string {
+	if a == nil {
+		return nil
+	}
+	return a.Plugins
+}
+
+func (a *AppEnumerateWordpressPluginsConfig) GetTimeout() int {
+	if a == nil {
+		return 0
+	}
+	return a.Timeout
+}
+
+func (a *AppEnumerateWordpressPluginsConfig) GetThreads() *int {
+	if a == nil {
+		return nil
+	}
+	return a.Threads
 }
 
 func (a *AppEnumerateWordpressPluginsConfig) GetExtraProperties() map[string]interface{} {
@@ -29,24 +57,22 @@ func (a *AppEnumerateWordpressPluginsConfig) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*a = AppEnumerateWordpressPluginsConfig(value)
-
-	extraProperties, err := core.ExtractExtraProperties(data, *a)
+	extraProperties, err := internal.ExtractExtraProperties(data, *a)
 	if err != nil {
 		return err
 	}
 	a.extraProperties = extraProperties
-
-	a._rawJSON = json.RawMessage(data)
+	a.rawJSON = json.RawMessage(data)
 	return nil
 }
 
 func (a *AppEnumerateWordpressPluginsConfig) String() string {
-	if len(a._rawJSON) > 0 {
-		if value, err := core.StringifyJSON(a._rawJSON); err == nil {
+	if len(a.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(a.rawJSON); err == nil {
 			return value
 		}
 	}
-	if value, err := core.StringifyJSON(a); err == nil {
+	if value, err := internal.StringifyJSON(a); err == nil {
 		return value
 	}
 	return fmt.Sprintf("%#v", a)
@@ -58,7 +84,28 @@ type AppEnumerateWordpressPluginsReport struct {
 	Errors  []string                                  `json:"errors,omitempty" url:"errors,omitempty"`
 
 	extraProperties map[string]interface{}
-	_rawJSON        json.RawMessage
+	rawJSON         json.RawMessage
+}
+
+func (a *AppEnumerateWordpressPluginsReport) GetTargets() []*AppEnumerateWordpressPluginsTargetInfo {
+	if a == nil {
+		return nil
+	}
+	return a.Targets
+}
+
+func (a *AppEnumerateWordpressPluginsReport) GetConfig() *AppEnumerateWordpressPluginsConfig {
+	if a == nil {
+		return nil
+	}
+	return a.Config
+}
+
+func (a *AppEnumerateWordpressPluginsReport) GetErrors() []string {
+	if a == nil {
+		return nil
+	}
+	return a.Errors
 }
 
 func (a *AppEnumerateWordpressPluginsReport) GetExtraProperties() map[string]interface{} {
@@ -72,24 +119,22 @@ func (a *AppEnumerateWordpressPluginsReport) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*a = AppEnumerateWordpressPluginsReport(value)
-
-	extraProperties, err := core.ExtractExtraProperties(data, *a)
+	extraProperties, err := internal.ExtractExtraProperties(data, *a)
 	if err != nil {
 		return err
 	}
 	a.extraProperties = extraProperties
-
-	a._rawJSON = json.RawMessage(data)
+	a.rawJSON = json.RawMessage(data)
 	return nil
 }
 
 func (a *AppEnumerateWordpressPluginsReport) String() string {
-	if len(a._rawJSON) > 0 {
-		if value, err := core.StringifyJSON(a._rawJSON); err == nil {
+	if len(a.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(a.rawJSON); err == nil {
 			return value
 		}
 	}
-	if value, err := core.StringifyJSON(a); err == nil {
+	if value, err := internal.StringifyJSON(a); err == nil {
 		return value
 	}
 	return fmt.Sprintf("%#v", a)
@@ -100,7 +145,21 @@ type AppEnumerateWordpressPluginsTargetInfo struct {
 	Plugins []*WordpressPlugin `json:"plugins,omitempty" url:"plugins,omitempty"`
 
 	extraProperties map[string]interface{}
-	_rawJSON        json.RawMessage
+	rawJSON         json.RawMessage
+}
+
+func (a *AppEnumerateWordpressPluginsTargetInfo) GetTarget() string {
+	if a == nil {
+		return ""
+	}
+	return a.Target
+}
+
+func (a *AppEnumerateWordpressPluginsTargetInfo) GetPlugins() []*WordpressPlugin {
+	if a == nil {
+		return nil
+	}
+	return a.Plugins
 }
 
 func (a *AppEnumerateWordpressPluginsTargetInfo) GetExtraProperties() map[string]interface{} {
@@ -114,24 +173,22 @@ func (a *AppEnumerateWordpressPluginsTargetInfo) UnmarshalJSON(data []byte) erro
 		return err
 	}
 	*a = AppEnumerateWordpressPluginsTargetInfo(value)
-
-	extraProperties, err := core.ExtractExtraProperties(data, *a)
+	extraProperties, err := internal.ExtractExtraProperties(data, *a)
 	if err != nil {
 		return err
 	}
 	a.extraProperties = extraProperties
-
-	a._rawJSON = json.RawMessage(data)
+	a.rawJSON = json.RawMessage(data)
 	return nil
 }
 
 func (a *AppEnumerateWordpressPluginsTargetInfo) String() string {
-	if len(a._rawJSON) > 0 {
-		if value, err := core.StringifyJSON(a._rawJSON); err == nil {
+	if len(a.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(a.rawJSON); err == nil {
 			return value
 		}
 	}
-	if value, err := core.StringifyJSON(a); err == nil {
+	if value, err := internal.StringifyJSON(a); err == nil {
 		return value
 	}
 	return fmt.Sprintf("%#v", a)
@@ -178,7 +235,35 @@ type WordpressPlugin struct {
 	Source      []DetectionSource `json:"source,omitempty" url:"source,omitempty"`
 
 	extraProperties map[string]interface{}
-	_rawJSON        json.RawMessage
+	rawJSON         json.RawMessage
+}
+
+func (w *WordpressPlugin) GetName() string {
+	if w == nil {
+		return ""
+	}
+	return w.Name
+}
+
+func (w *WordpressPlugin) GetVersion() *string {
+	if w == nil {
+		return nil
+	}
+	return w.Version
+}
+
+func (w *WordpressPlugin) GetDescription() *string {
+	if w == nil {
+		return nil
+	}
+	return w.Description
+}
+
+func (w *WordpressPlugin) GetSource() []DetectionSource {
+	if w == nil {
+		return nil
+	}
+	return w.Source
 }
 
 func (w *WordpressPlugin) GetExtraProperties() map[string]interface{} {
@@ -192,24 +277,22 @@ func (w *WordpressPlugin) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*w = WordpressPlugin(value)
-
-	extraProperties, err := core.ExtractExtraProperties(data, *w)
+	extraProperties, err := internal.ExtractExtraProperties(data, *w)
 	if err != nil {
 		return err
 	}
 	w.extraProperties = extraProperties
-
-	w._rawJSON = json.RawMessage(data)
+	w.rawJSON = json.RawMessage(data)
 	return nil
 }
 
 func (w *WordpressPlugin) String() string {
-	if len(w._rawJSON) > 0 {
-		if value, err := core.StringifyJSON(w._rawJSON); err == nil {
+	if len(w.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(w.rawJSON); err == nil {
 			return value
 		}
 	}
-	if value, err := core.StringifyJSON(w); err == nil {
+	if value, err := internal.StringifyJSON(w); err == nil {
 		return value
 	}
 	return fmt.Sprintf("%#v", w)

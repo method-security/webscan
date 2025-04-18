@@ -1,0 +1,24 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/fern-api/fern/main/fern.schema.json
+imports:
+  requests: ../common/requests.yml
+types:
+  StaticAssetTakeOverFingerprint:
+    properties:
+      name: string
+      description: string
+      responseBody: list<string>
+      statusCode: integer
+  StaticAssetTakeOverVulnerableInfo:
+    properties:
+      fingerprint: StaticAssetTakeOverFingerprint
+      vulnerable: boolean
+  StaticAssetTakeOverAttempt:
+    properties:
+      staticAsset: string
+      request: requests.RequestInfo
+      fingerprints: list<StaticAssetTakeOverVulnerableInfo>
+  StaticAssetTakeOverReport:
+    properties:
+      target: string
+      attempts: optional<list<StaticAssetTakeOverAttempt>>
+      errors: optional<list<string>>

@@ -221,7 +221,7 @@ func urlRemoveQueryParams(rawURL string) (string, error) {
 func isURLAllowed(baseURL string, targetURL string, baseUrlsOnly bool, captureStaticAssets bool) bool {
 	// First check to see if the targetURL is a static asset type
 	if !captureStaticAssets {
-		if isStaticAsset(targetURL) {
+		if IsStaticAsset(targetURL) {
 			return false
 		}
 	}
@@ -237,8 +237,8 @@ func isURLAllowed(baseURL string, targetURL string, baseUrlsOnly bool, captureSt
 	return isSubdomain(baseDomain, targetDomain)
 }
 
-// Helper function to check if a URL is a static asset
-func isStaticAsset(urlStr string) bool {
+// IsStaticAsset helper function to check if a URL is a static asset
+func IsStaticAsset(urlStr string) bool {
 	// Parse the URL
 	parsedURL, err := url.Parse(urlStr)
 	if err != nil {

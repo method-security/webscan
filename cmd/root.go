@@ -32,12 +32,15 @@ type WebScan struct {
 // subcommands as a contex within which output results and configuration values can be stored.
 // We pass the version value in from the main.go file, where we set the version string during the build process.
 func NewWebScan(version string) *WebScan {
+	startedAt := datetime.DateTime(time.Now())
 	webscan := WebScan{
 		Version: version,
 		RootFlags: config.RootFlags{
 			Quiet:   false,
 			Verbose: false,
 		},
+		OutputConfig: writer.NewOutputConfig(nil, writer.NewFormat(writer.SIGNAL)),
+		OutputSignal: signal.NewSignal(nil, &startedAt, nil, 0, nil),
 	}
 	return &webscan
 }
@@ -77,7 +80,7 @@ func (a *WebScan) InitRootCommand() {
 			return writer.Write(
 				a.OutputSignal.Content,
 				a.OutputConfig,
-				a.OutputSignal.StartedAt,
+				&a.OutputSignal.StartedAt,
 				a.OutputSignal.CompletedAt,
 				a.OutputSignal.Status,
 				a.OutputSignal.ErrorMessage,

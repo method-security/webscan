@@ -1,11 +1,11 @@
 module github.com/Method-Security/webscan
 
-go 1.22
+go 1.24
 
-toolchain go1.22.5
+toolchain go1.24.2
 
 require (
-	github.com/Method-Security/pkg v0.0.3
+	github.com/Method-Security/pkg v0.0.6
 	github.com/PuerkitoBio/goquery v1.9.3
 	github.com/chromedp/chromedp v0.9.2
 	github.com/go-rod/rod v0.116.2

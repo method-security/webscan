@@ -6,7 +6,7 @@ import (
 	json "encoding/json"
 	fmt "fmt"
 	common "github.com/Method-Security/webscan/generated/go/common"
-	core "github.com/Method-Security/webscan/generated/go/core"
+	internal "github.com/Method-Security/webscan/generated/go/internal"
 )
 
 type AppEnumerateIisConfig struct {
@@ -15,7 +15,28 @@ type AppEnumerateIisConfig struct {
 	Threads *int     `json:"threads,omitempty" url:"threads,omitempty"`
 
 	extraProperties map[string]interface{}
-	_rawJSON        json.RawMessage
+	rawJSON         json.RawMessage
+}
+
+func (a *AppEnumerateIisConfig) GetTargets() []string {
+	if a == nil {
+		return nil
+	}
+	return a.Targets
+}
+
+func (a *AppEnumerateIisConfig) GetTimeout() int {
+	if a == nil {
+		return 0
+	}
+	return a.Timeout
+}
+
+func (a *AppEnumerateIisConfig) GetThreads() *int {
+	if a == nil {
+		return nil
+	}
+	return a.Threads
 }
 
 func (a *AppEnumerateIisConfig) GetExtraProperties() map[string]interface{} {
@@ -29,24 +50,22 @@ func (a *AppEnumerateIisConfig) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*a = AppEnumerateIisConfig(value)
-
-	extraProperties, err := core.ExtractExtraProperties(data, *a)
+	extraProperties, err := internal.ExtractExtraProperties(data, *a)
 	if err != nil {
 		return err
 	}
 	a.extraProperties = extraProperties
-
-	a._rawJSON = json.RawMessage(data)
+	a.rawJSON = json.RawMessage(data)
 	return nil
 }
 
 func (a *AppEnumerateIisConfig) String() string {
-	if len(a._rawJSON) > 0 {
-		if value, err := core.StringifyJSON(a._rawJSON); err == nil {
+	if len(a.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(a.rawJSON); err == nil {
 			return value
 		}
 	}
-	if value, err := core.StringifyJSON(a); err == nil {
+	if value, err := internal.StringifyJSON(a); err == nil {
 		return value
 	}
 	return fmt.Sprintf("%#v", a)
@@ -58,7 +77,28 @@ type AppEnumerateIisReport struct {
 	Errors  []string                     `json:"errors,omitempty" url:"errors,omitempty"`
 
 	extraProperties map[string]interface{}
-	_rawJSON        json.RawMessage
+	rawJSON         json.RawMessage
+}
+
+func (a *AppEnumerateIisReport) GetTargets() []*AppEnumerateIisTargetInfo {
+	if a == nil {
+		return nil
+	}
+	return a.Targets
+}
+
+func (a *AppEnumerateIisReport) GetConfig() *AppEnumerateIisConfig {
+	if a == nil {
+		return nil
+	}
+	return a.Config
+}
+
+func (a *AppEnumerateIisReport) GetErrors() []string {
+	if a == nil {
+		return nil
+	}
+	return a.Errors
 }
 
 func (a *AppEnumerateIisReport) GetExtraProperties() map[string]interface{} {
@@ -72,24 +112,22 @@ func (a *AppEnumerateIisReport) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*a = AppEnumerateIisReport(value)
-
-	extraProperties, err := core.ExtractExtraProperties(data, *a)
+	extraProperties, err := internal.ExtractExtraProperties(data, *a)
 	if err != nil {
 		return err
 	}
 	a.extraProperties = extraProperties
-
-	a._rawJSON = json.RawMessage(data)
+	a.rawJSON = json.RawMessage(data)
 	return nil
 }
 
 func (a *AppEnumerateIisReport) String() string {
-	if len(a._rawJSON) > 0 {
-		if value, err := core.StringifyJSON(a._rawJSON); err == nil {
+	if len(a.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(a.rawJSON); err == nil {
 			return value
 		}
 	}
-	if value, err := core.StringifyJSON(a); err == nil {
+	if value, err := internal.StringifyJSON(a); err == nil {
 		return value
 	}
 	return fmt.Sprintf("%#v", a)
@@ -97,11 +135,32 @@ func (a *AppEnumerateIisReport) String() string {
 
 type AppEnumerateIisTargetInfo struct {
 	Target   string                `json:"target" url:"target"`
-	Sites    []*IisSite            `json:"sites,omitempty" url:"sites,omitempty"`
+	Site     *IisSite              `json:"site,omitempty" url:"site,omitempty"`
 	Requests []*common.RequestInfo `json:"requests,omitempty" url:"requests,omitempty"`
 
 	extraProperties map[string]interface{}
-	_rawJSON        json.RawMessage
+	rawJSON         json.RawMessage
+}
+
+func (a *AppEnumerateIisTargetInfo) GetTarget() string {
+	if a == nil {
+		return ""
+	}
+	return a.Target
+}
+
+func (a *AppEnumerateIisTargetInfo) GetSite() *IisSite {
+	if a == nil {
+		return nil
+	}
+	return a.Site
+}
+
+func (a *AppEnumerateIisTargetInfo) GetRequests() []*common.RequestInfo {
+	if a == nil {
+		return nil
+	}
+	return a.Requests
 }
 
 func (a *AppEnumerateIisTargetInfo) GetExtraProperties() map[string]interface{} {
@@ -115,24 +174,22 @@ func (a *AppEnumerateIisTargetInfo) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*a = AppEnumerateIisTargetInfo(value)
-
-	extraProperties, err := core.ExtractExtraProperties(data, *a)
+	extraProperties, err := internal.ExtractExtraProperties(data, *a)
 	if err != nil {
 		return err
 	}
 	a.extraProperties = extraProperties
-
-	a._rawJSON = json.RawMessage(data)
+	a.rawJSON = json.RawMessage(data)
 	return nil
 }
 
 func (a *AppEnumerateIisTargetInfo) String() string {
-	if len(a._rawJSON) > 0 {
-		if value, err := core.StringifyJSON(a._rawJSON); err == nil {
+	if len(a.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(a.rawJSON); err == nil {
 			return value
 		}
 	}
-	if value, err := core.StringifyJSON(a); err == nil {
+	if value, err := internal.StringifyJSON(a); err == nil {
 		return value
 	}
 	return fmt.Sprintf("%#v", a)
@@ -144,7 +201,28 @@ type IisSite struct {
 	AuthenticationMethods []string            `json:"authenticationMethods,omitempty" url:"authenticationMethods,omitempty"`
 
 	extraProperties map[string]interface{}
-	_rawJSON        json.RawMessage
+	rawJSON         json.RawMessage
+}
+
+func (i *IisSite) GetServer() *WebServerInfo {
+	if i == nil {
+		return nil
+	}
+	return i.Server
+}
+
+func (i *IisSite) GetFrameworks() []*WebFrameworkInfo {
+	if i == nil {
+		return nil
+	}
+	return i.Frameworks
+}
+
+func (i *IisSite) GetAuthenticationMethods() []string {
+	if i == nil {
+		return nil
+	}
+	return i.AuthenticationMethods
 }
 
 func (i *IisSite) GetExtraProperties() map[string]interface{} {
@@ -158,24 +236,22 @@ func (i *IisSite) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*i = IisSite(value)
-
-	extraProperties, err := core.ExtractExtraProperties(data, *i)
+	extraProperties, err := internal.ExtractExtraProperties(data, *i)
 	if err != nil {
 		return err
 	}
 	i.extraProperties = extraProperties
-
-	i._rawJSON = json.RawMessage(data)
+	i.rawJSON = json.RawMessage(data)
 	return nil
 }
 
 func (i *IisSite) String() string {
-	if len(i._rawJSON) > 0 {
-		if value, err := core.StringifyJSON(i._rawJSON); err == nil {
+	if len(i.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(i.rawJSON); err == nil {
 			return value
 		}
 	}
-	if value, err := core.StringifyJSON(i); err == nil {
+	if value, err := internal.StringifyJSON(i); err == nil {
 		return value
 	}
 	return fmt.Sprintf("%#v", i)
@@ -186,7 +262,21 @@ type WebFrameworkInfo struct {
 	Version *string `json:"version,omitempty" url:"version,omitempty"`
 
 	extraProperties map[string]interface{}
-	_rawJSON        json.RawMessage
+	rawJSON         json.RawMessage
+}
+
+func (w *WebFrameworkInfo) GetName() string {
+	if w == nil {
+		return ""
+	}
+	return w.Name
+}
+
+func (w *WebFrameworkInfo) GetVersion() *string {
+	if w == nil {
+		return nil
+	}
+	return w.Version
 }
 
 func (w *WebFrameworkInfo) GetExtraProperties() map[string]interface{} {
@@ -200,24 +290,22 @@ func (w *WebFrameworkInfo) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*w = WebFrameworkInfo(value)
-
-	extraProperties, err := core.ExtractExtraProperties(data, *w)
+	extraProperties, err := internal.ExtractExtraProperties(data, *w)
 	if err != nil {
 		return err
 	}
 	w.extraProperties = extraProperties
-
-	w._rawJSON = json.RawMessage(data)
+	w.rawJSON = json.RawMessage(data)
 	return nil
 }
 
 func (w *WebFrameworkInfo) String() string {
-	if len(w._rawJSON) > 0 {
-		if value, err := core.StringifyJSON(w._rawJSON); err == nil {
+	if len(w.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(w.rawJSON); err == nil {
 			return value
 		}
 	}
-	if value, err := core.StringifyJSON(w); err == nil {
+	if value, err := internal.StringifyJSON(w); err == nil {
 		return value
 	}
 	return fmt.Sprintf("%#v", w)
@@ -228,7 +316,21 @@ type WebServerInfo struct {
 	Version *string `json:"version,omitempty" url:"version,omitempty"`
 
 	extraProperties map[string]interface{}
-	_rawJSON        json.RawMessage
+	rawJSON         json.RawMessage
+}
+
+func (w *WebServerInfo) GetName() string {
+	if w == nil {
+		return ""
+	}
+	return w.Name
+}
+
+func (w *WebServerInfo) GetVersion() *string {
+	if w == nil {
+		return nil
+	}
+	return w.Version
 }
 
 func (w *WebServerInfo) GetExtraProperties() map[string]interface{} {
@@ -242,24 +344,22 @@ func (w *WebServerInfo) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*w = WebServerInfo(value)
-
-	extraProperties, err := core.ExtractExtraProperties(data, *w)
+	extraProperties, err := internal.ExtractExtraProperties(data, *w)
 	if err != nil {
 		return err
 	}
 	w.extraProperties = extraProperties
-
-	w._rawJSON = json.RawMessage(data)
+	w.rawJSON = json.RawMessage(data)
 	return nil
 }
 
 func (w *WebServerInfo) String() string {
-	if len(w._rawJSON) > 0 {
-		if value, err := core.StringifyJSON(w._rawJSON); err == nil {
+	if len(w.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(w.rawJSON); err == nil {
 			return value
 		}
 	}
-	if value, err := core.StringifyJSON(w); err == nil {
+	if value, err := internal.StringifyJSON(w); err == nil {
 		return value
 	}
 	return fmt.Sprintf("%#v", w)

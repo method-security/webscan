@@ -22,7 +22,7 @@ types:
   AppEnumerateIISTargetInfo:
     properties:
       target: string
-      sites: optional<list<IISSite>>
+      site: optional<IISSite>
       requests: optional<list<requests.RequestInfo>>
   AppEnumerateIISReport:
     properties:

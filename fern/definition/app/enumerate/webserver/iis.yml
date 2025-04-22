@@ -16,7 +16,7 @@ types:
       version: optional<string>
   IISSite:
     properties:
-      server: WebServerInfo
+      server: optional<WebServerInfo>
       frameworks: optional<list<WebFrameworkInfo>>
       authenticationMethods: optional<list<string>> # WWW-Authenticate headers
   AppEnumerateIISTargetInfo:

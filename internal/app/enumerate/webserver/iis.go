@@ -7,13 +7,12 @@ import (
 	"net/url"
 	"regexp"
 	"runtime"
-	"strings"
 	"sync"
 	"time"
 
 	webscan "github.com/Method-Security/webscan/generated/go/app/enumerate/webserver"
 	common "github.com/Method-Security/webscan/generated/go/common"
-	"github.com/Method-Security/webscan/utils"
+	utils "github.com/Method-Security/webscan/utils"
 )
 
 func PerformAppEnumerateWebserverIIS(ctx context.Context, cfg *webscan.AppEnumerateIisConfig) webscan.AppEnumerateIisReport {
@@ -75,7 +74,7 @@ func enumerateTarget(target string, timeout int) (webscan.AppEnumerateIisTargetI
 	errs = append(errs, es...)
 
 	if site != nil {
-		out.Sites = []*webscan.IisSite{site}
+		out.Site = site
 	}
 	out.Requests = reqs
 	return out, errs
@@ -128,7 +127,7 @@ func enumerateSite(target string, timeout int) (*webscan.IisSite, []*common.Requ
 
 	// --------- Capture auth schemes when 401 ---------
 	if root.StatusCode != nil && *root.StatusCode == 401 {
-		auths := getHeaderValues(&root, "WWW-Authenticate")
+		auths := utils.GetHeaderValues(&root, "WWW-Authenticate")
 		if len(auths) > 0 {
 			site.AuthenticationMethods = auths
 		}
@@ -144,7 +143,7 @@ func parseBanners(s *webscan.IisSite, r *common.RequestInfo) {
 	// Helper: banner & header parsing
 	// -----------------------------------------------------------------------------
 
-	serverHdr := getHeader(r, "Server")
+	serverHdr := utils.GetHeader(r, "Server")
 	if serverHdr != "" {
 		if matches := iisRe.FindStringSubmatch(serverHdr); len(matches) > 2 {
 			v := matches[2]
@@ -155,14 +154,14 @@ func parseBanners(s *webscan.IisSite, r *common.RequestInfo) {
 	}
 
 	// Get framework version from X-AspNet-Version
-	aspVer := getHeader(r, "X-AspNet-Version")
+	aspVer := utils.GetHeader(r, "X-AspNet-Version")
 	var version *string
 	if aspVer != "" {
 		version = &aspVer
 	}
 
 	// Get framework name from X-Powered-By
-	if xp := getHeader(r, "X-Powered-By"); xp != "" {
+	if xp := utils.GetHeader(r, "X-Powered-By"); xp != "" {
 		s.Frameworks = append(s.Frameworks, &webscan.WebFrameworkInfo{Name: xp, Version: version})
 	}
 }
@@ -178,35 +177,4 @@ func parseIisVersionFromBody(b string) string {
 		return m[1]
 	}
 	return ""
-}
-
-func getHeader(r *common.RequestInfo, name string) string {
-	// -----------------------------------------------------------------------------
-	// Generic header helpers (case‑insensitive)
-	// -----------------------------------------------------------------------------
-
-	if r.ResponseHeaders == nil {
-		return ""
-	}
-	if v, ok := r.ResponseHeaders[name]; ok {
-		return v
-	}
-	for hn, hv := range r.ResponseHeaders {
-		if strings.EqualFold(hn, name) {
-			return hv
-		}
-	}
-	return ""
-}
-
-func getHeaderValues(r *common.RequestInfo, name string) []string {
-	raw := getHeader(r, name)
-	if raw == "" {
-		return nil
-	}
-	parts := strings.Split(raw, ",")
-	for i := range parts {
-		parts[i] = strings.TrimSpace(parts[i])
-	}
-	return parts
 }

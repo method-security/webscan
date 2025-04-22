@@ -16,11 +16,11 @@ import (
 	"github.com/Method-Security/webscan/utils"
 )
 
-// -----------------------------------------------------------------------------
-// Entry point exposed to the wider application
-// -----------------------------------------------------------------------------
-
 func PerformAppEnumerateWebserverIIS(ctx context.Context, cfg *webscan.AppEnumerateIisConfig) webscan.AppEnumerateIisReport {
+	// -----------------------------------------------------------------------------
+	// Entry point exposed to the wider application
+	// -----------------------------------------------------------------------------
+
 	rpt := webscan.AppEnumerateIisReport{Config: cfg}
 
 	// Concurrency controls
@@ -61,11 +61,11 @@ func PerformAppEnumerateWebserverIIS(ctx context.Context, cfg *webscan.AppEnumer
 	return rpt
 }
 
-// -----------------------------------------------------------------------------
-// Per‑target routine – minimal probing
-// -----------------------------------------------------------------------------
-
 func enumerateTarget(target string, timeout int) (webscan.AppEnumerateIisTargetInfo, []string) {
+	// -----------------------------------------------------------------------------
+	// Per‑target routine – minimal probing
+	// -----------------------------------------------------------------------------
+
 	out := webscan.AppEnumerateIisTargetInfo{Target: target}
 	var errs []string
 	var reqs []*common.RequestInfo
@@ -81,11 +81,11 @@ func enumerateTarget(target string, timeout int) (webscan.AppEnumerateIisTargetI
 	return out, errs
 }
 
-// -----------------------------------------------------------------------------
-// Core logic: grab headers, parse versions, optional 404 scrape, 401 auth list
-// -----------------------------------------------------------------------------
-
 func enumerateSite(target string, timeout int) (*webscan.IisSite, []*common.RequestInfo, []string) {
+	// -----------------------------------------------------------------------------
+	// Core logic: grab headers, parse versions, optional 404 scrape, 401 auth list
+	// -----------------------------------------------------------------------------
+
 	var errs []string
 	var reqs []*common.RequestInfo
 
@@ -137,13 +137,13 @@ func enumerateSite(target string, timeout int) (*webscan.IisSite, []*common.Requ
 	return site, reqs, errs
 }
 
-// -----------------------------------------------------------------------------
-// Helper: banner & header parsing
-// -----------------------------------------------------------------------------
-
 var iisRe = regexp.MustCompile(`(?i)(Microsoft-IIS)/(\d+\.\d+)`)
 
 func parseBanners(s *webscan.IisSite, r *common.RequestInfo) {
+	// -----------------------------------------------------------------------------
+	// Helper: banner & header parsing
+	// -----------------------------------------------------------------------------
+
 	serverHdr := getHeader(r, "Server")
 	if serverHdr != "" {
 		if matches := iisRe.FindStringSubmatch(serverHdr); len(matches) > 2 {
@@ -167,24 +167,24 @@ func parseBanners(s *webscan.IisSite, r *common.RequestInfo) {
 	}
 }
 
-// -----------------------------------------------------------------------------
-// Helper: scrape version string from default IIS error pages
-// -----------------------------------------------------------------------------
-
 var bodyVerRe = regexp.MustCompile(`(?i)IIS\s*(\d+\.\d+)`)
 
 func parseIisVersionFromBody(b string) string {
+	// -----------------------------------------------------------------------------
+	// Helper: scrape version string from default IIS error pages
+	// -----------------------------------------------------------------------------
+
 	if m := bodyVerRe.FindStringSubmatch(b); len(m) > 1 {
 		return m[1]
 	}
 	return ""
 }
 
-// -----------------------------------------------------------------------------
-// Generic header helpers (case‑insensitive)
-// -----------------------------------------------------------------------------
-
 func getHeader(r *common.RequestInfo, name string) string {
+	// -----------------------------------------------------------------------------
+	// Generic header helpers (case‑insensitive)
+	// -----------------------------------------------------------------------------
+
 	if r.ResponseHeaders == nil {
 		return ""
 	}

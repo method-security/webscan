@@ -1,9 +1,4 @@
 types:
-  # Web Protocol Enum
-  WebProtocol:
-    enum:
-      - HTTP
-      - HTTPS
   # Http Method Enum
   HttpMethod:
     enum:

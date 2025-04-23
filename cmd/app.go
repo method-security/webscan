@@ -6,8 +6,10 @@ import (
 	"strings"
 
 	webscan "github.com/Method-Security/webscan/generated/go/app"
+	enumerateWebserverFern "github.com/Method-Security/webscan/generated/go/app/enumerate/webserver"
 	enumerateWordpressFern "github.com/Method-Security/webscan/generated/go/app/enumerate/wordpress"
 	"github.com/Method-Security/webscan/internal/app/enumerate"
+	enumerateWebserver "github.com/Method-Security/webscan/internal/app/enumerate/webserver"
 	enumerateWordpress "github.com/Method-Security/webscan/internal/app/enumerate/wordpress"
 	fingerprint "github.com/Method-Security/webscan/internal/app/fingerprint"
 	"github.com/Method-Security/webscan/utils"
@@ -364,6 +366,64 @@ HTTP methods, query parameters, and authentication mechanisms.`,
 
 	enumerateCmd.AddCommand(enumerateWordpressCmd)
 
+	enumerateWebserverCmd := &cobra.Command{
+		Use:   "webserver",
+		Short: "Perform webserver enumeration scans against a target",
+		Long: `Perform webserver enumeration scans against a target.
+		
+The webserver command identifies and catalogs detailed information about a webserver. 
+It extracts information such as server version, enabled modules, and more.`,
+	}
+
+	enumerateWebserverIISCmd := &cobra.Command{
+		Use:   "iis",
+		Short: "Perform IIS enumeration scans against a target",
+		Long:  `Perform IIS enumeration scans against a target.`,
+		Run: func(cmd *cobra.Command, args []string) {
+			defer a.OutputSignal.PanicHandler(cmd.Context())
+
+			// Target flag
+			targets, err := cmd.Flags().GetStringSlice("targets")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Threads flag
+			threads, err := cmd.Flags().GetInt("threads")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Timeout flag
+			timeout, err := cmd.Flags().GetInt("timeout")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			// Generate config
+			config := newEnumerateWebserverIISConfig(targets, threads, timeout)
+
+			// Generate report
+			report := enumerateWebserver.PerformAppEnumerateWebserverIIS(cmd.Context(), config)
+			if len(report.Errors) > 0 {
+				a.OutputSignal.Status = 1
+			}
+			a.OutputSignal.Content = report
+		},
+	}
+
+	enumerateWebserverIISCmd.Flags().StringSlice("targets", []string{}, "URL targets to perform IIS enumeration against")
+	enumerateWebserverIISCmd.Flags().Int("timeout", 30, "Timeout per request (seconds)")
+	enumerateWebserverIISCmd.Flags().Int("threads", 0, "Number of threads to use during enumeration (default is number of CPUs)")
+
+	_ = enumerateWebserverIISCmd.MarkFlagRequired("targets")
+
+	enumerateWebserverCmd.AddCommand(enumerateWebserverIISCmd)
+
+	enumerateCmd.AddCommand(enumerateWebserverCmd)
+
 	appCmd.AddCommand(enumerateCmd)
 
 	a.RootCmd.AddCommand(appCmd)
@@ -465,5 +525,18 @@ func newEnumerateWordpressPluginsConfig(targets []string, plugins []string, time
 	if threads > 0 {
 		config.Threads = &threads
 	}
+	return config
+}
+
+func newEnumerateWebserverIISConfig(targets []string, threads int, timeout int) *enumerateWebserverFern.AppEnumerateIisConfig {
+	config := &enumerateWebserverFern.AppEnumerateIisConfig{
+		Targets: targets,
+		Timeout: timeout,
+	}
+
+	if threads > 0 {
+		config.Threads = &threads
+	}
+
 	return config
 }

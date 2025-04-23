@@ -258,3 +258,32 @@ func populateReport(report *common.RequestInfo, statusCode int, headers map[stri
 		report.MultipartParams = params.MultipartParams
 	}
 }
+
+// GetHeader is a generic header helper (case‑insensitive)
+func GetHeader(r *common.RequestInfo, name string) string {
+	if r.ResponseHeaders == nil {
+		return ""
+	}
+	if v, ok := r.ResponseHeaders[name]; ok {
+		return v
+	}
+	for hn, hv := range r.ResponseHeaders {
+		if strings.EqualFold(hn, name) {
+			return hv
+		}
+	}
+	return ""
+}
+
+// GetHeaderValues is a generic header helper (case‑insensitive)
+func GetHeaderValues(r *common.RequestInfo, name string) []string {
+	raw := GetHeader(r, name)
+	if raw == "" {
+		return nil
+	}
+	parts := strings.Split(raw, ",")
+	for i := range parts {
+		parts[i] = strings.TrimSpace(parts[i])
+	}
+	return parts
+}

@@ -10,14 +10,14 @@ import (
 	"sync"
 	"time"
 
-	webscan "github.com/Method-Security/webscan/generated/go/app/enumerate/webserver"
+	enumerateWebserverFern "github.com/Method-Security/webscan/generated/go/app/enumerate/webserver"
 	common "github.com/Method-Security/webscan/generated/go/common"
 	utils "github.com/Method-Security/webscan/utils"
 )
 
 // PerformAppEnumerateWebserverIIS is the entry point exposed to the wider application
-func PerformAppEnumerateWebserverIIS(ctx context.Context, cfg *webscan.AppEnumerateIisConfig) webscan.AppEnumerateIisReport {
-	rpt := webscan.AppEnumerateIisReport{Config: cfg}
+func PerformAppEnumerateWebserverIIS(ctx context.Context, cfg *enumerateWebserverFern.AppEnumerateIisConfig) enumerateWebserverFern.AppEnumerateIisReport {
+	rpt := enumerateWebserverFern.AppEnumerateIisReport{Config: cfg}
 
 	// Concurrency controls
 	nWorkers := runtime.GOMAXPROCS(0)
@@ -27,7 +27,7 @@ func PerformAppEnumerateWebserverIIS(ctx context.Context, cfg *webscan.AppEnumer
 	sem := make(chan struct{}, nWorkers)
 
 	var wg sync.WaitGroup
-	resChan := make(chan *webscan.AppEnumerateIisTargetInfo, len(cfg.Targets))
+	resChan := make(chan *enumerateWebserverFern.AppEnumerateIisTargetInfo, len(cfg.Targets))
 	errChan := make(chan []string, len(cfg.Targets))
 
 	for _, tgt := range cfg.Targets {
@@ -58,8 +58,8 @@ func PerformAppEnumerateWebserverIIS(ctx context.Context, cfg *webscan.AppEnumer
 }
 
 // enumerateTarget is the per‑target routine – minimal probing
-func enumerateTarget(target string, timeout int) (webscan.AppEnumerateIisTargetInfo, []string) {
-	out := webscan.AppEnumerateIisTargetInfo{Target: target}
+func enumerateTarget(target string, timeout int) (enumerateWebserverFern.AppEnumerateIisTargetInfo, []string) {
+	out := enumerateWebserverFern.AppEnumerateIisTargetInfo{Target: target}
 	var errs []string
 	var reqs []*common.RequestInfo
 
@@ -75,7 +75,7 @@ func enumerateTarget(target string, timeout int) (webscan.AppEnumerateIisTargetI
 }
 
 // enumerateSite is the core logic: grab headers, parse versions, optional 404 scrape, 401 auth list
-func enumerateSite(target string, timeout int) (*webscan.IisSite, []*common.RequestInfo, []string) {
+func enumerateSite(target string, timeout int) (*enumerateWebserverFern.IisSite, []*common.RequestInfo, []string) {
 	var errs []string
 	var reqs []*common.RequestInfo
 
@@ -101,7 +101,7 @@ func enumerateSite(target string, timeout int) (*webscan.IisSite, []*common.Requ
 		return nil, reqs, []string{fmt.Sprintf("no response from %s", target)}
 	}
 
-	site := &webscan.IisSite{}
+	site := &enumerateWebserverFern.IisSite{}
 	parseBanners(site, &root) // Server & ASP.NET versions
 
 	// If server version still unknown, scrape 404 page
@@ -111,7 +111,7 @@ func enumerateSite(target string, timeout int) (*webscan.IisSite, []*common.Requ
 		reqs = append(reqs, &nf)
 		if nf.ResponseBody != nil {
 			if v := parseIisVersionFromBody(*nf.ResponseBody); v != "" {
-				site.Server = &webscan.WebServerInfo{Name: "Microsoft-IIS", Version: &v}
+				site.Server = &enumerateWebserverFern.WebServerInfo{Name: "Microsoft-IIS", Version: &v}
 			}
 		}
 	}
@@ -130,14 +130,14 @@ func enumerateSite(target string, timeout int) (*webscan.IisSite, []*common.Requ
 var iisRe = regexp.MustCompile(`(?i)(Microsoft-IIS)/(\d+\.\d+)`)
 
 // parseBanners is a helper: banner & header parsing
-func parseBanners(s *webscan.IisSite, r *common.RequestInfo) {
+func parseBanners(s *enumerateWebserverFern.IisSite, r *common.RequestInfo) {
 	serverHdr := utils.GetHeader(r, "Server")
 	if serverHdr != "" {
 		if matches := iisRe.FindStringSubmatch(serverHdr); len(matches) > 2 {
 			v := matches[2]
-			s.Server = &webscan.WebServerInfo{Name: "Microsoft-IIS", Version: &v}
+			s.Server = &enumerateWebserverFern.WebServerInfo{Name: "Microsoft-IIS", Version: &v}
 		} else {
-			s.Server = &webscan.WebServerInfo{Name: serverHdr}
+			s.Server = &enumerateWebserverFern.WebServerInfo{Name: serverHdr}
 		}
 	}
 
@@ -150,7 +150,7 @@ func parseBanners(s *webscan.IisSite, r *common.RequestInfo) {
 
 	// Get framework name from X-Powered-By
 	if xp := utils.GetHeader(r, "X-Powered-By"); xp != "" {
-		s.Frameworks = append(s.Frameworks, &webscan.WebFrameworkInfo{Name: xp, Version: version})
+		s.Frameworks = append(s.Frameworks, &enumerateWebserverFern.WebFrameworkInfo{Name: xp, Version: version})
 	}
 }
 

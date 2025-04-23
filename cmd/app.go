@@ -101,7 +101,6 @@ for the specified resource type.`,
 	apiApplicationModules := strings.Join([]string{
 		string(webscan.ApiApplicationModuleGraphql),
 		string(webscan.ApiApplicationModuleGrpc),
-		string(webscan.ApiApplicationModuleK8S),
 		string(webscan.ApiApplicationModuleSwagger),
 	}, ", ")
 	contentManagementSystemModules := strings.Join([]string{
@@ -114,6 +113,9 @@ for the specified resource type.`,
 	frameworkModules := strings.Join([]string{
 		string(webscan.FrameworkModuleFastapi),
 		string(webscan.FrameworkModuleNextjs),
+	}, ", ")
+	K8SModules := strings.Join([]string{
+		string(webscan.K8SModuleK8S),
 	}, ", ")
 	remoteAccessModules := strings.Join([]string{
 		string(webscan.RemoteAccessModuleCitrixgateway),
@@ -128,7 +130,7 @@ for the specified resource type.`,
 
 	fingerprintCmd.Flags().StringSlice("targets", []string{}, "URL target to perform fingerprint against")
 	fingerprintCmd.Flags().String("resourcetype", "", fmt.Sprintf("Resource type to fingerprint (%s)", resourceTypes))
-	fingerprintCmd.Flags().StringSlice("modules", []string{}, fmt.Sprintf("Modules to run (APIApplication: %s; CloudBucket: %s; ContentManagementSystem: %s; Framework: %s; RemoteAccess: %s, WebServer: %s)", apiApplicationModules, cloudBucketModules, contentManagementSystemModules, frameworkModules, remoteAccessModules, webServerModules))
+	fingerprintCmd.Flags().StringSlice("modules", []string{}, fmt.Sprintf("Modules to run (APIApplication: %s; CloudBucket: %s; ContentManagementSystem: %s; Framework: %s; K8S: %s; RemoteAccess: %s, WebServer: %s)", apiApplicationModules, cloudBucketModules, contentManagementSystemModules, frameworkModules, K8SModules, remoteAccessModules, webServerModules))
 	fingerprintCmd.Flags().Int("timeout", 30, "Timeout per request (seconds)")
 	fingerprintCmd.Flags().Bool("successfulonly", false, "Only show successful attempts")
 
@@ -477,6 +479,15 @@ func validateFingerprintResourseModuleSelection(resourceType webscan.AppFingerpr
 				return nil, err
 			}
 			moduleEnum := webscan.NewAppFingerprintResourceModuleFromFrameworkModule(moduleName)
+			moduleEnums = append(moduleEnums, moduleEnum)
+		}
+	} else if resourceType == webscan.AppFingerprintResourceTypeK8S {
+		for _, module := range modules {
+			moduleName, err := webscan.NewK8SModuleFromString(strings.ToUpper(module))
+			if err != nil {
+				return nil, err
+			}
+			moduleEnum := webscan.NewAppFingerprintResourceModuleFromK8SModule(moduleName)
 			moduleEnums = append(moduleEnums, moduleEnum)
 		}
 	} else if resourceType == webscan.AppFingerprintResourceTypeRemoteaccess {

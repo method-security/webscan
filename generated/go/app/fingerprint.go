@@ -14,7 +14,6 @@ type ApiApplicationModule string
 const (
 	ApiApplicationModuleGraphql ApiApplicationModule = "GRAPHQL"
 	ApiApplicationModuleGrpc    ApiApplicationModule = "GRPC"
-	ApiApplicationModuleK8S     ApiApplicationModule = "K8S"
 	ApiApplicationModuleSwagger ApiApplicationModule = "SWAGGER"
 )
 
@@ -24,8 +23,6 @@ func NewApiApplicationModuleFromString(s string) (ApiApplicationModule, error) {
 		return ApiApplicationModuleGraphql, nil
 	case "GRPC":
 		return ApiApplicationModuleGrpc, nil
-	case "K8S":
-		return ApiApplicationModuleK8S, nil
 	case "SWAGGER":
 		return ApiApplicationModuleSwagger, nil
 	}
@@ -245,6 +242,7 @@ type AppFingerprintResourceModule struct {
 	CloudBucketModule             CloudBucketModule
 	ContentManagementSystemModule ContentManagementSystemModule
 	FrameworkModule               FrameworkModule
+	K8SModule                     K8SModule
 	RemoteAccessModule            RemoteAccessModule
 	WebServerModule               WebServerModule
 }
@@ -263,6 +261,10 @@ func NewAppFingerprintResourceModuleFromContentManagementSystemModule(value Cont
 
 func NewAppFingerprintResourceModuleFromFrameworkModule(value FrameworkModule) *AppFingerprintResourceModule {
 	return &AppFingerprintResourceModule{Type: "FrameworkModule", FrameworkModule: value}
+}
+
+func NewAppFingerprintResourceModuleFromK8SModule(value K8SModule) *AppFingerprintResourceModule {
+	return &AppFingerprintResourceModule{Type: "K8sModule", K8SModule: value}
 }
 
 func NewAppFingerprintResourceModuleFromRemoteAccessModule(value RemoteAccessModule) *AppFingerprintResourceModule {
@@ -306,6 +308,13 @@ func (a *AppFingerprintResourceModule) GetFrameworkModule() FrameworkModule {
 		return ""
 	}
 	return a.FrameworkModule
+}
+
+func (a *AppFingerprintResourceModule) GetK8SModule() K8SModule {
+	if a == nil {
+		return ""
+	}
+	return a.K8SModule
 }
 
 func (a *AppFingerprintResourceModule) GetRemoteAccessModule() RemoteAccessModule {
@@ -366,6 +375,14 @@ func (a *AppFingerprintResourceModule) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		a.FrameworkModule = valueUnmarshaler.FrameworkModule
+	case "K8sModule":
+		var valueUnmarshaler struct {
+			K8SModule K8SModule `json:"value"`
+		}
+		if err := json.Unmarshal(data, &valueUnmarshaler); err != nil {
+			return err
+		}
+		a.K8SModule = valueUnmarshaler.K8SModule
 	case "RemoteAccessModule":
 		var valueUnmarshaler struct {
 			RemoteAccessModule RemoteAccessModule `json:"value"`
@@ -429,6 +446,15 @@ func (a AppFingerprintResourceModule) MarshalJSON() ([]byte, error) {
 			FrameworkModule: a.FrameworkModule,
 		}
 		return json.Marshal(marshaler)
+	case "K8sModule":
+		var marshaler = struct {
+			Type      string    `json:"type"`
+			K8SModule K8SModule `json:"value"`
+		}{
+			Type:      "K8sModule",
+			K8SModule: a.K8SModule,
+		}
+		return json.Marshal(marshaler)
 	case "RemoteAccessModule":
 		var marshaler = struct {
 			Type               string             `json:"type"`
@@ -455,6 +481,7 @@ type AppFingerprintResourceModuleVisitor interface {
 	VisitCloudBucketModule(CloudBucketModule) error
 	VisitContentManagementSystemModule(ContentManagementSystemModule) error
 	VisitFrameworkModule(FrameworkModule) error
+	VisitK8SModule(K8SModule) error
 	VisitRemoteAccessModule(RemoteAccessModule) error
 	VisitWebServerModule(WebServerModule) error
 }
@@ -471,6 +498,8 @@ func (a *AppFingerprintResourceModule) Accept(visitor AppFingerprintResourceModu
 		return visitor.VisitContentManagementSystemModule(a.ContentManagementSystemModule)
 	case "FrameworkModule":
 		return visitor.VisitFrameworkModule(a.FrameworkModule)
+	case "K8sModule":
+		return visitor.VisitK8SModule(a.K8SModule)
 	case "RemoteAccessModule":
 		return visitor.VisitRemoteAccessModule(a.RemoteAccessModule)
 	case "WebServerModule":
@@ -494,6 +523,9 @@ func (a *AppFingerprintResourceModule) validate() error {
 	}
 	if a.FrameworkModule != "" {
 		fields = append(fields, "FrameworkModule")
+	}
+	if a.K8SModule != "" {
+		fields = append(fields, "K8sModule")
 	}
 	if a.RemoteAccessModule != "" {
 		fields = append(fields, "RemoteAccessModule")
@@ -533,6 +565,7 @@ const (
 	AppFingerprintResourceTypeFramework               AppFingerprintResourceType = "FRAMEWORK"
 	AppFingerprintResourceTypeRemoteaccess            AppFingerprintResourceType = "REMOTEACCESS"
 	AppFingerprintResourceTypeWebserver               AppFingerprintResourceType = "WEBSERVER"
+	AppFingerprintResourceTypeK8S                     AppFingerprintResourceType = "K8S"
 )
 
 func NewAppFingerprintResourceTypeFromString(s string) (AppFingerprintResourceType, error) {
@@ -549,6 +582,8 @@ func NewAppFingerprintResourceTypeFromString(s string) (AppFingerprintResourceTy
 		return AppFingerprintResourceTypeRemoteaccess, nil
 	case "WEBSERVER":
 		return AppFingerprintResourceTypeWebserver, nil
+	case "K8S":
+		return AppFingerprintResourceTypeK8S, nil
 	}
 	var t AppFingerprintResourceType
 	return "", fmt.Errorf("%s is not a valid %T", s, t)
@@ -673,6 +708,25 @@ func NewFrameworkModuleFromString(s string) (FrameworkModule, error) {
 
 func (f FrameworkModule) Ptr() *FrameworkModule {
 	return &f
+}
+
+type K8SModule string
+
+const (
+	K8SModuleK8S K8SModule = "K8S"
+)
+
+func NewK8SModuleFromString(s string) (K8SModule, error) {
+	switch s {
+	case "K8S":
+		return K8SModuleK8S, nil
+	}
+	var t K8SModule
+	return "", fmt.Errorf("%s is not a valid %T", s, t)
+}
+
+func (k K8SModule) Ptr() *K8SModule {
+	return &k
 }
 
 type RemoteAccessModule string

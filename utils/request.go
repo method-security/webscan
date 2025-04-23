@@ -259,9 +259,8 @@ func populateReport(report *common.RequestInfo, statusCode int, headers map[stri
 	}
 }
 
+// GetHeader is a generic header helper (case‑insensitive)
 func GetHeader(r *common.RequestInfo, name string) string {
-	// -----------------------------------------------------------------------------
-	// Generic header helpers (case‑insensitive)
 	// -----------------------------------------------------------------------------
 
 	if r.ResponseHeaders == nil {
@@ -278,6 +277,7 @@ func GetHeader(r *common.RequestInfo, name string) string {
 	return ""
 }
 
+// GetHeaderValues is a generic header helper (case‑insensitive)
 func GetHeaderValues(r *common.RequestInfo, name string) []string {
 	raw := GetHeader(r, name)
 	if raw == "" {

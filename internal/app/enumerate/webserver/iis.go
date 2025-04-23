@@ -15,11 +15,8 @@ import (
 	utils "github.com/Method-Security/webscan/utils"
 )
 
+// PerformAppEnumerateWebserverIIS is the entry point exposed to the wider application
 func PerformAppEnumerateWebserverIIS(ctx context.Context, cfg *webscan.AppEnumerateIisConfig) webscan.AppEnumerateIisReport {
-	// -----------------------------------------------------------------------------
-	// Entry point exposed to the wider application
-	// -----------------------------------------------------------------------------
-
 	rpt := webscan.AppEnumerateIisReport{Config: cfg}
 
 	// Concurrency controls
@@ -60,11 +57,8 @@ func PerformAppEnumerateWebserverIIS(ctx context.Context, cfg *webscan.AppEnumer
 	return rpt
 }
 
+// enumerateTarget is the per‑target routine – minimal probing
 func enumerateTarget(target string, timeout int) (webscan.AppEnumerateIisTargetInfo, []string) {
-	// -----------------------------------------------------------------------------
-	// Per‑target routine – minimal probing
-	// -----------------------------------------------------------------------------
-
 	out := webscan.AppEnumerateIisTargetInfo{Target: target}
 	var errs []string
 	var reqs []*common.RequestInfo
@@ -80,15 +74,12 @@ func enumerateTarget(target string, timeout int) (webscan.AppEnumerateIisTargetI
 	return out, errs
 }
 
+// enumerateSite is the core logic: grab headers, parse versions, optional 404 scrape, 401 auth list
 func enumerateSite(target string, timeout int) (*webscan.IisSite, []*common.RequestInfo, []string) {
-	// -----------------------------------------------------------------------------
-	// Core logic: grab headers, parse versions, optional 404 scrape, 401 auth list
-	// -----------------------------------------------------------------------------
-
 	var errs []string
 	var reqs []*common.RequestInfo
 
-	// --------- Parse & normalise URL ---------
+	// Parse & normalise URL
 	u, err := url.Parse(target)
 	if err != nil {
 		return nil, nil, []string{fmt.Sprintf("invalid URL %s: %v", target, err)}
@@ -102,7 +93,7 @@ func enumerateSite(target string, timeout int) (*webscan.IisSite, []*common.Requ
 		path = "/"
 	}
 
-	// --------- Baseline GET ---------
+	// Baseline GET
 	root := utils.PerformRequestScan(baseURL, path, common.HttpMethodGet, common.RequestParams{}, timeout, true)
 	reqs = append(reqs, &root)
 
@@ -113,7 +104,7 @@ func enumerateSite(target string, timeout int) (*webscan.IisSite, []*common.Requ
 	site := &webscan.IisSite{}
 	parseBanners(site, &root) // Server & ASP.NET versions
 
-	// --------- If server version still unknown, scrape 404 page ---------
+	// If server version still unknown, scrape 404 page
 	if site.Server == nil || site.Server.Version == nil {
 		r := rand.New(rand.NewSource(time.Now().UnixNano()))
 		nf := utils.PerformRequestScan(baseURL, fmt.Sprintf("/nonexistent_%d.aspx", r.Intn(9e6)), common.HttpMethodGet, common.RequestParams{}, timeout, true)
@@ -125,7 +116,7 @@ func enumerateSite(target string, timeout int) (*webscan.IisSite, []*common.Requ
 		}
 	}
 
-	// --------- Capture auth schemes when 401 ---------
+	// Capture auth schemes when 401
 	if root.StatusCode != nil && *root.StatusCode == 401 {
 		auths := utils.GetHeaderValues(&root, "WWW-Authenticate")
 		if len(auths) > 0 {
@@ -138,11 +129,8 @@ func enumerateSite(target string, timeout int) (*webscan.IisSite, []*common.Requ
 
 var iisRe = regexp.MustCompile(`(?i)(Microsoft-IIS)/(\d+\.\d+)`)
 
+// parseBanners is a helper: banner & header parsing
 func parseBanners(s *webscan.IisSite, r *common.RequestInfo) {
-	// -----------------------------------------------------------------------------
-	// Helper: banner & header parsing
-	// -----------------------------------------------------------------------------
-
 	serverHdr := utils.GetHeader(r, "Server")
 	if serverHdr != "" {
 		if matches := iisRe.FindStringSubmatch(serverHdr); len(matches) > 2 {
@@ -168,11 +156,8 @@ func parseBanners(s *webscan.IisSite, r *common.RequestInfo) {
 
 var bodyVerRe = regexp.MustCompile(`(?i)IIS\s*(\d+\.\d+)`)
 
+// parseIisVersionFromBody is a helper: scrape version string from default IIS error pages
 func parseIisVersionFromBody(b string) string {
-	// -----------------------------------------------------------------------------
-	// Helper: scrape version string from default IIS error pages
-	// -----------------------------------------------------------------------------
-
 	if m := bodyVerRe.FindStringSubmatch(b); len(m) > 1 {
 		return m[1]
 	}

@@ -305,25 +305,3 @@ func (r *RequestParams) String() string {
 	}
 	return fmt.Sprintf("%#v", r)
 }
-
-type WebProtocol string
-
-const (
-	WebProtocolHttp  WebProtocol = "HTTP"
-	WebProtocolHttps WebProtocol = "HTTPS"
-)
-
-func NewWebProtocolFromString(s string) (WebProtocol, error) {
-	switch s {
-	case "HTTP":
-		return WebProtocolHttp, nil
-	case "HTTPS":
-		return WebProtocolHttps, nil
-	}
-	var t WebProtocol
-	return "", fmt.Errorf("%s is not a valid %T", s, t)
-}
-
-func (w WebProtocol) Ptr() *WebProtocol {
-	return &w
-}

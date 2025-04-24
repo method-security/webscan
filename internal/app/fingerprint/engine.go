@@ -11,6 +11,7 @@ import (
 	cloudbucket "github.com/Method-Security/webscan/internal/app/fingerprint/modules/cloudbucket"
 	contentmanagementsystem "github.com/Method-Security/webscan/internal/app/fingerprint/modules/contentmanagementsystem"
 	framework "github.com/Method-Security/webscan/internal/app/fingerprint/modules/frameworks"
+	kube "github.com/Method-Security/webscan/internal/app/fingerprint/modules/kube"
 	remoteaccess "github.com/Method-Security/webscan/internal/app/fingerprint/modules/remoteaccess"
 	webserver "github.com/Method-Security/webscan/internal/app/fingerprint/modules/webserver"
 	"github.com/Method-Security/webscan/utils"
@@ -37,7 +38,6 @@ func NewEngine(config *webscan.AppFingerprintConfig) *Engine {
 		Config: config,
 		Modules: map[webscan.AppFingerprintResourceType]map[webscan.AppFingerprintResourceModule]Module{
 			webscan.AppFingerprintResourceTypeApiapplication: {
-				*webscan.NewAppFingerprintResourceModuleFromApiApplicationModule(webscan.ApiApplicationModuleK8S):     &apiapplication.K8sLibrary{},
 				*webscan.NewAppFingerprintResourceModuleFromApiApplicationModule(webscan.ApiApplicationModuleGrpc):    &apiapplication.GrpcLibrary{},
 				*webscan.NewAppFingerprintResourceModuleFromApiApplicationModule(webscan.ApiApplicationModuleSwagger): &apiapplication.SwaggerLibrary{},
 				*webscan.NewAppFingerprintResourceModuleFromApiApplicationModule(webscan.ApiApplicationModuleGraphql): &apiapplication.GraphQLLibrary{},
@@ -52,6 +52,9 @@ func NewEngine(config *webscan.AppFingerprintConfig) *Engine {
 			webscan.AppFingerprintResourceTypeFramework: {
 				*webscan.NewAppFingerprintResourceModuleFromFrameworkModule(webscan.FrameworkModuleFastapi): &framework.FastAPILibrary{},
 				*webscan.NewAppFingerprintResourceModuleFromFrameworkModule(webscan.FrameworkModuleNextjs):  &framework.NextJsLibrary{},
+			},
+			webscan.AppFingerprintResourceTypeKube: {
+				*webscan.NewAppFingerprintResourceModuleFromKubeModule(webscan.KubeModuleKube): &kube.Library{},
 			},
 			webscan.AppFingerprintResourceTypeRemoteaccess: {
 				*webscan.NewAppFingerprintResourceModuleFromRemoteAccessModule(webscan.RemoteAccessModuleCitrixgateway): &remoteaccess.CitrixGatewayLibrary{},
@@ -92,6 +95,8 @@ func (e *Engine) GetModules() ([]Module, error) {
 		appendModules(e.Modules[webscan.AppFingerprintResourceTypeCloudbucket])
 	case webscan.AppFingerprintResourceTypeFramework:
 		appendModules(e.Modules[webscan.AppFingerprintResourceTypeFramework])
+	case webscan.AppFingerprintResourceTypeKube:
+		appendModules(e.Modules[webscan.AppFingerprintResourceTypeKube])
 	case webscan.AppFingerprintResourceTypeRemoteaccess:
 		appendModules(e.Modules[webscan.AppFingerprintResourceTypeRemoteaccess])
 	case webscan.AppFingerprintResourceTypeWebserver:

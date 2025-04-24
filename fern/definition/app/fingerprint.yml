@@ -6,7 +6,6 @@ types:
     enum:
       - GRAPHQL
       - GRPC
-      - K8S
       - SWAGGER
   ContentManagementSystemModule:
     enum:
@@ -19,6 +18,9 @@ types:
     enum:
       - FASTAPI
       - NEXTJS
+  KubeModule:
+    enum:
+      - KUBE
   RemoteAccessModule:
     enum:
       - CITRIXGATEWAY
@@ -35,6 +37,7 @@ types:
       CloudBucketModule: CloudBucketModule
       ContentManagementSystemModule: ContentManagementSystemModule
       FrameworkModule: FrameworkModule
+      KubeModule: KubeModule
       RemoteAccessModule: RemoteAccessModule
       WebServerModule: WebServerModule
   AppFingerprintResourceType:
@@ -45,6 +48,7 @@ types:
       - FRAMEWORK
       - REMOTEACCESS
       - WEBSERVER
+      - KUBE
   # Config Struct
   AppFingerprintConfig:
     properties:

@@ -18,9 +18,9 @@ types:
     enum:
       - FASTAPI
       - NEXTJS
-  K8sModule:
+  KubeModule:
     enum:
-      - K8S
+      - KUBE
   RemoteAccessModule:
     enum:
       - CITRIXGATEWAY
@@ -37,7 +37,7 @@ types:
       CloudBucketModule: CloudBucketModule
       ContentManagementSystemModule: ContentManagementSystemModule
       FrameworkModule: FrameworkModule
-      K8sModule: K8sModule
+      KubeModule: KubeModule
       RemoteAccessModule: RemoteAccessModule
       WebServerModule: WebServerModule
   AppFingerprintResourceType:
@@ -48,7 +48,7 @@ types:
       - FRAMEWORK
       - REMOTEACCESS
       - WEBSERVER
-      - K8S
+      - KUBE
   # Config Struct
   AppFingerprintConfig:
     properties:

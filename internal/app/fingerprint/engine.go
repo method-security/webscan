@@ -11,7 +11,7 @@ import (
 	cloudbucket "github.com/Method-Security/webscan/internal/app/fingerprint/modules/cloudbucket"
 	contentmanagementsystem "github.com/Method-Security/webscan/internal/app/fingerprint/modules/contentmanagementsystem"
 	framework "github.com/Method-Security/webscan/internal/app/fingerprint/modules/frameworks"
-	k8s "github.com/Method-Security/webscan/internal/app/fingerprint/modules/k8s"
+	kube "github.com/Method-Security/webscan/internal/app/fingerprint/modules/kube"
 	remoteaccess "github.com/Method-Security/webscan/internal/app/fingerprint/modules/remoteaccess"
 	webserver "github.com/Method-Security/webscan/internal/app/fingerprint/modules/webserver"
 	"github.com/Method-Security/webscan/utils"
@@ -53,8 +53,8 @@ func NewEngine(config *webscan.AppFingerprintConfig) *Engine {
 				*webscan.NewAppFingerprintResourceModuleFromFrameworkModule(webscan.FrameworkModuleFastapi): &framework.FastAPILibrary{},
 				*webscan.NewAppFingerprintResourceModuleFromFrameworkModule(webscan.FrameworkModuleNextjs):  &framework.NextJsLibrary{},
 			},
-			webscan.AppFingerprintResourceTypeK8S: {
-				*webscan.NewAppFingerprintResourceModuleFromK8SModule(webscan.K8SModuleK8S): &k8s.KubeLibrary{},
+			webscan.AppFingerprintResourceTypeKube: {
+				*webscan.NewAppFingerprintResourceModuleFromKubeModule(webscan.KubeModuleKube): &kube.Library{},
 			},
 			webscan.AppFingerprintResourceTypeRemoteaccess: {
 				*webscan.NewAppFingerprintResourceModuleFromRemoteAccessModule(webscan.RemoteAccessModuleCitrixgateway): &remoteaccess.CitrixGatewayLibrary{},
@@ -95,8 +95,8 @@ func (e *Engine) GetModules() ([]Module, error) {
 		appendModules(e.Modules[webscan.AppFingerprintResourceTypeCloudbucket])
 	case webscan.AppFingerprintResourceTypeFramework:
 		appendModules(e.Modules[webscan.AppFingerprintResourceTypeFramework])
-	case webscan.AppFingerprintResourceTypeK8S:
-		appendModules(e.Modules[webscan.AppFingerprintResourceTypeK8S])
+	case webscan.AppFingerprintResourceTypeKube:
+		appendModules(e.Modules[webscan.AppFingerprintResourceTypeKube])
 	case webscan.AppFingerprintResourceTypeRemoteaccess:
 		appendModules(e.Modules[webscan.AppFingerprintResourceTypeRemoteaccess])
 	case webscan.AppFingerprintResourceTypeWebserver:

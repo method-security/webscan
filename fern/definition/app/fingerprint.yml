@@ -53,7 +53,7 @@ types:
   AppFingerprintConfig:
     properties:
       targets: list<string>
-      modules: list<AppFingerprintResourceModule>
+      modules: optional<list<AppFingerprintResourceModule>>
       resourceType: AppFingerprintResourceType
       timeout: integer
       successfulOnly: boolean

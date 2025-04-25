@@ -29,8 +29,7 @@ func (apLib *ApacheLibrary) RequestParams() (common.HttpMethod, common.RequestPa
 
 func (apLib *ApacheLibrary) HeaderIndicators() map[string][]string {
 	return map[string][]string{
-		"server":       {"apache"},
-		"x-powered-by": {""},
+		"server": {"apache"},
 	}
 }
 

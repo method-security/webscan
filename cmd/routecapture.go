@@ -249,7 +249,7 @@ func (a *WebScan) InitRoutecaptureCommand() {
 				return
 			}
 
-			fingerprintFilePaths, _ := cmd.Flags().GetStringSlice("fingerprintfilepaths")
+			fingerprintFilePaths, _ := cmd.Flags().GetStringArray("fingerprintfilepaths")
 			var fingerprints []routecapturefern.StaticAssetTakeOverFingerprint
 			if len(fingerprintFilePaths) != 0 {
 				fingerprints = staticassest.GrabStaticAssetTakeOverFingerprints(fingerprintFilePaths)

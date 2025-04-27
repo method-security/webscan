@@ -2,44 +2,6 @@ imports:
   requests: ../common/requests.yml
 types:
   # AppFingerprint Enums
-  ApiApplicationModule:
-    enum:
-      - GRAPHQL
-      - GRPC
-      - SWAGGER
-  ContentManagementSystemModule:
-    enum:
-      - WORDPRESS
-  CloudBucketModule:
-    enum:
-      - AWSS3
-      - AZUREBLOB
-  FrameworkModule:
-    enum:
-      - FASTAPI
-      - NEXTJS
-  KubeModule:
-    enum:
-      - KUBE
-  RemoteAccessModule:
-    enum:
-      - CITRIXGATEWAY
-      - VMWAREHORIZON
-      - WINDOWSRDP
-  WebServerModule:
-    enum:
-      - APACHE
-      - NGINX
-      - IIS
-  AppFingerprintResourceModule:
-    union:
-      ApiApplicationModule: ApiApplicationModule
-      CloudBucketModule: CloudBucketModule
-      ContentManagementSystemModule: ContentManagementSystemModule
-      FrameworkModule: FrameworkModule
-      KubeModule: KubeModule
-      RemoteAccessModule: RemoteAccessModule
-      WebServerModule: WebServerModule
   AppFingerprintResourceType:
     enum:
       - APIAPPLICATION
@@ -49,18 +11,34 @@ types:
       - REMOTEACCESS
       - WEBSERVER
       - KUBE
+  # Fingerprint File Struct
+  AppResourceModule:
+    properties:
+      name: string
+      paths : list<string>
+      RequestParams: optional<requests.RequestParams>
+      HeaderIndicators : optional<map<string, optional<list<string>>>>
+      BodyIndicators : optional<list<string>>
+  AppResourceType:
+    properties:
+      name: AppFingerprintResourceType
+      modules: list<AppResourceModule>
+  AppFingerprints:
+    properties:
+      resourcetTypes: list<AppResourceType>
   # Config Struct
   AppFingerprintConfig:
     properties:
       targets: list<string>
-      modules: optional<list<AppFingerprintResourceModule>>
-      resourceType: AppFingerprintResourceType
+      resourceType: string
+      modules: optional<list<string>>
+      fingerprints: optional<AppFingerprints>
       timeout: integer
       successfulOnly: boolean
   # AppFingerprint Struct
   AppFingerprintAttemptInfo:
     properties:
-      name: AppFingerprintResourceModule
+      name: string
       requests: optional<list<requests.RequestInfo>>
       finding : boolean
   AppFingerprintTargetInfo:

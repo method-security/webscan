@@ -9,43 +9,18 @@ import (
 	internal "github.com/Method-Security/webscan/generated/go/internal"
 )
 
-type ApiApplicationModule string
-
-const (
-	ApiApplicationModuleGraphql ApiApplicationModule = "GRAPHQL"
-	ApiApplicationModuleGrpc    ApiApplicationModule = "GRPC"
-	ApiApplicationModuleSwagger ApiApplicationModule = "SWAGGER"
-)
-
-func NewApiApplicationModuleFromString(s string) (ApiApplicationModule, error) {
-	switch s {
-	case "GRAPHQL":
-		return ApiApplicationModuleGraphql, nil
-	case "GRPC":
-		return ApiApplicationModuleGrpc, nil
-	case "SWAGGER":
-		return ApiApplicationModuleSwagger, nil
-	}
-	var t ApiApplicationModule
-	return "", fmt.Errorf("%s is not a valid %T", s, t)
-}
-
-func (a ApiApplicationModule) Ptr() *ApiApplicationModule {
-	return &a
-}
-
 type AppFingerprintAttemptInfo struct {
-	Name     *AppFingerprintResourceModule `json:"name,omitempty" url:"name,omitempty"`
-	Requests []*common.RequestInfo         `json:"requests,omitempty" url:"requests,omitempty"`
-	Finding  bool                          `json:"finding" url:"finding"`
+	Name     string                `json:"name" url:"name"`
+	Requests []*common.RequestInfo `json:"requests,omitempty" url:"requests,omitempty"`
+	Finding  bool                  `json:"finding" url:"finding"`
 
 	extraProperties map[string]interface{}
 	rawJSON         json.RawMessage
 }
 
-func (a *AppFingerprintAttemptInfo) GetName() *AppFingerprintResourceModule {
+func (a *AppFingerprintAttemptInfo) GetName() string {
 	if a == nil {
-		return nil
+		return ""
 	}
 	return a.Name
 }
@@ -97,11 +72,12 @@ func (a *AppFingerprintAttemptInfo) String() string {
 }
 
 type AppFingerprintConfig struct {
-	Targets        []string                        `json:"targets,omitempty" url:"targets,omitempty"`
-	Modules        []*AppFingerprintResourceModule `json:"modules,omitempty" url:"modules,omitempty"`
-	ResourceType   AppFingerprintResourceType      `json:"resourceType" url:"resourceType"`
-	Timeout        int                             `json:"timeout" url:"timeout"`
-	SuccessfulOnly bool                            `json:"successfulOnly" url:"successfulOnly"`
+	Targets        []string         `json:"targets,omitempty" url:"targets,omitempty"`
+	ResourceType   string           `json:"resourceType" url:"resourceType"`
+	Modules        []string         `json:"modules,omitempty" url:"modules,omitempty"`
+	Fingerprints   *AppFingerprints `json:"fingerprints,omitempty" url:"fingerprints,omitempty"`
+	Timeout        int              `json:"timeout" url:"timeout"`
+	SuccessfulOnly bool             `json:"successfulOnly" url:"successfulOnly"`
 
 	extraProperties map[string]interface{}
 	rawJSON         json.RawMessage
@@ -114,18 +90,25 @@ func (a *AppFingerprintConfig) GetTargets() []string {
 	return a.Targets
 }
 
-func (a *AppFingerprintConfig) GetModules() []*AppFingerprintResourceModule {
+func (a *AppFingerprintConfig) GetResourceType() string {
+	if a == nil {
+		return ""
+	}
+	return a.ResourceType
+}
+
+func (a *AppFingerprintConfig) GetModules() []string {
 	if a == nil {
 		return nil
 	}
 	return a.Modules
 }
 
-func (a *AppFingerprintConfig) GetResourceType() AppFingerprintResourceType {
+func (a *AppFingerprintConfig) GetFingerprints() *AppFingerprints {
 	if a == nil {
-		return ""
+		return nil
 	}
-	return a.ResourceType
+	return a.Fingerprints
 }
 
 func (a *AppFingerprintConfig) GetTimeout() int {
@@ -236,326 +219,6 @@ func (a *AppFingerprintReport) String() string {
 	return fmt.Sprintf("%#v", a)
 }
 
-type AppFingerprintResourceModule struct {
-	Type                          string
-	ApiApplicationModule          ApiApplicationModule
-	CloudBucketModule             CloudBucketModule
-	ContentManagementSystemModule ContentManagementSystemModule
-	FrameworkModule               FrameworkModule
-	KubeModule                    KubeModule
-	RemoteAccessModule            RemoteAccessModule
-	WebServerModule               WebServerModule
-}
-
-func NewAppFingerprintResourceModuleFromApiApplicationModule(value ApiApplicationModule) *AppFingerprintResourceModule {
-	return &AppFingerprintResourceModule{Type: "ApiApplicationModule", ApiApplicationModule: value}
-}
-
-func NewAppFingerprintResourceModuleFromCloudBucketModule(value CloudBucketModule) *AppFingerprintResourceModule {
-	return &AppFingerprintResourceModule{Type: "CloudBucketModule", CloudBucketModule: value}
-}
-
-func NewAppFingerprintResourceModuleFromContentManagementSystemModule(value ContentManagementSystemModule) *AppFingerprintResourceModule {
-	return &AppFingerprintResourceModule{Type: "ContentManagementSystemModule", ContentManagementSystemModule: value}
-}
-
-func NewAppFingerprintResourceModuleFromFrameworkModule(value FrameworkModule) *AppFingerprintResourceModule {
-	return &AppFingerprintResourceModule{Type: "FrameworkModule", FrameworkModule: value}
-}
-
-func NewAppFingerprintResourceModuleFromKubeModule(value KubeModule) *AppFingerprintResourceModule {
-	return &AppFingerprintResourceModule{Type: "KubeModule", KubeModule: value}
-}
-
-func NewAppFingerprintResourceModuleFromRemoteAccessModule(value RemoteAccessModule) *AppFingerprintResourceModule {
-	return &AppFingerprintResourceModule{Type: "RemoteAccessModule", RemoteAccessModule: value}
-}
-
-func NewAppFingerprintResourceModuleFromWebServerModule(value WebServerModule) *AppFingerprintResourceModule {
-	return &AppFingerprintResourceModule{Type: "WebServerModule", WebServerModule: value}
-}
-
-func (a *AppFingerprintResourceModule) GetType() string {
-	if a == nil {
-		return ""
-	}
-	return a.Type
-}
-
-func (a *AppFingerprintResourceModule) GetApiApplicationModule() ApiApplicationModule {
-	if a == nil {
-		return ""
-	}
-	return a.ApiApplicationModule
-}
-
-func (a *AppFingerprintResourceModule) GetCloudBucketModule() CloudBucketModule {
-	if a == nil {
-		return ""
-	}
-	return a.CloudBucketModule
-}
-
-func (a *AppFingerprintResourceModule) GetContentManagementSystemModule() ContentManagementSystemModule {
-	if a == nil {
-		return ""
-	}
-	return a.ContentManagementSystemModule
-}
-
-func (a *AppFingerprintResourceModule) GetFrameworkModule() FrameworkModule {
-	if a == nil {
-		return ""
-	}
-	return a.FrameworkModule
-}
-
-func (a *AppFingerprintResourceModule) GetKubeModule() KubeModule {
-	if a == nil {
-		return ""
-	}
-	return a.KubeModule
-}
-
-func (a *AppFingerprintResourceModule) GetRemoteAccessModule() RemoteAccessModule {
-	if a == nil {
-		return ""
-	}
-	return a.RemoteAccessModule
-}
-
-func (a *AppFingerprintResourceModule) GetWebServerModule() WebServerModule {
-	if a == nil {
-		return ""
-	}
-	return a.WebServerModule
-}
-
-func (a *AppFingerprintResourceModule) UnmarshalJSON(data []byte) error {
-	var unmarshaler struct {
-		Type string `json:"type"`
-	}
-	if err := json.Unmarshal(data, &unmarshaler); err != nil {
-		return err
-	}
-	a.Type = unmarshaler.Type
-	if unmarshaler.Type == "" {
-		return fmt.Errorf("%T did not include discriminant type", a)
-	}
-	switch unmarshaler.Type {
-	case "ApiApplicationModule":
-		var valueUnmarshaler struct {
-			ApiApplicationModule ApiApplicationModule `json:"value"`
-		}
-		if err := json.Unmarshal(data, &valueUnmarshaler); err != nil {
-			return err
-		}
-		a.ApiApplicationModule = valueUnmarshaler.ApiApplicationModule
-	case "CloudBucketModule":
-		var valueUnmarshaler struct {
-			CloudBucketModule CloudBucketModule `json:"value"`
-		}
-		if err := json.Unmarshal(data, &valueUnmarshaler); err != nil {
-			return err
-		}
-		a.CloudBucketModule = valueUnmarshaler.CloudBucketModule
-	case "ContentManagementSystemModule":
-		var valueUnmarshaler struct {
-			ContentManagementSystemModule ContentManagementSystemModule `json:"value"`
-		}
-		if err := json.Unmarshal(data, &valueUnmarshaler); err != nil {
-			return err
-		}
-		a.ContentManagementSystemModule = valueUnmarshaler.ContentManagementSystemModule
-	case "FrameworkModule":
-		var valueUnmarshaler struct {
-			FrameworkModule FrameworkModule `json:"value"`
-		}
-		if err := json.Unmarshal(data, &valueUnmarshaler); err != nil {
-			return err
-		}
-		a.FrameworkModule = valueUnmarshaler.FrameworkModule
-	case "KubeModule":
-		var valueUnmarshaler struct {
-			KubeModule KubeModule `json:"value"`
-		}
-		if err := json.Unmarshal(data, &valueUnmarshaler); err != nil {
-			return err
-		}
-		a.KubeModule = valueUnmarshaler.KubeModule
-	case "RemoteAccessModule":
-		var valueUnmarshaler struct {
-			RemoteAccessModule RemoteAccessModule `json:"value"`
-		}
-		if err := json.Unmarshal(data, &valueUnmarshaler); err != nil {
-			return err
-		}
-		a.RemoteAccessModule = valueUnmarshaler.RemoteAccessModule
-	case "WebServerModule":
-		var valueUnmarshaler struct {
-			WebServerModule WebServerModule `json:"value"`
-		}
-		if err := json.Unmarshal(data, &valueUnmarshaler); err != nil {
-			return err
-		}
-		a.WebServerModule = valueUnmarshaler.WebServerModule
-	}
-	return nil
-}
-
-func (a AppFingerprintResourceModule) MarshalJSON() ([]byte, error) {
-	if err := a.validate(); err != nil {
-		return nil, err
-	}
-	switch a.Type {
-	default:
-		return nil, fmt.Errorf("invalid type %s in %T", a.Type, a)
-	case "ApiApplicationModule":
-		var marshaler = struct {
-			Type                 string               `json:"type"`
-			ApiApplicationModule ApiApplicationModule `json:"value"`
-		}{
-			Type:                 "ApiApplicationModule",
-			ApiApplicationModule: a.ApiApplicationModule,
-		}
-		return json.Marshal(marshaler)
-	case "CloudBucketModule":
-		var marshaler = struct {
-			Type              string            `json:"type"`
-			CloudBucketModule CloudBucketModule `json:"value"`
-		}{
-			Type:              "CloudBucketModule",
-			CloudBucketModule: a.CloudBucketModule,
-		}
-		return json.Marshal(marshaler)
-	case "ContentManagementSystemModule":
-		var marshaler = struct {
-			Type                          string                        `json:"type"`
-			ContentManagementSystemModule ContentManagementSystemModule `json:"value"`
-		}{
-			Type:                          "ContentManagementSystemModule",
-			ContentManagementSystemModule: a.ContentManagementSystemModule,
-		}
-		return json.Marshal(marshaler)
-	case "FrameworkModule":
-		var marshaler = struct {
-			Type            string          `json:"type"`
-			FrameworkModule FrameworkModule `json:"value"`
-		}{
-			Type:            "FrameworkModule",
-			FrameworkModule: a.FrameworkModule,
-		}
-		return json.Marshal(marshaler)
-	case "KubeModule":
-		var marshaler = struct {
-			Type       string     `json:"type"`
-			KubeModule KubeModule `json:"value"`
-		}{
-			Type:       "KubeModule",
-			KubeModule: a.KubeModule,
-		}
-		return json.Marshal(marshaler)
-	case "RemoteAccessModule":
-		var marshaler = struct {
-			Type               string             `json:"type"`
-			RemoteAccessModule RemoteAccessModule `json:"value"`
-		}{
-			Type:               "RemoteAccessModule",
-			RemoteAccessModule: a.RemoteAccessModule,
-		}
-		return json.Marshal(marshaler)
-	case "WebServerModule":
-		var marshaler = struct {
-			Type            string          `json:"type"`
-			WebServerModule WebServerModule `json:"value"`
-		}{
-			Type:            "WebServerModule",
-			WebServerModule: a.WebServerModule,
-		}
-		return json.Marshal(marshaler)
-	}
-}
-
-type AppFingerprintResourceModuleVisitor interface {
-	VisitApiApplicationModule(ApiApplicationModule) error
-	VisitCloudBucketModule(CloudBucketModule) error
-	VisitContentManagementSystemModule(ContentManagementSystemModule) error
-	VisitFrameworkModule(FrameworkModule) error
-	VisitKubeModule(KubeModule) error
-	VisitRemoteAccessModule(RemoteAccessModule) error
-	VisitWebServerModule(WebServerModule) error
-}
-
-func (a *AppFingerprintResourceModule) Accept(visitor AppFingerprintResourceModuleVisitor) error {
-	switch a.Type {
-	default:
-		return fmt.Errorf("invalid type %s in %T", a.Type, a)
-	case "ApiApplicationModule":
-		return visitor.VisitApiApplicationModule(a.ApiApplicationModule)
-	case "CloudBucketModule":
-		return visitor.VisitCloudBucketModule(a.CloudBucketModule)
-	case "ContentManagementSystemModule":
-		return visitor.VisitContentManagementSystemModule(a.ContentManagementSystemModule)
-	case "FrameworkModule":
-		return visitor.VisitFrameworkModule(a.FrameworkModule)
-	case "KubeModule":
-		return visitor.VisitKubeModule(a.KubeModule)
-	case "RemoteAccessModule":
-		return visitor.VisitRemoteAccessModule(a.RemoteAccessModule)
-	case "WebServerModule":
-		return visitor.VisitWebServerModule(a.WebServerModule)
-	}
-}
-
-func (a *AppFingerprintResourceModule) validate() error {
-	if a == nil {
-		return fmt.Errorf("type %T is nil", a)
-	}
-	var fields []string
-	if a.ApiApplicationModule != "" {
-		fields = append(fields, "ApiApplicationModule")
-	}
-	if a.CloudBucketModule != "" {
-		fields = append(fields, "CloudBucketModule")
-	}
-	if a.ContentManagementSystemModule != "" {
-		fields = append(fields, "ContentManagementSystemModule")
-	}
-	if a.FrameworkModule != "" {
-		fields = append(fields, "FrameworkModule")
-	}
-	if a.KubeModule != "" {
-		fields = append(fields, "KubeModule")
-	}
-	if a.RemoteAccessModule != "" {
-		fields = append(fields, "RemoteAccessModule")
-	}
-	if a.WebServerModule != "" {
-		fields = append(fields, "WebServerModule")
-	}
-	if len(fields) == 0 {
-		if a.Type != "" {
-			return fmt.Errorf("type %T defines a discriminant set to %q but the field is not set", a, a.Type)
-		}
-		return fmt.Errorf("type %T is empty", a)
-	}
-	if len(fields) > 1 {
-		return fmt.Errorf("type %T defines values for %s, but only one value is allowed", a, fields)
-	}
-	if a.Type != "" {
-		field := fields[0]
-		if a.Type != field {
-			return fmt.Errorf(
-				"type %T defines a discriminant set to %q, but it does not match the %T field; either remove or update the discriminant to match",
-				a,
-				a.Type,
-				a,
-			)
-		}
-	}
-	return nil
-}
-
 type AppFingerprintResourceType string
 
 const (
@@ -647,134 +310,180 @@ func (a *AppFingerprintTargetInfo) String() string {
 	return fmt.Sprintf("%#v", a)
 }
 
-type CloudBucketModule string
+type AppFingerprints struct {
+	ResourcetTypes []*AppResourceType `json:"resourcetTypes,omitempty" url:"resourcetTypes,omitempty"`
 
-const (
-	CloudBucketModuleAwss3     CloudBucketModule = "AWSS3"
-	CloudBucketModuleAzureblob CloudBucketModule = "AZUREBLOB"
-)
+	extraProperties map[string]interface{}
+	rawJSON         json.RawMessage
+}
 
-func NewCloudBucketModuleFromString(s string) (CloudBucketModule, error) {
-	switch s {
-	case "AWSS3":
-		return CloudBucketModuleAwss3, nil
-	case "AZUREBLOB":
-		return CloudBucketModuleAzureblob, nil
+func (a *AppFingerprints) GetResourcetTypes() []*AppResourceType {
+	if a == nil {
+		return nil
 	}
-	var t CloudBucketModule
-	return "", fmt.Errorf("%s is not a valid %T", s, t)
+	return a.ResourcetTypes
 }
 
-func (c CloudBucketModule) Ptr() *CloudBucketModule {
-	return &c
+func (a *AppFingerprints) GetExtraProperties() map[string]interface{} {
+	return a.extraProperties
 }
 
-type ContentManagementSystemModule string
-
-const (
-	ContentManagementSystemModuleWordpress ContentManagementSystemModule = "WORDPRESS"
-)
-
-func NewContentManagementSystemModuleFromString(s string) (ContentManagementSystemModule, error) {
-	switch s {
-	case "WORDPRESS":
-		return ContentManagementSystemModuleWordpress, nil
+func (a *AppFingerprints) UnmarshalJSON(data []byte) error {
+	type unmarshaler AppFingerprints
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
 	}
-	var t ContentManagementSystemModule
-	return "", fmt.Errorf("%s is not a valid %T", s, t)
-}
-
-func (c ContentManagementSystemModule) Ptr() *ContentManagementSystemModule {
-	return &c
-}
-
-type FrameworkModule string
-
-const (
-	FrameworkModuleFastapi FrameworkModule = "FASTAPI"
-	FrameworkModuleNextjs  FrameworkModule = "NEXTJS"
-)
-
-func NewFrameworkModuleFromString(s string) (FrameworkModule, error) {
-	switch s {
-	case "FASTAPI":
-		return FrameworkModuleFastapi, nil
-	case "NEXTJS":
-		return FrameworkModuleNextjs, nil
+	*a = AppFingerprints(value)
+	extraProperties, err := internal.ExtractExtraProperties(data, *a)
+	if err != nil {
+		return err
 	}
-	var t FrameworkModule
-	return "", fmt.Errorf("%s is not a valid %T", s, t)
+	a.extraProperties = extraProperties
+	a.rawJSON = json.RawMessage(data)
+	return nil
 }
 
-func (f FrameworkModule) Ptr() *FrameworkModule {
-	return &f
-}
-
-type KubeModule string
-
-const (
-	KubeModuleKube KubeModule = "KUBE"
-)
-
-func NewKubeModuleFromString(s string) (KubeModule, error) {
-	switch s {
-	case "KUBE":
-		return KubeModuleKube, nil
+func (a *AppFingerprints) String() string {
+	if len(a.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(a.rawJSON); err == nil {
+			return value
+		}
 	}
-	var t KubeModule
-	return "", fmt.Errorf("%s is not a valid %T", s, t)
-}
-
-func (k KubeModule) Ptr() *KubeModule {
-	return &k
-}
-
-type RemoteAccessModule string
-
-const (
-	RemoteAccessModuleCitrixgateway RemoteAccessModule = "CITRIXGATEWAY"
-	RemoteAccessModuleVmwarehorizon RemoteAccessModule = "VMWAREHORIZON"
-	RemoteAccessModuleWindowsrdp    RemoteAccessModule = "WINDOWSRDP"
-)
-
-func NewRemoteAccessModuleFromString(s string) (RemoteAccessModule, error) {
-	switch s {
-	case "CITRIXGATEWAY":
-		return RemoteAccessModuleCitrixgateway, nil
-	case "VMWAREHORIZON":
-		return RemoteAccessModuleVmwarehorizon, nil
-	case "WINDOWSRDP":
-		return RemoteAccessModuleWindowsrdp, nil
+	if value, err := internal.StringifyJSON(a); err == nil {
+		return value
 	}
-	var t RemoteAccessModule
-	return "", fmt.Errorf("%s is not a valid %T", s, t)
+	return fmt.Sprintf("%#v", a)
 }
 
-func (r RemoteAccessModule) Ptr() *RemoteAccessModule {
-	return &r
+type AppResourceModule struct {
+	Name             string                `json:"name" url:"name"`
+	Paths            []string              `json:"paths,omitempty" url:"paths,omitempty"`
+	RequestParams    *common.RequestParams `json:"RequestParams,omitempty" url:"RequestParams,omitempty"`
+	HeaderIndicators map[string][]string   `json:"HeaderIndicators,omitempty" url:"HeaderIndicators,omitempty"`
+	BodyIndicators   []string              `json:"BodyIndicators,omitempty" url:"BodyIndicators,omitempty"`
+
+	extraProperties map[string]interface{}
+	rawJSON         json.RawMessage
 }
 
-type WebServerModule string
-
-const (
-	WebServerModuleApache WebServerModule = "APACHE"
-	WebServerModuleNginx  WebServerModule = "NGINX"
-	WebServerModuleIis    WebServerModule = "IIS"
-)
-
-func NewWebServerModuleFromString(s string) (WebServerModule, error) {
-	switch s {
-	case "APACHE":
-		return WebServerModuleApache, nil
-	case "NGINX":
-		return WebServerModuleNginx, nil
-	case "IIS":
-		return WebServerModuleIis, nil
+func (a *AppResourceModule) GetName() string {
+	if a == nil {
+		return ""
 	}
-	var t WebServerModule
-	return "", fmt.Errorf("%s is not a valid %T", s, t)
+	return a.Name
 }
 
-func (w WebServerModule) Ptr() *WebServerModule {
-	return &w
+func (a *AppResourceModule) GetPaths() []string {
+	if a == nil {
+		return nil
+	}
+	return a.Paths
+}
+
+func (a *AppResourceModule) GetRequestParams() *common.RequestParams {
+	if a == nil {
+		return nil
+	}
+	return a.RequestParams
+}
+
+func (a *AppResourceModule) GetHeaderIndicators() map[string][]string {
+	if a == nil {
+		return nil
+	}
+	return a.HeaderIndicators
+}
+
+func (a *AppResourceModule) GetBodyIndicators() []string {
+	if a == nil {
+		return nil
+	}
+	return a.BodyIndicators
+}
+
+func (a *AppResourceModule) GetExtraProperties() map[string]interface{} {
+	return a.extraProperties
+}
+
+func (a *AppResourceModule) UnmarshalJSON(data []byte) error {
+	type unmarshaler AppResourceModule
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*a = AppResourceModule(value)
+	extraProperties, err := internal.ExtractExtraProperties(data, *a)
+	if err != nil {
+		return err
+	}
+	a.extraProperties = extraProperties
+	a.rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (a *AppResourceModule) String() string {
+	if len(a.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(a.rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := internal.StringifyJSON(a); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", a)
+}
+
+type AppResourceType struct {
+	Name    AppFingerprintResourceType `json:"name" url:"name"`
+	Modules []*AppResourceModule       `json:"modules,omitempty" url:"modules,omitempty"`
+
+	extraProperties map[string]interface{}
+	rawJSON         json.RawMessage
+}
+
+func (a *AppResourceType) GetName() AppFingerprintResourceType {
+	if a == nil {
+		return ""
+	}
+	return a.Name
+}
+
+func (a *AppResourceType) GetModules() []*AppResourceModule {
+	if a == nil {
+		return nil
+	}
+	return a.Modules
+}
+
+func (a *AppResourceType) GetExtraProperties() map[string]interface{} {
+	return a.extraProperties
+}
+
+func (a *AppResourceType) UnmarshalJSON(data []byte) error {
+	type unmarshaler AppResourceType
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*a = AppResourceType(value)
+	extraProperties, err := internal.ExtractExtraProperties(data, *a)
+	if err != nil {
+		return err
+	}
+	a.extraProperties = extraProperties
+	a.rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (a *AppResourceType) String() string {
+	if len(a.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(a.rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := internal.StringifyJSON(a); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", a)
 }

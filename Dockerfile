@@ -12,6 +12,7 @@ RUN \
   mkdir -p /opt/method/${CLI_NAME}/var/data && \
   mkdir -p /opt/method/${CLI_NAME}/var/data/tmp && \
   mkdir -p /opt/method/${CLI_NAME}/var/conf && \
+  mkdir -p /opt/method/${CLI_NAME}/var/conf/app && \
   mkdir -p /opt/method/${CLI_NAME}/var/conf/wordpress && \
   mkdir -p /opt/method/${CLI_NAME}/var/log && \
   mkdir -p /opt/method/${CLI_NAME}/service/bin && \
@@ -19,6 +20,7 @@ RUN \
 
 
 COPY configs/*                     /opt/method/${CLI_NAME}/var/conf/
+COPY configs/app/*                 /opt/method/${CLI_NAME}/var/conf/app/
 COPY configs/wordpress/*           /opt/method/${CLI_NAME}/var/conf/wordpress/
 
 COPY ${CLI_NAME} /opt/method/${CLI_NAME}/service/bin/${CLI_NAME}

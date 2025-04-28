@@ -39,7 +39,8 @@ func Run(ctx context.Context, target string, timeout int, config *webscan.AppFin
 		for _, path := range module.Paths {
 			// Request Configuration
 			fullPath := parsedTargetPath + path
-			method := common.HttpMethodGet
+			var method = module.Method
+
 			var requestParams common.RequestParams
 			if module.RequestParams != nil {
 				requestParams = *module.RequestParams

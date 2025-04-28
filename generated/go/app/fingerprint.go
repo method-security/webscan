@@ -358,6 +358,7 @@ func (a *AppFingerprints) String() string {
 
 type AppResourceModule struct {
 	Name             string                `json:"name" url:"name"`
+	Method           common.HttpMethod     `json:"method" url:"method"`
 	Paths            []string              `json:"paths,omitempty" url:"paths,omitempty"`
 	RequestParams    *common.RequestParams `json:"RequestParams,omitempty" url:"RequestParams,omitempty"`
 	HeaderIndicators map[string][]string   `json:"HeaderIndicators,omitempty" url:"HeaderIndicators,omitempty"`
@@ -372,6 +373,13 @@ func (a *AppResourceModule) GetName() string {
 		return ""
 	}
 	return a.Name
+}
+
+func (a *AppResourceModule) GetMethod() common.HttpMethod {
+	if a == nil {
+		return ""
+	}
+	return a.Method
 }
 
 func (a *AppResourceModule) GetPaths() []string {

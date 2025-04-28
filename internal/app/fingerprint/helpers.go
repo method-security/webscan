@@ -73,10 +73,8 @@ func FilterFingerprints(fingerprints *webscan.AppFingerprints, resourceType stri
 // GetModule returns the module configuration for a given resource type and module
 func GetModule(resourceType webscan.AppFingerprintResourceType, module string, fingerprints *webscan.AppFingerprints) (*webscan.AppResourceModule, error) {
 	// Check if resource type exists
-	var foundResourceType bool
 	for _, rt := range fingerprints.ResourcetTypes {
 		if rt.Name == resourceType {
-			foundResourceType = true
 			// Check if module exists
 			for _, m := range rt.Modules {
 				if m.Name == module {
@@ -86,8 +84,5 @@ func GetModule(resourceType webscan.AppFingerprintResourceType, module string, f
 			return nil, fmt.Errorf("module %s not found for resource type %s", module, resourceType)
 		}
 	}
-	if !foundResourceType {
-		return nil, fmt.Errorf("resource type %s not found", resourceType)
-	}
-	return nil, nil
+	return nil, fmt.Errorf("resource type %s not found", resourceType)
 }

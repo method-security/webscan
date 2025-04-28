@@ -15,6 +15,7 @@ types:
   AppResourceModule:
     properties:
       name: string
+      method: requests.HttpMethod
       paths : list<string>
       RequestParams: optional<requests.RequestParams>
       HeaderIndicators : optional<map<string, optional<list<string>>>>

@@ -224,7 +224,7 @@ type RequestParams struct {
 	PathParams      map[string]string `json:"pathParams,omitempty" url:"pathParams,omitempty"`
 	QueryParams     map[string]string `json:"queryParams,omitempty" url:"queryParams,omitempty"`
 	HeaderParams    map[string]string `json:"headerParams,omitempty" url:"headerParams,omitempty"`
-	BodyParams      string            `json:"bodyParams" url:"bodyParams"`
+	BodyParams      *string           `json:"bodyParams,omitempty" url:"bodyParams,omitempty"`
 	FormParams      map[string]string `json:"formParams,omitempty" url:"formParams,omitempty"`
 	MultipartParams map[string]string `json:"multipartParams,omitempty" url:"multipartParams,omitempty"`
 
@@ -253,9 +253,9 @@ func (r *RequestParams) GetHeaderParams() map[string]string {
 	return r.HeaderParams
 }
 
-func (r *RequestParams) GetBodyParams() string {
+func (r *RequestParams) GetBodyParams() *string {
 	if r == nil {
-		return ""
+		return nil
 	}
 	return r.BodyParams
 }

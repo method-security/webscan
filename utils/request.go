@@ -128,11 +128,11 @@ func constructURL(baseURL, path string, pathParams, queryParams map[string]strin
 }
 
 func prepareRequestBody(params common.RequestParams) (io.Reader, string, error) {
-	if params.BodyParams != "" {
-		if json.Valid([]byte(params.BodyParams)) {
-			return strings.NewReader(params.BodyParams), "application/json", nil
+	if params.BodyParams != nil && *params.BodyParams != "" {
+		if json.Valid([]byte(*params.BodyParams)) {
+			return strings.NewReader(*params.BodyParams), "application/json", nil
 		}
-		return bytes.NewReader([]byte(params.BodyParams)), "text/plain", nil
+		return bytes.NewReader([]byte(*params.BodyParams)), "text/plain", nil
 	}
 
 	if len(params.FormParams) > 0 {
@@ -248,8 +248,8 @@ func populateReport(report *common.RequestInfo, statusCode int, headers map[stri
 	if len(params.HeaderParams) > 0 {
 		report.HeaderParams = params.HeaderParams
 	}
-	if params.BodyParams != "" {
-		report.BodyParams = &params.BodyParams
+	if params.BodyParams != nil && *params.BodyParams != "" {
+		report.BodyParams = params.BodyParams
 	}
 	if len(params.FormParams) > 0 {
 		report.FormParams = params.FormParams

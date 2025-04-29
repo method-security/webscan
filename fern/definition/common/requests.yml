@@ -31,9 +31,9 @@ types:
   # Request Params
   RequestParams:
     properties:
-      pathParams: map<string, string>
-      queryParams: map<string, string>
-      headerParams: map<string, string>
-      bodyParams: string
-      formParams: map<string, string>
-      multipartParams: map<string, string>
+      pathParams: optional<map<string, string>>
+      queryParams: optional<map<string, string>>
+      headerParams: optional<map<string, string>>
+      bodyParams: optional<string>
+      formParams: optional<map<string, string>>
+      multipartParams: optional<map<string, string>>

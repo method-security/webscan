@@ -10,12 +10,12 @@ import (
 )
 
 func Run(ctx context.Context, target string, timeout int, config *webscan.AppFingerprintConfig) ([]*webscan.AppFingerprintAttemptInfo, []string) {
-	if config == nil || config.Fingerprints == nil || len(config.Fingerprints.ResourcetTypes) == 0 {
+	if config == nil || config.Fingerprints == nil || len(config.Fingerprints.Modules) == 0 {
 		return []*webscan.AppFingerprintAttemptInfo{}, []string{"invalid config: no resource types found"}
 	}
 
 	// Get the first (and should be only) resource type from the filtered config
-	resourceType := config.Fingerprints.ResourcetTypes[0]
+	resourceType := config.Fingerprints
 	if len(resourceType.Modules) == 0 {
 		return []*webscan.AppFingerprintAttemptInfo{}, []string{"invalid config: no modules found for resource type"}
 	}

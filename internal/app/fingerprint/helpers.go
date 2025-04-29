@@ -26,7 +26,7 @@ func LoadFingerprints(filePath string) (*webscan.AppFingerprints, error) {
 
 // FilterFingerprints filters the fingerprints based on resource types and modules
 // Returns error if resource type or module doesn't exist
-func FilterFingerprints(fingerprints *webscan.AppFingerprints, resourceType string, modules []string) (*webscan.AppFingerprints, error) {
+func FilterFingerprints(fingerprints *webscan.AppFingerprints, resourceType string, modules []string) (*webscan.AppResourceType, error) {
 	// Convert string to AppFingerprintResourceType
 	rt, err := webscan.NewAppFingerprintResourceTypeFromString(resourceType)
 	if err != nil {
@@ -35,7 +35,7 @@ func FilterFingerprints(fingerprints *webscan.AppFingerprints, resourceType stri
 
 	// Find the resource type
 	var foundResourceType *webscan.AppResourceType
-	for _, r := range fingerprints.ResourcetTypes {
+	for _, r := range fingerprints.ResourceTypes {
 		if r.Name == rt {
 			foundResourceType = r
 			break
@@ -47,9 +47,7 @@ func FilterFingerprints(fingerprints *webscan.AppFingerprints, resourceType stri
 
 	// If no module specified, return all modules for this type
 	if len(modules) == 0 {
-		return &webscan.AppFingerprints{
-			ResourcetTypes: []*webscan.AppResourceType{foundResourceType},
-		}, nil
+		return foundResourceType, nil
 	}
 
 	// Find the module
@@ -65,15 +63,13 @@ func FilterFingerprints(fingerprints *webscan.AppFingerprints, resourceType stri
 
 	// Return filtered config with just this module
 	foundResourceType.Modules = foundModules
-	return &webscan.AppFingerprints{
-		ResourcetTypes: []*webscan.AppResourceType{foundResourceType},
-	}, nil
+	return foundResourceType, nil
 }
 
 // GetModule returns the module configuration for a given resource type and module
 func GetModule(resourceType webscan.AppFingerprintResourceType, module string, fingerprints *webscan.AppFingerprints) (*webscan.AppResourceModule, error) {
 	// Check if resource type exists
-	for _, rt := range fingerprints.ResourcetTypes {
+	for _, rt := range fingerprints.ResourceTypes {
 		if rt.Name == resourceType {
 			// Check if module exists
 			for _, m := range rt.Modules {

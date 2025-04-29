@@ -26,14 +26,14 @@ types:
       modules: list<AppResourceModule>
   AppFingerprints:
     properties:
-      resourcetTypes: list<AppResourceType>
+      resourceTypes: list<AppResourceType>
   # Config Struct
   AppFingerprintConfig:
     properties:
       targets: list<string>
       resourceType: string
       modules: optional<list<string>>
-      fingerprints: optional<AppFingerprints>
+      fingerprints: optional<AppResourceType>
       timeout: integer
       successfulOnly: boolean
   # AppFingerprint Struct

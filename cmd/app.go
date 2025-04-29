@@ -395,7 +395,7 @@ It extracts information such as server version, enabled modules, and more.`,
 	a.RootCmd.AddCommand(appCmd)
 }
 
-func newFingerprintConfig(targets []string, resourceEnum string, moduleEnums []string, fingerprints *webscan.AppFingerprints, timeout int, successfulOnly bool) (*webscan.AppFingerprintConfig, error) {
+func newFingerprintConfig(targets []string, resourceEnum string, moduleEnums []string, fingerprints *webscan.AppResourceType, timeout int, successfulOnly bool) (*webscan.AppFingerprintConfig, error) {
 	config := &webscan.AppFingerprintConfig{
 		Targets:        targets,
 		ResourceType:   resourceEnum,

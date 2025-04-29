@@ -75,7 +75,7 @@ type AppFingerprintConfig struct {
 	Targets        []string         `json:"targets,omitempty" url:"targets,omitempty"`
 	ResourceType   string           `json:"resourceType" url:"resourceType"`
 	Modules        []string         `json:"modules,omitempty" url:"modules,omitempty"`
-	Fingerprints   *AppFingerprints `json:"fingerprints,omitempty" url:"fingerprints,omitempty"`
+	Fingerprints   *AppResourceType `json:"fingerprints,omitempty" url:"fingerprints,omitempty"`
 	Timeout        int              `json:"timeout" url:"timeout"`
 	SuccessfulOnly bool             `json:"successfulOnly" url:"successfulOnly"`
 
@@ -104,7 +104,7 @@ func (a *AppFingerprintConfig) GetModules() []string {
 	return a.Modules
 }
 
-func (a *AppFingerprintConfig) GetFingerprints() *AppFingerprints {
+func (a *AppFingerprintConfig) GetFingerprints() *AppResourceType {
 	if a == nil {
 		return nil
 	}
@@ -311,17 +311,17 @@ func (a *AppFingerprintTargetInfo) String() string {
 }
 
 type AppFingerprints struct {
-	ResourcetTypes []*AppResourceType `json:"resourcetTypes,omitempty" url:"resourcetTypes,omitempty"`
+	ResourceTypes []*AppResourceType `json:"resourceTypes,omitempty" url:"resourceTypes,omitempty"`
 
 	extraProperties map[string]interface{}
 	rawJSON         json.RawMessage
 }
 
-func (a *AppFingerprints) GetResourcetTypes() []*AppResourceType {
+func (a *AppFingerprints) GetResourceTypes() []*AppResourceType {
 	if a == nil {
 		return nil
 	}
-	return a.ResourcetTypes
+	return a.ResourceTypes
 }
 
 func (a *AppFingerprints) GetExtraProperties() map[string]interface{} {

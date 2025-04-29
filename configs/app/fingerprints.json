@@ -452,6 +452,35 @@
             "name": "REMOTEACCESS",
             "modules": [
                 {
+                    "name": "CISCOANYCONNECT",
+                    "method": "GET",
+                    "paths": [
+                        "/",
+                        "/+webvpn+/index.html",
+                        "/+CSCOE+/logon.html",
+                        "/+webvpn+/login"
+                    ],
+                    "headerIndicators": {
+                        "set-cookie": [
+                            "webvpnlogin",
+                            "webvpn"
+                        ],
+                        "x-cisco": [
+                            ""
+                        ],
+                        "server": [
+                            "cisco"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "cisco anyconnect",
+                        "+CSCOE+",
+                        "webvpn",
+                        "cisco ssl vpn",
+                        "webvpn login"
+                    ]
+                },
+                {
                     "name": "CITRIXGATEWAY",
                     "method": "GET",
                     "paths": [
@@ -541,6 +570,109 @@
                         "aaapage",
                         "aaacookiecheck",
                         "nsaaasession"
+                    ]
+                },
+                {
+                    "name": "FORTIGATEVPN",
+                    "method": "GET",
+                    "paths": [
+                        "/",
+                        "/remote/login",
+                        "/remote/fgt_lang",
+                        "/remote/fortissl/login"
+                    ],
+                    "headerIndicators": {
+                        "set-cookie": [
+                            "SVPNCOOKIE"
+                        ],
+                        "server": [
+                            "FortiGate",
+                            "Fortinet"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "fortigate",
+                        "fortinet",
+                        "SSLVPNLogin",
+                        "fgt_lang",
+                        "fortissl"
+                    ]
+                },
+                {
+                    "name": "OPENVPN",
+                    "method": "GET",
+                    "paths": [
+                        "/",
+                        "/admin",
+                        "/admin/login",
+                        "/__session_start__"
+                    ],
+                    "headerIndicators": {
+                        "server": [
+                            "openvpn"
+                        ],
+                        "set-cookie": [
+                            "openvpn_sess"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "openvpn access server",
+                        "openvpn technologies inc.",
+                        "openvpn_admin",
+                        "openvpn_as"
+                    ]
+                },
+                {
+                    "name": "PULSESECURE",
+                    "method": "GET",
+                    "paths": [
+                        "/",
+                        "/dana-na/",
+                        "/dana-na/auth/url_default/welcome.cgi",
+                        "/dana/home/index.cgi"
+                    ],
+                    "headerIndicators": {
+                        "server": [
+                            "pulse secure",
+                            "ivanti",
+                            "dana"
+                        ],
+                        "set-cookie": [
+                            "DSID",
+                            "DSSIGNIN",
+                            "DSPREAUTH",
+                            "DSSIGNIN"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "pulse secure",
+                        "ivanti connect secure",
+                        "pulseclient",
+                        "dspreauth.cgi"
+                    ]
+                },
+                {
+                    "name": "SONICWALL",
+                    "method": "GET",
+                    "paths": [
+                        "/",
+                        "/cgi-bin/userLogin",
+                        "/auth.html",
+                        "/status.html"
+                    ],
+                    "headerIndicators": {
+                        "server": [
+                            "sonicwall"
+                        ],
+                        "set-cookie": [
+                            "swsessionid"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "sonicwall ssl vpn",
+                        "sslvpn",
+                        "userlogin.cgi",
+                        "sonicwall network security"
                     ]
                 },
                 {
@@ -643,7 +775,9 @@
                         "/admin"
                     ],
                     "headerIndicators": {
-                        "server": ["Abyss"]
+                        "server": [
+                            "Abyss"
+                        ]
                     },
                     "bodyIndicators": [
                         "abyss web server",
@@ -708,7 +842,9 @@
                         "/status"
                     ],
                     "headerIndicators": {
-                        "server": ["Cherokee"]
+                        "server": [
+                            "Cherokee"
+                        ]
                     },
                     "bodyIndicators": [
                         "cherokee web server",
@@ -725,7 +861,9 @@
                         "/health"
                     ],
                     "headerIndicators": {
-                        "server": ["gunicorn"]
+                        "server": [
+                            "gunicorn"
+                        ]
                     },
                     "bodyIndicators": [
                         "gunicorn",
@@ -793,7 +931,9 @@
                         "/express"
                     ],
                     "headerIndicators": {
-                        "x-powered-by": ["Express"]
+                        "x-powered-by": [
+                            "Express"
+                        ]
                     },
                     "bodyIndicators": [
                         "express server",
@@ -851,6 +991,25 @@
                     ]
                 },
                 {
+                    "name": "TENGINE",
+                    "method": "GET",
+                    "paths": [
+                        "",
+                        "/tengine-status",
+                        "/nginx_status"
+                    ],
+                    "headerIndicators": {
+                        "server": [
+                            "Tengine"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "tengine",
+                        "powered by tengine",
+                        "<hr><center>tengine/"
+                    ]
+                },
+                {
                     "name": "TOMCAT",
                     "method": "GET",
                     "paths": [
@@ -862,13 +1021,70 @@
                         "/webdav"
                     ],
                     "headerIndicators": {
-                        "server": ["Apache-Coyote", "Tomcat"]
+                        "server": [
+                            "Apache-Coyote",
+                            "Tomcat"
+                        ]
                     },
                     "bodyIndicators": [
                         "<title>tomcat manager</title>",
                         "apache tomcat",
                         "tomcat web application manager",
                         "tomcat documentation"
+                    ]
+                },
+                {
+                    "name": "TWISTED",
+                    "method": "GET",
+                    "paths": [
+                        "",
+                        "/twisted",
+                        "/status"
+                    ],
+                    "headerIndicators": {
+                        "server": [
+                            "TwistedWeb"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "twisted matrix laboratories",
+                        "powered by twisted",
+                        "<title>twisted web</title>"
+                    ]
+                },
+                {
+                    "name": "YAWS",
+                    "method": "GET",
+                    "paths": [
+                        "",
+                        "/status",
+                        "/yaws"
+                    ],
+                    "headerIndicators": {
+                        "server": [
+                            "Yaws"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "powered by yaws",
+                        "yaws web server",
+                        "<title>yaws</title>"
+                    ]
+                },
+                {
+                    "name": "ZWS",
+                    "method": "GET",
+                    "paths": [
+                        "/"
+                    ],
+                    "headerIndicators": {
+                        "server": [
+                            "zws"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "zero web server",
+                        "<title>zws</title>"
                     ]
                 }
             ]

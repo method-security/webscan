@@ -2,8 +2,6 @@ package cmd
 
 import (
 	"errors"
-	"fmt"
-	"strings"
 
 	webscan "github.com/Method-Security/webscan/generated/go/app"
 	enumerateWebserverFern "github.com/Method-Security/webscan/generated/go/app/enumerate/webserver"
@@ -44,12 +42,17 @@ for the specified resource type.`,
 			}
 
 			// Config flags
-			resourceType, err := cmd.Flags().GetString("resourcetype")
+			fingerprintFile, err := cmd.Flags().GetString("fingerprintfile")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			resourceTypeEnum, err := validateFingerprintResourceType(resourceType)
+			fingeprints, err := fingerprint.LoadFingerprints(fingerprintFile)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			resourceType, err := cmd.Flags().GetString("resourcetype")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -59,7 +62,7 @@ for the specified resource type.`,
 				a.OutputSignal.AddError(err)
 				return
 			}
-			moduleEnums, err := validateFingerprintResourseModuleSelection(*resourceTypeEnum, modules)
+			filteredFingerprints, err := fingerprint.FilterFingerprints(fingeprints, resourceType, modules)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -74,14 +77,13 @@ for the specified resource type.`,
 				a.OutputSignal.AddError(err)
 				return
 			}
-			config, err := newFingerprintConfig(targets, *resourceTypeEnum, moduleEnums, timeout, successfulOnly)
+			config, err := newFingerprintConfig(targets, resourceType, modules, filteredFingerprints, timeout, successfulOnly)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
 
-			engine := fingerprint.NewEngine(config)
-			report, err := engine.Launch(cmd.Context())
+			report, err := fingerprint.Launch(cmd.Context(), config)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 			}
@@ -89,48 +91,10 @@ for the specified resource type.`,
 		},
 	}
 
-	// Flag Description Strings
-	resourceTypes := strings.Join([]string{
-		string(webscan.AppFingerprintResourceTypeApiapplication),
-		string(webscan.AppFingerprintResourceTypeCloudbucket),
-		string(webscan.AppFingerprintResourceTypeContentmanagementsystem),
-		string(webscan.AppFingerprintResourceTypeFramework),
-		string(webscan.AppFingerprintResourceTypeRemoteaccess),
-		string(webscan.AppFingerprintResourceTypeWebserver),
-	}, ", ")
-	apiApplicationModules := strings.Join([]string{
-		string(webscan.ApiApplicationModuleGraphql),
-		string(webscan.ApiApplicationModuleGrpc),
-		string(webscan.ApiApplicationModuleSwagger),
-	}, ", ")
-	contentManagementSystemModules := strings.Join([]string{
-		string(webscan.ContentManagementSystemModuleWordpress),
-	}, ", ")
-	cloudBucketModules := strings.Join([]string{
-		string(webscan.CloudBucketModuleAwss3),
-		string(webscan.CloudBucketModuleAzureblob),
-	}, ", ")
-	frameworkModules := strings.Join([]string{
-		string(webscan.FrameworkModuleFastapi),
-		string(webscan.FrameworkModuleNextjs),
-	}, ", ")
-	kubeModules := strings.Join([]string{
-		string(webscan.KubeModuleKube),
-	}, ", ")
-	remoteAccessModules := strings.Join([]string{
-		string(webscan.RemoteAccessModuleCitrixgateway),
-		string(webscan.RemoteAccessModuleVmwarehorizon),
-		string(webscan.RemoteAccessModuleWindowsrdp),
-	}, ", ")
-	webServerModules := strings.Join([]string{
-		string(webscan.WebServerModuleApache),
-		string(webscan.WebServerModuleIis),
-		string(webscan.WebServerModuleNginx),
-	}, ", ")
-
 	fingerprintCmd.Flags().StringSlice("targets", []string{}, "URL target to perform fingerprint against")
-	fingerprintCmd.Flags().String("resourcetype", "", fmt.Sprintf("Resource type to fingerprint (%s)", resourceTypes))
-	fingerprintCmd.Flags().StringSlice("modules", []string{}, fmt.Sprintf("Modules to run (APIApplication: %s; CloudBucket: %s; ContentManagementSystem: %s; Framework: %s; Kube: %s; RemoteAccess: %s, WebServer: %s)", apiApplicationModules, cloudBucketModules, contentManagementSystemModules, frameworkModules, kubeModules, remoteAccessModules, webServerModules))
+	fingerprintCmd.Flags().String("fingerprintfile", "configs/app/fingerprints.json", "Path to the fingerprint file to use for fingerprinting")
+	fingerprintCmd.Flags().String("resourcetype", "", "Defined resource type to fingerprint")
+	fingerprintCmd.Flags().StringSlice("modules", []string{}, "Defined resource type modules to run")
 	fingerprintCmd.Flags().Int("timeout", 30, "Timeout per request (seconds)")
 	fingerprintCmd.Flags().Bool("successfulonly", false, "Only show successful attempts")
 
@@ -431,92 +395,12 @@ It extracts information such as server version, enabled modules, and more.`,
 	a.RootCmd.AddCommand(appCmd)
 }
 
-func validateFingerprintResourceType(resourceType string) (*webscan.AppFingerprintResourceType, error) {
-	resourceTypeEnum, err := webscan.NewAppFingerprintResourceTypeFromString(strings.ToUpper(resourceType))
-	if err != nil {
-		return nil, err
-	}
-	return &resourceTypeEnum, nil
-}
-
-func validateFingerprintResourseModuleSelection(resourceType webscan.AppFingerprintResourceType, modules []string) ([]*webscan.AppFingerprintResourceModule, error) {
-	moduleEnums := []*webscan.AppFingerprintResourceModule{}
-	if len(modules) == 0 {
-		return nil, nil
-	}
-	if resourceType == webscan.AppFingerprintResourceTypeApiapplication {
-		for _, module := range modules {
-			moduleName, err := webscan.NewApiApplicationModuleFromString(strings.ToUpper(module))
-			if err != nil {
-				return nil, err
-			}
-			moduleEnum := webscan.NewAppFingerprintResourceModuleFromApiApplicationModule(moduleName)
-			moduleEnums = append(moduleEnums, moduleEnum)
-		}
-	} else if resourceType == webscan.AppFingerprintResourceTypeCloudbucket {
-		for _, module := range modules {
-			moduleName, err := webscan.NewCloudBucketModuleFromString(strings.ToUpper(module))
-			if err != nil {
-				return nil, err
-			}
-			moduleEnum := webscan.NewAppFingerprintResourceModuleFromCloudBucketModule(moduleName)
-			moduleEnums = append(moduleEnums, moduleEnum)
-		}
-	} else if resourceType == webscan.AppFingerprintResourceTypeContentmanagementsystem {
-		for _, module := range modules {
-			moduleName, err := webscan.NewContentManagementSystemModuleFromString(strings.ToUpper(module))
-			if err != nil {
-				return nil, err
-			}
-			moduleEnum := webscan.NewAppFingerprintResourceModuleFromContentManagementSystemModule(moduleName)
-			moduleEnums = append(moduleEnums, moduleEnum)
-		}
-
-	} else if resourceType == webscan.AppFingerprintResourceTypeFramework {
-		for _, module := range modules {
-			moduleName, err := webscan.NewFrameworkModuleFromString(strings.ToUpper(module))
-			if err != nil {
-				return nil, err
-			}
-			moduleEnum := webscan.NewAppFingerprintResourceModuleFromFrameworkModule(moduleName)
-			moduleEnums = append(moduleEnums, moduleEnum)
-		}
-	} else if resourceType == webscan.AppFingerprintResourceTypeKube {
-		for _, module := range modules {
-			moduleName, err := webscan.NewKubeModuleFromString(strings.ToUpper(module))
-			if err != nil {
-				return nil, err
-			}
-			moduleEnum := webscan.NewAppFingerprintResourceModuleFromKubeModule(moduleName)
-			moduleEnums = append(moduleEnums, moduleEnum)
-		}
-	} else if resourceType == webscan.AppFingerprintResourceTypeRemoteaccess {
-		for _, module := range modules {
-			moduleName, err := webscan.NewRemoteAccessModuleFromString(strings.ToUpper(module))
-			if err != nil {
-				return nil, err
-			}
-			moduleEnum := webscan.NewAppFingerprintResourceModuleFromRemoteAccessModule(moduleName)
-			moduleEnums = append(moduleEnums, moduleEnum)
-		}
-	} else if resourceType == webscan.AppFingerprintResourceTypeWebserver {
-		for _, module := range modules {
-			moduleName, err := webscan.NewWebServerModuleFromString(strings.ToUpper(module))
-			if err != nil {
-				return nil, err
-			}
-			moduleEnum := webscan.NewAppFingerprintResourceModuleFromWebServerModule(moduleName)
-			moduleEnums = append(moduleEnums, moduleEnum)
-		}
-	}
-	return moduleEnums, nil
-}
-
-func newFingerprintConfig(targets []string, resourceEnum webscan.AppFingerprintResourceType, moduleEnums []*webscan.AppFingerprintResourceModule, timeout int, successfulOnly bool) (*webscan.AppFingerprintConfig, error) {
+func newFingerprintConfig(targets []string, resourceEnum string, moduleEnums []string, fingerprints *webscan.AppResourceType, timeout int, successfulOnly bool) (*webscan.AppFingerprintConfig, error) {
 	config := &webscan.AppFingerprintConfig{
 		Targets:        targets,
 		ResourceType:   resourceEnum,
 		Modules:        moduleEnums,
+		Fingerprints:   fingerprints,
 		Timeout:        timeout,
 		SuccessfulOnly: successfulOnly,
 	}

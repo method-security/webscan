@@ -2,122 +2,80 @@ package fingerprint
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	webscan "github.com/Method-Security/webscan/generated/go/app"
 	common "github.com/Method-Security/webscan/generated/go/common"
-	apiapplication "github.com/Method-Security/webscan/internal/app/fingerprint/modules/apiapplication"
-	cloudbucket "github.com/Method-Security/webscan/internal/app/fingerprint/modules/cloudbucket"
-	contentmanagementsystem "github.com/Method-Security/webscan/internal/app/fingerprint/modules/contentmanagementsystem"
-	framework "github.com/Method-Security/webscan/internal/app/fingerprint/modules/frameworks"
-	kube "github.com/Method-Security/webscan/internal/app/fingerprint/modules/kube"
-	remoteaccess "github.com/Method-Security/webscan/internal/app/fingerprint/modules/remoteaccess"
-	webserver "github.com/Method-Security/webscan/internal/app/fingerprint/modules/webserver"
 	"github.com/Method-Security/webscan/utils"
 )
 
-type Module interface {
-	Name() *webscan.AppFingerprintResourceModule
-	Paths() []string
-	RequestParams() (common.HttpMethod, common.RequestParams)
-	BodyIndicators() []string
-	HeaderIndicators() map[string][]string
-}
-
-type Engine struct {
-	Library Module
-	Config  *webscan.AppFingerprintConfig
-	Modules map[webscan.AppFingerprintResourceType]map[webscan.AppFingerprintResourceModule]Module
-}
-
-var followRedirects = true
-
-func NewEngine(config *webscan.AppFingerprintConfig) *Engine {
-	return &Engine{
-		Config: config,
-		Modules: map[webscan.AppFingerprintResourceType]map[webscan.AppFingerprintResourceModule]Module{
-			webscan.AppFingerprintResourceTypeApiapplication: {
-				*webscan.NewAppFingerprintResourceModuleFromApiApplicationModule(webscan.ApiApplicationModuleGrpc):    &apiapplication.GrpcLibrary{},
-				*webscan.NewAppFingerprintResourceModuleFromApiApplicationModule(webscan.ApiApplicationModuleSwagger): &apiapplication.SwaggerLibrary{},
-				*webscan.NewAppFingerprintResourceModuleFromApiApplicationModule(webscan.ApiApplicationModuleGraphql): &apiapplication.GraphQLLibrary{},
-			},
-			webscan.AppFingerprintResourceTypeContentmanagementsystem: {
-				*webscan.NewAppFingerprintResourceModuleFromContentManagementSystemModule(webscan.ContentManagementSystemModuleWordpress): &contentmanagementsystem.WordPressLibrary{},
-			},
-			webscan.AppFingerprintResourceTypeCloudbucket: {
-				*webscan.NewAppFingerprintResourceModuleFromCloudBucketModule(webscan.CloudBucketModuleAzureblob): &cloudbucket.AzureBlobLibrary{},
-				*webscan.NewAppFingerprintResourceModuleFromCloudBucketModule(webscan.CloudBucketModuleAwss3):     &cloudbucket.AwsS3Library{},
-			},
-			webscan.AppFingerprintResourceTypeFramework: {
-				*webscan.NewAppFingerprintResourceModuleFromFrameworkModule(webscan.FrameworkModuleFastapi): &framework.FastAPILibrary{},
-				*webscan.NewAppFingerprintResourceModuleFromFrameworkModule(webscan.FrameworkModuleNextjs):  &framework.NextJsLibrary{},
-			},
-			webscan.AppFingerprintResourceTypeKube: {
-				*webscan.NewAppFingerprintResourceModuleFromKubeModule(webscan.KubeModuleKube): &kube.Library{},
-			},
-			webscan.AppFingerprintResourceTypeRemoteaccess: {
-				*webscan.NewAppFingerprintResourceModuleFromRemoteAccessModule(webscan.RemoteAccessModuleCitrixgateway): &remoteaccess.CitrixGatewayLibrary{},
-				*webscan.NewAppFingerprintResourceModuleFromRemoteAccessModule(webscan.RemoteAccessModuleWindowsrdp):    &remoteaccess.WindowsRDPLibrary{},
-				*webscan.NewAppFingerprintResourceModuleFromRemoteAccessModule(webscan.RemoteAccessModuleVmwarehorizon): &remoteaccess.VMwareHorizonLibrary{},
-			},
-			webscan.AppFingerprintResourceTypeWebserver: {
-				*webscan.NewAppFingerprintResourceModuleFromWebServerModule(webscan.WebServerModuleApache): &webserver.ApacheLibrary{},
-				*webscan.NewAppFingerprintResourceModuleFromWebServerModule(webscan.WebServerModuleNginx):  &webserver.NginxLibrary{},
-				*webscan.NewAppFingerprintResourceModuleFromWebServerModule(webscan.WebServerModuleIis):    &webserver.IISLibrary{},
-			},
-		},
+func Run(ctx context.Context, target string, timeout int, config *webscan.AppFingerprintConfig) ([]*webscan.AppFingerprintAttemptInfo, []string) {
+	if config == nil || config.Fingerprints == nil || len(config.Fingerprints.Modules) == 0 {
+		return []*webscan.AppFingerprintAttemptInfo{}, []string{"invalid config: no resource types found"}
 	}
-}
 
-func (e *Engine) GetModules() ([]Module, error) {
-	var moduleLibs []Module
-	appendModules := func(resourceModules map[webscan.AppFingerprintResourceModule]Module) {
-		if len(e.Config.Modules) == 0 {
-			for _, module := range resourceModules {
-				moduleLibs = append(moduleLibs, module)
+	// Get the first (and should be only) resource type from the filtered config
+	resourceType := config.Fingerprints
+	if len(resourceType.Modules) == 0 {
+		return []*webscan.AppFingerprintAttemptInfo{}, []string{"invalid config: no modules found for resource type"}
+	}
+
+	baseURL, parsedTargetPath, err := utils.SplitTarget(target)
+	if err != nil {
+		return []*webscan.AppFingerprintAttemptInfo{}, []string{err.Error()}
+	}
+
+	var attempts []*webscan.AppFingerprintAttemptInfo
+	var errors []string
+
+	// Process each module separately
+	for _, module := range resourceType.Modules {
+		attempt := &webscan.AppFingerprintAttemptInfo{
+			Name:    module.Name,
+			Finding: false,
+		}
+
+		var requests []*common.RequestInfo
+		for _, path := range module.Paths {
+			// Request Configuration
+			fullPath := parsedTargetPath + path
+			var method = module.Method
+
+			var requestParams common.RequestParams
+			if module.RequestParams != nil {
+				requestParams = *module.RequestParams
 			}
-		} else {
-			for _, moduleName := range e.Config.Modules {
-				if module, exists := resourceModules[*moduleName]; exists {
-					moduleLibs = append(moduleLibs, module)
-				}
+
+			// Perform Request
+			request := utils.PerformRequestScan(baseURL, fullPath, method, requestParams, timeout, true)
+			errors = append(errors, request.Errors...)
+
+			requests = append(requests, &request)
+			if AnalyzeResponse(&request, module) {
+				attempt.Finding = true
 			}
 		}
+
+		attempt.Requests = requests
+		attempts = append(attempts, attempt)
 	}
 
-	switch e.Config.ResourceType {
-	case webscan.AppFingerprintResourceTypeApiapplication:
-		appendModules(e.Modules[webscan.AppFingerprintResourceTypeApiapplication])
-	case webscan.AppFingerprintResourceTypeContentmanagementsystem:
-		appendModules(e.Modules[webscan.AppFingerprintResourceTypeContentmanagementsystem])
-	case webscan.AppFingerprintResourceTypeCloudbucket:
-		appendModules(e.Modules[webscan.AppFingerprintResourceTypeCloudbucket])
-	case webscan.AppFingerprintResourceTypeFramework:
-		appendModules(e.Modules[webscan.AppFingerprintResourceTypeFramework])
-	case webscan.AppFingerprintResourceTypeKube:
-		appendModules(e.Modules[webscan.AppFingerprintResourceTypeKube])
-	case webscan.AppFingerprintResourceTypeRemoteaccess:
-		appendModules(e.Modules[webscan.AppFingerprintResourceTypeRemoteaccess])
-	case webscan.AppFingerprintResourceTypeWebserver:
-		appendModules(e.Modules[webscan.AppFingerprintResourceTypeWebserver])
-	default:
-		return nil, fmt.Errorf("unsupported module type: %s", e.Config.ResourceType)
-	}
-
-	return moduleLibs, nil
+	return attempts, errors
 }
 
-func (e *Engine) AnalyzeResponse(response *common.RequestInfo) bool {
+func AnalyzeResponse(response *common.RequestInfo, module *webscan.AppResourceModule) bool {
 	if response == nil || response.StatusCode == nil {
 		return false
 	}
 
-	// Anaylsis Response Headers
+	// Analysis Response Headers
 	if response.ResponseHeaders == nil {
 		return false
 	}
-	headerIndicators := e.Library.HeaderIndicators()
+	headerIndicators := module.HeaderIndicators
+	if headerIndicators == nil {
+		return false
+	}
 	// Loop through response headers
 	for responseHeader, responseHeaderValue := range response.ResponseHeaders {
 		// Loop through header indicators
@@ -136,11 +94,14 @@ func (e *Engine) AnalyzeResponse(response *common.RequestInfo) bool {
 		}
 	}
 
-	// Anaylsis Response Body
+	// Analysis Response Body
 	if response.ResponseBody == nil {
 		return false
 	}
-	bodyIndicators := e.Library.BodyIndicators()
+	bodyIndicators := module.BodyIndicators
+	if bodyIndicators == nil {
+		return false
+	}
 	lowerBody := strings.ToLower(*response.ResponseBody)
 	for _, indicator := range bodyIndicators {
 		if strings.Contains(lowerBody, indicator) {
@@ -151,73 +112,31 @@ func (e *Engine) AnalyzeResponse(response *common.RequestInfo) bool {
 	return false
 }
 
-func (e *Engine) Run(ctx context.Context, target string, timeout int) (*webscan.AppFingerprintAttemptInfo, []string) {
-	attempt := webscan.AppFingerprintAttemptInfo{
-		Name:    e.Library.Name(),
-		Finding: false,
-	}
+func Launch(ctx context.Context, config *webscan.AppFingerprintConfig) (*webscan.AppFingerprintReport, error) {
+	report := webscan.AppFingerprintReport{Config: config}
 	errors := []string{}
-
-	baseURL, parsedTargetPath, err := utils.SplitTarget(target)
-	if err != nil {
-		errors = append(errors, err.Error())
-		return &attempt, errors
-	}
-
-	requests := []*common.RequestInfo{}
-	for _, path := range e.Library.Paths() {
-		// Request Configuration
-		fullPath := parsedTargetPath + path
-		method, params := e.Library.RequestParams()
-
-		// Perform Request
-		request := utils.PerformRequestScan(baseURL, fullPath, method, params, timeout, followRedirects)
-		errors = append(errors, request.Errors...)
-
-		requests = append(requests, &request)
-		if e.AnalyzeResponse(&request) {
-			attempt.Finding = true
-		}
-	}
-
-	attempt.Requests = requests
-	return &attempt, errors
-}
-
-func (e *Engine) Launch(ctx context.Context) (*webscan.AppFingerprintReport, error) {
-	report := webscan.AppFingerprintReport{Config: e.Config}
-	errors := []string{}
-
-	moduleLibs, err := e.GetModules()
-	if err != nil {
-		return nil, err
-	}
 
 	var targets []*webscan.AppFingerprintTargetInfo
-	for _, target := range e.Config.Targets {
+	for _, target := range config.Targets {
 		var attempts []*webscan.AppFingerprintAttemptInfo
-		for _, moduleLib := range moduleLibs {
-			// Set current module library in the engine
-			e.Library = moduleLib
 
-			// Marshal Attempt results
-			if !strings.HasPrefix(target, "http://") && !strings.HasPrefix(target, "https://") {
-				// Try both http and https schemes
-				schemes := []string{"http://", "https://"}
-				for _, scheme := range schemes {
-					schemeTarget := scheme + target
-					attempt, errs := e.Run(ctx, schemeTarget, e.Config.Timeout)
-					attempts = append(attempts, attempt)
-					errors = append(errors, errs...)
-				}
-			} else {
-				attempt, errs := e.Run(ctx, target, e.Config.Timeout)
-				attempts = append(attempts, attempt)
+		// Marshal Attempt results
+		if !strings.HasPrefix(target, "http://") && !strings.HasPrefix(target, "https://") {
+			// Try both http and https schemes
+			schemes := []string{"http://", "https://"}
+			for _, scheme := range schemes {
+				schemeTarget := scheme + target
+				attempt, errs := Run(ctx, schemeTarget, config.Timeout, config)
+				attempts = append(attempts, attempt...)
 				errors = append(errors, errs...)
 			}
+		} else {
+			attempt, errs := Run(ctx, target, config.Timeout, config)
+			attempts = append(attempts, attempt...)
+			errors = append(errors, errs...)
 		}
 
-		if e.Config.SuccessfulOnly {
+		if config.SuccessfulOnly {
 			successfulAttempts := []*webscan.AppFingerprintAttemptInfo{}
 			for _, attempt := range attempts {
 				if attempt.Finding {

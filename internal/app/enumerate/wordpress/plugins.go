@@ -20,8 +20,6 @@ type WordPressAPIResponse struct {
 	Routes     map[string]interface{} `json:"routes"`
 }
 
-var followRedirects = true
-
 // PerformAppEnumerateWordpressPlugins attempts to find plugins installed on WordPress sites
 func PerformAppEnumerateWordpressPlugins(ctx context.Context, config *enumerateWordpressFern.AppEnumerateWordpressPluginsConfig) enumerateWordpressFern.AppEnumerateWordpressPluginsReport {
 	report := enumerateWordpressFern.AppEnumerateWordpressPluginsReport{Config: config}
@@ -92,7 +90,7 @@ func scanTarget(url string, plugins []string, timeout int) (enumerateWordpressFe
 	errors := []string{}
 
 	// See if target is accessible
-	accessRequest := utils.PerformRequestScan(url, "", common.HttpMethodGet, common.RequestParams{}, timeout, followRedirects)
+	accessRequest := utils.PerformRequestScan(url, "", common.HttpMethodGet, common.RequestParams{}, timeout, true)
 	if accessRequest.Errors != nil {
 		return result, accessRequest.Errors
 	}
@@ -182,7 +180,7 @@ func checkWordPressAPI(url string, plugins []string, timeout int) ([]*enumerateW
 	errors := []string{}
 
 	// Check main REST API endpoint
-	apiRequest := utils.PerformRequestScan(url, "/wp-json", common.HttpMethodGet, common.RequestParams{}, timeout, followRedirects)
+	apiRequest := utils.PerformRequestScan(url, "/wp-json", common.HttpMethodGet, common.RequestParams{}, timeout, true)
 	if apiRequest.Errors != nil {
 		errors = append(errors, apiRequest.Errors...)
 		return pluginsList, errors
@@ -244,7 +242,7 @@ func checkWordPressAPI(url string, plugins []string, timeout int) ([]*enumerateW
 func fetchPluginsFromAPI(baseURL string, path string, timeout int) []*enumerateWordpressFern.WordpressPlugin {
 	plugins := []*enumerateWordpressFern.WordpressPlugin{}
 
-	apiRequest := utils.PerformRequestScan(baseURL, path, common.HttpMethodGet, common.RequestParams{}, timeout, followRedirects)
+	apiRequest := utils.PerformRequestScan(baseURL, path, common.HttpMethodGet, common.RequestParams{}, timeout, true)
 	if apiRequest.Errors != nil || *apiRequest.StatusCode != 200 {
 		return plugins
 	}
@@ -332,12 +330,17 @@ func checkReadmeFiles(url string, plugins []string, timeout int) ([]*enumerateWo
 	// Loop through plugins and check for readme.txt
 	for _, plugin := range plugins {
 		path := fmt.Sprintf("/wp-content/plugins/%s/readme.txt", plugin)
-		readmeRequest := utils.PerformRequestScan(url, path, common.HttpMethodGet, common.RequestParams{}, timeout, followRedirects)
+		readmeRequest := utils.PerformRequestScan(url, path, common.HttpMethodGet, common.RequestParams{}, timeout, false)
 		if readmeRequest.Errors != nil {
 			errors = append(errors, readmeRequest.Errors...)
 			continue
 		}
 		if readmeRequest.StatusCode != nil && *readmeRequest.StatusCode != 200 {
+			continue
+		}
+
+		// If readme.txt is empty, it's not a real plugin
+		if readmeRequest.ResponseBody == nil || *readmeRequest.ResponseBody == "" {
 			continue
 		}
 

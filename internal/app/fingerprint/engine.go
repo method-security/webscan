@@ -64,7 +64,7 @@ func Run(ctx context.Context, target string, timeout int, config *webscan.AppFin
 }
 
 func AnalyzeResponse(response *common.RequestInfo, module *webscan.AppResourceModule) bool {
-	if response == nil || response.StatusCode == nil {
+	if response == nil || response.StatusCode == nil || *response.StatusCode == 404 {
 		return false
 	}
 

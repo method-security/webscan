@@ -53,6 +53,28 @@
                     }
                 },
                 {
+                    "name": "ODATA",
+                    "method": "GET",
+                    "paths": [
+                        "/odata",
+                        "/odata/$metadata",
+                        "/odata.svc",
+                        "/odata/v1/$metadata"
+                    ],
+                    "headerIndicators": {
+                        "odata-version": [
+                            "4.0",
+                            "3.0"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "#microsoft.odata",
+                        "<edmx:Edmx",
+                        "\"@odata.context\"",
+                        "\"@odata.metadata\""
+                    ]
+                },
+                {
                     "name": "SWAGGER",
                     "method": "GET",
                     "paths": [
@@ -127,6 +149,91 @@
             "name": "CONTENTMANAGEMENTSYSTEM",
             "modules": [
                 {
+                    "name": "DRUPAL",
+                    "method": "GET",
+                    "paths": [
+                        "/",
+                        "/user/login",
+                        "/core/install.php",
+                        "/admin",
+                        "/sites/default",
+                        "/misc/drupal.js"
+                    ],
+                    "headerIndicators": {
+                        "x-generator": [
+                            "drupal"
+                        ],
+                        "x-drupal-cache": [
+                            ""
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "content=\"drupal",
+                        "/misc/drupal.js",
+                        "drupal.settings"
+                    ]
+                },
+                {
+                    "name": "GHOST",
+                    "method": "GET",
+                    "paths": [
+                        "/",
+                        "/ghost/",
+                        "/ghost/api/content/posts/"
+                    ],
+                    "headerIndicators": {
+                        "x-powered-by": [
+                            "ghost"
+                        ],
+                        "server": [
+                            "ghost"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "content=\"Ghost\"",
+                        "/ghost/api/content"
+                    ]
+                },
+                {
+                    "name": "JOOMLA",
+                    "method": "GET",
+                    "paths": [
+                        "/",
+                        "/administrator",
+                        "/language/en-GB/en-GB.xml",
+                        "/templates/system/css/system.css"
+                    ],
+                    "headerIndicators": {
+                        "x-content-powered-by": [
+                            "joomla"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "content=\"joomla",
+                        "joomla!",
+                        "name=\"generator\" content=\"joomla"
+                    ]
+                },
+                {
+                    "name": "MODX",
+                    "method": "GET",
+                    "paths": [
+                        "/",
+                        "/manager",
+                        "/connectors",
+                        "/assets"
+                    ],
+                    "headerIndicators": {
+                        "x-powered-by": [
+                            "modx"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "content=\"MODX",
+                        "modx.setup.js"
+                    ]
+                },
+                {
                     "name": "WORDPRESS",
                     "method": "GET",
                     "paths": [
@@ -172,6 +279,43 @@
             "name": "FRAMEWORK",
             "modules": [
                 {
+                    "name": "ANGULAR",
+                    "method": "GET",
+                    "paths": [
+                        "/",
+                        "/main.js",
+                        "/runtime.js",
+                        "/polyfills.js"
+                    ],
+                    "headerIndicators": {
+                        "x-powered-by": [
+                            "angular"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "<app-root>",
+                        "_ngcontent-",
+                        "_nghost-"
+                    ]
+                },
+                {
+                    "name": "DJANGO",
+                    "method": "GET",
+                    "paths": [
+                        "/admin",
+                        "/static/admin/css/base.css"
+                    ],
+                    "headerIndicators": {
+                        "server": [
+                            "wsgiserver"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "django administration",
+                        "powered by django"
+                    ]
+                },
+                {
                     "name": "FASTAPI",
                     "method": "GET",
                     "paths": [
@@ -188,6 +332,42 @@
                         "fastapi - swagger ui",
                         "fastapi - redoc",
                         "fastapi.tiangolo.com"
+                    ]
+                },
+                {
+                    "name": "FLASK",
+                    "method": "GET",
+                    "paths": [
+                        "/",
+                        "/static",
+                        "/favicon.ico"
+                    ],
+                    "headerIndicators": {
+                        "server": [
+                            "werkzeug"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "flask",
+                        "werkzeug debugger",
+                        "flask application"
+                    ]
+                },
+                {
+                    "name": "LARAVEL",
+                    "method": "GET",
+                    "paths": [
+                        "/",
+                        "/login",
+                        "/home"
+                    ],
+                    "headerIndicators": {
+                        "x-powered-by": [
+                            "laravel"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "laravel.log"
                     ]
                 },
                 {
@@ -209,6 +389,27 @@
                     },
                     "bodyIndicators": [
                         "/_next/static/"
+                    ]
+                },
+                {
+                    "name": "RAILS",
+                    "method": "GET",
+                    "paths": [
+                        "/rails/info",
+                        "/rails/info/routes"
+                    ],
+                    "headerIndicators": {
+                        "x-powered-by": [
+                            "phusion passenger",
+                            "mod_rails"
+                        ],
+                        "x-rails": [
+                            ""
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "ruby on rails",
+                        "rails application"
                     ]
                 }
             ]
@@ -236,6 +437,29 @@
         {
             "name": "REMOTEACCESS",
             "modules": [
+                {
+                    "name": "CISCOANYCONNECT",
+                    "method": "GET",
+                    "paths": [
+                        "/",
+                        "/+webvpn+/index.html",
+                        "/+CSCOE+/logon.html",
+                        "/+webvpn+/login"
+                    ],
+                    "headerIndicators": {
+                        "x-cisco": [
+                            ""
+                        ],
+                        "server": [
+                            "cisco"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "cisco anyconnect",
+                        "+CSCOE+",
+                        "cisco ssl vpn"
+                    ]
+                },
                 {
                     "name": "CITRIXGATEWAY",
                     "method": "GET",
@@ -326,6 +550,100 @@
                         "aaapage",
                         "aaacookiecheck",
                         "nsaaasession"
+                    ]
+                },
+                {
+                    "name": "FORTIGATEVPN",
+                    "method": "GET",
+                    "paths": [
+                        "/",
+                        "/remote/login",
+                        "/remote/fgt_lang",
+                        "/remote/fortissl/login"
+                    ],
+                    "headerIndicators": {
+                        "server": [
+                            "fortigate",
+                            "fortinet"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "fortigate",
+                        "fortinet",
+                        "fgt_lang",
+                        "fortissl"
+                    ]
+                },
+                {
+                    "name": "OPENVPN",
+                    "method": "GET",
+                    "paths": [
+                        "/",
+                        "/admin",
+                        "/admin/login",
+                        "/__session_start__"
+                    ],
+                    "headerIndicators": {
+                        "server": [
+                            "openvpn"
+                        ],
+                        "set-cookie": [
+                            "openvpn_sess"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "openvpn access server",
+                        "openvpn technologies inc.",
+                        "openvpn_admin",
+                        "openvpn_as"
+                    ]
+                },
+                {
+                    "name": "PULSESECURE",
+                    "method": "GET",
+                    "paths": [
+                        "/",
+                        "/dana-na/",
+                        "/dana-na/auth/url_default/welcome.cgi",
+                        "/dana/home/index.cgi"
+                    ],
+                    "headerIndicators": {
+                        "server": [
+                            "pulse secure",
+                            "ivanti",
+                            "dana"
+                        ],
+                        "set-cookie": [
+                            "DSID",
+                            "DSSIGNIN",
+                            "DSPREAUTH",
+                            "DSSIGNIN"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "pulse secure",
+                        "ivanti connect secure",
+                        "pulseclient",
+                        "dspreauth.cgi"
+                    ]
+                },
+                {
+                    "name": "SONICWALLVPN",
+                    "method": "GET",
+                    "paths": [
+                        "/",
+                        "/cgi-bin/userLogin",
+                        "/auth.html",
+                        "/status.html"
+                    ],
+                    "headerIndicators": {
+                        "server": [
+                            "sonicwall"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "sonicwall ssl vpn",
+                        "sonicwall network security"
                     ]
                 },
                 {
@@ -420,6 +738,25 @@
             "name": "WEBSERVER",
             "modules": [
                 {
+                    "name": "ABYSS",
+                    "method": "GET",
+                    "paths": [
+                        "/",
+                        "/abyss-status",
+                        "/admin"
+                    ],
+                    "headerIndicators": {
+                        "server": [
+                            "abyss"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "abyss web server",
+                        "powered by abyss",
+                        "<title>abyss</title>"
+                    ]
+                },
+                {
                     "name": "APACHE",
                     "method": "GET",
                     "paths": [
@@ -446,6 +783,45 @@
                     ]
                 },
                 {
+                    "name": "CADDY",
+                    "method": "GET",
+                    "paths": [
+                        "",
+                        "/caddy-status",
+                        "/.caddy",
+                        "/server-info"
+                    ],
+                    "headerIndicators": {
+                        "server": [
+                            "caddy"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "caddy server",
+                        "powered by caddy",
+                        "served by caddy"
+                    ]
+                },
+                {
+                    "name": "CHEROKEE",
+                    "method": "GET",
+                    "paths": [
+                        "",
+                        "/cherokee-admin",
+                        "/admin",
+                        "/status"
+                    ],
+                    "headerIndicators": {
+                        "server": [
+                            "cherokee"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "cherokee web server",
+                        "powered by cherokee"
+                    ]
+                },
+                {
                     "name": "IIS",
                     "method": "GET",
                     "paths": [
@@ -467,6 +843,52 @@
                             "ASP.NET"
                         ]
                     }
+                },
+                {
+                    "name": "JETTY",
+                    "method": "GET",
+                    "paths": [
+                      "/",
+                      "/status",
+                      "/server-status"
+                    ],
+                    "headerIndicators": {
+                      "server": [
+                        "jetty"
+                      ]
+                    },
+                    "bodyIndicators": [
+                      "powered by jetty",
+                      "jetty web server",
+                      "<title>jetty</title>",
+                      "org.eclipse.jetty",
+                      "jetty-server"
+                    ]
+                },
+                {
+                    "name": "LITESPEED",
+                    "method": "GET",
+                    "paths": [
+                        "",
+                        "/litespeed-status",
+                        "/server-status",
+                        "/_autoindex",
+                        "/admin"
+                    ],
+                    "headerIndicators": {
+                        "server": [
+                            "litespeed"
+                        ],
+                        "x-powered-by": [
+                            "litespeed"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "powered by litespeed",
+                        "<title>litespeed web server</title>",
+                        "litespeed web server",
+                        "litespeed technologies"
+                    ]
                 },
                 {
                     "name": "NGINX",
@@ -495,6 +917,101 @@
                         "<center>nginx</center>",
                         "<hr><center>nginx/",
                         "powered by nginx"
+                    ]
+                },
+                {
+                    "name": "OPENRESTY",
+                    "method": "GET",
+                    "paths": [
+                        "",
+                        "/openresty_status",
+                        "/server-status",
+                        "/status"
+                    ],
+                    "headerIndicators": {
+                        "server": [
+                            "openresty"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "<title>openresty server</title>",
+                        "powered by openresty",
+                        "openresty web server"
+                    ]
+                },
+                {
+                    "name": "TENGINE",
+                    "method": "GET",
+                    "paths": [
+                        "",
+                        "/tengine-status",
+                        "/nginx_status"
+                    ],
+                    "headerIndicators": {
+                        "server": [
+                            "tengine"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "powered by tengine"
+                    ]
+                },
+                {
+                    "name": "TOMCAT",
+                    "method": "GET",
+                    "paths": [
+                        "",
+                        "/manager/html",
+                        "/host-manager/html",
+                        "/docs",
+                        "/examples",
+                        "/webdav"
+                    ],
+                    "headerIndicators": {
+                        "server": [
+                            "apache-coyote",
+                            "tomcat"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "apache tomcat",
+                        "tomcat web application manager",
+                        "tomcat documentation"
+                    ]
+                },
+                {
+                    "name": "YAWS",
+                    "method": "GET",
+                    "paths": [
+                        "",
+                        "/status",
+                        "/yaws"
+                    ],
+                    "headerIndicators": {
+                        "server": [
+                            "yaws"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "powered by yaws",
+                        "yaws web server",
+                        "<title>yaws</title>"
+                    ]
+                },
+                {
+                    "name": "ZWS",
+                    "method": "GET",
+                    "paths": [
+                        "/"
+                    ],
+                    "headerIndicators": {
+                        "server": [
+                            "zws"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "zero web server",
+                        "<title>zws</title>"
                     ]
                 }
             ]

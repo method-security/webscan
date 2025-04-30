@@ -68,7 +68,7 @@
                         ]
                     },
                     "bodyIndicators": [
-                        "#Microsoft.OData",
+                        "#microsoft.odata",
                         "<edmx:Edmx",
                         "\"@odata.context\"",
                         "\"@odata.metadata\""
@@ -165,14 +165,10 @@
                         ],
                         "x-drupal-cache": [
                             ""
-                        ],
-                        "x-content-type-options": [
-                            "nosniff"
                         ]
                     },
                     "bodyIndicators": [
                         "content=\"drupal",
-                        "sites/all/",
                         "/misc/drupal.js",
                         "drupal.settings"
                     ]
@@ -187,15 +183,14 @@
                     ],
                     "headerIndicators": {
                         "x-powered-by": [
-                            "Ghost"
+                            "ghost"
                         ],
                         "server": [
-                            "Ghost"
+                            "ghost"
                         ]
                     },
                     "bodyIndicators": [
-                        "<meta name=\"generator\" content=\"Ghost\"",
-                        "class=\"gh-",
+                        "content=\"Ghost\"",
                         "/ghost/api/content"
                     ]
                 },
@@ -230,12 +225,11 @@
                     ],
                     "headerIndicators": {
                         "x-powered-by": [
-                            "MODX"
+                            "modx"
                         ]
                     },
                     "bodyIndicators": [
                         "content=\"MODX",
-                        "modx",
                         "modx.setup.js"
                     ]
                 },
@@ -295,7 +289,7 @@
                     ],
                     "headerIndicators": {
                         "x-powered-by": [
-                            "Angular"
+                            "angular"
                         ]
                     },
                     "bodyIndicators": [
@@ -313,15 +307,11 @@
                     ],
                     "headerIndicators": {
                         "server": [
-                            "WSGIServer"
-                        ],
-                        "x-frame-options": [
-                            "DENY"
+                            "wsgiserver"
                         ]
                     },
                     "bodyIndicators": [
                         "django administration",
-                        "csrfmiddlewaretoken",
                         "powered by django"
                     ]
                 },
@@ -354,7 +344,7 @@
                     ],
                     "headerIndicators": {
                         "server": [
-                            "Werkzeug"
+                            "werkzeug"
                         ]
                     },
                     "bodyIndicators": [
@@ -373,14 +363,11 @@
                     ],
                     "headerIndicators": {
                         "x-powered-by": [
-                            "Laravel"
+                            "laravel"
                         ]
                     },
                     "bodyIndicators": [
-                        "laravel",
-                        "laravel.log",
-                        "csrf-token",
-                        "mix-manifest.json"
+                        "laravel.log"
                     ]
                 },
                 {
@@ -413,7 +400,7 @@
                     ],
                     "headerIndicators": {
                         "x-powered-by": [
-                            "Phusion Passenger",
+                            "phusion passenger",
                             "mod_rails"
                         ],
                         "x-rails": [
@@ -422,8 +409,7 @@
                     },
                     "bodyIndicators": [
                         "ruby on rails",
-                        "rails application",
-                        "routes list"
+                        "rails application"
                     ]
                 }
             ]
@@ -461,10 +447,6 @@
                         "/+webvpn+/login"
                     ],
                     "headerIndicators": {
-                        "set-cookie": [
-                            "webvpnlogin",
-                            "webvpn"
-                        ],
                         "x-cisco": [
                             ""
                         ],
@@ -475,9 +457,7 @@
                     "bodyIndicators": [
                         "cisco anyconnect",
                         "+CSCOE+",
-                        "webvpn",
-                        "cisco ssl vpn",
-                        "webvpn login"
+                        "cisco ssl vpn"
                     ]
                 },
                 {
@@ -582,18 +562,14 @@
                         "/remote/fortissl/login"
                     ],
                     "headerIndicators": {
-                        "set-cookie": [
-                            "SVPNCOOKIE"
-                        ],
                         "server": [
-                            "FortiGate",
-                            "Fortinet"
+                            "fortigate",
+                            "fortinet"
                         ]
                     },
                     "bodyIndicators": [
                         "fortigate",
                         "fortinet",
-                        "SSLVPNLogin",
                         "fgt_lang",
                         "fortissl"
                     ]
@@ -652,7 +628,7 @@
                     ]
                 },
                 {
-                    "name": "SONICWALL",
+                    "name": "SONICWALLVPN",
                     "method": "GET",
                     "paths": [
                         "/",
@@ -663,15 +639,10 @@
                     "headerIndicators": {
                         "server": [
                             "sonicwall"
-                        ],
-                        "set-cookie": [
-                            "swsessionid"
                         ]
                     },
                     "bodyIndicators": [
                         "sonicwall ssl vpn",
-                        "sslvpn",
-                        "userlogin.cgi",
                         "sonicwall network security"
                     ]
                 },
@@ -776,7 +747,7 @@
                     ],
                     "headerIndicators": {
                         "server": [
-                            "Abyss"
+                            "abyss"
                         ]
                     },
                     "bodyIndicators": [
@@ -822,14 +793,13 @@
                     ],
                     "headerIndicators": {
                         "server": [
-                            "Caddy"
+                            "caddy"
                         ]
                     },
                     "bodyIndicators": [
-                        "<title>caddy server</title>",
+                        "caddy server",
                         "powered by caddy",
-                        "served by caddy",
-                        "<h1>caddy server</h1>"
+                        "served by caddy"
                     ]
                 },
                 {
@@ -843,32 +813,12 @@
                     ],
                     "headerIndicators": {
                         "server": [
-                            "Cherokee"
+                            "cherokee"
                         ]
                     },
                     "bodyIndicators": [
                         "cherokee web server",
-                        "<title>cherokee admin</title>",
                         "powered by cherokee"
-                    ]
-                },
-                {
-                    "name": "GUNICORN",
-                    "method": "GET",
-                    "paths": [
-                        "",
-                        "/status",
-                        "/health"
-                    ],
-                    "headerIndicators": {
-                        "server": [
-                            "gunicorn"
-                        ]
-                    },
-                    "bodyIndicators": [
-                        "gunicorn",
-                        "wsgi server",
-                        "python web server"
                     ]
                 },
                 {
@@ -895,6 +845,27 @@
                     }
                 },
                 {
+                    "name": "JETTY",
+                    "method": "GET",
+                    "paths": [
+                      "/",
+                      "/status",
+                      "/server-status"
+                    ],
+                    "headerIndicators": {
+                      "server": [
+                        "jetty"
+                      ]
+                    },
+                    "bodyIndicators": [
+                      "powered by jetty",
+                      "jetty web server",
+                      "<title>jetty</title>",
+                      "org.eclipse.jetty",
+                      "jetty-server"
+                    ]
+                },
+                {
                     "name": "LITESPEED",
                     "method": "GET",
                     "paths": [
@@ -906,10 +877,10 @@
                     ],
                     "headerIndicators": {
                         "server": [
-                            "LiteSpeed"
+                            "litespeed"
                         ],
                         "x-powered-by": [
-                            "LiteSpeed"
+                            "litespeed"
                         ]
                     },
                     "bodyIndicators": [
@@ -917,28 +888,6 @@
                         "<title>litespeed web server</title>",
                         "litespeed web server",
                         "litespeed technologies"
-                    ]
-                },
-                {
-                    "name": "NODEJSEXPRESS",
-                    "method": "GET",
-                    "paths": [
-                        "",
-                        "/status",
-                        "/health",
-                        "/debug",
-                        "/api",
-                        "/express"
-                    ],
-                    "headerIndicators": {
-                        "x-powered-by": [
-                            "Express"
-                        ]
-                    },
-                    "bodyIndicators": [
-                        "express server",
-                        "node.js",
-                        "powered by express"
                     ]
                 },
                 {
@@ -1000,13 +949,11 @@
                     ],
                     "headerIndicators": {
                         "server": [
-                            "Tengine"
+                            "tengine"
                         ]
                     },
                     "bodyIndicators": [
-                        "tengine",
-                        "powered by tengine",
-                        "<hr><center>tengine/"
+                        "powered by tengine"
                     ]
                 },
                 {
@@ -1022,34 +969,14 @@
                     ],
                     "headerIndicators": {
                         "server": [
-                            "Apache-Coyote",
-                            "Tomcat"
+                            "apache-coyote",
+                            "tomcat"
                         ]
                     },
                     "bodyIndicators": [
-                        "<title>tomcat manager</title>",
                         "apache tomcat",
                         "tomcat web application manager",
                         "tomcat documentation"
-                    ]
-                },
-                {
-                    "name": "TWISTED",
-                    "method": "GET",
-                    "paths": [
-                        "",
-                        "/twisted",
-                        "/status"
-                    ],
-                    "headerIndicators": {
-                        "server": [
-                            "TwistedWeb"
-                        ]
-                    },
-                    "bodyIndicators": [
-                        "twisted matrix laboratories",
-                        "powered by twisted",
-                        "<title>twisted web</title>"
                     ]
                 },
                 {
@@ -1062,7 +989,7 @@
                     ],
                     "headerIndicators": {
                         "server": [
-                            "Yaws"
+                            "yaws"
                         ]
                     },
                     "bodyIndicators": [

@@ -20,5 +20,6 @@ types:
   StaticAssetTakeOverReport:
     properties:
       target: string
+      targetRequest: optional<requests.RequestInfo>
       attempts: optional<list<StaticAssetTakeOverAttempt>>
       errors: optional<list<string>>

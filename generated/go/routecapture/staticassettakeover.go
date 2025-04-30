@@ -142,9 +142,10 @@ func (s *StaticAssetTakeOverFingerprint) String() string {
 }
 
 type StaticAssetTakeOverReport struct {
-	Target   string                        `json:"target" url:"target"`
-	Attempts []*StaticAssetTakeOverAttempt `json:"attempts,omitempty" url:"attempts,omitempty"`
-	Errors   []string                      `json:"errors,omitempty" url:"errors,omitempty"`
+	Target        string                        `json:"target" url:"target"`
+	TargetRequest *common.RequestInfo           `json:"targetRequest,omitempty" url:"targetRequest,omitempty"`
+	Attempts      []*StaticAssetTakeOverAttempt `json:"attempts,omitempty" url:"attempts,omitempty"`
+	Errors        []string                      `json:"errors,omitempty" url:"errors,omitempty"`
 
 	extraProperties map[string]interface{}
 	rawJSON         json.RawMessage
@@ -155,6 +156,13 @@ func (s *StaticAssetTakeOverReport) GetTarget() string {
 		return ""
 	}
 	return s.Target
+}
+
+func (s *StaticAssetTakeOverReport) GetTargetRequest() *common.RequestInfo {
+	if s == nil {
+		return nil
+	}
+	return s.TargetRequest
 }
 
 func (s *StaticAssetTakeOverReport) GetAttempts() []*StaticAssetTakeOverAttempt {

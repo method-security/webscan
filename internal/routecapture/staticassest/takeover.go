@@ -3,6 +3,7 @@ package routecapture
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -28,6 +29,17 @@ func PerformStaticAssetTakeOverAnalysis(ctx context.Context, target string, capt
 		return report
 	}
 
+	// Target Request Data
+	targetBaseURL, targetPath, err := utils.SplitTarget(target)
+	if err != nil {
+		errors = append(errors, fmt.Sprintf("error splitting target: %s", err))
+		report.Errors = errors
+		return report
+	}
+	targetRequest := utils.PerformRequestScan(targetBaseURL, targetPath, common.HttpMethodGet, common.RequestParams{}, timeout, true)
+	report.TargetRequest = &targetRequest
+
+	// Static Asset Take Over Attempts
 	StaticAssetTakeOverAttempts := []*routecapturefern.StaticAssetTakeOverAttempt{}
 	for _, url := range routeCaptureReport.Urls {
 		if !routecapture.IsStaticAsset(url) {
@@ -36,7 +48,13 @@ func PerformStaticAssetTakeOverAnalysis(ctx context.Context, target string, capt
 		StaticAssetTakeOverAttempt := routecapturefern.StaticAssetTakeOverAttempt{StaticAsset: url}
 
 		// Perform Request
-		request := utils.PerformRequestScan(url, "", common.HttpMethodGet, common.RequestParams{}, timeout, true)
+		staticAssetBaseURL, staticAssetPath, err := utils.SplitTarget(url)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("error splitting target: %s", err))
+			continue
+		}
+
+		request := utils.PerformRequestScan(staticAssetBaseURL, staticAssetPath, common.HttpMethodGet, common.RequestParams{}, timeout, true)
 		StaticAssetTakeOverAttempt.Request = &request
 
 		// Check if the request is vulnerable

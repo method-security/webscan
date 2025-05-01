@@ -47,12 +47,14 @@ func Run(ctx context.Context, target string, timeout int, config *webscan.AppFin
 			}
 
 			// Perform Request
-			request := utils.PerformRequestScan(baseURL, fullPath, method, requestParams, timeout, true)
+			// Dont follow redirects
+			request := utils.PerformRequestScan(baseURL, fullPath, method, requestParams, timeout, false)
 			errors = append(errors, request.Errors...)
 
 			requests = append(requests, &request)
 			if AnalyzeResponse(&request, module) {
 				attempt.Finding = true
+				break
 			}
 		}
 

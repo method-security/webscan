@@ -732,11 +732,11 @@
                     "name": "APACHE",
                     "method": "GET",
                     "paths": [
-                        "",
-                        "/server-status",
+                        "/",
                         "/icons",
                         "/manual",
                         "/cgi-bin",
+                        "/server-status",
                         "/.htaccess"
                     ],
                     "headerIndicators": {

@@ -53,28 +53,6 @@
                     }
                 },
                 {
-                    "name": "ODATA",
-                    "method": "GET",
-                    "paths": [
-                        "/odata",
-                        "/odata/$metadata",
-                        "/odata.svc",
-                        "/odata/v1/$metadata"
-                    ],
-                    "headerIndicators": {
-                        "odata-version": [
-                            "4.0",
-                            "3.0"
-                        ]
-                    },
-                    "bodyIndicators": [
-                        "#microsoft.odata",
-                        "<edmx:Edmx",
-                        "\"@odata.context\"",
-                        "\"@odata.metadata\""
-                    ]
-                },
-                {
                     "name": "SWAGGER",
                     "method": "GET",
                     "paths": [
@@ -461,7 +439,6 @@
                     },
                     "bodyIndicators": [
                         "cisco anyconnect",
-                        "+CSCOE+",
                         "cisco ssl vpn"
                     ]
                 },
@@ -490,7 +467,10 @@
                         ],
                         "set-cookie": [
                             "citrix_ns",
-                            "nsc_",
+                            "nsc_user",
+                            "nsc_vpn",
+                            "nsc_wj",
+                            "nsc_lb",
                             "nsc_aaac",
                             "nsc_tass",
                             "nsc_aaa"
@@ -529,7 +509,8 @@
                             ""
                         ],
                         "microsoftsharepointteamservices": [
-                            "citrix sharefile"
+                            "citrix sharefile",
+                            "citrix-sharefile"
                         ]
                     },
                     "bodyIndicators": [
@@ -550,11 +531,7 @@
                         "netscaleraaa",
                         "aaa service",
                         "aaa authentication",
-                        "aaalogin.js",
-                        "aaatm.js",
-                        "aaapage",
-                        "aaacookiecheck",
-                        "nsaaasession"
+                        "aaalogin.js"
                     ]
                 },
                 {
@@ -573,10 +550,15 @@
                         ]
                     },
                     "bodyIndicators": [
-                        "fortigate",
-                        "fortinet",
-                        "fgt_lang",
-                        "fortissl"
+                        "var fgt_lang =",
+                        "FortiGate-SSL VPN",
+                        "Welcome to Fortinet",
+                        "/fortisslvpn/",
+                        "name=\"fgtLang\"",
+                        "Fortinet Technologies Inc",
+                        "FortiOS",
+                        "FGTWebUI",
+                        "FortiGate Web Management"
                     ]
                 },
                 {
@@ -731,7 +713,6 @@
                         "remote desktop gateway",
                         "rd gateway",
                         "rd web access",
-                        "remote desktop services",
                         "rdpclientlauncher",
                         "msrdpclient"
                     ]
@@ -777,13 +758,8 @@
                         ]
                     },
                     "bodyIndicators": [
-                        "<address>apache",
-                        "apache server at",
                         "powered by apache",
-                        "apache/",
-                        "<title>apache http server",
-                        "<title>apache status</title>",
-                        "apache tomcat"
+                        "apache http server"
                     ]
                 },
                 {

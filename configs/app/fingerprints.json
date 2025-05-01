@@ -53,28 +53,6 @@
                     }
                 },
                 {
-                    "name": "ODATA",
-                    "method": "GET",
-                    "paths": [
-                        "/odata",
-                        "/odata/$metadata",
-                        "/odata.svc",
-                        "/odata/v1/$metadata"
-                    ],
-                    "headerIndicators": {
-                        "odata-version": [
-                            "4.0",
-                            "3.0"
-                        ]
-                    },
-                    "bodyIndicators": [
-                        "#microsoft.odata",
-                        "<edmx:Edmx",
-                        "\"@odata.context\"",
-                        "\"@odata.metadata\""
-                    ]
-                },
-                {
                     "name": "SWAGGER",
                     "method": "GET",
                     "paths": [
@@ -169,7 +147,6 @@
                     },
                     "bodyIndicators": [
                         "content=\"drupal",
-                        "/misc/drupal.js",
                         "drupal.settings"
                     ]
                 },
@@ -181,14 +158,6 @@
                         "/ghost/",
                         "/ghost/api/content/posts/"
                     ],
-                    "headerIndicators": {
-                        "x-powered-by": [
-                            "ghost"
-                        ],
-                        "server": [
-                            "ghost"
-                        ]
-                    },
                     "bodyIndicators": [
                         "content=\"Ghost\"",
                         "/ghost/api/content"
@@ -261,16 +230,20 @@
                             "wordpress"
                         ],
                         "server": [
-                            "wordpress",
-                            "wordpress/nginx"
+                            "wordpress"
                         ]
                     },
                     "bodyIndicators": [
-                        "wp-content",
-                        "wp-includes",
-                        "content=\"WordPress",
-                        "/wp-json",
-                        "/wp-admin/admin-ajax.php"
+                        "\"generator\" content=\"WordPress",
+                        "/wp-login.php",
+                        "/wp-admin/load-scripts.php",
+                        "/wp-admin/admin-ajax.php",
+                        "id=\"wp-admin-bar",
+                        "wp-emoji-release.min.js",
+                        "var wpApiSettings =",
+                        "class=\"login hentry\"",
+                        "wp-includes/js/jquery/jquery.js",
+                        "window._wpemojiSettings"
                     ]
                 }
             ]
@@ -456,7 +429,6 @@
                     },
                     "bodyIndicators": [
                         "cisco anyconnect",
-                        "+CSCOE+",
                         "cisco ssl vpn"
                     ]
                 },
@@ -485,7 +457,10 @@
                         ],
                         "set-cookie": [
                             "citrix_ns",
-                            "nsc_",
+                            "nsc_user",
+                            "nsc_vpn",
+                            "nsc_wj",
+                            "nsc_lb",
                             "nsc_aaac",
                             "nsc_tass",
                             "nsc_aaa"
@@ -497,9 +472,6 @@
                             ""
                         ],
                         "x-citrix-gateway": [
-                            ""
-                        ],
-                        "x-transcend-version": [
                             ""
                         ],
                         "nscookie": [
@@ -524,7 +496,8 @@
                             ""
                         ],
                         "microsoftsharepointteamservices": [
-                            "citrix sharefile"
+                            "citrix sharefile",
+                            "citrix-sharefile"
                         ]
                     },
                     "bodyIndicators": [
@@ -545,11 +518,7 @@
                         "netscaleraaa",
                         "aaa service",
                         "aaa authentication",
-                        "aaalogin.js",
-                        "aaatm.js",
-                        "aaapage",
-                        "aaacookiecheck",
-                        "nsaaasession"
+                        "aaalogin.js"
                     ]
                 },
                 {
@@ -568,10 +537,15 @@
                         ]
                     },
                     "bodyIndicators": [
-                        "fortigate",
-                        "fortinet",
-                        "fgt_lang",
-                        "fortissl"
+                        "var fgt_lang =",
+                        "FortiGate-SSL VPN",
+                        "Welcome to Fortinet",
+                        "/fortisslvpn/",
+                        "name=\"fgtLang\"",
+                        "Fortinet Technologies Inc",
+                        "FortiOS",
+                        "FGTWebUI",
+                        "FortiGate Web Management"
                     ]
                 },
                 {
@@ -614,7 +588,6 @@
                             "dana"
                         ],
                         "set-cookie": [
-                            "DSID",
                             "DSSIGNIN",
                             "DSPREAUTH",
                             "DSSIGNIN"
@@ -727,7 +700,6 @@
                         "remote desktop gateway",
                         "rd gateway",
                         "rd web access",
-                        "remote desktop services",
                         "rdpclientlauncher",
                         "msrdpclient"
                     ]
@@ -760,11 +732,11 @@
                     "name": "APACHE",
                     "method": "GET",
                     "paths": [
-                        "",
-                        "/server-status",
+                        "/",
                         "/icons",
                         "/manual",
                         "/cgi-bin",
+                        "/server-status",
                         "/.htaccess"
                     ],
                     "headerIndicators": {
@@ -773,13 +745,8 @@
                         ]
                     },
                     "bodyIndicators": [
-                        "<address>apache",
-                        "apache server at",
                         "powered by apache",
-                        "apache/",
-                        "<title>apache http server",
-                        "<title>apache status</title>",
-                        "apache tomcat"
+                        "apache http server"
                     ]
                 },
                 {
@@ -848,21 +815,21 @@
                     "name": "JETTY",
                     "method": "GET",
                     "paths": [
-                      "/",
-                      "/status",
-                      "/server-status"
+                        "/",
+                        "/status",
+                        "/server-status"
                     ],
                     "headerIndicators": {
-                      "server": [
-                        "jetty"
-                      ]
+                        "server": [
+                            "jetty"
+                        ]
                     },
                     "bodyIndicators": [
-                      "powered by jetty",
-                      "jetty web server",
-                      "<title>jetty</title>",
-                      "org.eclipse.jetty",
-                      "jetty-server"
+                        "powered by jetty",
+                        "jetty web server",
+                        "<title>jetty</title>",
+                        "org.eclipse.jetty",
+                        "jetty-server"
                     ]
                 },
                 {

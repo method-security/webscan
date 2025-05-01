@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	webscan "github.com/Method-Security/webscan/generated/go/app/enumerate"
@@ -18,6 +19,9 @@ import (
 // PerformAppEnumerateGrpc performs a gRPC scan against a target URL and returns the report.
 func PerformAppEnumerateGrpc(ctx context.Context, target string) webscan.RoutesReport {
 	report := webscan.RoutesReport{Target: target, BaseEndpointUrl: target, AppType: webscan.ApiTypeGrpc}
+
+	// Strip scheme if present
+	target = strings.TrimPrefix(strings.TrimPrefix(target, "http://"), "https://")
 
 	conn, err := connectToGRPCServer(target)
 	if err != nil {

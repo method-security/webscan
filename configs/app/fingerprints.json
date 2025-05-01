@@ -147,7 +147,6 @@
                     },
                     "bodyIndicators": [
                         "content=\"drupal",
-                        "/misc/drupal.js",
                         "drupal.settings"
                     ]
                 },
@@ -159,14 +158,6 @@
                         "/ghost/",
                         "/ghost/api/content/posts/"
                     ],
-                    "headerIndicators": {
-                        "x-powered-by": [
-                            "ghost"
-                        ],
-                        "server": [
-                            "ghost"
-                        ]
-                    },
                     "bodyIndicators": [
                         "content=\"Ghost\"",
                         "/ghost/api/content"
@@ -239,8 +230,7 @@
                             "wordpress"
                         ],
                         "server": [
-                            "wordpress",
-                            "wordpress/nginx"
+                            "wordpress"
                         ]
                     },
                     "bodyIndicators": [
@@ -482,9 +472,6 @@
                             ""
                         ],
                         "x-citrix-gateway": [
-                            ""
-                        ],
-                        "x-transcend-version": [
                             ""
                         ],
                         "nscookie": [
@@ -828,21 +815,21 @@
                     "name": "JETTY",
                     "method": "GET",
                     "paths": [
-                      "/",
-                      "/status",
-                      "/server-status"
+                        "/",
+                        "/status",
+                        "/server-status"
                     ],
                     "headerIndicators": {
-                      "server": [
-                        "jetty"
-                      ]
+                        "server": [
+                            "jetty"
+                        ]
                     },
                     "bodyIndicators": [
-                      "powered by jetty",
-                      "jetty web server",
-                      "<title>jetty</title>",
-                      "org.eclipse.jetty",
-                      "jetty-server"
+                        "powered by jetty",
+                        "jetty web server",
+                        "<title>jetty</title>",
+                        "org.eclipse.jetty",
+                        "jetty-server"
                     ]
                 },
                 {

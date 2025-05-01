@@ -66,30 +66,27 @@ func Run(ctx context.Context, target string, timeout int, config *webscan.AppFin
 }
 
 func AnalyzeResponse(response *common.RequestInfo, module *webscan.AppResourceModule) bool {
+	// Check if response is nil or status code is 404
 	if response == nil || response.StatusCode == nil || *response.StatusCode == 404 {
 		return false
 	}
 
 	// Analysis Response Headers
-	if response.ResponseHeaders == nil {
-		return false
-	}
 	headerIndicators := module.HeaderIndicators
-	if headerIndicators == nil {
-		return false
-	}
-	// Loop through response headers
-	for responseHeader, responseHeaderValue := range response.ResponseHeaders {
-		// Loop through header indicators
-		for headerIndicator, headerIndicatorValues := range headerIndicators {
-			if strings.EqualFold(responseHeader, headerIndicator) {
-				if len(headerIndicatorValues) == 0 {
-					return true // If empty array, the header presence alone is an indicator
-				}
-				// Loop through header values
-				for _, headerIndicatorValue := range headerIndicatorValues {
-					if strings.Contains(strings.ToLower(responseHeaderValue), strings.ToLower(headerIndicatorValue)) {
-						return true
+	if response.ResponseHeaders != nil && headerIndicators != nil {
+		// Loop through response headers
+		for responseHeader, responseHeaderValue := range response.ResponseHeaders {
+			// Loop through header indicators
+			for headerIndicator, headerIndicatorValues := range headerIndicators {
+				if strings.EqualFold(responseHeader, headerIndicator) {
+					if len(headerIndicatorValues) == 0 {
+						return true // If empty array, the header presence alone is an indicator
+					}
+					// Loop through header values
+					for _, headerIndicatorValue := range headerIndicatorValues {
+						if strings.Contains(strings.ToLower(responseHeaderValue), strings.ToLower(headerIndicatorValue)) {
+							return true
+						}
 					}
 				}
 			}
@@ -97,17 +94,13 @@ func AnalyzeResponse(response *common.RequestInfo, module *webscan.AppResourceMo
 	}
 
 	// Analysis Response Body
-	if response.ResponseBody == nil {
-		return false
-	}
 	bodyIndicators := module.BodyIndicators
-	if bodyIndicators == nil {
-		return false
-	}
-	lowerBody := strings.ToLower(*response.ResponseBody)
-	for _, indicator := range bodyIndicators {
-		if strings.Contains(lowerBody, indicator) {
-			return true
+	if response.ResponseBody != nil && bodyIndicators != nil {
+		lowerBody := strings.ToLower(*response.ResponseBody)
+		for _, indicator := range bodyIndicators {
+			if strings.Contains(lowerBody, indicator) {
+				return true
+			}
 		}
 	}
 

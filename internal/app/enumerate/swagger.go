@@ -48,7 +48,7 @@ var commonSpecPaths = []string{
 }
 
 // PerformAppEnumerateSwagger performs a Swagger scan against a target URL and returns the report.
-func PerformAppEnumerateSwagger(ctx context.Context, target string) webscan.RoutesReport {
+func PerformAppEnumerateSwagger(ctx context.Context, target string, timeout int) webscan.RoutesReport {
 	report := webscan.RoutesReport{Target: target}
 
 	// Normalize target URL
@@ -63,16 +63,11 @@ func PerformAppEnumerateSwagger(ctx context.Context, target string) webscan.Rout
 	var foundSpec bool
 
 	for _, path := range commonSpecPaths {
-		params := common.RequestParams{HeaderParams: map[string]string{
-			"Accept": "application/json, application/yaml;q=0.9,*/*;q=0.8",
-		}}
-
-		timeout := 8
 		if dl, ok := ctx.Deadline(); ok {
 			timeout = int(time.Until(dl).Seconds())
 		}
 
-		resp := utils.PerformRequestScan(target, path, common.HttpMethodGet, params, timeout, true)
+		resp := utils.PerformRequestScan(target, path, common.HttpMethodGet, common.RequestParams{}, timeout, true)
 		if len(resp.Errors) > 0 || resp.StatusCode == nil || *resp.StatusCode != 200 || resp.ResponseBody == nil {
 			continue
 		}

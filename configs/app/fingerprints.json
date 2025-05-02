@@ -689,8 +689,7 @@
                         ],
                         "set-cookie": [
                             "rdpcookie",
-                            "rdp_fx_",
-                            "rdweb"
+                            "rdp_fx_"
                         ],
                         "x-rdwebstartmode": [
                             ""

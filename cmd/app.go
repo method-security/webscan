@@ -229,15 +229,15 @@ HTTP methods, query parameters, and authentication mechanisms.`,
 				return
 			}
 
-			// Config flags
-			noSandbox, err := cmd.Flags().GetBool("no-sandbox")
+			// Timeout flag
+			timeout, err := cmd.Flags().GetInt("timeout")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
 
 			// Generate report
-			report := enumerate.PerformAppEnumerateSwagger(cmd.Context(), target, noSandbox)
+			report := enumerate.PerformAppEnumerateSwagger(cmd.Context(), target, timeout)
 			if len(report.Errors) > 0 {
 				a.OutputSignal.Status = 1
 			}
@@ -246,7 +246,7 @@ HTTP methods, query parameters, and authentication mechanisms.`,
 	}
 
 	enumerateSwaggerCmd.Flags().String("target", "", "URL target to perform Swagger enumeration against")
-	enumerateSwaggerCmd.Flags().Bool("no-sandbox", false, "Disable sandbox mode for Swagger scan")
+	enumerateSwaggerCmd.Flags().Int("timeout", 30, "Timeout per request (seconds)")
 
 	_ = enumerateSwaggerCmd.MarkFlagRequired("target")
 

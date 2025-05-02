@@ -5,68 +5,92 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io"
-	"log"
-	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
 
 	webscan "github.com/Method-Security/webscan/generated/go/app/enumerate"
-	"github.com/chromedp/chromedp"
+	"github.com/Method-Security/webscan/generated/go/common"
+	"github.com/Method-Security/webscan/utils"
 	"github.com/pb33f/libopenapi"
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 	v2 "github.com/pb33f/libopenapi/datamodel/high/v2"
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 	"github.com/pb33f/libopenapi/orderedmap"
-	"golang.org/x/net/html"
 	"gopkg.in/yaml.v3"
 )
 
+// Common Swagger/OpenAPI endpoint paths to check
+var commonSpecPaths = []string{
+	"/swagger.json",
+	"/api-docs/swagger.json",
+	"/api/swagger.json",
+	"/api/v1/swagger.json",
+	"/api/v2/swagger.json",
+	"/api/v3/swagger.json",
+	"/swagger/v1/swagger.json",
+	"/swagger/v2/swagger.json",
+	"/swagger/v3/swagger.json",
+	"/openapi.json",
+	"/api-docs/openapi.json",
+	"/api/openapi.json",
+	"/api/v1/openapi.json",
+	"/api/v2/openapi.json",
+	"/api/v3/openapi.json",
+	"/v1/swagger.json",
+	"/v2/swagger.json",
+	"/v3/swagger.json",
+	"/docs/swagger.json",
+	"/docs/openapi.json",
+	"/swagger-ui/swagger.json",
+	"/swagger-ui/openapi.json",
+}
+
 // PerformAppEnumerateSwagger performs a Swagger scan against a target URL and returns the report.
-func PerformAppEnumerateSwagger(ctx context.Context, target string, noSandbox bool) webscan.RoutesReport {
+func PerformAppEnumerateSwagger(ctx context.Context, target string, timeout int) webscan.RoutesReport {
 	report := webscan.RoutesReport{Target: target}
 
-	opts := chromedp.DefaultExecAllocatorOptions[:]
-	if noSandbox {
-		opts = append(opts, chromedp.Flag("no-sandbox", true))
+	// Normalize target URL
+	if !strings.HasPrefix(target, "http://") && !strings.HasPrefix(target, "https://") {
+		target = "https://" + target
+	}
+	target = strings.TrimSuffix(target, "/")
+
+	// Try each common path until we find a valid Swagger/OpenAPI spec
+	var swaggerURL string
+	var bodyBytes []byte
+	var foundSpec bool
+
+	for _, path := range commonSpecPaths {
+		if dl, ok := ctx.Deadline(); ok {
+			timeout = int(time.Until(dl).Seconds())
+		}
+
+		resp := utils.PerformRequestScan(target, path, common.HttpMethodGet, common.RequestParams{}, timeout, true)
+		if len(resp.Errors) > 0 || resp.StatusCode == nil || *resp.StatusCode != 200 || resp.ResponseBody == nil {
+			continue
+		}
+
+		var docType map[string]interface{}
+		if err := json.Unmarshal([]byte(*resp.ResponseBody), &docType); err != nil {
+			continue
+		}
+
+		if _, ok := docType["swagger"]; ok || docType["openapi"] != nil {
+			swaggerURL = target + path // full URL for the report
+			bodyBytes = []byte(*resp.ResponseBody)
+			foundSpec = true
+			break
+		}
 	}
 
-	ctx, cancel := chromedp.NewExecAllocator(ctx, opts...)
-	defer cancel()
-
-	ctx, cancel = chromedp.NewContext(ctx, chromedp.WithLogf(func(string, ...interface{}) {}))
-	defer cancel()
-
-	ctx, cancel = context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
-	// Fetch the fully rendered HTML content
-	body, err := fetchHTMLContent(ctx, target)
-	if err != nil {
-		errMsg := fmt.Sprintf("Error fetching HTML content: %v", err)
-		report.Errors = append(report.Errors, errMsg)
-		return report
-	}
-
-	// Parse the HTML to find the Swagger JSON link
-	swaggerURL, err := findSwaggerURL(body, target)
-	if err != nil {
-		errMsg := fmt.Sprintf("Error finding Swagger URL: %v", err)
-		report.Errors = append(report.Errors, errMsg)
+	if !foundSpec {
+		report.Errors = append(report.Errors, "No valid Swagger/OpenAPI spec found")
 		return report
 	}
 
 	report.SchemaUrl = &swaggerURL
-
-	// Fetch the Swagger JSON
-	bodyBytes, err := fetchSwaggerJSON(swaggerURL)
-	if err != nil {
-		errMsg := fmt.Sprintf("Error fetching Swagger JSON: %v", err)
-		report.Errors = append(report.Errors, errMsg)
-		return report
-	}
 
 	// Encode the raw body in base64 and add to the report
 	report.Raw = base64.StdEncoding.EncodeToString(bodyBytes)
@@ -74,16 +98,14 @@ func PerformAppEnumerateSwagger(ctx context.Context, target string, noSandbox bo
 	// Create a new document from specification bytes
 	document, err := libopenapi.NewDocument(bodyBytes)
 	if err != nil {
-		errMsg := fmt.Sprintf("Error creating new document: %v", err)
-		report.Errors = append(report.Errors, errMsg)
+		report.Errors = append(report.Errors, fmt.Sprintf("Error creating new document: %v", err))
 		return report
 	}
 
 	// Determine if the document is Swagger (OpenAPI 2.0) or OpenAPI 3.0+
 	var docType map[string]interface{}
 	if err := json.Unmarshal(bodyBytes, &docType); err != nil {
-		errMsg := fmt.Sprintf("failed to unmarshal document type: %v", err)
-		report.Errors = append(report.Errors, errMsg)
+		report.Errors = append(report.Errors, fmt.Sprintf("failed to unmarshal document type: %v", err))
 		return report
 	}
 
@@ -96,8 +118,7 @@ func PerformAppEnumerateSwagger(ctx context.Context, target string, noSandbox bo
 		report.Version = &versionStr
 		err = handleOpenAPIV3(document, &report, target)
 	} else {
-		errMsg := "unsupported OpenAPI version"
-		report.Errors = append(report.Errors, errMsg)
+		report.Errors = append(report.Errors, "unsupported OpenAPI version")
 		return report
 	}
 
@@ -107,103 +128,6 @@ func PerformAppEnumerateSwagger(ctx context.Context, target string, noSandbox bo
 	}
 
 	return report
-}
-
-func fetchHTMLContent(ctx context.Context, target string) (string, error) {
-	var body string
-	err := chromedp.Run(ctx,
-		chromedp.Navigate(target),
-		chromedp.OuterHTML("html", &body),
-	)
-	if err != nil {
-		return "", fmt.Errorf("failed to fetch HTML: %v", err)
-	}
-	return body, nil
-}
-
-func findSwaggerURL(body, target string) (string, error) {
-	doc, err := html.Parse(strings.NewReader(body))
-	if err != nil {
-		return "", fmt.Errorf("failed to parse HTML: %v", err)
-	}
-
-	var potentialURLs []string
-	var f func(*html.Node)
-	f = func(n *html.Node) {
-		if n.Type == html.ElementNode {
-			for _, a := range n.Attr {
-				if strings.Contains(a.Val, "swagger.json") || strings.Contains(a.Val, "openapi.json") {
-					potentialURLs = append(potentialURLs, a.Val)
-				}
-			}
-		}
-		if n.Type == html.TextNode && n.Parent != nil && n.Parent.Data == "script" {
-			if strings.Contains(n.Data, "swagger.json") || strings.Contains(n.Data, "openapi.json") {
-				start := strings.Index(n.Data, "url: '") + len("url: '")
-				end := strings.Index(n.Data[start:], "'") + start
-				if start > len("url: '")-1 && end > start {
-					urlStr := n.Data[start:end]
-					potentialURLs = append(potentialURLs, urlStr)
-				}
-			}
-		}
-		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			f(c)
-		}
-	}
-	f(doc)
-
-	// Parse the potential URLs found in the HTML and return the first valid one
-	for _, urlStr := range potentialURLs {
-		swaggerURL := constructSwaggerURL(urlStr, target)
-		if _, err := url.ParseRequestURI(swaggerURL); err == nil {
-			fmt.Printf("Valid docs link: %s\n", swaggerURL)
-			return swaggerURL, nil
-		}
-	}
-
-	return "", fmt.Errorf("valid swagger.json link not found in HTML")
-}
-
-func constructSwaggerURL(urlStr, target string) string {
-	parsedURL, err := url.Parse(urlStr)
-	if err != nil || !parsedURL.IsAbs() {
-		parsedTarget, err := url.Parse(target)
-		if err != nil {
-			fmt.Printf("Error parsing target URL: %v\n", err)
-			return ""
-		}
-		baseURL := fmt.Sprintf("%s://%s", parsedTarget.Scheme, parsedTarget.Host)
-		if strings.HasPrefix(urlStr, "/") {
-			return baseURL + urlStr
-		}
-		return baseURL + "/" + urlStr
-	}
-	return parsedURL.String()
-}
-
-func fetchSwaggerJSON(swaggerURL string) ([]byte, error) {
-	resp, err := http.Get(swaggerURL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch Swagger JSON: %v", err)
-	}
-	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			log.Println("Error closing response body:", err)
-		}
-	}()
-
-	contentType := resp.Header.Get("Content-Type")
-	if !strings.HasPrefix(contentType, "application/json") {
-		return nil, fmt.Errorf("invalid content type: expected application/json, got %s", contentType)
-	}
-
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %v", err)
-	}
-
-	return bodyBytes, nil
 }
 
 func handleSwaggerV2(document libopenapi.Document, report *webscan.RoutesReport) error {

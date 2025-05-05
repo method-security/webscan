@@ -20,4 +20,4 @@ types:
   GraphQLQuery:
     properties:
       type: string
-      fields: list<string>
+      fields: optional<list<string>>

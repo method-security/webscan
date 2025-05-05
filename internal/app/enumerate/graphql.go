@@ -9,6 +9,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"strings"
 
 	webscan "github.com/Method-Security/webscan/generated/go/app/enumerate"
@@ -19,7 +20,7 @@ func PerformAppEnumerateGraphQL(ctx context.Context, target string) webscan.Rout
 	report := webscan.RoutesReport{Target: target, AppType: webscan.ApiTypeGraphQl}
 
 	basePath, baseEndpointURL := extractBasePathAndEndpoint(target)
-	report.BaseEndpointUrl = baseEndpointURL
+	report.BaseEndpointUrl = baseEndpointURL + basePath
 
 	addTopLevelRoute(&report, basePath)
 
@@ -46,13 +47,16 @@ func PerformAppEnumerateGraphQL(ctx context.Context, target string) webscan.Rout
 }
 
 func extractBasePathAndEndpoint(target string) (string, string) {
-	urlParts := strings.Split(target, "/")
-	basePath := "/"
-	if len(urlParts) > 3 {
-		basePath = "/" + strings.Join(urlParts[3:], "/")
-		return basePath, strings.Join(urlParts[:3], "/")
+	u, err := url.Parse(target)
+	if err != nil {
+		return "/", target // fallback if parsing fails
 	}
-	return basePath, strings.Join(urlParts, "/")
+	baseEndpoint := u.Scheme + "://" + u.Host
+	basePath := u.Path
+	if basePath == "" {
+		basePath = "/"
+	}
+	return basePath, baseEndpoint
 }
 
 func addTopLevelRoute(report *webscan.RoutesReport, basePath string) {

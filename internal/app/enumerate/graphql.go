@@ -20,7 +20,7 @@ func PerformAppEnumerateGraphQL(ctx context.Context, target string) webscan.Rout
 	report := webscan.RoutesReport{Target: target, AppType: webscan.ApiTypeGraphQl}
 
 	basePath, baseEndpointURL := extractBasePathAndEndpoint(target)
-	report.BaseEndpointUrl = baseEndpointURL + basePath
+	report.BaseEndpointUrl = baseEndpointURL
 
 	addTopLevelRoute(&report, basePath)
 

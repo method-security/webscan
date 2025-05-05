@@ -3,7 +3,7 @@
       {
         "name": "Amazon S3",
         "description": "DNS record points to an Amazon S3 bucket that no longer exists.",
-        "responseBody": ["NoSuchBucket", "The specified bucket does not exist", "The specified key does not exist."],
+        "responseBody": ["NoSuchBucket", "The specified bucket does not exist"],
         "statusCode": 404
       },
       {

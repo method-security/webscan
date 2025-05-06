@@ -41,8 +41,8 @@ go.work.sum
 .idea/
 .vscode/
 
-# Fern Python
-generated/python/**
+# Fern
+generated/*
 
 # Webscan binary
 /webscan

@@ -74,8 +74,8 @@ func PerformStaticAssetTakeOverAnalysis(ctx context.Context, target string, capt
 func isStaticAssetTakeOver(request *common.RequestInfo, fingerprints []routecapturefern.StaticAssetTakeOverFingerprint, successfulOnly bool) []*routecapturefern.StaticAssetTakeOverVulnerableInfo {
 	info := []*routecapturefern.StaticAssetTakeOverVulnerableInfo{}
 
+	successfulFingerprint := false
 	for _, fingerprint := range fingerprints {
-		vulnerable := false
 		instance := routecapturefern.StaticAssetTakeOverVulnerableInfo{
 			Fingerprint: &fingerprint,
 			Vulnerable:  false,
@@ -93,15 +93,29 @@ func isStaticAssetTakeOver(request *common.RequestInfo, fingerprints []routecapt
 			lowerBody := strings.ToLower(responseBody)
 			lowerRequestBody := strings.ToLower(*request.ResponseBody)
 			if *request.StatusCode == fingerprint.StatusCode && strings.Contains(lowerRequestBody, lowerBody) {
+				successfulFingerprint = true
 				instance.Vulnerable = true
-				vulnerable = true
 				break
 			}
 		}
 
-		if vulnerable || !successfulOnly {
+		if instance.Vulnerable || !successfulOnly {
 			info = append(info, &instance)
 		}
+	}
+
+	// If no fingerprint was found but the asset returned a 404, an issue should still be reported
+	if !successfulFingerprint && *request.StatusCode == 404 {
+		instance := routecapturefern.StaticAssetTakeOverVulnerableInfo{
+			Fingerprint: &routecapturefern.StaticAssetTakeOverFingerprint{
+				Name:         "Service Unknown",
+				Description:  "Service did not match any fingerprint but the asset returned a 404",
+				ResponseBody: []string{"N/A"},
+				StatusCode:   404,
+			},
+		}
+		instance.Vulnerable = true
+		info = append(info, &instance)
 	}
 
 	return info

@@ -42,7 +42,7 @@ go.work.sum
 .vscode/
 
 # Fern
-generated/*
+/generated/**
 
 # Webscan binary
 /webscan

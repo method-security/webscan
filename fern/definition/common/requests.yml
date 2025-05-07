@@ -23,6 +23,7 @@ types:
       bodyParams: optional<string>
       formParams: optional<map<string, string>>  
       multipartParams: optional<map<string, string>>
+      redirectChain: optional<list<string>>
       statusCode: optional<integer>
       responseBody: optional<string>
       responseHeaders: optional<map<string, string>>

@@ -1,4 +1,4 @@
-package pagecapture
+package headless
 
 import (
 	"context"
@@ -12,6 +12,8 @@ import (
 type WebSocket struct {
 	conn net.Conn
 }
+
+type Options struct{}
 
 func NewWebSocket(ctx context.Context, url string) *WebSocket {
 	conn, _, _, err := ws.Dial(context.Background(), url)

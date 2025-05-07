@@ -6,7 +6,7 @@ import (
 	"time"
 
 	webscan "github.com/Method-Security/webscan/generated/go/webserver"
-	pagecapture "github.com/Method-Security/webscan/internal/pagecapture/helpers"
+	"github.com/Method-Security/webscan/utils/headless"
 	"github.com/projectdiscovery/httpx/runner"
 )
 
@@ -83,15 +83,15 @@ func performBrowserProbe(ctx context.Context, targets []string, timeout time.Dur
 	urls := []*webscan.WebserverProbeUrlDetails{}
 
 	for _, target := range targets {
-		capturer := pagecapture.NewBrowserPageCapturer(browserPath, int(timeout.Seconds()), minDOMStabalizeTime)
+		capturer := headless.NewBrowserPageCapturer(browserPath, int(timeout.Seconds()), minDOMStabalizeTime)
 
 		// Try HTTPS first
 		targetURL := "https://" + target
-		result, err := capturer.Capture(ctx, targetURL, &pagecapture.Options{})
+		result, err := capturer.Capture(ctx, targetURL, &headless.Options{})
 		if err != nil {
 			// If HTTPS fails, try HTTP
 			targetURL = "http://" + target
-			result, err = capturer.Capture(ctx, targetURL, &pagecapture.Options{})
+			result, err = capturer.Capture(ctx, targetURL, &headless.Options{})
 			if err != nil {
 				errors = append(errors, "invalid address "+target)
 				continue
@@ -100,7 +100,7 @@ func performBrowserProbe(ctx context.Context, targets []string, timeout time.Dur
 
 		urlDetails := &webscan.WebserverProbeUrlDetails{
 			Url:    targetURL,
-			Status: result.Request.StatusCode,
+			Status: result.StatusCode,
 		}
 
 		urls = append(urls, urlDetails)

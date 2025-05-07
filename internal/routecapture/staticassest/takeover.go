@@ -11,9 +11,9 @@ import (
 
 	"github.com/Method-Security/webscan/generated/go/common"
 	routecapturefern "github.com/Method-Security/webscan/generated/go/routecapture"
-	"github.com/Method-Security/webscan/internal/pagecapture/helpers/browserbase"
 	"github.com/Method-Security/webscan/internal/routecapture"
 	"github.com/Method-Security/webscan/utils"
+	"github.com/Method-Security/webscan/utils/headless/browserbase"
 )
 
 func PerformStaticAssetTakeOverAnalysis(ctx context.Context, target string, captureMethod common.CaptureMethod, baseURLsOnly bool, timeout int, minDOMStabalizeTime int, insecure bool, browserPath *string, browserBaseToken *string, browserBaseProject *string, browserBaseOptions *[]browserbase.Option, successfulOnly bool, fingerprints []routecapturefern.StaticAssetTakeOverFingerprint) routecapturefern.StaticAssetTakeOverReport {

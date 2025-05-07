@@ -5,9 +5,9 @@ import (
 
 	common "github.com/Method-Security/webscan/generated/go/common"
 	routecapturefern "github.com/Method-Security/webscan/generated/go/routecapture"
-	"github.com/Method-Security/webscan/internal/pagecapture/helpers/browserbase"
-	routecapture "github.com/Method-Security/webscan/internal/routecapture"
+	"github.com/Method-Security/webscan/internal/routecapture"
 	staticassest "github.com/Method-Security/webscan/internal/routecapture/staticassest"
+	"github.com/Method-Security/webscan/utils/headless/browserbase"
 	"github.com/spf13/cobra"
 )
 

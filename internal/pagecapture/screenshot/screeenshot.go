@@ -5,8 +5,8 @@ import (
 
 	common "github.com/Method-Security/webscan/generated/go/common"
 	pagecapturefern "github.com/Method-Security/webscan/generated/go/pagecapture"
-	pagecapture "github.com/Method-Security/webscan/internal/pagecapture/helpers"
-	"github.com/Method-Security/webscan/internal/pagecapture/helpers/browserbase"
+	"github.com/Method-Security/webscan/utils/headless"
+	"github.com/Method-Security/webscan/utils/headless/browserbase"
 	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
@@ -16,8 +16,8 @@ func PerformScreenshotPageCapture(ctx context.Context, target string, captureMet
 	switch captureMethod {
 	case common.CaptureMethodBrowser:
 		log.Info("Initiating page capture with browser method", svc1log.SafeParam("target", target))
-		capturer := pagecapture.NewBrowserPageCapturer(browserPath, timeout, minDOMStabalizeTime)
-		report := capturer.CaptureScreenshot(ctx, target, &pagecapture.Options{})
+		capturer := headless.NewBrowserPageCapturer(browserPath, timeout, minDOMStabalizeTime)
+		report := CaptureScreenshot(ctx, capturer, target, &headless.Options{})
 		_ = capturer.Close(ctx)
 
 		return report
@@ -30,8 +30,8 @@ func PerformScreenshotPageCapture(ctx context.Context, target string, captureMet
 		}
 
 		client := browserbase.NewBrowserbaseClient(*browserBaseToken, *browserBaseProject, browserbase.NewBrowserbaseOptions(ctx, *browserBaseOptions...))
-		capturer := pagecapture.NewBrowserbasePageCapturer(ctx, timeout, minDOMStabalizeTime, client)
-		report := capturer.CaptureScreenshot(ctx, target, &pagecapture.Options{})
+		capturer := browserbase.NewBrowserbasePageCapturer(ctx, timeout, minDOMStabalizeTime, *client)
+		report := CaptureScreenshot(ctx, capturer.Capturer, target, &headless.Options{})
 
 		_ = capturer.Close(ctx)
 

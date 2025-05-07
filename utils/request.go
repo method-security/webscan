@@ -61,7 +61,7 @@ func PerformRequestScan(baseURL, path string, method common.HttpMethod, params c
 	responseHeader := make(map[string]string)
 	// Create and send the request based on the presence of escape characters
 	if !hasEscapeChars {
-		resp, err := sendRequest(method, fullURL.String(), reqBody, contentType, params.HeaderParams, timeout, followRedirects)
+		resp, redirectChain, err := sendRequest(method, fullURL.String(), reqBody, contentType, params.HeaderParams, timeout, followRedirects)
 		if err != nil {
 			request.Errors = append(request.Errors, err.Error())
 			return request
@@ -85,9 +85,11 @@ func PerformRequestScan(baseURL, path string, method common.HttpMethod, params c
 				responseHeader[key] = values[0]
 			}
 		}
+		// Populate report
+		populateReport(&request, statusCode, responseHeader, responseBody, params, redirectChain)
 	} else {
 		// Use sendFastHTTPRequest if escape characters are present
-		resp, err := sendFastHTTPRequest(string(method), fullURL.String(), responseBody, contentType, params.HeaderParams, followRedirects)
+		resp, redirectChain, err := sendFastHTTPRequest(string(method), fullURL.String(), responseBody, contentType, params.HeaderParams, followRedirects)
 		if err != nil {
 			request.Errors = append(request.Errors, err.Error())
 			return request
@@ -98,10 +100,9 @@ func PerformRequestScan(baseURL, path string, method common.HttpMethod, params c
 			responseHeader[string(key)] = string(value)
 		})
 		fasthttp.ReleaseResponse(resp)
+		// Populate report
+		populateReport(&request, statusCode, responseHeader, responseBody, params, redirectChain)
 	}
-
-	// Populate report
-	populateReport(&request, statusCode, responseHeader, responseBody, params)
 
 	return request
 }
@@ -162,10 +163,10 @@ func prepareRequestBody(params common.RequestParams) (io.Reader, string, error) 
 	return nil, "", nil
 }
 
-func sendRequest(method common.HttpMethod, url string, body io.Reader, contentType string, headers map[string]string, timeout int, followRedirects bool) (*http.Response, error) {
+func sendRequest(method common.HttpMethod, url string, body io.Reader, contentType string, headers map[string]string, timeout int, followRedirects bool) (*http.Response, []string, error) {
 	req, err := http.NewRequest(string(method), url, body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %v", err)
+		return nil, nil, fmt.Errorf("failed to create request: %v", err)
 	}
 
 	for key, value := range headers {
@@ -175,6 +176,7 @@ func sendRequest(method common.HttpMethod, url string, body io.Reader, contentTy
 		req.Header.Set("Content-Type", contentType)
 	}
 
+	redirectChain := []string{url}
 	client := &http.Client{
 		Timeout: time.Duration(timeout) * time.Second,
 		Transport: &http.Transport{
@@ -184,18 +186,19 @@ func sendRequest(method common.HttpMethod, url string, body io.Reader, contentTy
 			if !followRedirects {
 				return http.ErrUseLastResponse
 			}
+			redirectChain = append(redirectChain, req.URL.String())
 			return nil
 		},
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to perform request: %v", err)
+		return nil, nil, fmt.Errorf("failed to perform request: %v", err)
 	}
 
-	return resp, nil
+	return resp, redirectChain, nil
 }
 
-func sendFastHTTPRequest(method, url string, body string, contentType string, headers map[string]string, followRedirects bool) (*fasthttp.Response, error) {
+func sendFastHTTPRequest(method, url string, body string, contentType string, headers map[string]string, followRedirects bool) (*fasthttp.Response, []string, error) {
 	// Prepare the fasthttp request and response objects
 	req := fasthttp.AcquireRequest()
 	defer fasthttp.ReleaseRequest(req)
@@ -214,21 +217,29 @@ func sendFastHTTPRequest(method, url string, body string, contentType string, he
 		req.Header.Set(key, value)
 	}
 
+	redirectChain := []string{url}
 	var err error
 	if followRedirects {
 		err = fasthttp.DoRedirects(req, resp, 10) // Follow up to 10 redirects
+		// For FastHTTP, we need to manually track redirects
+		if err == nil {
+			location := resp.Header.Peek("Location")
+			if len(location) > 0 {
+				redirectChain = append(redirectChain, string(location))
+			}
+		}
 	} else {
 		err = fasthttp.Do(req, resp)
 	}
 	if err != nil {
 		fasthttp.ReleaseResponse(resp)
-		return nil, fmt.Errorf("failed to perform request: %v", err)
+		return nil, nil, fmt.Errorf("failed to perform request: %v", err)
 	}
 
-	return resp, nil
+	return resp, redirectChain, nil
 }
 
-func populateReport(report *common.RequestInfo, statusCode int, headers map[string]string, body string, params common.RequestParams) {
+func populateReport(report *common.RequestInfo, statusCode int, headers map[string]string, body string, params common.RequestParams, redirectChain []string) {
 	if headers != nil {
 		report.ResponseHeaders = make(map[string]string)
 		for key, values := range headers {
@@ -238,6 +249,7 @@ func populateReport(report *common.RequestInfo, statusCode int, headers map[stri
 
 	report.ResponseBody = &body
 	report.StatusCode = &statusCode
+	report.RedirectChain = redirectChain
 
 	if len(params.PathParams) > 0 {
 		report.PathParams = params.PathParams

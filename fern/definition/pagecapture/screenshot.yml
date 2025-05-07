@@ -3,6 +3,6 @@ imports:
 types:
   PageCaptureScreenshotReport:
     properties:
-      request: requests.RequestInfo
+      request: optional<requests.RequestInfo>
       screenshot: optional<base64>
       errors: optional<list<string>>

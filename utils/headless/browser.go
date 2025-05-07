@@ -1,12 +1,13 @@
-package pagecapture
+package headless
 
 import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"strings"
 	"time"
 
-	pagecapturefern "github.com/Method-Security/webscan/generated/go/pagecapture"
+	common "github.com/Method-Security/webscan/generated/go/common"
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/cdp"
 	"github.com/go-rod/rod/lib/launcher"
@@ -40,9 +41,9 @@ func NewBrowserPageCapturerWithClient(client *cdp.Client, timeout int, minDOMSta
 	}
 }
 
-func (b *BrowserPageCapturer) Capture(ctx context.Context, url string, options *Options) (*pagecapturefern.PageCaptureHtmlReport, error) {
+func (b *BrowserPageCapturer) Capture(ctx context.Context, url string, options *Options) (*common.RequestInfo, error) {
 	log := svc1log.FromContext(ctx)
-	report := NewPageCaptureReport(url)
+	requestInfo := &common.RequestInfo{}
 
 	if b.Browser == nil {
 		log.Info("Initializing browser")
@@ -57,6 +58,15 @@ func (b *BrowserPageCapturer) Capture(ctx context.Context, url string, options *
 		log.Info("Creating page", svc1log.SafeParam("url", url))
 		page = b.Browser.MustPage(url).Context(pageCtx)
 
+		// Track redirect chain
+		redirectChain := []string{url}
+		page.MustEvalOnNewDocument(`
+			window.addEventListener('beforeunload', function() {
+				window.redirectChain = window.redirectChain || [];
+				window.redirectChain.push(window.location.href);
+			});
+		`)
+
 		// Subscribe to Network.responseReceived events before navigation
 		var e = proto.NetworkResponseReceived{}
 		wait := page.WaitEvent(&e)
@@ -68,7 +78,7 @@ func (b *BrowserPageCapturer) Capture(ctx context.Context, url string, options *
 		log.Info("Waiting for DOM to be stable")
 		if err := page.WaitDOMStable(time.Duration(b.MinDOMStabalizeTimeSeconds)*time.Second, .1); err != nil {
 			log.Error("Failed waiting for DOM to stabilize", svc1log.SafeParam("error", err))
-			report.Errors = append(report.Errors, err.Error())
+			requestInfo.Errors = append(requestInfo.Errors, err.Error())
 			return
 		}
 
@@ -80,14 +90,46 @@ func (b *BrowserPageCapturer) Capture(ctx context.Context, url string, options *
 		for k, v := range e.Response.Headers {
 			headers[k] = fmt.Sprint(v)
 		}
-		report.Request.ResponseHeaders = headers
-		report.Request.StatusCode = &e.Response.Status
+		requestInfo.ResponseHeaders = headers
+		requestInfo.StatusCode = &e.Response.Status
 		log.Info("Event URL", svc1log.SafeParam("url", e.Response.URL))
+
+		// Get the final URL and redirect chain
+		finalURL := page.MustEval(`window.location.href`).Str()
+		if finalURL != url {
+			redirectChain = append(redirectChain, finalURL)
+		}
+
+		// Get any intermediate redirects from the browser
+		urls := page.MustEval(`(function() {
+			const chain = window.redirectChain || [];
+			return chain.join(',');
+		})()`).Str()
+
+		if urls != "" {
+			for _, url := range strings.Split(urls, ",") {
+				url = strings.Trim(url, `" `)
+				if url != "" {
+					redirectChain = append(redirectChain, url)
+				}
+			}
+		}
+
+		// Remove duplicates while preserving order
+		seen := make(map[string]bool)
+		uniqueChain := make([]string, 0, len(redirectChain))
+		for _, u := range redirectChain {
+			if !seen[u] {
+				seen[u] = true
+				uniqueChain = append(uniqueChain, u)
+			}
+		}
+		requestInfo.RedirectChain = uniqueChain
 	})
 	if err != nil {
 		log.Error("Failed to create page", svc1log.SafeParam("url", url), svc1log.SafeParam("error", err))
-		report.Errors = append(report.Errors, err.Error())
-		return report, err
+		requestInfo.Errors = append(requestInfo.Errors, err.Error())
+		return requestInfo, err
 	}
 	log.Debug("Successfully connected to page")
 
@@ -95,24 +137,24 @@ func (b *BrowserPageCapturer) Capture(ctx context.Context, url string, options *
 	htmlContent, err := page.HTML()
 	if err != nil {
 		log.Error("Failed to evaluate page content", svc1log.SafeParam("url", url), svc1log.SafeParam("error", err))
-		report.Errors = append(report.Errors, err.Error())
-		return report, err
+		requestInfo.Errors = append(requestInfo.Errors, err.Error())
+		return requestInfo, err
 	}
 
 	log.Info("Encoding page content")
 	encodedBody := base64.StdEncoding.EncodeToString([]byte(htmlContent))
-	report.Request.ResponseBody = &encodedBody
+	requestInfo.ResponseBody = &encodedBody
 
 	log.Info("Parsing URL to get path and query parameters")
 	if parsedURL, err := urlutil.Parse(url); err == nil {
-		report.Request.Path = parsedURL.Path
+		requestInfo.Path = parsedURL.Path
 		parsedURL.Query().Iterate(func(key string, value []string) bool {
-			report.Request.QueryParams[key] = value[0]
+			requestInfo.QueryParams[key] = value[0]
 			return true
 		})
 	}
 
-	return report, nil
+	return requestInfo, nil
 }
 
 func (b *BrowserPageCapturer) InitializeBrowser() {

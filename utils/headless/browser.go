@@ -72,15 +72,26 @@ func (b *BrowserPageCapturer) Capture(ctx context.Context, url string, options *
 
 	var page *rod.Page
 	err = rod.Try(func() {
-		log.Info("Creating page", svc1log.SafeParam("url", url))
-		page = b.Browser.MustPage(url).Context(pageCtx)
+		log.Info("Creating page")
+		page = b.Browser.MustPage().Context(pageCtx)
+
+		// Enable network tracking
+		networkEventErr := proto.NetworkEnable{}.Call(page)
+		if networkEventErr != nil {
+			log.Error("Failed to enable network tracking", svc1log.SafeParam("error", networkEventErr))
+			requestInfo.Errors = append(requestInfo.Errors, networkEventErr.Error())
+			return
+		}
 
 		// Track redirect chain
 		redirectChain := []string{url}
 
 		// Subscribe to Network.responseReceived events before navigation
-		var e = proto.NetworkResponseReceived{}
-		wait := page.WaitEvent(&e)
+		var responseReceived *proto.NetworkResponseReceived
+		waitForResponse := page.EachEvent(func(e *proto.NetworkResponseReceived) bool {
+			responseReceived = e
+			return true // Stop listening after first response
+		})
 
 		// Wait for any navigation for redirect(s) to complete
 		log.Info("Waiting for navigation to complete")
@@ -103,16 +114,18 @@ func (b *BrowserPageCapturer) Capture(ctx context.Context, url string, options *
 		}
 
 		log.Info("Waiting for response received event")
-		wait()
+		waitForResponse()
 
-		log.Info("Processing response received event")
-		headers := make(map[string]string)
-		for k, v := range e.Response.Headers {
-			headers[k] = fmt.Sprint(v)
+		if responseReceived != nil {
+			log.Info("Processing response received event")
+			headers := make(map[string]string)
+			for k, v := range responseReceived.Response.Headers {
+				headers[k] = fmt.Sprint(v)
+			}
+			requestInfo.ResponseHeaders = headers
+			requestInfo.StatusCode = &responseReceived.Response.Status
+			log.Info("Event URL", svc1log.SafeParam("url", responseReceived.Response.URL))
 		}
-		requestInfo.ResponseHeaders = headers
-		requestInfo.StatusCode = &e.Response.Status
-		log.Info("Event URL", svc1log.SafeParam("url", e.Response.URL))
 
 		// Get the final URL and add it to redirect chain if different
 		finalURL := page.MustEval(`() => window.location.toString()`).Str()
@@ -130,6 +143,13 @@ func (b *BrowserPageCapturer) Capture(ctx context.Context, url string, options *
 			}
 		}
 		requestInfo.RedirectChain = uniqueChain
+
+		log.Info("Waiting for DOM to be stable")
+		if err := page.WaitDOMStable(time.Duration(b.MinDOMStabalizeTimeSeconds)*time.Second, .1); err != nil {
+			log.Error("Failed waiting for DOM to stabilize", svc1log.SafeParam("error", err))
+			requestInfo.Errors = append(requestInfo.Errors, err.Error())
+			return
+		}
 	})
 	if err != nil {
 		log.Error("Failed to create page", svc1log.SafeParam("url", url), svc1log.SafeParam("error", err))

@@ -34,7 +34,7 @@ func NewBrowserbasePageCapturer(
 	}
 }
 
-func (b *PageCapturer) Capture(ctx context.Context, url string, options *headless.Options) (*common.RequestInfo, error) {
+func (b *PageCapturer) Capture(ctx context.Context, url string, options *headless.BrowserOptions) (*common.RequestInfo, error) {
 	return b.Capturer.Capture(ctx, url, options)
 }
 

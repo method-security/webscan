@@ -17,10 +17,10 @@ func PerformScreenshotPageCapture(ctx context.Context, target string, captureMet
 	case common.CaptureMethodBrowser:
 		log.Info("Initiating page capture with browser method", svc1log.SafeParam("target", target))
 		capturer := headless.NewBrowserPageCapturer(browserPath, timeout, minDOMStabalizeTime)
-		report := CaptureScreenshot(ctx, capturer, target, &headless.Options{})
+		report := CaptureScreenshot(ctx, capturer, target, &headless.BrowserOptions{})
 		_ = capturer.Close(ctx)
-
 		return report
+
 	case common.CaptureMethodBrowserbase:
 		log.Info("Initiating page capture with browserbase method", svc1log.SafeParam("target", target))
 		if browserBaseToken == nil || browserBaseProject == nil {
@@ -28,13 +28,10 @@ func PerformScreenshotPageCapture(ctx context.Context, target string, captureMet
 				Errors: []string{"browserbase token and project are required"},
 			}
 		}
-
 		client := browserbase.NewBrowserbaseClient(*browserBaseToken, *browserBaseProject, browserbase.NewBrowserbaseOptions(ctx, *browserBaseOptions...))
 		capturer := browserbase.NewBrowserbasePageCapturer(ctx, timeout, minDOMStabalizeTime, *client)
-		report := CaptureScreenshot(ctx, capturer.Capturer, target, &headless.Options{})
-
+		report := CaptureScreenshot(ctx, capturer.Capturer, target, &headless.BrowserOptions{})
 		_ = capturer.Close(ctx)
-
 		return report
 
 	default:

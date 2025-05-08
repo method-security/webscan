@@ -5,19 +5,12 @@ import (
 
 	pagecapturefern "github.com/Method-Security/webscan/generated/go/pagecapture"
 	"github.com/Method-Security/webscan/utils/headless"
-	browserbase "github.com/Method-Security/webscan/utils/headless/browserbase"
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 	"github.com/ysmood/gson"
 )
 
-func CaptureScreenshotWithBrowserbase(ctx context.Context, capturer *browserbase.PageCapturer, url string, options *browserbase.Options) *pagecapturefern.PageCaptureScreenshotReport {
-	// Convert browserbase.Options to headless.Options
-	headlessOptions := &headless.Options{}
-	return CaptureScreenshot(ctx, capturer.Capturer, url, headlessOptions)
-}
-
-func CaptureScreenshot(ctx context.Context, capturer *headless.BrowserPageCapturer, url string, options *headless.Options) *pagecapturefern.PageCaptureScreenshotReport {
+func CaptureScreenshot(ctx context.Context, capturer *headless.BrowserPageCapturer, url string, options *headless.BrowserOptions) *pagecapturefern.PageCaptureScreenshotReport {
 	report := pagecapturefern.PageCaptureScreenshotReport{}
 	log := svc1log.FromContext(ctx)
 

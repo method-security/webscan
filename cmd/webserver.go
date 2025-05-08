@@ -124,9 +124,10 @@ func (a *WebScan) InitWebserverCommand() {
 			config := LoadWebserverProbeConfig(targets, timeout, strategyEnum, browserPath, minDOMStabalizeTime)
 
 			// Generate report
-			report := webserver.PerformWebserverProbe(cmd.Context(), config)
-			if len(report.Errors) > 0 {
-				a.OutputSignal.Status = 1
+			report, err := webserver.PerformWebserverProbe(cmd.Context(), config)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
 			}
 			a.OutputSignal.Content = report
 		},
@@ -134,55 +135,13 @@ func (a *WebScan) InitWebserverCommand() {
 
 	probeCmd.Flags().StringSlice("targets", []string{}, "Address targets to perform web application probing agains, comma delimited list")
 	probeCmd.Flags().Int("timeout", 30, "Timeout limit (seconds)")
-	probeCmd.Flags().String("strategy", "REQUEST", "Strategy to use for probing")
+	probeCmd.Flags().String("strategy", "REQUEST", "Strategy to use for probing (REQUEST, BROWSER)")
 	probeCmd.Flags().String("browserpath", "", "Path to a browser executable")
 	probeCmd.Flags().Int("mindomstabalizetime", 5, "Minimum time in seconds to wait for DOM to stabilize")
 
 	_ = probeCmd.MarkFlagRequired("targets")
 
 	webserverCmd.AddCommand(probeCmd)
-
-	headergrabCmd := &cobra.Command{
-		Use:   "headergrab",
-		Short: "Grab the headers of the webserver",
-		Long:  `Grab the headers of the webserver`,
-		Run: func(cmd *cobra.Command, args []string) {
-			defer a.OutputSignal.PanicHandler(cmd.Context())
-
-			// Target flags
-			targets, err := cmd.Flags().GetStringSlice("targets")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-
-			// Configuration flags
-			timeout, err := cmd.Flags().GetInt("timeout")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-
-			// Load configuration
-			config := LoadWebserverHeadergrabConfig(targets, timeout)
-
-			// Generate report
-			report := webserver.PerformWebserverHeadergrab(cmd.Context(), config)
-			if len(report.Errors) > 0 {
-				a.OutputSignal.Status = 1
-			}
-
-			a.OutputSignal.Content = report
-		},
-	}
-
-	headergrabCmd.Flags().StringSlice("targets", []string{}, "URL of target")
-	headergrabCmd.Flags().Int("timeout", 30, "Timeout per request (seconds)")
-
-	_ = headergrabCmd.MarkFlagRequired("targets")
-
-	webserverCmd.AddCommand(headergrabCmd)
-
 	a.RootCmd.AddCommand(webserverCmd)
 }
 
@@ -204,14 +163,6 @@ func LoadWebserverRatelimitConfig(targets []string, maxRequests int, timespan in
 		MaxRequests: maxRequests,
 		Timespan:    timespan,
 		Timeout:     timeout,
-	}
-	return config
-}
-
-func LoadWebserverHeadergrabConfig(targets []string, timeout int) *webscan.WebserverHeadergrabConfig {
-	config := &webscan.WebserverHeadergrabConfig{
-		Targets: targets,
-		Timeout: timeout,
 	}
 	return config
 }

@@ -23,6 +23,10 @@ type BrowserPageCapturer struct {
 	MinDOMStabalizeTimeSeconds int
 }
 
+type BrowserOptions struct {
+	FollowRedirects bool
+}
+
 func NewBrowserPageCapturer(pathToBrowser *string, timeout int, minDOMStabalizeTime int) *BrowserPageCapturer {
 	return &BrowserPageCapturer{
 		PathToBrowser:              pathToBrowser,
@@ -41,7 +45,7 @@ func NewBrowserPageCapturerWithClient(client *cdp.Client, timeout int, minDOMSta
 	}
 }
 
-func (b *BrowserPageCapturer) Capture(ctx context.Context, url string, options *Options) (*common.RequestInfo, error) {
+func (b *BrowserPageCapturer) Capture(ctx context.Context, url string, options *BrowserOptions) (*common.RequestInfo, error) {
 	log := svc1log.FromContext(ctx)
 	requestInfo := &common.RequestInfo{}
 
@@ -60,12 +64,14 @@ func (b *BrowserPageCapturer) Capture(ctx context.Context, url string, options *
 
 		// Track redirect chain
 		redirectChain := []string{url}
-		page.MustEvalOnNewDocument(`
-			window.addEventListener('beforeunload', function() {
-				window.redirectChain = window.redirectChain || [];
-				window.redirectChain.push(window.location.href);
-			});
-		`)
+		if options != nil && options.FollowRedirects {
+			page.MustEvalOnNewDocument(`
+				window.addEventListener('beforeunload', function() {
+					window.redirectChain = window.redirectChain || [];
+					window.redirectChain.push(window.location.href);
+				});
+			`)
+		}
 
 		// Subscribe to Network.responseReceived events before navigation
 		var e = proto.NetworkResponseReceived{}
@@ -73,6 +79,23 @@ func (b *BrowserPageCapturer) Capture(ctx context.Context, url string, options *
 
 		// Wait for any navigation for redirect(s) to complete
 		log.Info("Waiting for navigation to complete")
+		if options != nil && !options.FollowRedirects {
+			// If not following redirects, use a custom navigation that stops at the first response
+			page.MustEvalOnNewDocument(`
+				Object.defineProperty(window, 'location', {
+					get: function() { return { href: window.location.href }; },
+					set: function(url) {
+						fetch(url, { redirect: 'manual' })
+							.then(response => {
+								window.location.href = url;
+							})
+							.catch(error => {
+								console.error('Navigation failed:', error);
+							});
+					}
+				});
+			`)
+		}
 		page.MustNavigate(url)
 
 		log.Info("Waiting for DOM to be stable")
@@ -100,17 +123,19 @@ func (b *BrowserPageCapturer) Capture(ctx context.Context, url string, options *
 			redirectChain = append(redirectChain, finalURL)
 		}
 
-		// Get any intermediate redirects from the browser
-		urls := page.MustEval(`(function() {
-			const chain = window.redirectChain || [];
-			return chain.join(',');
-		})()`).Str()
+		// Get any intermediate redirects from the browser if following redirects
+		if options != nil && options.FollowRedirects {
+			urls := page.MustEval(`(function() {
+				const chain = window.redirectChain || [];
+				return chain.join(',');
+			})()`).Str()
 
-		if urls != "" {
-			for _, url := range strings.Split(urls, ",") {
-				url = strings.Trim(url, `" `)
-				if url != "" {
-					redirectChain = append(redirectChain, url)
+			if urls != "" {
+				for _, url := range strings.Split(urls, ",") {
+					url = strings.Trim(url, `" `)
+					if url != "" {
+						redirectChain = append(redirectChain, url)
+					}
 				}
 			}
 		}

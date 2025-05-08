@@ -11,6 +11,47 @@ types:
       - HEAD
       - CONNECT
       - TRACE
+
+  # Body Kind Enum
+  BodyKind:
+  enum:
+    - json # parses to structured object
+    - form # application/x-www-form-urlencoded
+    - multipart # multipart/form-data
+    - text # any text/* that is NOT form-urlencoded
+    - binary # everything else (images, pdf, video, etc.)
+
+  Part:
+    properties:
+      headers: optional<map<string, string>>
+      body: Body # recursive reuse
+
+  # Body Union
+  Body:
+    discriminated: kind
+    union:
+      json:
+        properties:
+          data: unknown # parsed JSON
+          mimeType: optional<string> # default application/json
+      form:
+        properties:
+          fields: map<string, string> # key-value pairs
+          mimeType: optional<string> # default application/x-www-form-urlencoded
+      multipart:
+        properties:
+          parts: list<Part>
+          mimeType: optional<string> # default multipart/form-data
+      text:
+        properties:
+          value: string # UTF-8 by convention
+          mimeType: optional<string> # text/plain, text/html, text/csv, …
+          encoding: optional<string> # fallback if not UTF-8
+      binary:
+        properties:
+          base64: string # opaque bytes
+          mimeType: optional<string> # image/png, video/mp4, application/pdf, …
+
   # Request Structure
   RequestInfo:
     properties:
@@ -19,22 +60,21 @@ types:
       method: HttpMethod
       pathParams: optional<map<string, string>>
       queryParams: optional<map<string, string>>
-      headerParams: optional<map<string, string>>
-      bodyParams: optional<string>
-      formParams: optional<map<string, string>>  
-      multipartParams: optional<map<string, string>>
+      headers: optional<map<string, list<string>>>
+      body: optional<Body>
       redirectChain: optional<list<string>>
       statusCode: optional<integer>
-      responseBody: optional<string>
-      responseHeaders: optional<map<string, string>>
+      responseBody: optional<Body>
+      responseHeaders: optional<map<string, list<string>>>
+      receivedAt: datetime
+      sizeBytes: optional<integer>
       errors: optional<list<string>>
       timestamp: datetime
+
   # Request Params
   RequestParams:
     properties:
       pathParams: optional<map<string, string>>
       queryParams: optional<map<string, string>>
-      headerParams: optional<map<string, string>>
-      bodyParams: optional<string>
-      formParams: optional<map<string, string>>
-      multipartParams: optional<map<string, string>>
+      headers: optional<map<string, list<string>>>
+      body: optional<Body>

@@ -17,7 +17,20 @@ func PerformHTMLPageCapture(ctx context.Context, target string, captureMethod co
 	switch captureMethod {
 	case common.CaptureMethodRequest:
 		log.Info("Initiating page capture with request method", svc1log.SafeParam("target", target))
-		requestInfo := utils.PerformRequestScan(target, "", common.HttpMethodGet, common.RequestParams{}, timeout, insecure)
+		baseURL, path, err := utils.SplitTarget(target)
+		if err != nil {
+			report.Errors = append(report.Errors, err.Error())
+			return report
+		}
+		requestInfo := utils.PerformRequestScan(utils.RequestOptions{
+			BaseURL:         baseURL,
+			Path:            path,
+			Method:          common.HttpMethodGet,
+			Params:          common.RequestParams{},
+			Timeout:         timeout,
+			FollowRedirects: false,
+			Insecure:        insecure,
+		})
 		if requestInfo.Errors != nil {
 			report.Errors = requestInfo.Errors
 		}

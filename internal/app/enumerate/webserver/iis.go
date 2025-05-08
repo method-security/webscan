@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
-	"net/url"
 	"regexp"
 	"runtime"
 	"sync"
@@ -80,23 +79,21 @@ func enumerateSite(target string, timeout int) (*enumerateWebserverFern.IisSite,
 	var reqs []*common.RequestInfo
 
 	// Parse & normalise URL
-	u, err := url.Parse(target)
+	baseURL, path, err := utils.SplitTarget(target)
 	if err != nil {
 		return nil, nil, []string{fmt.Sprintf("invalid URL %s: %v", target, err)}
 	}
-	if u.Scheme == "" {
-		u.Scheme = "http"
-	}
-	baseURL := fmt.Sprintf("%s://%s", u.Scheme, u.Host)
-	path := u.Path
-	if path == "" {
-		path = "/"
-	}
 
 	// Baseline GET
-	root := utils.PerformRequestScan(baseURL, path, common.HttpMethodGet, common.RequestParams{}, timeout, true)
-	reqs = append(reqs, &root)
-
+	root := utils.PerformRequestScan(utils.RequestOptions{
+		BaseURL:         baseURL,
+		Path:            path,
+		Method:          common.HttpMethodGet,
+		Params:          common.RequestParams{},
+		Timeout:         timeout,
+		FollowRedirects: false,
+		Insecure:        true,
+	})
 	if root.StatusCode == nil {
 		return nil, reqs, []string{fmt.Sprintf("no response from %s", target)}
 	}
@@ -107,8 +104,15 @@ func enumerateSite(target string, timeout int) (*enumerateWebserverFern.IisSite,
 	// If server version still unknown, scrape 404 page
 	if site.Server == nil || site.Server.Version == nil {
 		r := rand.New(rand.NewSource(time.Now().UnixNano()))
-		nf := utils.PerformRequestScan(baseURL, fmt.Sprintf("/nonexistent_%d.aspx", r.Intn(9e6)), common.HttpMethodGet, common.RequestParams{}, timeout, true)
-		reqs = append(reqs, &nf)
+		nf := utils.PerformRequestScan(utils.RequestOptions{
+			BaseURL:         baseURL,
+			Path:            fmt.Sprintf("/nonexistent_%d.aspx", r.Intn(9e6)),
+			Method:          common.HttpMethodGet,
+			Params:          common.RequestParams{},
+			Timeout:         timeout,
+			FollowRedirects: false,
+			Insecure:        true,
+		})
 		if nf.ResponseBody != nil {
 			if v := parseIisVersionFromBody(*nf.ResponseBody); v != "" {
 				site.Server = &enumerateWebserverFern.WebServerInfo{Name: "Microsoft-IIS", Version: &v}

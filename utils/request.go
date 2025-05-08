@@ -16,28 +16,38 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
-func PerformRequestScan(baseURL, path string, method common.HttpMethod, params common.RequestParams, timeout int, followRedirects bool) common.RequestInfo {
-	normalizedPath := strings.TrimRight(path, "/")
+type RequestOptions struct {
+	BaseURL         string
+	Path            string
+	Method          common.HttpMethod
+	Params          common.RequestParams
+	FollowRedirects bool
+	Insecure        bool
+	Timeout         int
+}
+
+func PerformRequestScan(options RequestOptions) common.RequestInfo {
+	normalizedPath := strings.TrimRight(options.Path, "/")
 	if normalizedPath == "" {
 		normalizedPath = "/"
 	}
 
 	request := common.RequestInfo{
-		BaseUrl:   baseURL,
+		BaseUrl:   options.BaseURL,
 		Path:      normalizedPath,
-		Method:    method,
+		Method:    options.Method,
 		Timestamp: time.Now(),
 	}
 
 	// Construct the URL
-	fullURL, err := constructURL(baseURL, normalizedPath, params.PathParams, params.QueryParams)
+	fullURL, err := constructURL(options.BaseURL, normalizedPath, options.Params.PathParams, options.Params.QueryParams)
 	if err != nil {
 		request.Errors = append(request.Errors, err.Error())
 		return request
 	}
 
 	// Prepare request body and content type
-	reqBody, contentType, err := prepareRequestBody(params)
+	reqBody, contentType, err := prepareRequestBody(options.Params)
 	if err != nil {
 		request.Errors = append(request.Errors, err.Error())
 		return request
@@ -45,7 +55,7 @@ func PerformRequestScan(baseURL, path string, method common.HttpMethod, params c
 
 	// Check for escape characters in headers
 	hasEscapeChars := false
-	for key, value := range params.HeaderParams {
+	for key, value := range options.Params.HeaderParams {
 		if strings.Contains(key, "\r") || strings.Contains(key, "\n") || strings.Contains(key, "\\") || strings.Contains(key, "\u0000") {
 			hasEscapeChars = true
 			break
@@ -61,7 +71,7 @@ func PerformRequestScan(baseURL, path string, method common.HttpMethod, params c
 	responseHeader := make(map[string]string)
 	// Create and send the request based on the presence of escape characters
 	if !hasEscapeChars {
-		resp, redirectChain, err := sendRequest(method, fullURL.String(), reqBody, contentType, params.HeaderParams, timeout, followRedirects)
+		resp, redirectChain, err := sendRequest(options.Method, fullURL.String(), reqBody, contentType, options.Params.HeaderParams, options.Timeout, options.FollowRedirects, options.Insecure)
 		if err != nil {
 			request.Errors = append(request.Errors, err.Error())
 			return request
@@ -86,10 +96,10 @@ func PerformRequestScan(baseURL, path string, method common.HttpMethod, params c
 			}
 		}
 		// Populate report
-		populateReport(&request, statusCode, responseHeader, responseBody, params, redirectChain)
+		populateReport(&request, statusCode, responseHeader, responseBody, options.Params, redirectChain)
 	} else {
 		// Use sendFastHTTPRequest if escape characters are present
-		resp, redirectChain, err := sendFastHTTPRequest(string(method), fullURL.String(), responseBody, contentType, params.HeaderParams, followRedirects)
+		resp, redirectChain, err := sendFastHTTPRequest(string(options.Method), fullURL.String(), responseBody, contentType, options.Params.HeaderParams, options.FollowRedirects)
 		if err != nil {
 			request.Errors = append(request.Errors, err.Error())
 			return request
@@ -101,7 +111,7 @@ func PerformRequestScan(baseURL, path string, method common.HttpMethod, params c
 		})
 		fasthttp.ReleaseResponse(resp)
 		// Populate report
-		populateReport(&request, statusCode, responseHeader, responseBody, params, redirectChain)
+		populateReport(&request, statusCode, responseHeader, responseBody, options.Params, redirectChain)
 	}
 
 	return request
@@ -163,7 +173,7 @@ func prepareRequestBody(params common.RequestParams) (io.Reader, string, error) 
 	return nil, "", nil
 }
 
-func sendRequest(method common.HttpMethod, url string, body io.Reader, contentType string, headers map[string]string, timeout int, followRedirects bool) (*http.Response, []string, error) {
+func sendRequest(method common.HttpMethod, url string, body io.Reader, contentType string, headers map[string]string, timeout int, followRedirects bool, insecure bool) (*http.Response, []string, error) {
 	req, err := http.NewRequest(string(method), url, body)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create request: %v", err)
@@ -180,7 +190,7 @@ func sendRequest(method common.HttpMethod, url string, body io.Reader, contentTy
 	client := &http.Client{
 		Timeout: time.Duration(timeout) * time.Second,
 		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
 		},
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			if !followRedirects {

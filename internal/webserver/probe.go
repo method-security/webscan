@@ -52,8 +52,21 @@ func performRequestProbe(targets []string, timeout time.Duration) ([]*common.Req
 	requests := []*common.RequestInfo{}
 
 	for _, target := range targets {
+		baseURL, path, err := utils.SplitTarget(target)
+		if err != nil {
+			errors = append(errors, "invalid address "+target)
+			continue
+		}
 		probeFunc := func(url string) (*common.RequestInfo, error) {
-			request := utils.PerformRequestScan(url, "", common.HttpMethodGet, common.RequestParams{}, int(timeout.Seconds()), true)
+			request := utils.PerformRequestScan(utils.RequestOptions{
+				BaseURL:         baseURL,
+				Path:            path,
+				Method:          common.HttpMethodGet,
+				Params:          common.RequestParams{},
+				Timeout:         int(timeout.Seconds()),
+				FollowRedirects: true,
+				Insecure:        true,
+			})
 			if request.StatusCode != nil && *request.StatusCode >= 400 {
 				return &request, fmt.Errorf("request failed with status %d", *request.StatusCode)
 			}

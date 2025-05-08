@@ -36,7 +36,15 @@ func PerformStaticAssetTakeOverAnalysis(ctx context.Context, target string, capt
 		report.Errors = errors
 		return report
 	}
-	targetRequest := utils.PerformRequestScan(targetBaseURL, targetPath, common.HttpMethodGet, common.RequestParams{}, timeout, true)
+	targetRequest := utils.PerformRequestScan(utils.RequestOptions{
+		BaseURL:         targetBaseURL,
+		Path:            targetPath,
+		Method:          common.HttpMethodGet,
+		Params:          common.RequestParams{},
+		Timeout:         timeout,
+		FollowRedirects: false,
+		Insecure:        insecure,
+	})
 	report.TargetRequest = &targetRequest
 
 	// Static Asset Take Over Attempts
@@ -54,7 +62,15 @@ func PerformStaticAssetTakeOverAnalysis(ctx context.Context, target string, capt
 			continue
 		}
 
-		request := utils.PerformRequestScan(staticAssetBaseURL, staticAssetPath, common.HttpMethodGet, common.RequestParams{}, timeout, true)
+		request := utils.PerformRequestScan(utils.RequestOptions{
+			BaseURL:         staticAssetBaseURL,
+			Path:            staticAssetPath,
+			Method:          common.HttpMethodGet,
+			Params:          common.RequestParams{},
+			Timeout:         timeout,
+			FollowRedirects: true,
+			Insecure:        insecure,
+		})
 		StaticAssetTakeOverAttempt.Request = &request
 
 		// Check if the request is vulnerable

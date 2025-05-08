@@ -91,8 +91,21 @@ func PerformRouteCapture(ctx context.Context, target string, captureMethod commo
 	var errors []string
 	switch captureMethod {
 	case common.CaptureMethodRequest:
+		baseURL, path, err := utils.SplitTarget(target)
+		if err != nil {
+			report.Errors = append(report.Errors, err.Error())
+			return report
+		}
 		log.Info("Initiating page capture with request method", svc1log.SafeParam("target", target))
-		requestInfo := utils.PerformRequestScan(target, "", common.HttpMethodGet, common.RequestParams{}, timeout, insecure)
+		requestInfo := utils.PerformRequestScan(utils.RequestOptions{
+			BaseURL:         baseURL,
+			Path:            path,
+			Method:          common.HttpMethodGet,
+			Params:          common.RequestParams{},
+			Timeout:         timeout,
+			FollowRedirects: false,
+			Insecure:        insecure,
+		})
 		if requestInfo.Errors != nil {
 			report.Errors = requestInfo.Errors
 			return report
@@ -104,7 +117,7 @@ func PerformRouteCapture(ctx context.Context, target string, captureMethod commo
 	case common.CaptureMethodBrowser:
 		log.Info("Initiating page capture with browser method", svc1log.SafeParam("target", target))
 		capturer := headless.NewBrowserPageCapturer(browserPath, timeout, minDOMStabalizeTime)
-		result, err := capturer.Capture(ctx, target, &headless.BrowserOptions{})
+		result, err := capturer.Capture(ctx, target, &headless.BrowserOptions{FollowRedirects: false})
 		if err != nil {
 			report.Errors = append(report.Errors, err.Error())
 			return report

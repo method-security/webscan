@@ -24,8 +24,15 @@ func PerformAppEnumerateK8s(ctx context.Context, target string, timeout int) *we
 	attempts := []*webscan.AppEnumerateK8SAttemptInfo{}
 	for _, path := range commonK8spaths {
 		attempt := webscan.AppEnumerateK8SAttemptInfo{Path: path}
-		request := utils.PerformRequestScan(baseURL, parsedTargetPath+path, common.HttpMethodGet, common.RequestParams{}, timeout, false)
-
+		request := utils.PerformRequestScan(utils.RequestOptions{
+			BaseURL:         baseURL,
+			Path:            parsedTargetPath + path,
+			Method:          common.HttpMethodGet,
+			Params:          common.RequestParams{},
+			Timeout:         timeout,
+			FollowRedirects: false,
+			Insecure:        true,
+		})
 		if request.Errors != nil {
 			errors = append(errors, request.Errors...)
 			attempt.Request = &request

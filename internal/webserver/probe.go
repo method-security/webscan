@@ -82,7 +82,7 @@ func performBrowserProbe(ctx context.Context, targets []string, timeout time.Dur
 		}()
 
 		probeFunc := func(url string) (*common.RequestInfo, error) {
-			return capturer.Capture(ctx, url, &headless.BrowserOptions{})
+			return capturer.Capture(ctx, url, &headless.BrowserOptions{FollowRedirects: true})
 		}
 
 		result, err := tryHTTPSThenHTTP(target, probeFunc)

@@ -2,12 +2,11 @@ package headless
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
-	"strings"
 	"time"
 
 	common "github.com/Method-Security/webscan/generated/go/common"
+	"github.com/Method-Security/webscan/utils"
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/cdp"
 	"github.com/go-rod/rod/lib/launcher"
@@ -25,6 +24,7 @@ type BrowserPageCapturer struct {
 
 type BrowserOptions struct {
 	FollowRedirects bool
+	Method          common.HttpMethod
 }
 
 func NewBrowserPageCapturer(pathToBrowser *string, timeout int, minDOMStabalizeTime int) *BrowserPageCapturer {
@@ -47,7 +47,20 @@ func NewBrowserPageCapturerWithClient(client *cdp.Client, timeout int, minDOMSta
 
 func (b *BrowserPageCapturer) Capture(ctx context.Context, url string, options *BrowserOptions) (*common.RequestInfo, error) {
 	log := svc1log.FromContext(ctx)
-	requestInfo := &common.RequestInfo{}
+
+	// Set basic RequestInfo
+	baseURL, path, err := utils.SplitTarget(url)
+	if err != nil {
+		log.Error("Failed to parse URL", svc1log.SafeParam("url", url), svc1log.SafeParam("error", err))
+		return nil, err
+	}
+
+	// Set default method to GET if not specified
+	method := common.HttpMethodGet
+	if options != nil && options.Method != "" {
+		method = options.Method
+	}
+	requestInfo := &common.RequestInfo{BaseUrl: baseURL, Path: path, Method: method}
 
 	if b.Browser == nil {
 		log.Info("Initializing browser")
@@ -58,20 +71,12 @@ func (b *BrowserPageCapturer) Capture(ctx context.Context, url string, options *
 	defer cancel()
 
 	var page *rod.Page
-	err := rod.Try(func() {
+	err = rod.Try(func() {
 		log.Info("Creating page", svc1log.SafeParam("url", url))
 		page = b.Browser.MustPage(url).Context(pageCtx)
 
 		// Track redirect chain
 		redirectChain := []string{url}
-		if options != nil && options.FollowRedirects {
-			page.MustEvalOnNewDocument(`
-				window.addEventListener('beforeunload', function() {
-					window.redirectChain = window.redirectChain || [];
-					window.redirectChain.push(window.location.href);
-				});
-			`)
-		}
 
 		// Subscribe to Network.responseReceived events before navigation
 		var e = proto.NetworkResponseReceived{}
@@ -79,30 +84,22 @@ func (b *BrowserPageCapturer) Capture(ctx context.Context, url string, options *
 
 		// Wait for any navigation for redirect(s) to complete
 		log.Info("Waiting for navigation to complete")
-		if options != nil && !options.FollowRedirects {
-			// If not following redirects, use a custom navigation that stops at the first response
-			page.MustEvalOnNewDocument(`
-				Object.defineProperty(window, 'location', {
-					get: function() { return { href: window.location.href }; },
-					set: function(url) {
-						fetch(url, { redirect: 'manual' })
-							.then(response => {
-								window.location.href = url;
-							})
-							.catch(error => {
-								console.error('Navigation failed:', error);
-							});
-					}
-				});
-			`)
-		}
-		page.MustNavigate(url)
-
-		log.Info("Waiting for DOM to be stable")
-		if err := page.WaitDOMStable(time.Duration(b.MinDOMStabalizeTimeSeconds)*time.Second, .1); err != nil {
-			log.Error("Failed waiting for DOM to stabilize", svc1log.SafeParam("error", err))
-			requestInfo.Errors = append(requestInfo.Errors, err.Error())
-			return
+		if method == common.HttpMethodGet {
+			page.MustNavigate(url)
+		} else {
+			// For non-GET methods, we need to use a different approach
+			script := fmt.Sprintf(`
+				() => {
+					fetch(window.location.href, {
+						method: '%s',
+						headers: {
+							'Content-Type': 'application/json'
+						}
+					});
+				}
+			`, method)
+			page.MustEvalOnNewDocument(script)
+			page.MustNavigate(url)
 		}
 
 		log.Info("Waiting for response received event")
@@ -117,27 +114,10 @@ func (b *BrowserPageCapturer) Capture(ctx context.Context, url string, options *
 		requestInfo.StatusCode = &e.Response.Status
 		log.Info("Event URL", svc1log.SafeParam("url", e.Response.URL))
 
-		// Get the final URL and redirect chain
-		finalURL := page.MustEval(`window.location.href`).Str()
+		// Get the final URL and add it to redirect chain if different
+		finalURL := page.MustEval(`() => window.location.toString()`).Str()
 		if finalURL != url {
 			redirectChain = append(redirectChain, finalURL)
-		}
-
-		// Get any intermediate redirects from the browser if following redirects
-		if options != nil && options.FollowRedirects {
-			urls := page.MustEval(`(function() {
-				const chain = window.redirectChain || [];
-				return chain.join(',');
-			})()`).Str()
-
-			if urls != "" {
-				for _, url := range strings.Split(urls, ",") {
-					url = strings.Trim(url, `" `)
-					if url != "" {
-						redirectChain = append(redirectChain, url)
-					}
-				}
-			}
 		}
 
 		// Remove duplicates while preserving order
@@ -166,9 +146,7 @@ func (b *BrowserPageCapturer) Capture(ctx context.Context, url string, options *
 		return requestInfo, err
 	}
 
-	log.Info("Encoding page content")
-	encodedBody := base64.StdEncoding.EncodeToString([]byte(htmlContent))
-	requestInfo.ResponseBody = &encodedBody
+	requestInfo.ResponseBody = &htmlContent
 
 	log.Info("Parsing URL to get path and query parameters")
 	if parsedURL, err := urlutil.Parse(url); err == nil {

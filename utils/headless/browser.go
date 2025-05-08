@@ -125,30 +125,43 @@ func (b *BrowserPageCapturer) Capture(ctx context.Context, url string, options *
 			requestInfo.ResponseHeaders = headers
 			requestInfo.StatusCode = &responseReceived.Response.Status
 			log.Info("Event URL", svc1log.SafeParam("url", responseReceived.Response.URL))
-		}
 
-		// Get the final URL and add it to redirect chain if different
-		finalURL := page.MustEval(`() => window.location.toString()`).Str()
-		if finalURL != url {
-			redirectChain = append(redirectChain, finalURL)
-		}
-
-		// Remove duplicates while preserving order
-		seen := make(map[string]bool)
-		uniqueChain := make([]string, 0, len(redirectChain))
-		for _, u := range redirectChain {
-			if !seen[u] {
-				seen[u] = true
-				uniqueChain = append(uniqueChain, u)
+			// If we got a redirect response and FollowRedirects is false, return now
+			if responseReceived.Response.Status >= 300 && responseReceived.Response.Status < 400 &&
+				options != nil && !options.FollowRedirects {
+				requestInfo.RedirectChain = redirectChain
+				return
 			}
 		}
-		requestInfo.RedirectChain = uniqueChain
 
-		log.Info("Waiting for DOM to be stable")
-		if err := page.WaitDOMStable(time.Duration(b.MinDOMStabalizeTimeSeconds)*time.Second, .1); err != nil {
-			log.Error("Failed waiting for DOM to stabilize", svc1log.SafeParam("error", err))
-			requestInfo.Errors = append(requestInfo.Errors, err.Error())
-			return
+		// Only get final URL and continue processing if we're following redirects
+		if options == nil || options.FollowRedirects {
+			// Get the final URL and add it to redirect chain if different
+			finalURL := page.MustEval(`() => window.location.toString()`).Str()
+			if finalURL != url {
+				redirectChain = append(redirectChain, finalURL)
+			}
+
+			// Remove duplicates while preserving order
+			seen := make(map[string]bool)
+			uniqueChain := make([]string, 0, len(redirectChain))
+			for _, u := range redirectChain {
+				if !seen[u] {
+					seen[u] = true
+					uniqueChain = append(uniqueChain, u)
+				}
+			}
+			requestInfo.RedirectChain = uniqueChain
+
+			log.Info("Waiting for DOM to be stable")
+			if err := page.WaitDOMStable(time.Duration(b.MinDOMStabalizeTimeSeconds)*time.Second, .1); err != nil {
+				log.Error("Failed waiting for DOM to stabilize", svc1log.SafeParam("error", err))
+				requestInfo.Errors = append(requestInfo.Errors, err.Error())
+				return
+			}
+		} else {
+			// If not following redirects, just use the original URL in the chain
+			requestInfo.RedirectChain = redirectChain
 		}
 	})
 	if err != nil {
@@ -195,7 +208,7 @@ func (b *BrowserPageCapturer) Close(ctx context.Context) error {
 	svc1log.FromContext(ctx).Debug("Closing browser with allowed timeout of 5 seconds")
 	if b.Browser != nil {
 		svc1log.FromContext(ctx).Debug("Attempting to close browser")
-		closeCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		closeCtx, cancel := context.WithTimeout(ctx, time.Duration(b.TimeoutSeconds)*time.Second)
 		defer cancel()
 
 		closeChan := make(chan error)

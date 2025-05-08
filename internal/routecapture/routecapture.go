@@ -133,7 +133,7 @@ func PerformRouteCapture(ctx context.Context, target string, captureMethod commo
 		log.Info("Initiating page capture with browserbase method", svc1log.SafeParam("target", target))
 		client := browserbase.NewBrowserbaseClient(*browserBaseToken, *browserBaseProject, browserbase.NewBrowserbaseOptions(ctx, *browserBaseOptions...))
 		capturer := browserbase.NewBrowserbasePageCapturer(ctx, timeout, minDOMStabalizeTime, *client)
-		result, err := capturer.Capture(ctx, target, &headless.BrowserOptions{})
+		result, err := capturer.Capture(ctx, target, &headless.BrowserOptions{FollowRedirects: false})
 		if err != nil {
 			report.Errors = append(report.Errors, err.Error())
 			return report

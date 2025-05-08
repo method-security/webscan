@@ -2,7 +2,6 @@ package routecapture
 
 import (
 	"context"
-	"encoding/base64"
 	"net/http"
 	"strings"
 	"time"
@@ -87,8 +86,6 @@ func PerformRouteCapture(ctx context.Context, target string, captureMethod commo
 		Errors: []string{},
 	}
 
-	// Get the HTML content with specified method
-	var htmlContent string
 	var routes []*routecapturefern.WebRoute
 	var urls []string
 	var errors []string
@@ -101,15 +98,8 @@ func PerformRouteCapture(ctx context.Context, target string, captureMethod commo
 			return report
 		}
 		log.Info("Page capture successful")
-		decodedContent, err := base64.StdEncoding.DecodeString(*requestInfo.ResponseBody)
-		if err != nil {
-			report.Errors = append(report.Errors, "Failed to decode base64 response: "+err.Error())
-			return report
-		}
-		htmlContent = string(decodedContent)
-
 		// Extract the routes and urls
-		routes, urls, errors = extractRoutes(ctx, target, htmlContent, baseURLsOnly, captureStaticAssets, timeout, common.CaptureMethodRequest, nil)
+		routes, urls, errors = extractRoutes(ctx, target, *requestInfo.ResponseBody, baseURLsOnly, captureStaticAssets, timeout, common.CaptureMethodRequest, nil)
 
 	case common.CaptureMethodBrowser:
 		log.Info("Initiating page capture with browser method", svc1log.SafeParam("target", target))
@@ -119,17 +109,10 @@ func PerformRouteCapture(ctx context.Context, target string, captureMethod commo
 			report.Errors = append(report.Errors, err.Error())
 			return report
 		}
-
 		log.Info("Page capture successful")
-		decodedContent, err := base64.StdEncoding.DecodeString(*result.ResponseBody)
-		if err != nil {
-			report.Errors = append(report.Errors, "Failed to decode base64 response: "+err.Error())
-			return report
-		}
-		htmlContent = string(decodedContent)
 
 		// Extract the routes and urls
-		routes, urls, errors = extractRoutes(ctx, target, htmlContent, baseURLsOnly, captureStaticAssets, timeout, common.CaptureMethodBrowser, capturer)
+		routes, urls, errors = extractRoutes(ctx, target, *result.ResponseBody, baseURLsOnly, captureStaticAssets, timeout, common.CaptureMethodBrowser, capturer)
 
 		_ = capturer.Close(ctx)
 
@@ -143,15 +126,9 @@ func PerformRouteCapture(ctx context.Context, target string, captureMethod commo
 			return report
 		}
 		log.Info("Page capture successful")
-		decodedContent, err := base64.StdEncoding.DecodeString(*result.ResponseBody)
-		if err != nil {
-			report.Errors = append(report.Errors, "Failed to decode base64 response: "+err.Error())
-			return report
-		}
-		htmlContent = string(decodedContent)
 
 		// Extract the routes and urls
-		routes, urls, errors = extractRoutes(ctx, target, htmlContent, baseURLsOnly, captureStaticAssets, timeout, common.CaptureMethodBrowserbase, capturer.Capturer)
+		routes, urls, errors = extractRoutes(ctx, target, *result.ResponseBody, baseURLsOnly, captureStaticAssets, timeout, common.CaptureMethodBrowserbase, capturer.Capturer)
 
 		_ = capturer.Close(ctx)
 

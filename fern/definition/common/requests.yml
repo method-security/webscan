@@ -12,45 +12,47 @@ types:
       - CONNECT
       - TRACE
 
-  # Body Kind Enum
-  BodyKind:
-  enum:
-    - json # parses to structured object
-    - form # application/x-www-form-urlencoded
-    - multipart # multipart/form-data
-    - text # any text/* that is NOT form-urlencoded
-    - binary # everything else (images, pdf, video, etc.)
+  # Leaf payload types
+  JsonBody:
+    properties:
+      data: unknown # any JSON structure
+      mimeType: optional<string>
 
-  Part:
+  FormBody:
+    properties:
+      fields: map<string, string>
+      mimeType: optional<string>
+
+  BinaryBody:
+    properties:
+      base64: base64
+      mimeType: optional<string>
+
+  MultipartPart:
     properties:
       headers: optional<map<string, string>>
-      body: Body # recursive reuse
+      content: BinaryBody
 
-  # Body Union
+  MultipartBody:
+    properties:
+      parts: list<MultipartPart>
+      mimeType: optional<string>
+
+  TextBody:
+    properties:
+      value: string
+      mimeType: optional<string>
+      encoding: optional<string>
+
+  # Discriminated Union
   Body:
-    discriminated: kind
+    discriminant: kind
     union:
-      json:
-        properties:
-          data: unknown # parsed JSON
-          mimeType: optional<string> # default application/json
-      form:
-        properties:
-          fields: map<string, string> # key-value pairs
-          mimeType: optional<string> # default application/x-www-form-urlencoded
-      multipart:
-        properties:
-          parts: list<Part>
-          mimeType: optional<string> # default multipart/form-data
-      text:
-        properties:
-          value: string # UTF-8 by convention
-          mimeType: optional<string> # text/plain, text/html, text/csv, …
-          encoding: optional<string> # fallback if not UTF-8
-      binary:
-        properties:
-          base64: string # opaque bytes
-          mimeType: optional<string> # image/png, video/mp4, application/pdf, …
+      json: JsonBody
+      form: FormBody
+      multipart: MultipartBody
+      text: TextBody
+      binary: BinaryBody
 
   # Request Structure
   RequestInfo:

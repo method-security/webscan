@@ -16,28 +16,38 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
-func PerformRequestScan(baseURL, path string, method common.HttpMethod, params common.RequestParams, timeout int, followRedirects bool) common.RequestInfo {
-	normalizedPath := strings.TrimRight(path, "/")
+type RequestOptions struct {
+	BaseURL         string
+	Path            string
+	Method          common.HttpMethod
+	Params          common.RequestParams
+	FollowRedirects bool
+	Insecure        bool
+	Timeout         int
+}
+
+func PerformRequestScan(options RequestOptions) common.RequestInfo {
+	normalizedPath := strings.TrimRight(options.Path, "/")
 	if normalizedPath == "" {
 		normalizedPath = "/"
 	}
 
 	request := common.RequestInfo{
-		BaseUrl:   baseURL,
+		BaseUrl:   options.BaseURL,
 		Path:      normalizedPath,
-		Method:    method,
+		Method:    options.Method,
 		Timestamp: time.Now(),
 	}
 
 	// Construct the URL
-	fullURL, err := constructURL(baseURL, normalizedPath, params.PathParams, params.QueryParams)
+	fullURL, err := constructURL(options.BaseURL, normalizedPath, options.Params.PathParams, options.Params.QueryParams)
 	if err != nil {
 		request.Errors = append(request.Errors, err.Error())
 		return request
 	}
 
 	// Prepare request body and content type
-	reqBody, contentType, err := prepareRequestBody(params)
+	reqBody, contentType, err := prepareRequestBody(options.Params)
 	if err != nil {
 		request.Errors = append(request.Errors, err.Error())
 		return request
@@ -45,7 +55,7 @@ func PerformRequestScan(baseURL, path string, method common.HttpMethod, params c
 
 	// Check for escape characters in headers
 	hasEscapeChars := false
-	for key, value := range params.HeaderParams {
+	for key, value := range options.Params.HeaderParams {
 		if strings.Contains(key, "\r") || strings.Contains(key, "\n") || strings.Contains(key, "\\") || strings.Contains(key, "\u0000") {
 			hasEscapeChars = true
 			break
@@ -61,7 +71,7 @@ func PerformRequestScan(baseURL, path string, method common.HttpMethod, params c
 	responseHeader := make(map[string]string)
 	// Create and send the request based on the presence of escape characters
 	if !hasEscapeChars {
-		resp, err := sendRequest(method, fullURL.String(), reqBody, contentType, params.HeaderParams, timeout, followRedirects)
+		resp, redirectChain, err := sendRequest(options.Method, fullURL.String(), reqBody, contentType, options.Params.HeaderParams, options.Timeout, options.FollowRedirects, options.Insecure)
 		if err != nil {
 			request.Errors = append(request.Errors, err.Error())
 			return request
@@ -85,9 +95,11 @@ func PerformRequestScan(baseURL, path string, method common.HttpMethod, params c
 				responseHeader[key] = values[0]
 			}
 		}
+		// Populate report
+		populateReport(&request, statusCode, responseHeader, responseBody, options.Params, redirectChain)
 	} else {
 		// Use sendFastHTTPRequest if escape characters are present
-		resp, err := sendFastHTTPRequest(string(method), fullURL.String(), responseBody, contentType, params.HeaderParams, followRedirects)
+		resp, redirectChain, err := sendFastHTTPRequest(string(options.Method), fullURL.String(), responseBody, contentType, options.Params.HeaderParams, options.FollowRedirects)
 		if err != nil {
 			request.Errors = append(request.Errors, err.Error())
 			return request
@@ -98,10 +110,9 @@ func PerformRequestScan(baseURL, path string, method common.HttpMethod, params c
 			responseHeader[string(key)] = string(value)
 		})
 		fasthttp.ReleaseResponse(resp)
+		// Populate report
+		populateReport(&request, statusCode, responseHeader, responseBody, options.Params, redirectChain)
 	}
-
-	// Populate report
-	populateReport(&request, statusCode, responseHeader, responseBody, params)
 
 	return request
 }
@@ -162,10 +173,10 @@ func prepareRequestBody(params common.RequestParams) (io.Reader, string, error) 
 	return nil, "", nil
 }
 
-func sendRequest(method common.HttpMethod, url string, body io.Reader, contentType string, headers map[string]string, timeout int, followRedirects bool) (*http.Response, error) {
+func sendRequest(method common.HttpMethod, url string, body io.Reader, contentType string, headers map[string]string, timeout int, followRedirects bool, insecure bool) (*http.Response, []string, error) {
 	req, err := http.NewRequest(string(method), url, body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %v", err)
+		return nil, nil, fmt.Errorf("failed to create request: %v", err)
 	}
 
 	for key, value := range headers {
@@ -175,27 +186,29 @@ func sendRequest(method common.HttpMethod, url string, body io.Reader, contentTy
 		req.Header.Set("Content-Type", contentType)
 	}
 
+	redirectChain := []string{url}
 	client := &http.Client{
 		Timeout: time.Duration(timeout) * time.Second,
 		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
 		},
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			if !followRedirects {
 				return http.ErrUseLastResponse
 			}
+			redirectChain = append(redirectChain, req.URL.String())
 			return nil
 		},
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to perform request: %v", err)
+		return nil, nil, fmt.Errorf("failed to perform request: %v", err)
 	}
 
-	return resp, nil
+	return resp, redirectChain, nil
 }
 
-func sendFastHTTPRequest(method, url string, body string, contentType string, headers map[string]string, followRedirects bool) (*fasthttp.Response, error) {
+func sendFastHTTPRequest(method, url string, body string, contentType string, headers map[string]string, followRedirects bool) (*fasthttp.Response, []string, error) {
 	// Prepare the fasthttp request and response objects
 	req := fasthttp.AcquireRequest()
 	defer fasthttp.ReleaseRequest(req)
@@ -214,21 +227,29 @@ func sendFastHTTPRequest(method, url string, body string, contentType string, he
 		req.Header.Set(key, value)
 	}
 
+	redirectChain := []string{url}
 	var err error
 	if followRedirects {
 		err = fasthttp.DoRedirects(req, resp, 10) // Follow up to 10 redirects
+		// For FastHTTP, we need to manually track redirects
+		if err == nil {
+			location := resp.Header.Peek("Location")
+			if len(location) > 0 {
+				redirectChain = append(redirectChain, string(location))
+			}
+		}
 	} else {
 		err = fasthttp.Do(req, resp)
 	}
 	if err != nil {
 		fasthttp.ReleaseResponse(resp)
-		return nil, fmt.Errorf("failed to perform request: %v", err)
+		return nil, nil, fmt.Errorf("failed to perform request: %v", err)
 	}
 
-	return resp, nil
+	return resp, redirectChain, nil
 }
 
-func populateReport(report *common.RequestInfo, statusCode int, headers map[string]string, body string, params common.RequestParams) {
+func populateReport(report *common.RequestInfo, statusCode int, headers map[string]string, body string, params common.RequestParams, redirectChain []string) {
 	if headers != nil {
 		report.ResponseHeaders = make(map[string]string)
 		for key, values := range headers {
@@ -238,6 +259,7 @@ func populateReport(report *common.RequestInfo, statusCode int, headers map[stri
 
 	report.ResponseBody = &body
 	report.StatusCode = &statusCode
+	report.RedirectChain = redirectChain
 
 	if len(params.PathParams) > 0 {
 		report.PathParams = params.PathParams

@@ -48,7 +48,15 @@ func Run(ctx context.Context, target string, timeout int, config *webscan.AppFin
 
 			// Perform Request
 			// Dont follow redirects
-			request := utils.PerformRequestScan(baseURL, fullPath, method, requestParams, timeout, false)
+			request := utils.PerformRequestScan(utils.RequestOptions{
+				BaseURL:         baseURL,
+				Path:            fullPath,
+				Method:          method,
+				Params:          requestParams,
+				Timeout:         timeout,
+				FollowRedirects: false,
+				Insecure:        true,
+			})
 			errors = append(errors, request.Errors...)
 
 			requests = append(requests, &request)

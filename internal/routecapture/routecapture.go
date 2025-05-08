@@ -2,20 +2,20 @@ package routecapture
 
 import (
 	"context"
-	"encoding/base64"
 	"net/http"
 	"strings"
 	"time"
 
 	common "github.com/Method-Security/webscan/generated/go/common"
 	routecapturefern "github.com/Method-Security/webscan/generated/go/routecapture"
-	pagecapture "github.com/Method-Security/webscan/internal/pagecapture/helpers"
-	"github.com/Method-Security/webscan/internal/pagecapture/helpers/browserbase"
+	"github.com/Method-Security/webscan/utils"
+	"github.com/Method-Security/webscan/utils/headless"
+	"github.com/Method-Security/webscan/utils/headless/browserbase"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
-func extractRoutes(ctx context.Context, target string, htmlContent string, baseURLsOnly bool, captureStaticAssets bool, timeout int, captureMethod common.CaptureMethod, browserCapturer *pagecapture.BrowserPageCapturer) ([]*routecapturefern.WebRoute, []string, []string) {
+func extractRoutes(ctx context.Context, target string, htmlContent string, baseURLsOnly bool, captureStaticAssets bool, timeout int, captureMethod common.CaptureMethod, browserCapturer *headless.BrowserPageCapturer) ([]*routecapturefern.WebRoute, []string, []string) {
 	log := svc1log.FromContext(ctx)
 	routes := []*routecapturefern.WebRoute{}
 	urls := make(map[string]struct{})
@@ -86,74 +86,62 @@ func PerformRouteCapture(ctx context.Context, target string, captureMethod commo
 		Errors: []string{},
 	}
 
-	// Get the HTML content with specified method
-	var htmlContent string
 	var routes []*routecapturefern.WebRoute
 	var urls []string
 	var errors []string
 	switch captureMethod {
 	case common.CaptureMethodRequest:
-		log.Info("Initiating page capture with request method", svc1log.SafeParam("target", target))
-		capturer := pagecapture.NewRequestPageCapturer(insecure, timeout)
-		result, err := capturer.Capture(ctx, target, &pagecapture.Options{})
+		baseURL, path, err := utils.SplitTarget(target)
 		if err != nil {
 			report.Errors = append(report.Errors, err.Error())
 			return report
 		}
-		log.Info("Page capture successful")
-		decodedContent, err := base64.StdEncoding.DecodeString(*result.Request.ResponseBody)
-		if err != nil {
-			report.Errors = append(report.Errors, "Failed to decode base64 response: "+err.Error())
+		log.Info("Initiating page capture with request method", svc1log.SafeParam("target", target))
+		requestInfo := utils.PerformRequestScan(utils.RequestOptions{
+			BaseURL:         baseURL,
+			Path:            path,
+			Method:          common.HttpMethodGet,
+			Params:          common.RequestParams{},
+			Timeout:         timeout,
+			FollowRedirects: false,
+			Insecure:        insecure,
+		})
+		if requestInfo.Errors != nil {
+			report.Errors = requestInfo.Errors
 			return report
 		}
-		htmlContent = string(decodedContent)
-
+		log.Info("Page capture successful")
 		// Extract the routes and urls
-		routes, urls, errors = extractRoutes(ctx, target, htmlContent, baseURLsOnly, captureStaticAssets, timeout, common.CaptureMethodRequest, nil)
-
-		_ = capturer.Close(ctx)
+		routes, urls, errors = extractRoutes(ctx, target, *requestInfo.ResponseBody, baseURLsOnly, captureStaticAssets, timeout, common.CaptureMethodRequest, nil)
 
 	case common.CaptureMethodBrowser:
 		log.Info("Initiating page capture with browser method", svc1log.SafeParam("target", target))
-		capturer := pagecapture.NewBrowserPageCapturer(browserPath, timeout, minDOMStabalizeTime)
-		result, err := capturer.Capture(ctx, target, &pagecapture.Options{})
+		capturer := headless.NewBrowserPageCapturer(browserPath, timeout, minDOMStabalizeTime)
+		result, err := capturer.Capture(ctx, target, &headless.BrowserOptions{FollowRedirects: false})
 		if err != nil {
 			report.Errors = append(report.Errors, err.Error())
 			return report
 		}
-
 		log.Info("Page capture successful")
-		decodedContent, err := base64.StdEncoding.DecodeString(*result.Request.ResponseBody)
-		if err != nil {
-			report.Errors = append(report.Errors, "Failed to decode base64 response: "+err.Error())
-			return report
-		}
-		htmlContent = string(decodedContent)
 
 		// Extract the routes and urls
-		routes, urls, errors = extractRoutes(ctx, target, htmlContent, baseURLsOnly, captureStaticAssets, timeout, common.CaptureMethodBrowser, capturer)
+		routes, urls, errors = extractRoutes(ctx, target, *result.ResponseBody, baseURLsOnly, captureStaticAssets, timeout, common.CaptureMethodBrowser, capturer)
 
 		_ = capturer.Close(ctx)
 
 	case common.CaptureMethodBrowserbase:
 		log.Info("Initiating page capture with browserbase method", svc1log.SafeParam("target", target))
 		client := browserbase.NewBrowserbaseClient(*browserBaseToken, *browserBaseProject, browserbase.NewBrowserbaseOptions(ctx, *browserBaseOptions...))
-		capturer := pagecapture.NewBrowserbasePageCapturer(ctx, timeout, minDOMStabalizeTime, client)
-		result, err := capturer.Capture(ctx, target, &pagecapture.Options{})
+		capturer := browserbase.NewBrowserbasePageCapturer(ctx, timeout, minDOMStabalizeTime, *client)
+		result, err := capturer.Capture(ctx, target, &headless.BrowserOptions{})
 		if err != nil {
 			report.Errors = append(report.Errors, err.Error())
 			return report
 		}
 		log.Info("Page capture successful")
-		decodedContent, err := base64.StdEncoding.DecodeString(*result.Request.ResponseBody)
-		if err != nil {
-			report.Errors = append(report.Errors, "Failed to decode base64 response: "+err.Error())
-			return report
-		}
-		htmlContent = string(decodedContent)
 
 		// Extract the routes and urls
-		routes, urls, errors = extractRoutes(ctx, target, htmlContent, baseURLsOnly, captureStaticAssets, timeout, common.CaptureMethodBrowserbase, capturer.Capturer)
+		routes, urls, errors = extractRoutes(ctx, target, *result.ResponseBody, baseURLsOnly, captureStaticAssets, timeout, common.CaptureMethodBrowserbase, capturer.Capturer)
 
 		_ = capturer.Close(ctx)
 

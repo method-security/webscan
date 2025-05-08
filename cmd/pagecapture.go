@@ -6,7 +6,8 @@ import (
 
 	common "github.com/Method-Security/webscan/generated/go/common"
 	"github.com/Method-Security/webscan/internal/pagecapture"
-	"github.com/Method-Security/webscan/internal/pagecapture/helpers/browserbase"
+	screenshot "github.com/Method-Security/webscan/internal/pagecapture/screenshot"
+	"github.com/Method-Security/webscan/utils/headless/browserbase"
 	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 	"github.com/spf13/cobra"
 )
@@ -57,7 +58,7 @@ func (a *WebScan) InitPagecaptureCommand() {
 			timeout, _ := cmd.Flags().GetInt("timeout")
 			minDOMStabalizeTime, _ := cmd.Flags().GetInt("minDOMStabalizeTime")
 
-			report := pagecapture.PerformScreenshotPageCapture(cmd.Context(), target, common.CaptureMethodBrowser, false, false, timeout, minDOMStabalizeTime, false, browserPath, nil, nil, nil)
+			report := screenshot.PerformScreenshotPageCapture(cmd.Context(), target, common.CaptureMethodBrowser, false, false, timeout, minDOMStabalizeTime, false, browserPath, nil, nil, nil)
 			log.Info("Screenshot capture successful", svc1log.SafeParam("target", target))
 
 			a.OutputSignal.Content = report
@@ -109,7 +110,7 @@ func (a *WebScan) InitPagecaptureCommand() {
 				options = append(options, browserbase.WithProxy())
 			}
 
-			report := pagecapture.PerformScreenshotPageCapture(cmd.Context(), target, common.CaptureMethodBrowserbase, false, false, timeout, minDOMStabalizeTime, false, nil, &token, &project, &options)
+			report := screenshot.PerformScreenshotPageCapture(cmd.Context(), target, common.CaptureMethodBrowserbase, false, false, timeout, minDOMStabalizeTime, false, nil, &token, &project, &options)
 			log.Info("Screenshot capture successful", svc1log.SafeParam("target", target))
 			a.OutputSignal.Content = report
 		},

@@ -5,125 +5,106 @@ import (
 	"fmt"
 	"time"
 
+	common "github.com/Method-Security/webscan/generated/go/common"
 	webscan "github.com/Method-Security/webscan/generated/go/webserver"
-	pagecapture "github.com/Method-Security/webscan/internal/pagecapture/helpers"
-	"github.com/projectdiscovery/httpx/runner"
+	"github.com/Method-Security/webscan/utils"
+	"github.com/Method-Security/webscan/utils/headless"
 )
 
-func performWebserverProbe(ctx context.Context, targets []string, timeout time.Duration, strategy webscan.WebserverProbeStrategy, browserPath *string, minDOMStabalizeTime *int) ([]*webscan.WebserverProbeUrlDetails, []string, error) {
+func PerformWebserverProbe(ctx context.Context, config *webscan.WebserverProbeConfig) (*webscan.WebserverProbeReport, error) {
+	report := &webscan.WebserverProbeReport{Config: config}
+	errors := []string{}
+
 	// Toggle on method selected
-	if strategy == webscan.WebserverProbeStrategyBrowser {
-		return performBrowserProbe(ctx, targets, timeout, browserPath, *minDOMStabalizeTime)
+	if config.Strategy == webscan.WebserverProbeStrategyBrowser {
+		request, err := performBrowserProbe(ctx, config.Targets, time.Duration(config.Timeout)*time.Second, config.BrowserPath, *config.MinDomStabalizeTime)
+		if err != nil {
+			errors = append(errors, err...)
+		}
+		report.Targets = request
+	} else if config.Strategy == webscan.WebserverProbeStrategyRequest {
+		request, err := performRequestProbe(config.Targets, time.Duration(config.Timeout)*time.Second)
+		if err != nil {
+			errors = append(errors, err...)
+		}
+		report.Targets = request
 	}
-	return performHttpxProbe(ctx, targets, timeout)
+
+	report.Errors = errors
+	return report, nil
 }
 
-func performHttpxProbe(ctx context.Context, targets []string, timeout time.Duration) ([]*webscan.WebserverProbeUrlDetails, []string, error) {
-	errors := []string{}
-	urls := []*webscan.WebserverProbeUrlDetails{}
-
-	// Create a new context with timeout
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
-	options := runner.Options{
-		Methods:         "GET",
-		InputTargetHost: targets,
-		RandomAgent:     true,
-		FollowRedirects: true,
-		NoFallback:      true,
-		Debug:           true,
-		OnResult: func(r runner.Result) {
-			// If there's an HTTP response (even from a WAF), append the URL
-			if r.Err != nil {
-				errors = append(errors, r.Err.Error())
-			}
-			urlDetails := webscan.WebserverProbeUrlDetails{
-				Url:    r.URL,
-				Status: &r.StatusCode,
-				Title:  &r.Title,
-			}
-			urls = append(urls, &urlDetails)
-		},
-	}
-
-	// Validate HTTPX options
-	if err := options.ValidateOptions(); err != nil {
-		return urls, errors, err
-	}
-
-	// Initialize HTTPX
-	httpxRunner, err := runner.New(&options)
+// tryHTTPSThenHTTP attempts to connect to a target using HTTPS first, falling back to HTTP if HTTPS fails
+func tryHTTPSThenHTTP(target string, probeFunc func(string) (*common.RequestInfo, error)) (*common.RequestInfo, error) {
+	// Try HTTPS first
+	targetURL := "https://" + target
+	result, err := probeFunc(targetURL)
 	if err != nil {
-		fmt.Printf("Failed to initialize HTTPX: %v\n", err)
-		return urls, errors, err
+		// If HTTPS fails, try HTTP
+		targetURL = "http://" + target
+		result, err = probeFunc(targetURL)
 	}
-	defer httpxRunner.Close()
-
-	// Run the enumeration with a goroutine and select for timeout
-	done := make(chan struct{})
-
-	go func() {
-		fmt.Println("Running HTTPX Enumeration...")
-		httpxRunner.RunEnumeration()
-		close(done)
-	}()
-	select {
-	case <-ctx.Done():
-		fmt.Println("CTX Timeout reached before completion")
-		return urls, errors, ctx.Err()
-	case <-done:
-		fmt.Println("Httpx scan completed successfully")
-		return urls, errors, nil
-	}
+	return result, err
 }
 
-func performBrowserProbe(ctx context.Context, targets []string, timeout time.Duration, browserPath *string, minDOMStabalizeTime int) ([]*webscan.WebserverProbeUrlDetails, []string, error) {
+func performRequestProbe(targets []string, timeout time.Duration) ([]*common.RequestInfo, []string) {
 	errors := []string{}
-	urls := []*webscan.WebserverProbeUrlDetails{}
+	requests := []*common.RequestInfo{}
 
 	for _, target := range targets {
-		capturer := pagecapture.NewBrowserPageCapturer(browserPath, int(timeout.Seconds()), minDOMStabalizeTime)
-
-		// Try HTTPS first
-		targetURL := "https://" + target
-		result, err := capturer.Capture(ctx, targetURL, &pagecapture.Options{})
+		baseURL, path, err := utils.SplitTarget(target)
 		if err != nil {
-			// If HTTPS fails, try HTTP
-			targetURL = "http://" + target
-			result, err = capturer.Capture(ctx, targetURL, &pagecapture.Options{})
-			if err != nil {
-				errors = append(errors, "invalid address "+target)
-				continue
+			errors = append(errors, "invalid address "+target)
+			continue
+		}
+		probeFunc := func(url string) (*common.RequestInfo, error) {
+			request := utils.PerformRequestScan(utils.RequestOptions{
+				BaseURL:         baseURL,
+				Path:            path,
+				Method:          common.HttpMethodGet,
+				Params:          common.RequestParams{},
+				Timeout:         int(timeout.Seconds()),
+				FollowRedirects: true,
+				Insecure:        true,
+			})
+			if request.StatusCode != nil && *request.StatusCode >= 400 {
+				return &request, fmt.Errorf("request failed with status %d", *request.StatusCode)
 			}
+			return &request, nil
 		}
 
-		urlDetails := &webscan.WebserverProbeUrlDetails{
-			Url:    targetURL,
-			Status: result.Request.StatusCode,
+		result, err := tryHTTPSThenHTTP(target, probeFunc)
+		if err != nil {
+			errors = append(errors, "invalid address "+target)
+			continue
 		}
-
-		urls = append(urls, urlDetails)
-
-		_ = capturer.Close(ctx)
+		requests = append(requests, result)
 	}
 
-	return urls, errors, nil
+	return requests, errors
 }
 
-// PerformWebserverProbe performs a server probe against the provided targets, returning a ProbeReport with the
-// results of the probe.
-func PerformWebserverProbe(ctx context.Context, config *webscan.WebserverProbeConfig) *webscan.WebserverProbeReport {
+func performBrowserProbe(ctx context.Context, targets []string, timeout time.Duration, browserPath *string, minDOMStabalizeTime int) ([]*common.RequestInfo, []string) {
+	errors := []string{}
+	requests := []*common.RequestInfo{}
 
-	urls, errors, err := performWebserverProbe(ctx, config.Targets, time.Duration(config.Timeout)*time.Second,
-		config.Strategy, config.BrowserPath, config.MinDomStabalizeTime)
-	if err != nil {
-		errors = append(errors, err.Error())
+	for _, target := range targets {
+		capturer := headless.NewBrowserPageCapturer(browserPath, int(timeout.Seconds()), minDOMStabalizeTime)
+		defer func() {
+			_ = capturer.Close(ctx)
+		}()
+
+		probeFunc := func(url string) (*common.RequestInfo, error) {
+			return capturer.Capture(ctx, url, &headless.BrowserOptions{FollowRedirects: true})
+		}
+
+		result, err := tryHTTPSThenHTTP(target, probeFunc)
+		if err != nil {
+			errors = append(errors, "invalid address "+target)
+			continue
+		}
+		requests = append(requests, result)
 	}
-	report := webscan.WebserverProbeReport{
-		Targets: config.Targets,
-		Urls:    urls,
-		Errors:  errors,
-	}
-	return &report
+
+	return requests, errors
 }

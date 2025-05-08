@@ -7,14 +7,14 @@ import (
 
 	common "github.com/Method-Security/webscan/generated/go/common"
 	routecapturefern "github.com/Method-Security/webscan/generated/go/routecapture"
-	pagecapture "github.com/Method-Security/webscan/internal/pagecapture/helpers"
+	"github.com/Method-Security/webscan/utils/headless"
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
 // extractNetworkRoutes fetches network requests, parses them, and populates []WebRoute.
-func extractNetworkRoutes(ctx context.Context, b *pagecapture.BrowserPageCapturer, target string, baseURLsOnly bool, captureStaticAssets bool) ([]*routecapturefern.WebRoute, []string, []string) {
+func extractNetworkRoutes(ctx context.Context, b *headless.BrowserPageCapturer, target string, baseURLsOnly bool, captureStaticAssets bool) ([]*routecapturefern.WebRoute, []string, []string) {
 	routes := []*routecapturefern.WebRoute{}
 	urls := make(map[string]struct{})
 	errors := []string{}

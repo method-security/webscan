@@ -11,9 +11,9 @@ import (
 
 	"github.com/Method-Security/webscan/generated/go/common"
 	routecapturefern "github.com/Method-Security/webscan/generated/go/routecapture"
-	"github.com/Method-Security/webscan/internal/pagecapture/helpers/browserbase"
 	"github.com/Method-Security/webscan/internal/routecapture"
 	"github.com/Method-Security/webscan/utils"
+	"github.com/Method-Security/webscan/utils/headless/browserbase"
 )
 
 func PerformStaticAssetTakeOverAnalysis(ctx context.Context, target string, captureMethod common.CaptureMethod, baseURLsOnly bool, timeout int, minDOMStabalizeTime int, insecure bool, browserPath *string, browserBaseToken *string, browserBaseProject *string, browserBaseOptions *[]browserbase.Option, successfulOnly bool, fingerprints []routecapturefern.StaticAssetTakeOverFingerprint) routecapturefern.StaticAssetTakeOverReport {
@@ -36,7 +36,15 @@ func PerformStaticAssetTakeOverAnalysis(ctx context.Context, target string, capt
 		report.Errors = errors
 		return report
 	}
-	targetRequest := utils.PerformRequestScan(targetBaseURL, targetPath, common.HttpMethodGet, common.RequestParams{}, timeout, true)
+	targetRequest := utils.PerformRequestScan(utils.RequestOptions{
+		BaseURL:         targetBaseURL,
+		Path:            targetPath,
+		Method:          common.HttpMethodGet,
+		Params:          common.RequestParams{},
+		Timeout:         timeout,
+		FollowRedirects: false,
+		Insecure:        insecure,
+	})
 	report.TargetRequest = &targetRequest
 
 	// Static Asset Take Over Attempts
@@ -54,7 +62,15 @@ func PerformStaticAssetTakeOverAnalysis(ctx context.Context, target string, capt
 			continue
 		}
 
-		request := utils.PerformRequestScan(staticAssetBaseURL, staticAssetPath, common.HttpMethodGet, common.RequestParams{}, timeout, true)
+		request := utils.PerformRequestScan(utils.RequestOptions{
+			BaseURL:         staticAssetBaseURL,
+			Path:            staticAssetPath,
+			Method:          common.HttpMethodGet,
+			Params:          common.RequestParams{},
+			Timeout:         timeout,
+			FollowRedirects: true,
+			Insecure:        insecure,
+		})
 		StaticAssetTakeOverAttempt.Request = &request
 
 		// Check if the request is vulnerable

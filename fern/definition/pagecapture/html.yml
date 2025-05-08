@@ -3,5 +3,5 @@ imports:
 types:
   PageCaptureHtmlReport:
     properties:
-      request: requests.RequestInfo
+      request: optional<requests.RequestInfo>
       errors: optional<list<string>>

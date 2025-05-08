@@ -1,3 +1,5 @@
+imports:
+  requests: ../common/requests.yml
 types:
   # Config Struct
   WebserverProbeStrategy:
@@ -11,14 +13,9 @@ types:
       strategy: WebserverProbeStrategy
       browserPath: optional<string>
       minDOMStabalizeTime: optional<integer>
-  # WebserverProbeUrl Struct
-  WebserverProbeUrlDetails:
-    properties:
-      url: string 
-      status: optional<integer>
-      title: optional<string>
+  # WebserverProbeReport Struct
   WebserverProbeReport:
     properties:
-      targets: list<string>
-      urls: optional<list<WebserverProbeUrlDetails>>
+      targets: optional<list<requests.RequestInfo>>
+      config: WebserverProbeConfig
       errors: optional<list<string>>

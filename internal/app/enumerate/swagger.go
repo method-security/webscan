@@ -67,7 +67,15 @@ func PerformAppEnumerateSwagger(ctx context.Context, target string, timeout int)
 			timeout = int(time.Until(dl).Seconds())
 		}
 
-		resp := utils.PerformRequestScan(target, path, common.HttpMethodGet, common.RequestParams{}, timeout, true)
+		resp := utils.PerformRequestScan(utils.RequestOptions{
+			BaseURL:         target,
+			Path:            path,
+			Method:          common.HttpMethodGet,
+			Params:          common.RequestParams{},
+			Timeout:         timeout,
+			FollowRedirects: false,
+			Insecure:        true,
+		})
 		if len(resp.Errors) > 0 || resp.StatusCode == nil || *resp.StatusCode != 200 || resp.ResponseBody == nil {
 			continue
 		}

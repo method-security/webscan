@@ -180,6 +180,9 @@ func (b *BrowserPageCapturer) Capture(ctx context.Context, url string, options *
 		requestInfo.Errors = append(requestInfo.Errors, err.Error())
 	}
 
+	requestInfo.ResponseBody = &htmlContent
+
+	log.Info("Parsing URL to get path and query parameters")
 	if parsedURL, err := urlutil.Parse(url); err == nil {
 		requestInfo.Path = parsedURL.Path
 		parsedURL.Query().Iterate(func(key string, value []string) bool {

@@ -125,7 +125,7 @@ func isStaticAssetTakeOver(request *common.RequestInfo, fingerprints []routecapt
 		for _, responseBody := range fingerprint.ResponseBody {
 			// Convert the response body to lowercase to make the comparison case insensitive
 			lowerBody := strings.ToLower(responseBody)
-			lowerRequestBody := strings.ToLower(*request.ResponseBody)
+			lowerRequestBody := strings.ToLower(request.ResponseBody.GetText().GetValue())
 			if *request.StatusCode == fingerprint.StatusCode && strings.Contains(lowerRequestBody, lowerBody) {
 				successfulFingerprint = true
 				instance.Vulnerable = true

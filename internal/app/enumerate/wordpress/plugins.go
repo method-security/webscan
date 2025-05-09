@@ -125,9 +125,9 @@ func scanTarget(url string, plugins []string, timeout int) (enumerateWordpressFe
 		errors = append(errors, errs...)
 	}
 	// Base response body detection methods
-	htmlPlugins := checkHTMLForPlugins(accessRequest.ResponseBody)
-	registeredPlugins := checkRegisteredPlugins(accessRequest.ResponseBody)
-	cssPlugins := checkCSSReferences(accessRequest.ResponseBody)
+	htmlPlugins := checkHTMLForPlugins(accessRequest.ResponseBody.GetText())
+	registeredPlugins := checkRegisteredPlugins(accessRequest.ResponseBody.GetText())
+	cssPlugins := checkCSSReferences(accessRequest.ResponseBody.GetText())
 
 	// Combine results with proper deduplication
 	pluginsMap := make(map[string]*enumerateWordpressFern.WordpressPlugin)
@@ -217,7 +217,7 @@ func checkWordPressAPI(url string, plugins []string, timeout int) ([]*enumerateW
 	}
 
 	var apiResponse WordPressAPIResponse
-	if err := json.Unmarshal([]byte(*apiRequest.ResponseBody), &apiResponse); err == nil {
+	if err := json.Unmarshal([]byte(apiRequest.ResponseBody.GetText().GetValue()), &apiResponse); err == nil {
 		// Look for plugin namespaces (they often start with plugin-specific prefixes)
 		for _, namespace := range apiResponse.Namespaces {
 			// Plugins typically register their REST API namespaces in the format 'plugin-name/v1' or 'plugin-name/version-number',
@@ -282,7 +282,7 @@ func fetchPluginsFromAPI(baseURL string, path string, timeout int) []*enumerateW
 
 	// Try to parse as JSON array of plugins
 	var pluginList []map[string]interface{}
-	if err := json.Unmarshal([]byte(*apiRequest.ResponseBody), &pluginList); err == nil {
+	if err := json.Unmarshal([]byte(apiRequest.ResponseBody.GetText().GetValue()), &pluginList); err == nil {
 		for _, pluginData := range pluginList {
 			name, _ := pluginData["name"].(string)
 			version, _ := pluginData["version"].(string)
@@ -301,7 +301,7 @@ func fetchPluginsFromAPI(baseURL string, path string, timeout int) []*enumerateW
 }
 
 // checkHTMLForPlugins scans the HTML for common plugin paths
-func checkHTMLForPlugins(baseResponseBody *string) []*enumerateWordpressFern.WordpressPlugin {
+func checkHTMLForPlugins(baseResponseBody *common.TextBody) []*enumerateWordpressFern.WordpressPlugin {
 	plugins := []*enumerateWordpressFern.WordpressPlugin{}
 
 	// Different regex patterns to find plugin references
@@ -327,7 +327,7 @@ func checkHTMLForPlugins(baseResponseBody *string) []*enumerateWordpressFern.Wor
 	// match[1] = plugin name
 	// match[2] = version
 	for _, pattern := range patterns {
-		matches := pattern.regex.FindAllStringSubmatch(*baseResponseBody, -1)
+		matches := pattern.regex.FindAllStringSubmatch(baseResponseBody.GetValue(), -1)
 		for _, match := range matches {
 			if len(match) > pattern.nameGroup {
 				// Extract plugin name
@@ -386,13 +386,13 @@ func checkReadmeFiles(url string, plugins []string, timeout int) ([]*enumerateWo
 		}
 
 		// If readme.txt is empty, it's not a real plugin
-		if readmeRequest.ResponseBody == nil || *readmeRequest.ResponseBody == "" {
+		if readmeRequest.ResponseBody == nil || readmeRequest.ResponseBody.GetText() == nil || readmeRequest.ResponseBody.GetText().GetValue() == "" {
 			continue
 		}
 
 		// Try to extract version from readme.txt
 		versionRegex := regexp.MustCompile(`(?i)stable tag:\s*([0-9.]+)`)
-		versionMatch := versionRegex.FindStringSubmatch(*readmeRequest.ResponseBody)
+		versionMatch := versionRegex.FindStringSubmatch(readmeRequest.ResponseBody.GetText().GetValue())
 		var version *string
 
 		// Regex Info:
@@ -404,8 +404,9 @@ func checkReadmeFiles(url string, plugins []string, timeout int) ([]*enumerateWo
 
 		// Extract description if available
 		var description *string
-		if readmeRequest.ResponseBody != nil && *readmeRequest.ResponseBody != "" {
-			description = readmeRequest.ResponseBody
+		if readmeRequest.ResponseBody != nil && readmeRequest.ResponseBody.GetText() != nil {
+			desc := readmeRequest.ResponseBody.GetText().GetValue()
+			description = &desc
 		}
 
 		// Add plugin to list
@@ -421,12 +422,12 @@ func checkReadmeFiles(url string, plugins []string, timeout int) ([]*enumerateWo
 }
 
 // checkRegisteredPlugins checks for plugin registration in the page source
-func checkRegisteredPlugins(baseResponseBody *string) []*enumerateWordpressFern.WordpressPlugin {
+func checkRegisteredPlugins(baseResponseBody *common.TextBody) []*enumerateWordpressFern.WordpressPlugin {
 	plugins := []*enumerateWordpressFern.WordpressPlugin{}
 
 	// Look for wp_register_script, wp_enqueue_script, etc. with plugin names
 	regex := regexp.MustCompile(`/wp-content/plugins/([^/'"]+)/`)
-	matches := regex.FindAllStringSubmatch(*baseResponseBody, -1)
+	matches := regex.FindAllStringSubmatch(baseResponseBody.GetValue(), -1)
 
 	// Regex Info:
 	// match[0] = full match
@@ -444,12 +445,12 @@ func checkRegisteredPlugins(baseResponseBody *string) []*enumerateWordpressFern.
 }
 
 // checkCSSReferences looks for plugin-specific CSS files
-func checkCSSReferences(baseResponseBody *string) []*enumerateWordpressFern.WordpressPlugin {
+func checkCSSReferences(baseResponseBody *common.TextBody) []*enumerateWordpressFern.WordpressPlugin {
 	plugins := []*enumerateWordpressFern.WordpressPlugin{}
 
 	// Look for CSS links with plugin references
 	regex := regexp.MustCompile(`href=['"]([^'"]*wp-content/plugins/([^/'"]+)/[^'"]*\.css[^'"]*?)['"]`)
-	matches := regex.FindAllStringSubmatch(*baseResponseBody, -1)
+	matches := regex.FindAllStringSubmatch(baseResponseBody.GetValue(), -1)
 
 	// Regex Info:
 	// match[0] = full match

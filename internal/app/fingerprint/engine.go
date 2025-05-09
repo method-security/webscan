@@ -92,8 +92,10 @@ func AnalyzeResponse(response *common.RequestInfo, module *webscan.AppResourceMo
 					}
 					// Loop through header values
 					for _, headerIndicatorValue := range headerIndicatorValues {
-						if strings.Contains(strings.ToLower(responseHeaderValue), strings.ToLower(headerIndicatorValue)) {
-							return true
+						for _, headerValue := range responseHeaderValue {
+							if strings.Contains(strings.ToLower(headerValue), strings.ToLower(headerIndicatorValue)) {
+								return true
+							}
 						}
 					}
 				}
@@ -104,7 +106,7 @@ func AnalyzeResponse(response *common.RequestInfo, module *webscan.AppResourceMo
 	// Analysis Response Body
 	bodyIndicators := module.BodyIndicators
 	if response.ResponseBody != nil && bodyIndicators != nil {
-		lowerBody := strings.ToLower(*response.ResponseBody)
+		lowerBody := strings.ToLower(response.ResponseBody.GetText().GetValue())
 		for _, indicator := range bodyIndicators {
 			if strings.Contains(lowerBody, indicator) {
 				return true

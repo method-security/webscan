@@ -76,7 +76,9 @@ func rateLimitDetected(request *common.RequestInfo, hasSeen200 bool) bool {
 	if request.StatusCode != nil && *request.StatusCode == http.StatusTooManyRequests {
 		return true
 	}
-	if request.ResponseHeaders != nil && request.ResponseHeaders["X-Retry-After"] != "" || request.ResponseHeaders["X-RateLimit-Remaining"] == "0" {
+	if request.ResponseHeaders != nil &&
+		((len(request.ResponseHeaders["X-Retry-After"]) > 0 && request.ResponseHeaders["X-Retry-After"][0] != "") ||
+			(len(request.ResponseHeaders["X-RateLimit-Remaining"]) > 0 && request.ResponseHeaders["X-RateLimit-Remaining"][0] == "0")) {
 		return true
 	}
 

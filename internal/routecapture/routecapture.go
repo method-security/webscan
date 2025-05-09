@@ -24,7 +24,7 @@ func extractRoutes(ctx context.Context, target string, htmlContent string, baseU
 	errors := []string{}
 
 	log.Info("Parsing HTML content using goquery")
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlContent))
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlContent.GetText().GetValue()))
 	if err != nil {
 		log.Error("Failed to parse HTML content", svc1log.SafeParam("error", err))
 		errors = append(errors, err.Error())
@@ -114,7 +114,7 @@ func PerformRouteCapture(ctx context.Context, target string, captureMethod commo
 		}
 		log.Info("Page capture successful")
 		// Extract the routes and urls
-		routes, urls, errors = extractRoutes(ctx, target, *requestInfo.ResponseBody, baseURLsOnly, captureStaticAssets, timeout, common.CaptureMethodRequest, nil)
+		routes, urls, errors = extractRoutes(ctx, target, requestInfo.ResponseBody, baseURLsOnly, captureStaticAssets, timeout, common.CaptureMethodRequest, nil)
 
 	case common.CaptureMethodBrowser:
 		log.Info("Initiating page capture with browser method", svc1log.SafeParam("target", target))
@@ -127,7 +127,7 @@ func PerformRouteCapture(ctx context.Context, target string, captureMethod commo
 		log.Info("Page capture successful")
 
 		// Extract the routes and urls
-		routes, urls, errors = extractRoutes(ctx, target, *result.ResponseBody, baseURLsOnly, captureStaticAssets, timeout, common.CaptureMethodBrowser, capturer)
+		routes, urls, errors = extractRoutes(ctx, target, result.ResponseBody, baseURLsOnly, captureStaticAssets, timeout, common.CaptureMethodBrowser, capturer)
 
 		_ = capturer.Close(ctx)
 
@@ -143,7 +143,7 @@ func PerformRouteCapture(ctx context.Context, target string, captureMethod commo
 		log.Info("Page capture successful")
 
 		// Extract the routes and urls
-		routes, urls, errors = extractRoutes(ctx, target, *result.ResponseBody, baseURLsOnly, captureStaticAssets, timeout, common.CaptureMethodBrowserbase, capturer.Capturer)
+		routes, urls, errors = extractRoutes(ctx, target, result.ResponseBody, baseURLsOnly, captureStaticAssets, timeout, common.CaptureMethodBrowserbase, capturer.Capturer)
 
 		_ = capturer.Close(ctx)
 

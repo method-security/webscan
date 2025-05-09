@@ -117,8 +117,8 @@ func enumerateSite(target string, timeout int) (*enumerateWebserverFern.IisSite,
 			FollowRedirects: FollowRedirects,
 			Insecure:        true,
 		})
-		if nf.ResponseBody != nil {
-			if v := parseIisVersionFromBody(*nf.ResponseBody); v != "" {
+		if nf.ResponseBody != nil && nf.ResponseBody.GetText() != nil {
+			if v := parseIisVersionFromBody(nf.ResponseBody.GetText().GetValue()); v != "" {
 				site.Server = &enumerateWebserverFern.WebServerInfo{Name: "Microsoft-IIS", Version: &v}
 			}
 		}

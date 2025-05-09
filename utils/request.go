@@ -42,7 +42,7 @@ func PerformRequestScan(options RequestOptions) common.RequestInfo {
 	}
 
 	// Prepare request body and content type
-	reqBody, contentType, err := prepareRequestBody(options.Params)
+	reqBody, contentType, err := prepareRequestBody(options.Params.Body)
 	if err != nil {
 		request.Errors = append(request.Errors, err.Error())
 		return request
@@ -50,23 +50,28 @@ func PerformRequestScan(options RequestOptions) common.RequestInfo {
 
 	// Check for escape characters in headers
 	hasEscapeChars := false
-	for key, value := range options.Params.HeaderParams {
+	for key, values := range options.Params.Headers {
 		if strings.Contains(key, "\r") || strings.Contains(key, "\n") || strings.Contains(key, "\\") || strings.Contains(key, "\u0000") {
 			hasEscapeChars = true
 			break
 		}
-		if strings.Contains(value, "\r") || strings.Contains(value, "\n") || strings.Contains(value, "\\") || strings.Contains(value, "\u0000") {
-			hasEscapeChars = true
+		for _, value := range values {
+			if strings.Contains(value, "\r") || strings.Contains(value, "\n") || strings.Contains(value, "\\") || strings.Contains(value, "\u0000") {
+				hasEscapeChars = true
+				break
+			}
+		}
+		if hasEscapeChars {
 			break
 		}
 	}
 
 	var statusCode int
 	var responseBody string
-	responseHeader := make(map[string]string)
+	responseHeader := make(map[string][]string)
 	// Create and send the request based on the presence of escape characters
 	if !hasEscapeChars {
-		resp, redirectChain, err := sendRequest(options.Method, fullURL.String(), reqBody, contentType, options.Params.HeaderParams, options.Timeout, options.FollowRedirects, options.Insecure)
+		resp, redirectChain, err := sendRequest(options.Method, fullURL.String(), reqBody, contentType, options.Params.Headers, options.Timeout, options.FollowRedirects, options.Insecure)
 		if err != nil {
 			request.Errors = append(request.Errors, err.Error())
 			return request
@@ -85,16 +90,13 @@ func PerformRequestScan(options RequestOptions) common.RequestInfo {
 		}
 		statusCode = resp.StatusCode
 		responseBody = string(body)
-		for key, values := range resp.Header {
-			if len(values) > 0 {
-				responseHeader[key] = values[0]
-			}
-		}
+		responseHeader = resp.Header
+
 		// Populate report
 		populateReport(&request, statusCode, responseHeader, responseBody, options.Params, redirectChain)
 	} else {
 		// Use sendFastHTTPRequest if escape characters are present
-		resp, redirectChain, err := sendFastHTTPRequest(string(options.Method), fullURL.String(), responseBody, contentType, options.Params.HeaderParams, options.FollowRedirects)
+		resp, redirectChain, err := sendFastHTTPRequest(string(options.Method), fullURL.String(), responseBody, contentType, options.Params.Headers, options.FollowRedirects)
 		if err != nil {
 			request.Errors = append(request.Errors, err.Error())
 			return request
@@ -102,7 +104,7 @@ func PerformRequestScan(options RequestOptions) common.RequestInfo {
 		statusCode = resp.StatusCode()
 		responseBody = string(resp.Body())
 		resp.Header.VisitAll(func(key, value []byte) {
-			responseHeader[string(key)] = string(value)
+			responseHeader[string(key)] = append(responseHeader[string(key)], string(value))
 		})
 		fasthttp.ReleaseResponse(resp)
 		// Populate report
@@ -135,50 +137,74 @@ func constructURL(baseURL, path string, pathParams, queryParams map[string]strin
 	return fullURL, nil
 }
 
-func prepareRequestBody(params common.RequestParams) (io.Reader, string, error) {
-	if params.BodyParams != nil && *params.BodyParams != "" {
-		if json.Valid([]byte(*params.BodyParams)) {
-			return strings.NewReader(*params.BodyParams), "application/json", nil
-		}
-		return bytes.NewReader([]byte(*params.BodyParams)), "text/plain", nil
+func prepareRequestBody(body *common.Body) (io.Reader, string, error) {
+	if body == nil {
+		return nil, "", nil
 	}
 
-	if len(params.FormParams) > 0 {
-		formValues := url.Values{}
-		for key, value := range params.FormParams {
-			formValues.Set(key, value)
+	switch body.GetKind() {
+	case "text":
+		if body.GetText() != nil {
+			return strings.NewReader(body.GetText().GetValue()), "text/plain", nil
 		}
-
-		encodedForm := formValues.Encode()
-		return strings.NewReader(encodedForm), "application/x-www-form-urlencoded", nil
-	}
-
-	if len(params.MultipartParams) > 0 {
-		body := &bytes.Buffer{}
-		writer := multipart.NewWriter(body)
-		for key, value := range params.MultipartParams {
-			if err := writer.WriteField(key, value); err != nil {
-				return nil, "", fmt.Errorf("failed to write multipart field: %v", err)
+	case "json":
+		if body.GetJson() != nil {
+			jsonBytes, err := json.Marshal(body.GetJson().GetData())
+			if err != nil {
+				return nil, "", err
 			}
+			return bytes.NewReader(jsonBytes), "application/json", nil
 		}
-		if err := writer.Close(); err != nil {
-			return nil, "", fmt.Errorf("failed to close multipart writer: %v", err)
+	case "form":
+		if body.GetForm() != nil {
+			formValues := url.Values{}
+			for key, value := range body.GetForm().GetFields() {
+				formValues.Set(key, value)
+			}
+			encodedForm := formValues.Encode()
+			return strings.NewReader(encodedForm), "application/x-www-form-urlencoded", nil
 		}
-		return body, writer.FormDataContentType(), nil
+	case "multipart":
+		if body.GetMultipart() != nil {
+			buf := &bytes.Buffer{}
+			writer := multipart.NewWriter(buf)
+			for _, part := range body.GetMultipart().GetParts() {
+				if part.GetContent() != nil {
+					// Assume each part is a file for simplicity
+					formFile, err := writer.CreateFormFile("file", "file.bin")
+					if err != nil {
+						return nil, "", err
+					}
+					_, err = formFile.Write(part.GetContent().GetBase64())
+					if err != nil {
+						return nil, "", err
+					}
+				}
+				for key, value := range part.GetHeaders() {
+					writer.WriteField(key, value)
+				}
+			}
+			if err := writer.Close(); err != nil {
+				return nil, "", err
+			}
+			return buf, writer.FormDataContentType(), nil
+		}
+	case "binary":
+		if body.GetBinary() != nil {
+			return bytes.NewReader(body.GetBinary().GetBase64()), "application/octet-stream", nil
+		}
 	}
-
 	return nil, "", nil
 }
 
-func sendRequest(method common.HttpMethod, url string, body io.Reader, contentType string, headers map[string]string, timeout int, followRedirects bool, insecure bool) (*http.Response, []string, error) {
+func sendRequest(method common.HttpMethod, url string, body io.Reader, contentType string, headers map[string][]string, timeout int, followRedirects bool, insecure bool) (*http.Response, []string, error) {
 	req, err := http.NewRequest(string(method), url, body)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create request: %v", err)
 	}
 
-	for key, value := range headers {
-		req.Header.Add(key, value)
-	}
+	req.Header = headers
+
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
 	}
@@ -205,7 +231,7 @@ func sendRequest(method common.HttpMethod, url string, body io.Reader, contentTy
 	return resp, redirectChain, nil
 }
 
-func sendFastHTTPRequest(method, url string, body string, contentType string, headers map[string]string, followRedirects bool) (*fasthttp.Response, []string, error) {
+func sendFastHTTPRequest(method, url string, body string, contentType string, headers map[string][]string, followRedirects bool) (*fasthttp.Response, []string, error) {
 	// Prepare the fasthttp request and response objects
 	req := fasthttp.AcquireRequest()
 	defer fasthttp.ReleaseRequest(req)
@@ -220,8 +246,10 @@ func sendFastHTTPRequest(method, url string, body string, contentType string, he
 		req.Header.Set("Content-Type", contentType)
 	}
 
-	for key, value := range headers {
-		req.Header.Set(key, value)
+	for key, values := range headers {
+		for _, value := range values {
+			req.Header.Add(key, value)
+		}
 	}
 
 	redirectChain := []string{url}
@@ -246,15 +274,15 @@ func sendFastHTTPRequest(method, url string, body string, contentType string, he
 	return resp, redirectChain, nil
 }
 
-func populateReport(report *common.RequestInfo, statusCode int, headers map[string]string, body string, params common.RequestParams, redirectChain []string) {
+func populateReport(report *common.RequestInfo, statusCode int, headers map[string][]string, body string, params common.RequestParams, redirectChain []string) {
 	if headers != nil {
-		report.ResponseHeaders = make(map[string]string)
+		report.ResponseHeaders = make(map[string][]string)
 		for key, values := range headers {
 			report.ResponseHeaders[key] = values
 		}
 	}
 
-	report.ResponseBody = &body
+	report.ResponseBody = common.NewBodyFromText(&common.TextBody{Value: body})
 	report.StatusCode = &statusCode
 	report.RedirectChain = redirectChain
 
@@ -264,18 +292,6 @@ func populateReport(report *common.RequestInfo, statusCode int, headers map[stri
 	if len(params.QueryParams) > 0 {
 		report.QueryParams = params.QueryParams
 	}
-	if len(params.HeaderParams) > 0 {
-		report.HeaderParams = params.HeaderParams
-	}
-	if params.BodyParams != nil && *params.BodyParams != "" {
-		report.BodyParams = params.BodyParams
-	}
-	if len(params.FormParams) > 0 {
-		report.FormParams = params.FormParams
-	}
-	if len(params.MultipartParams) > 0 {
-		report.MultipartParams = params.MultipartParams
-	}
 }
 
 // GetHeader is a generic header helper (case‑insensitive)
@@ -283,12 +299,12 @@ func GetHeader(r *common.RequestInfo, name string) string {
 	if r.ResponseHeaders == nil {
 		return ""
 	}
-	if v, ok := r.ResponseHeaders[name]; ok {
-		return v
+	if v, ok := r.ResponseHeaders[name]; ok && len(v) > 0 {
+		return v[0]
 	}
 	for hn, hv := range r.ResponseHeaders {
-		if strings.EqualFold(hn, name) {
-			return hv
+		if strings.EqualFold(hn, name) && len(hv) > 0 {
+			return hv[0]
 		}
 	}
 	return ""

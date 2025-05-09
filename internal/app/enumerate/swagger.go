@@ -81,13 +81,13 @@ func PerformAppEnumerateSwagger(ctx context.Context, target string, timeout int)
 		}
 
 		var docType map[string]interface{}
-		if err := json.Unmarshal([]byte(*resp.ResponseBody), &docType); err != nil {
+		if err := json.Unmarshal([]byte(resp.ResponseBody.GetText().GetValue()), &docType); err != nil {
 			continue
 		}
 
 		if _, ok := docType["swagger"]; ok || docType["openapi"] != nil {
 			swaggerURL = target + path // full URL for the report
-			bodyBytes = []byte(*resp.ResponseBody)
+			bodyBytes = []byte(resp.ResponseBody.GetText().GetValue())
 			foundSpec = true
 			break
 		}

@@ -79,6 +79,7 @@ func PerformStaticAssetTakeOverAnalysis(ctx context.Context, target string, capt
 			continue
 		}
 
+		// Always send 'standard' requests as Browser is way to slow
 		request := utils.PerformRequestScan(utils.RequestOptions{
 			BaseURL:         staticAssetBaseURL,
 			Path:            staticAssetPath,

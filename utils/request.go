@@ -27,20 +27,15 @@ type RequestOptions struct {
 }
 
 func PerformRequestScan(options RequestOptions) common.RequestInfo {
-	normalizedPath := strings.TrimRight(options.Path, "/")
-	if normalizedPath == "" {
-		normalizedPath = "/"
-	}
-
 	request := common.RequestInfo{
 		BaseUrl:   options.BaseURL,
-		Path:      normalizedPath,
+		Path:      options.Path,
 		Method:    options.Method,
 		Timestamp: time.Now(),
 	}
 
 	// Construct the URL
-	fullURL, err := constructURL(options.BaseURL, normalizedPath, options.Params.PathParams, options.Params.QueryParams)
+	fullURL, err := constructURL(options.BaseURL, options.Path, options.Params.PathParams, options.Params.QueryParams)
 	if err != nil {
 		request.Errors = append(request.Errors, err.Error())
 		return request
@@ -125,6 +120,8 @@ func constructURL(baseURL, path string, pathParams, queryParams map[string]strin
 
 	endpoint := path
 	for key, value := range pathParams {
+		endpoint = strings.TrimRight(endpoint, "/")
+		endpoint = endpoint + "/"
 		endpoint = strings.ReplaceAll(endpoint, fmt.Sprintf("{%s}", key), url.PathEscape(value))
 	}
 	fullURL.Path = endpoint

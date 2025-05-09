@@ -60,10 +60,9 @@ func (b *BrowserPageCapturer) Capture(ctx context.Context, url string, options *
 		method = options.Method
 	}
 	requestInfo := &common.RequestInfo{
-		BaseUrl:     baseURL,
-		Path:        path,
-		Method:      method,
-		QueryParams: make(map[string]string),
+		BaseUrl: baseURL,
+		Path:    path,
+		Method:  method,
 	}
 
 	if b.Browser == nil {

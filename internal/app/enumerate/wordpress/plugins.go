@@ -14,6 +14,8 @@ import (
 	"github.com/Method-Security/webscan/utils"
 )
 
+var FollowRedirects = false
+
 // WordPressAPIResponse represents a simplified structure of the WordPress API response
 type WordPressAPIResponse struct {
 	Namespaces []string               `json:"namespaces"`
@@ -101,7 +103,7 @@ func scanTarget(url string, plugins []string, timeout int) (enumerateWordpressFe
 		Method:          common.HttpMethodGet,
 		Params:          common.RequestParams{},
 		Timeout:         timeout,
-		FollowRedirects: false,
+		FollowRedirects: FollowRedirects,
 		Insecure:        true,
 	})
 	if accessRequest.Errors != nil {
@@ -205,7 +207,7 @@ func checkWordPressAPI(url string, plugins []string, timeout int) ([]*enumerateW
 		Method:          common.HttpMethodGet,
 		Params:          common.RequestParams{},
 		Timeout:         timeout,
-		FollowRedirects: false,
+		FollowRedirects: FollowRedirects,
 		Insecure:        true,
 	})
 
@@ -271,7 +273,7 @@ func fetchPluginsFromAPI(baseURL string, path string, timeout int) []*enumerateW
 		Method:          common.HttpMethodGet,
 		Params:          common.RequestParams{},
 		Timeout:         timeout,
-		FollowRedirects: false,
+		FollowRedirects: FollowRedirects,
 		Insecure:        true,
 	})
 	if apiRequest.Errors != nil || *apiRequest.StatusCode != 200 {
@@ -372,7 +374,7 @@ func checkReadmeFiles(url string, plugins []string, timeout int) ([]*enumerateWo
 			Method:          common.HttpMethodGet,
 			Params:          common.RequestParams{},
 			Timeout:         timeout,
-			FollowRedirects: false,
+			FollowRedirects: FollowRedirects,
 			Insecure:        true,
 		})
 		if readmeRequest.Errors != nil {

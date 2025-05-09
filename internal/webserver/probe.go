@@ -11,6 +11,8 @@ import (
 	"github.com/Method-Security/webscan/utils/headless"
 )
 
+var FollowRedirects = true
+
 func PerformWebserverProbe(ctx context.Context, config *webscan.WebserverProbeConfig) (*webscan.WebserverProbeReport, error) {
 	report := &webscan.WebserverProbeReport{Config: config}
 	errors := []string{}
@@ -43,8 +45,11 @@ func tryHTTPSThenHTTP(target string, probeFunc func(string) (*common.RequestInfo
 		// If HTTPS fails, try HTTP
 		targetURL = "http://" + target
 		result, err = probeFunc(targetURL)
+		if err != nil {
+			return nil, err
+		}
 	}
-	return result, err
+	return result, nil
 }
 
 func performRequestProbe(targets []string, timeout time.Duration) ([]*common.RequestInfo, []string) {
@@ -52,19 +57,18 @@ func performRequestProbe(targets []string, timeout time.Duration) ([]*common.Req
 	requests := []*common.RequestInfo{}
 
 	for _, target := range targets {
-		baseURL, path, err := utils.SplitTarget(target)
-		if err != nil {
-			errors = append(errors, "invalid address "+target)
-			continue
-		}
 		probeFunc := func(url string) (*common.RequestInfo, error) {
+			baseURL, path, err := utils.SplitTarget(url)
+			if err != nil {
+				return nil, fmt.Errorf("invalid address %s: %v", url, err)
+			}
 			request := utils.PerformRequestScan(utils.RequestOptions{
 				BaseURL:         baseURL,
 				Path:            path,
 				Method:          common.HttpMethodGet,
 				Params:          common.RequestParams{},
 				Timeout:         int(timeout.Seconds()),
-				FollowRedirects: true,
+				FollowRedirects: FollowRedirects,
 				Insecure:        true,
 			})
 			if request.StatusCode != nil && *request.StatusCode >= 400 {
@@ -75,7 +79,7 @@ func performRequestProbe(targets []string, timeout time.Duration) ([]*common.Req
 
 		result, err := tryHTTPSThenHTTP(target, probeFunc)
 		if err != nil {
-			errors = append(errors, "invalid address "+target)
+			errors = append(errors, fmt.Sprintf("failed to probe %s: %v", target, err))
 			continue
 		}
 		requests = append(requests, result)
@@ -95,7 +99,7 @@ func performBrowserProbe(ctx context.Context, targets []string, timeout time.Dur
 		}()
 
 		probeFunc := func(url string) (*common.RequestInfo, error) {
-			return capturer.Capture(ctx, url, &headless.BrowserOptions{FollowRedirects: true})
+			return capturer.Capture(ctx, url, &headless.BrowserOptions{FollowRedirects: FollowRedirects})
 		}
 
 		result, err := tryHTTPSThenHTTP(target, probeFunc)

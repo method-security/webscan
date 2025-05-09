@@ -13,6 +13,7 @@ import (
 	routecapturefern "github.com/Method-Security/webscan/generated/go/routecapture"
 	"github.com/Method-Security/webscan/internal/routecapture"
 	"github.com/Method-Security/webscan/utils"
+	"github.com/Method-Security/webscan/utils/headless"
 	"github.com/Method-Security/webscan/utils/headless/browserbase"
 )
 
@@ -30,21 +31,37 @@ func PerformStaticAssetTakeOverAnalysis(ctx context.Context, target string, capt
 	}
 
 	// Target Request Data
-	targetBaseURL, targetPath, err := utils.SplitTarget(target)
-	if err != nil {
-		errors = append(errors, fmt.Sprintf("error splitting target: %s", err))
+	var targetRequest common.RequestInfo
+	if captureMethod == common.CaptureMethodRequest {
+		targetBaseURL, targetPath, err := utils.SplitTarget(target)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("error splitting target: %s", err))
+			report.Errors = errors
+			return report
+		}
+		targetRequest = utils.PerformRequestScan(utils.RequestOptions{
+			BaseURL:         targetBaseURL,
+			Path:            targetPath,
+			Method:          common.HttpMethodGet,
+			Params:          common.RequestParams{},
+			Timeout:         timeout,
+			FollowRedirects: true,
+			Insecure:        insecure,
+		})
+	} else if captureMethod == common.CaptureMethodBrowser {
+		capturer := headless.NewBrowserPageCapturer(browserPath, timeout, minDOMStabalizeTime)
+		result, err := capturer.Capture(ctx, target, &headless.BrowserOptions{FollowRedirects: true})
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("error capturing target: %s", err))
+			report.Errors = errors
+			return report
+		}
+		targetRequest = *result
+	} else {
+		errors = append(errors, "invalid capture method")
 		report.Errors = errors
 		return report
 	}
-	targetRequest := utils.PerformRequestScan(utils.RequestOptions{
-		BaseURL:         targetBaseURL,
-		Path:            targetPath,
-		Method:          common.HttpMethodGet,
-		Params:          common.RequestParams{},
-		Timeout:         timeout,
-		FollowRedirects: false,
-		Insecure:        insecure,
-	})
 	report.TargetRequest = &targetRequest
 
 	// Static Asset Take Over Attempts
@@ -62,6 +79,7 @@ func PerformStaticAssetTakeOverAnalysis(ctx context.Context, target string, capt
 			continue
 		}
 
+		// Always send 'standard' requests as Browser is way to slow
 		request := utils.PerformRequestScan(utils.RequestOptions{
 			BaseURL:         staticAssetBaseURL,
 			Path:            staticAssetPath,

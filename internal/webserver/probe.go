@@ -11,6 +11,8 @@ import (
 	"github.com/Method-Security/webscan/utils/headless"
 )
 
+var FollowRedirects = true
+
 func PerformWebserverProbe(ctx context.Context, config *webscan.WebserverProbeConfig) (*webscan.WebserverProbeReport, error) {
 	report := &webscan.WebserverProbeReport{Config: config}
 	errors := []string{}
@@ -66,7 +68,7 @@ func performRequestProbe(targets []string, timeout time.Duration) ([]*common.Req
 				Method:          common.HttpMethodGet,
 				Params:          common.RequestParams{},
 				Timeout:         int(timeout.Seconds()),
-				FollowRedirects: true,
+				FollowRedirects: FollowRedirects,
 				Insecure:        true,
 			})
 			if request.StatusCode != nil && *request.StatusCode >= 400 {
@@ -97,7 +99,7 @@ func performBrowserProbe(ctx context.Context, targets []string, timeout time.Dur
 		}()
 
 		probeFunc := func(url string) (*common.RequestInfo, error) {
-			return capturer.Capture(ctx, url, &headless.BrowserOptions{FollowRedirects: true})
+			return capturer.Capture(ctx, url, &headless.BrowserOptions{FollowRedirects: FollowRedirects})
 		}
 
 		result, err := tryHTTPSThenHTTP(target, probeFunc)

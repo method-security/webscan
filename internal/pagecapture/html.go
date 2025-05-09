@@ -11,6 +11,8 @@ import (
 	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
+var FollowRedirects = true
+
 func PerformHTMLPageCapture(ctx context.Context, target string, captureMethod common.CaptureMethod, baseURLsOnly bool, captureStaticAssets bool, timeout int, minDOMStabalizeTime int, insecure bool, browserPath *string, browserBaseToken *string, browserBaseProject *string, browserBaseOptions *[]browserbase.Option) pagecapturefern.PageCaptureHtmlReport {
 	log := svc1log.FromContext(ctx)
 	report := pagecapturefern.PageCaptureHtmlReport{}
@@ -28,7 +30,7 @@ func PerformHTMLPageCapture(ctx context.Context, target string, captureMethod co
 			Method:          common.HttpMethodGet,
 			Params:          common.RequestParams{},
 			Timeout:         timeout,
-			FollowRedirects: true,
+			FollowRedirects: FollowRedirects,
 			Insecure:        insecure,
 		})
 		if requestInfo.Errors != nil {
@@ -40,7 +42,7 @@ func PerformHTMLPageCapture(ctx context.Context, target string, captureMethod co
 	case common.CaptureMethodBrowser:
 		log.Info("Initiating page capture with browser method", svc1log.SafeParam("target", target))
 		capturer := headless.NewBrowserPageCapturer(browserPath, timeout, minDOMStabalizeTime)
-		requestInfo, err := capturer.Capture(ctx, target, &headless.BrowserOptions{FollowRedirects: true})
+		requestInfo, err := capturer.Capture(ctx, target, &headless.BrowserOptions{FollowRedirects: FollowRedirects})
 		if err != nil {
 			report.Errors = []string{err.Error()}
 		}
@@ -62,7 +64,7 @@ func PerformHTMLPageCapture(ctx context.Context, target string, captureMethod co
 				Errors: []string{"failed to create browserbase capturer"},
 			}
 		}
-		requestInfo, err := capturer.Capture(ctx, target, &headless.BrowserOptions{FollowRedirects: true})
+		requestInfo, err := capturer.Capture(ctx, target, &headless.BrowserOptions{FollowRedirects: FollowRedirects})
 		if err != nil {
 			return pagecapturefern.PageCaptureHtmlReport{
 				Errors: []string{err.Error()},

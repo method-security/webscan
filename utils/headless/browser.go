@@ -2,7 +2,6 @@ package headless
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -75,55 +74,50 @@ func (b *BrowserPageCapturer) Capture(ctx context.Context, url string, options *
 	pageCtx, cancel := context.WithTimeout(ctx, time.Duration(b.TimeoutSeconds)*time.Second)
 	defer cancel()
 
+	var redirectChain = []string{url}
+	var statusCode int
+	var headers = map[string]string{}
+	redirectIntercepted := false
+
 	err = rod.Try(func() {
-		log.Info("Creating page")
 		page := b.Browser.MustPage().Context(pageCtx)
 
-		err = proto.NetworkEnable{}.Call(page)
+		err := proto.FetchEnable{
+			HandleAuthRequests: true,
+			Patterns: []*proto.FetchRequestPattern{
+				{RequestStage: proto.FetchRequestStageResponse},
+			},
+		}.Call(page)
 		if err != nil {
-			log.Error("Failed to enable network tracking", svc1log.SafeParam("error", err))
+			log.Error("Failed to enable fetch domain", svc1log.SafeParam("error", err))
 			requestInfo.Errors = append(requestInfo.Errors, err.Error())
 			return
 		}
 
-		redirectChain := []string{url}
+		go page.EachEvent(func(e *proto.FetchRequestPaused) {
+			if e.ResponseStatusCode != nil &&
+				*e.ResponseStatusCode >= 300 && *e.ResponseStatusCode < 400 &&
+				options != nil && !options.FollowRedirects && !redirectIntercepted {
 
-		page.MustEval(`() => {
-			window.__redirectHistory = [];
-			const originalPushState = history.pushState;
-			const originalReplaceState = history.replaceState;
-			history.pushState = function() {
-				window.__redirectHistory.push(arguments[2]);
-				return originalPushState.apply(this, arguments);
-			};
-			history.replaceState = function() {
-				window.__redirectHistory.push(arguments[2]);
-				return originalReplaceState.apply(this, arguments);
-			};
-		}`)
-
-		var responseReceived *proto.NetworkResponseReceived
-		waitForResponse := page.EachEvent(func(e *proto.NetworkResponseReceived) bool {
-			responseReceived = e
-			log.Info("Received response",
-				svc1log.SafeParam("url", e.Response.URL),
-				svc1log.SafeParam("status", e.Response.Status),
-				svc1log.SafeParam("headers", e.Response.Headers))
-
-			if e.Response.Status >= 300 && e.Response.Status < 400 {
-				if location, exists := e.Response.Headers["Location"]; exists {
-					locationStr := fmt.Sprint(location)
-					if locationStr != "" && !isStaticAsset(locationStr) && (len(redirectChain) == 0 || redirectChain[len(redirectChain)-1] != locationStr) {
-						redirectChain = append(redirectChain, locationStr)
-					}
+				redirectIntercepted = true
+				statusCode = int(*e.ResponseStatusCode)
+				for _, h := range e.ResponseHeaders {
+					headers[h.Name] = h.Value
 				}
+				if location := headers["Location"]; location != "" && !isStaticAsset(location) {
+					redirectChain = append(redirectChain, location)
+				}
+				_ = proto.FetchFailRequest{
+					RequestID:   e.RequestID,
+					ErrorReason: proto.NetworkErrorReasonAborted,
+				}.Call(page)
+				return
 			}
-			return true
-		})
+			_ = proto.FetchContinueRequest{RequestID: e.RequestID}.Call(page)
+		})()
 
 		if method == common.HttpMethodGet {
 			log.Info("Navigating with GET", svc1log.SafeParam("url", url))
-			page.MustNavigate(url)
 		} else {
 			script := fmt.Sprintf(`
 				() => {
@@ -137,71 +131,33 @@ func (b *BrowserPageCapturer) Capture(ctx context.Context, url string, options *
 			`, method)
 			log.Info("Navigating with custom method", svc1log.SafeParam("method", method))
 			page.MustEvalOnNewDocument(script)
-			page.MustNavigate(url)
 		}
 
-		waitForResponse()
-
-		if responseReceived != nil {
-			headers := make(map[string]string)
-			for k, v := range responseReceived.Response.Headers {
-				headers[k] = fmt.Sprint(v)
-			}
-			requestInfo.ResponseHeaders = headers
-			requestInfo.StatusCode = &responseReceived.Response.Status
-
-			if responseReceived.Response.Status >= 300 && responseReceived.Response.Status < 400 &&
-				options != nil && !options.FollowRedirects {
-				log.Info("Stopping at redirect",
-					svc1log.SafeParam("status", responseReceived.Response.Status),
-					svc1log.SafeParam("location", headers["Location"]))
+		err = page.Navigate(url)
+		if err != nil {
+			if strings.Contains(err.Error(), "net::ERR_ABORTED") && redirectIntercepted {
+				log.Info("Navigation aborted due to blocked redirect", svc1log.SafeParam("url", url))
+				requestInfo.StatusCode = &statusCode
+				requestInfo.ResponseHeaders = headers
 				requestInfo.RedirectChain = redirectChain
 				return
 			}
+			log.Error("Unexpected navigation error", svc1log.SafeParam("error", err))
+			requestInfo.Errors = append(requestInfo.Errors, err.Error())
+			return
 		}
 
-		jsRedirectsScript := `
-			const history = window.__redirectHistory || [];
-			if (Array.isArray(history)) {
-				const result = [];
-				for (let i = 0; i < history.length; i++) {
-					if (history[i]) {
-						result.push(String(history[i]));
-					}
-				}
-				return JSON.stringify(result);
-			}
-			return "[]";
-		`
-		jsRedirectsResult, err := page.Eval(jsRedirectsScript)
-		if err == nil && jsRedirectsResult != nil {
-			redirectsJSON := jsRedirectsResult.Value.String()
-			if redirectsJSON != "" && redirectsJSON != "[]" {
-				var redirectURLs []string
-				if err := json.Unmarshal([]byte(redirectsJSON), &redirectURLs); err == nil {
-					for _, redirectURL := range redirectURLs {
-						if redirectURL != "" && !isStaticAsset(redirectURL) && (len(redirectChain) == 0 || redirectChain[len(redirectChain)-1] != redirectURL) {
-							redirectChain = append(redirectChain, redirectURL)
-						}
-					}
-				}
-			}
-		}
+		page.MustWaitLoad()
 
+		// Final URL after following redirects
 		finalURL := page.MustEval(`() => window.location.toString()`).Str()
 		if finalURL != "" && (len(redirectChain) == 0 || redirectChain[len(redirectChain)-1] != finalURL) {
 			redirectChain = append(redirectChain, finalURL)
 		}
 
-		seen := make(map[string]bool)
-		uniqueChain := make([]string, 0, len(redirectChain))
-		for _, u := range redirectChain {
-			if !seen[u] {
-				seen[u] = true
-				uniqueChain = append(uniqueChain, u)
-			}
-		}
-		requestInfo.RedirectChain = uniqueChain
+		status := 200
+		requestInfo.StatusCode = &status
+		requestInfo.RedirectChain = redirectChain
 
 		if options == nil || options.FollowRedirects {
 			log.Info("Waiting for DOM to be stable")
@@ -221,9 +177,8 @@ func (b *BrowserPageCapturer) Capture(ctx context.Context, url string, options *
 	})
 
 	if err != nil {
-		log.Error("Failed to create page", svc1log.SafeParam("url", url), svc1log.SafeParam("error", err))
+		log.Error("Failed during headless capture", svc1log.SafeParam("url", url), svc1log.SafeParam("error", err))
 		requestInfo.Errors = append(requestInfo.Errors, err.Error())
-		return requestInfo, err
 	}
 
 	if parsedURL, err := urlutil.Parse(url); err == nil {

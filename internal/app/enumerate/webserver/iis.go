@@ -14,6 +14,8 @@ import (
 	utils "github.com/Method-Security/webscan/utils"
 )
 
+var FollowRedirects = false
+
 // PerformAppEnumerateWebserverIIS is the entry point exposed to the wider application
 func PerformAppEnumerateWebserverIIS(ctx context.Context, cfg *enumerateWebserverFern.AppEnumerateIisConfig) enumerateWebserverFern.AppEnumerateIisReport {
 	rpt := enumerateWebserverFern.AppEnumerateIisReport{Config: cfg}
@@ -91,7 +93,7 @@ func enumerateSite(target string, timeout int) (*enumerateWebserverFern.IisSite,
 		Method:          common.HttpMethodGet,
 		Params:          common.RequestParams{},
 		Timeout:         timeout,
-		FollowRedirects: false,
+		FollowRedirects: FollowRedirects,
 		Insecure:        true,
 	})
 	reqs = append(reqs, &root)
@@ -112,7 +114,7 @@ func enumerateSite(target string, timeout int) (*enumerateWebserverFern.IisSite,
 			Method:          common.HttpMethodGet,
 			Params:          common.RequestParams{},
 			Timeout:         timeout,
-			FollowRedirects: false,
+			FollowRedirects: FollowRedirects,
 			Insecure:        true,
 		})
 		if nf.ResponseBody != nil {

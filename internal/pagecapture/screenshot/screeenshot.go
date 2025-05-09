@@ -17,7 +17,7 @@ func PerformScreenshotPageCapture(ctx context.Context, target string, captureMet
 	case common.CaptureMethodBrowser:
 		log.Info("Initiating page capture with browser method", svc1log.SafeParam("target", target))
 		capturer := headless.NewBrowserPageCapturer(browserPath, timeout, minDOMStabalizeTime)
-		report := CaptureScreenshot(ctx, capturer, target, &headless.BrowserOptions{FollowRedirects: false})
+		report := CaptureScreenshot(ctx, capturer, target, &headless.BrowserOptions{FollowRedirects: true})
 		_ = capturer.Close(ctx)
 		return report
 
@@ -30,7 +30,7 @@ func PerformScreenshotPageCapture(ctx context.Context, target string, captureMet
 		}
 		client := browserbase.NewBrowserbaseClient(*browserBaseToken, *browserBaseProject, browserbase.NewBrowserbaseOptions(ctx, *browserBaseOptions...))
 		capturer := browserbase.NewBrowserbasePageCapturer(ctx, timeout, minDOMStabalizeTime, *client)
-		report := CaptureScreenshot(ctx, capturer.Capturer, target, &headless.BrowserOptions{FollowRedirects: false})
+		report := CaptureScreenshot(ctx, capturer.Capturer, target, &headless.BrowserOptions{FollowRedirects: true})
 		_ = capturer.Close(ctx)
 		return report
 

@@ -94,6 +94,8 @@ func enumerateSite(target string, timeout int) (*enumerateWebserverFern.IisSite,
 		FollowRedirects: false,
 		Insecure:        true,
 	})
+	reqs = append(reqs, &root)
+
 	if root.StatusCode == nil {
 		return nil, reqs, []string{fmt.Sprintf("no response from %s", target)}
 	}

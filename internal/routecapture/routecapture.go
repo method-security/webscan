@@ -103,7 +103,7 @@ func PerformRouteCapture(ctx context.Context, target string, captureMethod commo
 			Method:          common.HttpMethodGet,
 			Params:          common.RequestParams{},
 			Timeout:         timeout,
-			FollowRedirects: false,
+			FollowRedirects: true,
 			Insecure:        insecure,
 		})
 		if requestInfo.Errors != nil {
@@ -117,7 +117,7 @@ func PerformRouteCapture(ctx context.Context, target string, captureMethod commo
 	case common.CaptureMethodBrowser:
 		log.Info("Initiating page capture with browser method", svc1log.SafeParam("target", target))
 		capturer := headless.NewBrowserPageCapturer(browserPath, timeout, minDOMStabalizeTime)
-		result, err := capturer.Capture(ctx, target, &headless.BrowserOptions{FollowRedirects: false})
+		result, err := capturer.Capture(ctx, target, &headless.BrowserOptions{FollowRedirects: true})
 		if err != nil {
 			report.Errors = append(report.Errors, err.Error())
 			return report
@@ -133,7 +133,7 @@ func PerformRouteCapture(ctx context.Context, target string, captureMethod commo
 		log.Info("Initiating page capture with browserbase method", svc1log.SafeParam("target", target))
 		client := browserbase.NewBrowserbaseClient(*browserBaseToken, *browserBaseProject, browserbase.NewBrowserbaseOptions(ctx, *browserBaseOptions...))
 		capturer := browserbase.NewBrowserbasePageCapturer(ctx, timeout, minDOMStabalizeTime, *client)
-		result, err := capturer.Capture(ctx, target, &headless.BrowserOptions{FollowRedirects: false})
+		result, err := capturer.Capture(ctx, target, &headless.BrowserOptions{FollowRedirects: true})
 		if err != nil {
 			report.Errors = append(report.Errors, err.Error())
 			return report

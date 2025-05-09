@@ -42,7 +42,7 @@ func PerformStaticAssetTakeOverAnalysis(ctx context.Context, target string, capt
 		Method:          common.HttpMethodGet,
 		Params:          common.RequestParams{},
 		Timeout:         timeout,
-		FollowRedirects: false,
+		FollowRedirects: true,
 		Insecure:        insecure,
 	})
 	report.TargetRequest = &targetRequest

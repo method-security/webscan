@@ -99,7 +99,7 @@ func (b *BrowserPageCapturer) Capture(ctx context.Context, url string, options *
 				options != nil && !options.FollowRedirects && !redirectIntercepted {
 
 				redirectIntercepted = true
-				statusCode = int(*e.ResponseStatusCode)
+				statusCode = *e.ResponseStatusCode
 				for _, h := range e.ResponseHeaders {
 					headers[h.Name] = h.Value
 				}

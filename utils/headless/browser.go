@@ -77,6 +77,9 @@ func (b *BrowserPageCapturer) Capture(ctx context.Context, url string, options *
 	var statusCode int
 	var headers = map[string]string{}
 	redirectIntercepted := false
+	var timestamp time.Time
+	var receivedAt time.Time
+	var sizeBytes int
 
 	err = rod.Try(func() {
 		page := b.Browser.MustPage().Context(pageCtx)
@@ -132,6 +135,8 @@ func (b *BrowserPageCapturer) Capture(ctx context.Context, url string, options *
 			page.MustEvalOnNewDocument(script)
 		}
 
+		timestamp = time.Now()
+
 		err = page.Navigate(url)
 		if err != nil {
 			if strings.Contains(err.Error(), "net::ERR_ABORTED") && redirectIntercepted {
@@ -178,12 +183,17 @@ func (b *BrowserPageCapturer) Capture(ctx context.Context, url string, options *
 					log.Error("Failed to get HTML content", svc1log.SafeParam("error", err))
 					requestInfo.Errors = append(requestInfo.Errors, err.Error())
 				} else {
+					receivedAt = time.Now()
+					sizeBytes = len(htmlContent)
 					requestInfo.ResponseBody = &common.Body{
 						Kind: "text",
 						Text: &common.TextBody{
 							Value: htmlContent,
 						},
 					}
+					requestInfo.Timestamp = timestamp
+					requestInfo.ReceivedAt = &receivedAt
+					requestInfo.SizeBytes = &sizeBytes
 				}
 			}
 		}
@@ -198,7 +208,7 @@ func (b *BrowserPageCapturer) Capture(ctx context.Context, url string, options *
 	if parsedURL, err := urlutil.Parse(url); err == nil {
 		requestInfo.Path = parsedURL.Path
 		parsedURL.Query().Iterate(func(key string, value []string) bool {
-			requestInfo.QueryParams[key] = value[0]
+			requestInfo.Parameters.QueryParams[key] = value[0]
 			return true
 		})
 	}

@@ -20,6 +20,7 @@ type RequestOptions struct {
 	BaseURL         string
 	Path            string
 	Method          common.HttpMethod
+	BaseHeaders     map[string][]string
 	Params          common.RequestParams
 	FollowRedirects bool
 	Insecure        bool
@@ -28,10 +29,10 @@ type RequestOptions struct {
 
 func PerformRequestScan(options RequestOptions) common.RequestInfo {
 	request := common.RequestInfo{
-		BaseUrl:   options.BaseURL,
-		Path:      options.Path,
-		Method:    options.Method,
-		Timestamp: time.Now(),
+		BaseUrl:     options.BaseURL,
+		Path:        options.Path,
+		Method:      options.Method,
+		BaseHeaders: options.BaseHeaders,
 	}
 
 	// Construct the URL
@@ -50,7 +51,7 @@ func PerformRequestScan(options RequestOptions) common.RequestInfo {
 
 	// Check for escape characters in headers
 	hasEscapeChars := false
-	for key, values := range options.Params.Headers {
+	for key, values := range options.Params.HeaderParams {
 		if strings.Contains(key, "\r") || strings.Contains(key, "\n") || strings.Contains(key, "\\") || strings.Contains(key, "\u0000") {
 			hasEscapeChars = true
 			break
@@ -68,10 +69,14 @@ func PerformRequestScan(options RequestOptions) common.RequestInfo {
 
 	var statusCode int
 	var responseBody string
-	responseHeader := make(map[string][]string)
+	var timestamp = time.Now()
+	var receivedAt time.Time
+	var sizeBytes int
+	responseHeaders := make(map[string][]string)
 	// Create and send the request based on the presence of escape characters
 	if !hasEscapeChars {
-		resp, redirectChain, err := sendRequest(options.Method, fullURL.String(), reqBody, contentType, options.Params.Headers, options.Timeout, options.FollowRedirects, options.Insecure)
+		resp, redirectChain, err := sendRequest(options.Method, fullURL.String(), reqBody, contentType, options.Params.HeaderParams, options.Timeout, options.FollowRedirects, options.Insecure)
+		receivedAt = time.Now()
 		if err != nil {
 			request.Errors = append(request.Errors, err.Error())
 			return request
@@ -90,25 +95,28 @@ func PerformRequestScan(options RequestOptions) common.RequestInfo {
 		}
 		statusCode = resp.StatusCode
 		responseBody = string(body)
-		responseHeader = resp.Header
+		sizeBytes = int(len(body))
+		responseHeaders = resp.Header
 
 		// Populate report
-		populateReport(&request, statusCode, responseHeader, responseBody, options.Params, redirectChain)
+		populateReport(&request, statusCode, responseHeaders, responseBody, options.Params, redirectChain, timestamp, receivedAt, &sizeBytes)
 	} else {
 		// Use sendFastHTTPRequest if escape characters are present
-		resp, redirectChain, err := sendFastHTTPRequest(string(options.Method), fullURL.String(), responseBody, contentType, options.Params.Headers, options.FollowRedirects)
+		resp, redirectChain, err := sendFastHTTPRequest(string(options.Method), fullURL.String(), responseBody, contentType, options.Params.HeaderParams, options.FollowRedirects)
+		receivedAt = time.Now()
 		if err != nil {
 			request.Errors = append(request.Errors, err.Error())
 			return request
 		}
 		statusCode = resp.StatusCode()
 		responseBody = string(resp.Body())
+		sizeBytes = int(len(resp.Body()))
 		resp.Header.VisitAll(func(key, value []byte) {
-			responseHeader[string(key)] = append(responseHeader[string(key)], string(value))
+			responseHeaders[string(key)] = append(responseHeaders[string(key)], string(value))
 		})
 		fasthttp.ReleaseResponse(resp)
 		// Populate report
-		populateReport(&request, statusCode, responseHeader, responseBody, options.Params, redirectChain)
+		populateReport(&request, statusCode, responseHeaders, responseBody, options.Params, redirectChain, timestamp, receivedAt, &sizeBytes)
 	}
 
 	return request
@@ -274,7 +282,41 @@ func sendFastHTTPRequest(method, url string, body string, contentType string, he
 	return resp, redirectChain, nil
 }
 
-func populateReport(report *common.RequestInfo, statusCode int, headers map[string][]string, body string, params common.RequestParams, redirectChain []string) {
+// parseResponseBody parses the response body based on the Content-Type header and returns a *common.Body
+func parseResponseBody(body string, contentType string) *common.Body {
+	switch {
+	case strings.Contains(contentType, "application/json"):
+		var jsonData interface{}
+		if err := json.Unmarshal([]byte(body), &jsonData); err == nil {
+			return common.NewBodyFromJson(&common.JsonBody{Data: jsonData})
+		}
+		return common.NewBodyFromText(&common.TextBody{Value: body})
+	case strings.Contains(contentType, "application/x-www-form-urlencoded"):
+		formVals, err := url.ParseQuery(body)
+		if err == nil {
+			fields := make(map[string]string)
+			for k, v := range formVals {
+				if len(v) > 0 {
+					fields[k] = v[0]
+				}
+			}
+			return common.NewBodyFromForm(&common.FormBody{Fields: fields})
+		}
+		return common.NewBodyFromText(&common.TextBody{Value: body})
+	case strings.Contains(contentType, "text/"):
+		return common.NewBodyFromText(&common.TextBody{Value: body})
+	case strings.Contains(contentType, "multipart/"):
+		// For now, just store as text. Parsing multipart is complex and not always needed.
+		return common.NewBodyFromText(&common.TextBody{Value: body})
+	case strings.Contains(contentType, "application/octet-stream"):
+		// Could handle binary, but for now, just store as text
+		return common.NewBodyFromText(&common.TextBody{Value: body})
+	default:
+		return common.NewBodyFromText(&common.TextBody{Value: body})
+	}
+}
+
+func populateReport(report *common.RequestInfo, statusCode int, headers map[string][]string, body string, params common.RequestParams, redirectChain []string, timestamp time.Time, receivedAt time.Time, sizeBytes *int) {
 	if headers != nil {
 		report.ResponseHeaders = make(map[string][]string)
 		for key, values := range headers {
@@ -282,15 +324,26 @@ func populateReport(report *common.RequestInfo, statusCode int, headers map[stri
 		}
 	}
 
-	report.ResponseBody = common.NewBodyFromText(&common.TextBody{Value: body})
+	// Determine Content-Type
+	contentType := ""
+	if headers != nil {
+		if ctVals, ok := headers["Content-Type"]; ok && len(ctVals) > 0 {
+			contentType = ctVals[0]
+		}
+	}
+
+	report.ResponseBody = parseResponseBody(body, contentType)
 	report.StatusCode = &statusCode
 	report.RedirectChain = redirectChain
+	report.Timestamp = timestamp
+	report.ReceivedAt = &receivedAt
+	report.SizeBytes = sizeBytes
 
 	if len(params.PathParams) > 0 {
-		report.PathParams = params.PathParams
+		report.Parameters.PathParams = params.PathParams
 	}
 	if len(params.QueryParams) > 0 {
-		report.QueryParams = params.QueryParams
+		report.Parameters.QueryParams = params.QueryParams
 	}
 }
 

@@ -54,16 +54,24 @@ types:
       text: TextBody
       binary: BinaryBody
 
+  # Request Params
+  RequestParams:
+    properties:
+      pathParams: optional<map<string, string>>
+      queryParams: optional<map<string, string>>
+      headerParams: optional<map<string, list<string>>>
+      body: optional<Body>
+
   # Request Structure
   RequestInfo:
     properties:
       baseUrl: string
       path: string
       method: HttpMethod
-      pathParams: optional<map<string, string>>
-      queryParams: optional<map<string, string>>
-      headers: optional<map<string, list<string>>>
+      baseHeaders: optional<map<string, list<string>>>
+      parameters: optional<RequestParams>
       body: optional<Body>
+      timestamp: datetime
       redirectChain: optional<list<string>>
       statusCode: optional<integer>
       responseBody: optional<Body>
@@ -71,12 +79,3 @@ types:
       receivedAt: optional<datetime>
       sizeBytes: optional<integer>
       errors: optional<list<string>>
-      timestamp: datetime
-
-  # Request Params
-  RequestParams:
-    properties:
-      pathParams: optional<map<string, string>>
-      queryParams: optional<map<string, string>>
-      headers: optional<map<string, list<string>>>
-      body: optional<Body>

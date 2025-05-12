@@ -68,7 +68,7 @@ types:
       statusCode: optional<integer>
       responseBody: optional<Body>
       responseHeaders: optional<map<string, list<string>>>
-      receivedAt: datetime
+      receivedAt: optional<datetime>
       sizeBytes: optional<integer>
       errors: optional<list<string>>
       timestamp: datetime

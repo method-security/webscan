@@ -137,7 +137,16 @@ func (b *BrowserPageCapturer) Capture(ctx context.Context, url string, options *
 			if strings.Contains(err.Error(), "net::ERR_ABORTED") && redirectIntercepted {
 				log.Info("Navigation aborted due to blocked redirect", svc1log.SafeParam("url", url))
 				requestInfo.StatusCode = &statusCode
-				requestInfo.ResponseHeaders = headers
+				// Convert headers (map[string]string) to map[string][]string, splitting on commas
+				headerMap := make(map[string][]string, len(headers))
+				for k, v := range headers {
+					parts := strings.Split(v, ",")
+					for i := range parts {
+						parts[i] = strings.TrimSpace(parts[i])
+					}
+					headerMap[k] = parts
+				}
+				requestInfo.ResponseHeaders = headerMap
 				requestInfo.RedirectChain = redirectChain
 				return
 			}
@@ -169,7 +178,12 @@ func (b *BrowserPageCapturer) Capture(ctx context.Context, url string, options *
 					log.Error("Failed to get HTML content", svc1log.SafeParam("error", err))
 					requestInfo.Errors = append(requestInfo.Errors, err.Error())
 				} else {
-					requestInfo.ResponseBody = &htmlContent
+					requestInfo.ResponseBody = &common.Body{
+						Kind: "text",
+						Text: &common.TextBody{
+							Value: htmlContent,
+						},
+					}
 				}
 			}
 		}
@@ -179,8 +193,6 @@ func (b *BrowserPageCapturer) Capture(ctx context.Context, url string, options *
 		log.Error("Failed during headless capture", svc1log.SafeParam("url", url), svc1log.SafeParam("error", err))
 		requestInfo.Errors = append(requestInfo.Errors, err.Error())
 	}
-
-	requestInfo.ResponseBody = &htmlContent
 
 	log.Info("Parsing URL to get path and query parameters")
 	if parsedURL, err := urlutil.Parse(url); err == nil {

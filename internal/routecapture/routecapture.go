@@ -17,7 +17,7 @@ import (
 
 var FollowRedirects = true
 
-func extractRoutes(ctx context.Context, target string, htmlContent string, baseURLsOnly bool, captureStaticAssets bool, timeout int, captureMethod common.CaptureMethod, browserCapturer *headless.BrowserPageCapturer) ([]*routecapturefern.WebRoute, []string, []string) {
+func extractRoutes(ctx context.Context, target string, htmlContent common.Body, baseURLsOnly bool, captureStaticAssets bool, timeout int, captureMethod common.CaptureMethod, browserCapturer *headless.BrowserPageCapturer) ([]*routecapturefern.WebRoute, []string, []string) {
 	log := svc1log.FromContext(ctx)
 	routes := []*routecapturefern.WebRoute{}
 	urls := make(map[string]struct{})
@@ -114,7 +114,7 @@ func PerformRouteCapture(ctx context.Context, target string, captureMethod commo
 		}
 		log.Info("Page capture successful")
 		// Extract the routes and urls
-		routes, urls, errors = extractRoutes(ctx, target, requestInfo.ResponseBody, baseURLsOnly, captureStaticAssets, timeout, common.CaptureMethodRequest, nil)
+		routes, urls, errors = extractRoutes(ctx, target, *requestInfo.ResponseBody, baseURLsOnly, captureStaticAssets, timeout, common.CaptureMethodRequest, nil)
 
 	case common.CaptureMethodBrowser:
 		log.Info("Initiating page capture with browser method", svc1log.SafeParam("target", target))
@@ -127,7 +127,7 @@ func PerformRouteCapture(ctx context.Context, target string, captureMethod commo
 		log.Info("Page capture successful")
 
 		// Extract the routes and urls
-		routes, urls, errors = extractRoutes(ctx, target, result.ResponseBody, baseURLsOnly, captureStaticAssets, timeout, common.CaptureMethodBrowser, capturer)
+		routes, urls, errors = extractRoutes(ctx, target, *result.ResponseBody, baseURLsOnly, captureStaticAssets, timeout, common.CaptureMethodBrowser, capturer)
 
 		_ = capturer.Close(ctx)
 
@@ -143,7 +143,7 @@ func PerformRouteCapture(ctx context.Context, target string, captureMethod commo
 		log.Info("Page capture successful")
 
 		// Extract the routes and urls
-		routes, urls, errors = extractRoutes(ctx, target, result.ResponseBody, baseURLsOnly, captureStaticAssets, timeout, common.CaptureMethodBrowserbase, capturer.Capturer)
+		routes, urls, errors = extractRoutes(ctx, target, *result.ResponseBody, baseURLsOnly, captureStaticAssets, timeout, common.CaptureMethodBrowserbase, capturer.Capturer)
 
 		_ = capturer.Close(ctx)
 

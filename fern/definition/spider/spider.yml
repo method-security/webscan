@@ -1,0 +1,15 @@
+imports:
+  requests: ../common/requests.yml
+types:
+  WebRoute:
+    properties:
+      url: string
+      path: optional<string>
+      method: optional<requests.HttpMethod>
+      requestParams: optional<list<requests.RequestParams>>
+  WebSpiderReport:
+    properties:
+      target: string
+      routes: optional<list<WebRoute>>
+      urls: optional<list<string>>
+      errors: optional<list<string>>

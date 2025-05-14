@@ -6,9 +6,10 @@ types:
   GeneralProbeConfig:
     properties:
       targets: list<string>
-      timeout: integer
       maxRedirects: integer
+      onlyHttps: boolean
       insecure: boolean
+      timeout: integer
       requestMethod: config.RequestMethod
       headlessConfig: optional<config.HeadlessConfig>
       browserbaseConfig: optional<config.BrowserbaseConfig>

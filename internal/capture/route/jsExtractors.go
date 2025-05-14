@@ -1,22 +1,26 @@
-package routecapture
+package captureroute
 
 import (
+	// Standard
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
 
-	routefern "github.com/Method-Security/webscan/generated/go/capture/route"
+	// Generated
+	route "github.com/Method-Security/webscan/generated/go/capture/route"
 	common "github.com/Method-Security/webscan/generated/go/common"
-	"github.com/PuerkitoBio/goquery"
-	"github.com/robertkrimen/otto/ast"
-	"github.com/robertkrimen/otto/parser"
+
+	// External
+	goquery "github.com/PuerkitoBio/goquery"
+	ast "github.com/robertkrimen/otto/ast"
+	parser "github.com/robertkrimen/otto/parser"
 )
 
 // extractScriptContentRoutes takes JavaScript code as a string, parses it using the Otto parser library to find all routes (including POST and GET methods with bodyParams and queryParams), and returns them.
-func extractScriptContentRoutes(scriptContent string, baseURL string, baseURLsOnly bool, captureStaticAssets bool) ([]*routefern.WebRoute, []string, []string) {
-	routes := []*routefern.WebRoute{}
+func extractScriptContentRoutes(scriptContent string, baseURL string, baseURLsOnly bool, captureStaticAssets bool) ([]*route.WebRoute, []string, []string) {
+	routes := []*route.WebRoute{}
 	urls := make(map[string]struct{})
 	errors := []string{}
 
@@ -36,7 +40,7 @@ func extractScriptContentRoutes(scriptContent string, baseURL string, baseURLsOn
 
 // visitor struct for AST traversal
 type visitor struct {
-	routes              *[]*routefern.WebRoute
+	routes              *[]*route.WebRoute
 	urls                map[string]struct{}
 	baseURL             string
 	baseURLsOnly        bool
@@ -88,8 +92,8 @@ func (v *visitor) processFetchCall(node *ast.CallExpression) {
 	}
 
 	method := "GET" // Default method
-	var bodyParams []*routefern.BodyParams
-	var queryParams []*routefern.QueryParams
+	var bodyParams []*route.BodyParams
+	var queryParams []*route.QueryParams
 
 	// Second argument may be options object
 	if len(node.ArgumentList) > 1 {
@@ -102,7 +106,7 @@ func (v *visitor) processFetchCall(node *ast.CallExpression) {
 					}
 				case "body":
 					// Placeholder for body parameters
-					bodyParams = append(bodyParams, &routefern.BodyParams{Name: "body"})
+					bodyParams = append(bodyParams, &route.BodyParams{Name: "body"})
 				}
 			}
 		}
@@ -112,7 +116,7 @@ func (v *visitor) processFetchCall(node *ast.CallExpression) {
 }
 
 // addRoute adds a route to the list
-func (v *visitor) addRoute(urlStr, method string, bodyParams []*routefern.BodyParams, queryParams []*routefern.QueryParams) {
+func (v *visitor) addRoute(urlStr, method string, bodyParams []*route.BodyParams, queryParams []*route.QueryParams) {
 	// The route URL should not have query params, those are stored in QueryParams
 	urlNoQuery, err := urlRemoveQueryParams(urlStr)
 	if err != nil {
@@ -126,7 +130,7 @@ func (v *visitor) addRoute(urlStr, method string, bodyParams []*routefern.BodyPa
 		return
 	}
 
-	route := &routefern.WebRoute{
+	route := &route.WebRoute{
 		Url:         urlNoQuery,
 		Path:        &parsedURL.Path,
 		Method:      common.HttpMethod(method).Ptr(),
@@ -139,8 +143,8 @@ func (v *visitor) addRoute(urlStr, method string, bodyParams []*routefern.BodyPa
 }
 
 // extractScriptRoutes finds script elements with a src attribute, fetches the JavaScript data, converts it to a string, then calls extractScriptContentRoutes and returns the results. If onlybaseURLs is set, only request script src that are relative.
-func extractScriptRoutes(doc *goquery.Document, baseURL string, baseURLsOnly bool, captureStaticAssets bool, httpClient *http.Client) ([]*routefern.WebRoute, []string, []string) {
-	routes := []*routefern.WebRoute{}
+func extractScriptRoutes(doc *goquery.Document, baseURL string, baseURLsOnly bool, captureStaticAssets bool, httpClient *http.Client) ([]*route.WebRoute, []string, []string) {
+	routes := []*route.WebRoute{}
 	urls := make(map[string]struct{})
 	errors := []string{}
 
@@ -205,8 +209,8 @@ func extractScriptRoutes(doc *goquery.Document, baseURL string, baseURLsOnly boo
 }
 
 // extractInlineScriptRoutes finds inline JavaScript code within script tags, and for each, passes the string contents to extractScriptContentRoutes and returns the results.
-func extractInlineScriptRoutes(doc *goquery.Document, baseURL string, baseURLsOnly bool, captureStaticAssets bool) ([]*routefern.WebRoute, []string, []string) {
-	routes := []*routefern.WebRoute{}
+func extractInlineScriptRoutes(doc *goquery.Document, baseURL string, baseURLsOnly bool, captureStaticAssets bool) ([]*route.WebRoute, []string, []string) {
+	routes := []*route.WebRoute{}
 	urls := make(map[string]struct{})
 	errors := []string{}
 

@@ -1,26 +1,29 @@
-package webapplication
+package general
 
 import (
+	// Standard
 	"context"
 	"fmt"
 
+	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
 	generalfern "github.com/Method-Security/webscan/generated/go/general"
+
+	// Utils
 	"github.com/Method-Security/webscan/utils"
 	request "github.com/Method-Security/webscan/utils/request"
 )
 
-// createWebserverProbeRequestConfig creates a common request configuration
-func createGeneralProbeRequestConfig(baseURL, path string, config *generalfern.GeneralProbeConfig, browserbaseSecrets *common.BrowserbaseSecrets) common.RequestConfig {
+func createProbeRequestConfig(baseURL, path string, config *generalfern.GeneralProbeConfig, browserbaseSecrets *common.BrowserbaseSecrets) common.RequestConfig {
 	return common.RequestConfig{
 		BaseUrl:            baseURL,
 		Path:               path,
 		Method:             common.HttpMethodGet,
 		RequestParams:      &common.RequestParams{},
-		Timeout:            config.Timeout,
 		FollowRedirects:    true,
 		MaxRedirects:       &config.MaxRedirects,
 		Insecure:           true,
+		Timeout:            config.Timeout,
 		RequestMethod:      config.RequestMethod,
 		HeadlessConfig:     config.HeadlessConfig,
 		BrowserbaseConfig:  config.BrowserbaseConfig,
@@ -35,12 +38,12 @@ func PerformGeneralProbe(ctx context.Context, config *generalfern.GeneralProbeCo
 
 	// Single loop to process all targets
 	for _, target := range config.Targets {
-		result, err := tryHTTPSThenHTTP(ctx, target, config, browserbaseSecrets)
+		results, err := tryHTTPSThenHTTP(ctx, target, config, browserbaseSecrets)
 		if err != nil {
 			errors = append(errors, fmt.Sprintf("failed to probe %s: %v", target, err))
 			continue
 		}
-		requests = append(requests, result)
+		requests = append(requests, results...)
 	}
 
 	report.Targets = requests
@@ -48,30 +51,35 @@ func PerformGeneralProbe(ctx context.Context, config *generalfern.GeneralProbeCo
 	return report, nil
 }
 
-// tryHTTPSThenHTTP attempts to connect to a target using HTTPS first, falling back to HTTP if HTTPS fails
-func tryHTTPSThenHTTP(ctx context.Context, target string, config *generalfern.GeneralProbeConfig, browserbaseSecrets *common.BrowserbaseSecrets) (*common.RequestInfo, error) {
-	// Try HTTPS first
-	targetURL := "https://" + target
-	baseURL, path, err := utils.SplitTarget(targetURL)
-	if err != nil {
-		return nil, fmt.Errorf("invalid address %s: %v", targetURL, err)
-	}
-	requestConfig := createGeneralProbeRequestConfig(baseURL, path, config, browserbaseSecrets)
+// tryHTTPSThenHTTP attempts to connect to a target using both HTTPS and HTTP protocols
+func tryHTTPSThenHTTP(ctx context.Context, target string, config *generalfern.GeneralProbeConfig, browserbaseSecrets *common.BrowserbaseSecrets) ([]*common.RequestInfo, error) {
+	results := []*common.RequestInfo{}
 
-	result, err := request.SendRequest(ctx, requestConfig)
+	// Try HTTPS
+	httpsURL := "https://" + target
+	baseURL, path, err := utils.SplitTarget(httpsURL)
 	if err != nil {
-		// If HTTPS fails, try HTTP
-		targetURL = "http://" + target
-		baseURL, path, err = utils.SplitTarget(targetURL)
-		if err != nil {
-			return nil, fmt.Errorf("invalid address %s: %v", targetURL, err)
-		}
+		return nil, fmt.Errorf("invalid address %s: %v", httpsURL, err)
+	}
+	httpsConfig := createProbeRequestConfig(baseURL, path, config, browserbaseSecrets)
+	httpsResult, httpsErr := request.SendRequest(ctx, httpsConfig)
+	if httpsErr == nil {
+		results = append(results, httpsResult)
+	}
 
-		requestConfig = createGeneralProbeRequestConfig(baseURL, path, config, browserbaseSecrets)
-		result, err = request.SendRequest(ctx, requestConfig)
+	// Try HTTP
+	if !config.OnlyHttps {
+		httpURL := "http://" + target
+		baseURL, path, err = utils.SplitTarget(httpURL)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("invalid address %s: %v", httpURL, err)
+		}
+		httpConfig := createProbeRequestConfig(baseURL, path, config, browserbaseSecrets)
+		httpResult, httpErr := request.SendRequest(ctx, httpConfig)
+		if httpErr == nil {
+			results = append(results, httpResult)
 		}
 	}
-	return result, nil
+
+	return results, nil
 }

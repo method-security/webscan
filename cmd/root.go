@@ -41,7 +41,7 @@ func NewWebScan(version string) *WebScan {
 			Verbose: false,
 		},
 		RequestFlags: &config.RequestFlags{
-			RequestMethod:       new(string), // STANDARD, HEADLESS, BROWSERBASE
+			RequestMethod:       new(string), // ENUM(STANDARD, HEADLESS, BROWSERBASE)
 			HeadlessPath:        new(string), // Headless browser path
 			MinDomStabalizeTime: new(int),    // Headless browser DOM stabilization time
 			BrowserbaseToken:    new(string), // Browserbase API token

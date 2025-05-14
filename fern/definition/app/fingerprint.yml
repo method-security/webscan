@@ -18,9 +18,9 @@ types:
       name: string
       method: requests.HttpMethod
       paths : list<string>
-      RequestParams: optional<requests.RequestParams>
-      HeaderIndicators : optional<map<string, optional<list<string>>>>
-      BodyIndicators : optional<list<string>>
+      requestParams: optional<requests.RequestParams>
+      headerIndicators : optional<map<string, optional<list<string>>>>
+      bodyIndicators : optional<list<string>>
   AppResourceType:
     properties:
       name: AppFingerprintResourceType
@@ -32,15 +32,15 @@ types:
   AppFingerprintConfig:
     properties:
       targets: list<string>
-      resourceType: string
+      resourceType: AppFingerprintResourceType
       modules: optional<list<string>>
       fingerprints: optional<AppResourceType>
-      timeout: integer
       successfulOnly: boolean
       insecure: boolean
+      timeout: integer
       requestMethod: config.RequestMethod
       headlessConfig: optional<config.HeadlessConfig>
-      BrowserbaseConfig: optional<config.BrowserbaseConfig>
+      browserbaseConfig: optional<config.BrowserbaseConfig>
   # AppFingerprint Struct
   AppFingerprintAttemptInfo:
     properties:

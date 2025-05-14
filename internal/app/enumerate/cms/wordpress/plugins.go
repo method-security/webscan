@@ -1,17 +1,22 @@
 package cms
 
 import (
+	// Standard
 	"context"
 	"encoding/json"
 	"fmt"
 	"regexp"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 
-	enumerateWordpressFern "github.com/Method-Security/webscan/generated/go/app/enumerate/cms/wordpress"
+	// Generated
+	enumerateCmsWordpressFern "github.com/Method-Security/webscan/generated/go/app/enumerate/cms/wordpress"
 	common "github.com/Method-Security/webscan/generated/go/common"
-	"github.com/Method-Security/webscan/utils"
+
+	// Utils
+	utils "github.com/Method-Security/webscan/utils"
 	request "github.com/Method-Security/webscan/utils/request"
 )
 
@@ -21,16 +26,16 @@ type WordPressAPIResponse struct {
 	Routes     map[string]any `json:"routes"`
 }
 
-func createEnumerateCMSWordpressPluginsRequestConfig(baseURL, path string, config *enumerateWordpressFern.AppEnumerateWordpressPluginsConfig) common.RequestConfig {
+func createRequestConfig(baseURL, path string, config *enumerateCmsWordpressFern.AppEnumerateWordpressPluginsConfig) common.RequestConfig {
 	return common.RequestConfig{
 		BaseUrl:            baseURL,
 		Path:               path,
 		Method:             common.HttpMethodGet,
 		RequestParams:      &common.RequestParams{},
-		Timeout:            config.Timeout,
 		FollowRedirects:    false,
 		MaxRedirects:       nil,
 		Insecure:           true,
+		Timeout:            config.Timeout,
 		RequestMethod:      common.RequestMethodStandard,
 		HeadlessConfig:     nil,
 		BrowserbaseConfig:  nil,
@@ -39,11 +44,11 @@ func createEnumerateCMSWordpressPluginsRequestConfig(baseURL, path string, confi
 }
 
 // PerformAppEnumerateCMSWordpressPlugins attempts to find plugins installed on WordPress sites
-func PerformAppEnumerateCMSWordpressPlugins(ctx context.Context, config *enumerateWordpressFern.AppEnumerateWordpressPluginsConfig) enumerateWordpressFern.AppEnumerateWordpressPluginsReport {
-	report := enumerateWordpressFern.AppEnumerateWordpressPluginsReport{Config: config}
+func PerformAppEnumerateCMSWordpressPlugins(ctx context.Context, config *enumerateCmsWordpressFern.AppEnumerateWordpressPluginsConfig) enumerateCmsWordpressFern.AppEnumerateWordpressPluginsReport {
+	report := enumerateCmsWordpressFern.AppEnumerateWordpressPluginsReport{Config: config}
 
 	// Create channels for collecting results and errors
-	resultsChan := make(chan *enumerateWordpressFern.AppEnumerateWordpressPluginsTargetInfo, len(config.Targets))
+	resultsChan := make(chan *enumerateCmsWordpressFern.AppEnumerateWordpressPluginsTargetInfo, len(config.Targets))
 	errorsChan := make(chan []string, len(config.Targets))
 
 	// Create a wait group to wait for all goroutines to finish
@@ -83,7 +88,7 @@ func PerformAppEnumerateCMSWordpressPlugins(ctx context.Context, config *enumera
 	close(errorsChan)
 
 	// Collect results and errors
-	targetResults := []*enumerateWordpressFern.AppEnumerateWordpressPluginsTargetInfo{}
+	targetResults := []*enumerateCmsWordpressFern.AppEnumerateWordpressPluginsTargetInfo{}
 	errors := []string{}
 
 	for result := range resultsChan {
@@ -100,10 +105,10 @@ func PerformAppEnumerateCMSWordpressPlugins(ctx context.Context, config *enumera
 }
 
 // scanTarget scans a single WordPress site for plugins
-func scanTarget(ctx context.Context, url string, config *enumerateWordpressFern.AppEnumerateWordpressPluginsConfig) (enumerateWordpressFern.AppEnumerateWordpressPluginsTargetInfo, []string) {
-	result := enumerateWordpressFern.AppEnumerateWordpressPluginsTargetInfo{
+func scanTarget(ctx context.Context, url string, config *enumerateCmsWordpressFern.AppEnumerateWordpressPluginsConfig) (enumerateCmsWordpressFern.AppEnumerateWordpressPluginsTargetInfo, []string) {
+	result := enumerateCmsWordpressFern.AppEnumerateWordpressPluginsTargetInfo{
 		Target:  url,
-		Plugins: []*enumerateWordpressFern.WordpressPlugin{},
+		Plugins: []*enumerateCmsWordpressFern.WordpressPlugin{},
 	}
 	errors := []string{}
 
@@ -114,7 +119,7 @@ func scanTarget(ctx context.Context, url string, config *enumerateWordpressFern.
 		return result, errors
 	}
 
-	requestConfig := createEnumerateCMSWordpressPluginsRequestConfig(baseURL, path, config)
+	requestConfig := createRequestConfig(baseURL, path, config)
 	accessRequest, err := request.SendRequest(ctx, requestConfig)
 	if err != nil {
 		errors = append(errors, err.Error())
@@ -145,7 +150,7 @@ func scanTarget(ctx context.Context, url string, config *enumerateWordpressFern.
 	cssPlugins := checkCSSReferences(accessRequest.ResponseBody)
 
 	// Combine results with proper deduplication
-	pluginsMap := make(map[string]*enumerateWordpressFern.WordpressPlugin)
+	pluginsMap := make(map[string]*enumerateCmsWordpressFern.WordpressPlugin)
 
 	// Merge and Deduplicate plugins from all sources
 	mergePlugins(pluginsMap, readmePlugins) // Prioritize data from readme.txt as its the densest source
@@ -155,7 +160,7 @@ func scanTarget(ctx context.Context, url string, config *enumerateWordpressFern.
 	mergePlugins(pluginsMap, cssPlugins)
 
 	// Convert map to slice
-	result.Plugins = make([]*enumerateWordpressFern.WordpressPlugin, 0, len(pluginsMap))
+	result.Plugins = make([]*enumerateCmsWordpressFern.WordpressPlugin, 0, len(pluginsMap))
 	for _, plugin := range pluginsMap {
 		result.Plugins = append(result.Plugins, plugin)
 	}
@@ -164,11 +169,11 @@ func scanTarget(ctx context.Context, url string, config *enumerateWordpressFern.
 }
 
 // mergePlugins merges a list of plugins into an existing map, handling duplicates properly
-func mergePlugins(plugins map[string]*enumerateWordpressFern.WordpressPlugin, pluginList []*enumerateWordpressFern.WordpressPlugin) {
+func mergePlugins(plugins map[string]*enumerateCmsWordpressFern.WordpressPlugin, pluginList []*enumerateCmsWordpressFern.WordpressPlugin) {
 	for _, plugin := range pluginList {
 		if existing, exists := plugins[plugin.Name]; exists {
 			// Merge sources without duplicates
-			sourceMap := make(map[enumerateWordpressFern.DetectionSource]bool)
+			sourceMap := make(map[enumerateCmsWordpressFern.DetectionSource]bool)
 
 			// Add existing sources to map
 			for _, src := range existing.Source {
@@ -181,7 +186,7 @@ func mergePlugins(plugins map[string]*enumerateWordpressFern.WordpressPlugin, pl
 			}
 
 			// Rebuild source list from map
-			existing.Source = make([]enumerateWordpressFern.DetectionSource, 0, len(sourceMap))
+			existing.Source = make([]enumerateCmsWordpressFern.DetectionSource, 0, len(sourceMap))
 			for src := range sourceMap {
 				existing.Source = append(existing.Source, src)
 			}
@@ -205,8 +210,8 @@ func mergePlugins(plugins map[string]*enumerateWordpressFern.WordpressPlugin, pl
 }
 
 // checkWordPressAPI checks the /wp-json endpoint for exposed plugin data
-func checkWordPressAPI(ctx context.Context, url string, config *enumerateWordpressFern.AppEnumerateWordpressPluginsConfig) ([]*enumerateWordpressFern.WordpressPlugin, []string) {
-	pluginsList := []*enumerateWordpressFern.WordpressPlugin{}
+func checkWordPressAPI(ctx context.Context, url string, config *enumerateCmsWordpressFern.AppEnumerateWordpressPluginsConfig) ([]*enumerateCmsWordpressFern.WordpressPlugin, []string) {
+	pluginsList := []*enumerateCmsWordpressFern.WordpressPlugin{}
 	errors := []string{}
 
 	// Check main REST API endpoint
@@ -216,7 +221,7 @@ func checkWordPressAPI(ctx context.Context, url string, config *enumerateWordpre
 		return pluginsList, errors
 	}
 	apiPath := fmt.Sprintf("%s/wp-json", path)
-	requestConfig := createEnumerateCMSWordpressPluginsRequestConfig(baseURL, apiPath, config)
+	requestConfig := createRequestConfig(baseURL, apiPath, config)
 	apiRequest, err := request.SendRequest(ctx, requestConfig)
 	if err != nil {
 		errors = append(errors, err.Error())
@@ -239,7 +244,7 @@ func checkWordPressAPI(ctx context.Context, url string, config *enumerateWordpre
 			potentiallyCommonPlugin := parts[0]
 
 			// Only add plugin if it's in the list of plugins to check to prevent false positives
-			if !containsString(config.Plugins, potentiallyCommonPlugin) {
+			if !slices.Contains(config.Plugins, potentiallyCommonPlugin) {
 				continue
 			}
 
@@ -250,10 +255,10 @@ func checkWordPressAPI(ctx context.Context, url string, config *enumerateWordpre
 			}
 
 			// Add plugin to list
-			pluginsList = append(pluginsList, &enumerateWordpressFern.WordpressPlugin{
+			pluginsList = append(pluginsList, &enumerateCmsWordpressFern.WordpressPlugin{
 				Name:    potentiallyCommonPlugin,
 				Version: version,
-				Source:  []enumerateWordpressFern.DetectionSource{enumerateWordpressFern.DetectionSourceRestApiDirect},
+				Source:  []enumerateCmsWordpressFern.DetectionSource{enumerateCmsWordpressFern.DetectionSourceRestApiDirect},
 			})
 
 		}
@@ -276,8 +281,8 @@ func checkWordPressAPI(ctx context.Context, url string, config *enumerateWordpre
 }
 
 // fetchPluginsFromAPI tries to get plugin info directly from the API
-func fetchPluginsFromAPI(ctx context.Context, baseURL string, path string, timeout int) []*enumerateWordpressFern.WordpressPlugin {
-	plugins := []*enumerateWordpressFern.WordpressPlugin{}
+func fetchPluginsFromAPI(ctx context.Context, baseURL string, path string, timeout int) []*enumerateCmsWordpressFern.WordpressPlugin {
+	plugins := []*enumerateCmsWordpressFern.WordpressPlugin{}
 
 	apiRequest, err := request.SendRequest(ctx, common.RequestConfig{
 		BaseUrl:         baseURL,
@@ -300,11 +305,11 @@ func fetchPluginsFromAPI(ctx context.Context, baseURL string, path string, timeo
 			name, _ := pluginData["name"].(string)
 			version, _ := pluginData["version"].(string)
 			description, _ := pluginData["description"].(string)
-			plugin := &enumerateWordpressFern.WordpressPlugin{
+			plugin := &enumerateCmsWordpressFern.WordpressPlugin{
 				Name:        name,
 				Version:     &version,
 				Description: &description,
-				Source:      []enumerateWordpressFern.DetectionSource{enumerateWordpressFern.DetectionSourceRestApiDirect},
+				Source:      []enumerateCmsWordpressFern.DetectionSource{enumerateCmsWordpressFern.DetectionSourceRestApiDirect},
 			}
 			plugins = append(plugins, plugin)
 		}
@@ -314,8 +319,8 @@ func fetchPluginsFromAPI(ctx context.Context, baseURL string, path string, timeo
 }
 
 // checkHTMLForPlugins scans the HTML for common plugin paths
-func checkHTMLForPlugins(baseResponseBody *string) []*enumerateWordpressFern.WordpressPlugin {
-	plugins := []*enumerateWordpressFern.WordpressPlugin{}
+func checkHTMLForPlugins(baseResponseBody *string) []*enumerateCmsWordpressFern.WordpressPlugin {
+	plugins := []*enumerateCmsWordpressFern.WordpressPlugin{}
 
 	// Different regex patterns to find plugin references
 	patterns := []struct {
@@ -356,10 +361,10 @@ func checkHTMLForPlugins(baseResponseBody *string) []*enumerateWordpressFern.Wor
 				}
 
 				// Add plugin to map
-				plugins = append(plugins, &enumerateWordpressFern.WordpressPlugin{
+				plugins = append(plugins, &enumerateCmsWordpressFern.WordpressPlugin{
 					Name:    name,
 					Version: version,
-					Source:  []enumerateWordpressFern.DetectionSource{enumerateWordpressFern.DetectionSourceHtml},
+					Source:  []enumerateCmsWordpressFern.DetectionSource{enumerateCmsWordpressFern.DetectionSourceHtml},
 				})
 			}
 		}
@@ -369,8 +374,8 @@ func checkHTMLForPlugins(baseResponseBody *string) []*enumerateWordpressFern.Wor
 }
 
 // checkReadmeFiles tests for known plugin files
-func checkReadmeFiles(ctx context.Context, url string, config *enumerateWordpressFern.AppEnumerateWordpressPluginsConfig) ([]*enumerateWordpressFern.WordpressPlugin, []string) {
-	pluginsList := []*enumerateWordpressFern.WordpressPlugin{}
+func checkReadmeFiles(ctx context.Context, url string, config *enumerateCmsWordpressFern.AppEnumerateWordpressPluginsConfig) ([]*enumerateCmsWordpressFern.WordpressPlugin, []string) {
+	pluginsList := []*enumerateCmsWordpressFern.WordpressPlugin{}
 	errors := []string{}
 
 	// Loop through plugins and check for readme.txt
@@ -381,7 +386,7 @@ func checkReadmeFiles(ctx context.Context, url string, config *enumerateWordpres
 			continue
 		}
 		readmePath := fmt.Sprintf("%s/wp-content/plugins/%s/readme.txt", path, plugin)
-		requestConfig := createEnumerateCMSWordpressPluginsRequestConfig(baseURL, readmePath, config)
+		requestConfig := createRequestConfig(baseURL, readmePath, config)
 		readmeRequest, err := request.SendRequest(ctx, requestConfig)
 		if err != nil {
 			errors = append(errors, err.Error())
@@ -419,11 +424,11 @@ func checkReadmeFiles(ctx context.Context, url string, config *enumerateWordpres
 		}
 
 		// Add plugin to list
-		pluginsList = append(pluginsList, &enumerateWordpressFern.WordpressPlugin{
+		pluginsList = append(pluginsList, &enumerateCmsWordpressFern.WordpressPlugin{
 			Name:        plugin,
 			Version:     version,
 			Description: description,
-			Source:      []enumerateWordpressFern.DetectionSource{enumerateWordpressFern.DetectionSourceReadmeTxt},
+			Source:      []enumerateCmsWordpressFern.DetectionSource{enumerateCmsWordpressFern.DetectionSourceReadmeTxt},
 		})
 	}
 
@@ -431,8 +436,8 @@ func checkReadmeFiles(ctx context.Context, url string, config *enumerateWordpres
 }
 
 // checkRegisteredPlugins checks for plugin registration in the page source
-func checkRegisteredPlugins(baseResponseBody *string) []*enumerateWordpressFern.WordpressPlugin {
-	plugins := []*enumerateWordpressFern.WordpressPlugin{}
+func checkRegisteredPlugins(baseResponseBody *string) []*enumerateCmsWordpressFern.WordpressPlugin {
+	plugins := []*enumerateCmsWordpressFern.WordpressPlugin{}
 
 	// Look for wp_register_script, wp_enqueue_script, etc. with plugin names
 	regex := regexp.MustCompile(`/wp-content/plugins/([^/'"]+)/`)
@@ -443,9 +448,9 @@ func checkRegisteredPlugins(baseResponseBody *string) []*enumerateWordpressFern.
 	// match[1] = plugin name
 	for _, match := range matches {
 		if len(match) > 1 {
-			plugins = append(plugins, &enumerateWordpressFern.WordpressPlugin{
+			plugins = append(plugins, &enumerateCmsWordpressFern.WordpressPlugin{
 				Name:   match[1],
-				Source: []enumerateWordpressFern.DetectionSource{enumerateWordpressFern.DetectionSourceRegisteredScript},
+				Source: []enumerateCmsWordpressFern.DetectionSource{enumerateCmsWordpressFern.DetectionSourceRegisteredScript},
 			})
 		}
 	}
@@ -454,8 +459,8 @@ func checkRegisteredPlugins(baseResponseBody *string) []*enumerateWordpressFern.
 }
 
 // checkCSSReferences looks for plugin-specific CSS files
-func checkCSSReferences(baseResponseBody *string) []*enumerateWordpressFern.WordpressPlugin {
-	plugins := []*enumerateWordpressFern.WordpressPlugin{}
+func checkCSSReferences(baseResponseBody *string) []*enumerateCmsWordpressFern.WordpressPlugin {
+	plugins := []*enumerateCmsWordpressFern.WordpressPlugin{}
 
 	// Look for CSS links with plugin references
 	regex := regexp.MustCompile(`href=['"]([^'"]*wp-content/plugins/([^/'"]+)/[^'"]*\.css[^'"]*?)['"]`)
@@ -485,23 +490,13 @@ func checkCSSReferences(baseResponseBody *string) []*enumerateWordpressFern.Word
 			}
 
 			// Add plugin to list
-			plugins = append(plugins, &enumerateWordpressFern.WordpressPlugin{
+			plugins = append(plugins, &enumerateCmsWordpressFern.WordpressPlugin{
 				Name:    pluginName,
 				Version: version,
-				Source:  []enumerateWordpressFern.DetectionSource{enumerateWordpressFern.DetectionSourceCssReference},
+				Source:  []enumerateCmsWordpressFern.DetectionSource{enumerateCmsWordpressFern.DetectionSourceCssReference},
 			})
 		}
 	}
 
 	return plugins
-}
-
-// containsString checks if a string is present in a slice of strings
-func containsString(slice []string, str string) bool {
-	for _, item := range slice {
-		if item == str {
-			return true
-		}
-	}
-	return false
 }

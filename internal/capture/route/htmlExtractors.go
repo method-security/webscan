@@ -1,25 +1,29 @@
-package routecapture
+package captureroute
 
 import (
+	// Standard
 	"net/url"
 	"strings"
 
-	routefern "github.com/Method-Security/webscan/generated/go/capture/route"
+	// Generated
+	route "github.com/Method-Security/webscan/generated/go/capture/route"
 	common "github.com/Method-Security/webscan/generated/go/common"
-	"github.com/PuerkitoBio/goquery"
+
+	// External
+	goquery "github.com/PuerkitoBio/goquery"
 )
 
 // extractFormRoutes extracts WebRoutes from form elements in the HTML document
 // It returns a slice of WebRoutes, a slice of URLs and a slice of errors
 // WebRoutes are merged to only return unique routes
-func extractFormRoutes(doc *goquery.Document, baseURL string, baseURLsOnly bool, captureStaticAssets bool) ([]*routefern.WebRoute, []string, []string) {
-	routes := []*routefern.WebRoute{}
+func extractFormRoutes(doc *goquery.Document, baseURL string, baseURLsOnly bool, captureStaticAssets bool) ([]*route.WebRoute, []string, []string) {
+	routes := []*route.WebRoute{}
 	urls := make(map[string]struct{})
 	errors := []string{}
 
 	doc.Find("form").Each(func(i int, s *goquery.Selection) {
 
-		route := routefern.WebRoute{}
+		routeVar := route.WebRoute{}
 
 		// Extract action attribute
 		action, exists := s.Attr("action")
@@ -41,7 +45,7 @@ func extractFormRoutes(doc *goquery.Document, baseURL string, baseURLsOnly bool,
 			errors = append(errors, err.Error())
 			return
 		}
-		route.Url = urlNoQuery
+		routeVar.Url = urlNoQuery
 		urls[urlNoQuery] = struct{}{}
 
 		// Extract method attribute
@@ -51,47 +55,47 @@ func extractFormRoutes(doc *goquery.Document, baseURL string, baseURLsOnly bool,
 		} else {
 			method = strings.ToUpper(method)
 		}
-		route.Method = common.HttpMethod(method).Ptr()
+		routeVar.Method = common.HttpMethod(method).Ptr()
 
 		// Get the path from the full URL and set it
 		parsedURL, err := url.Parse(fullURL)
 		if err == nil {
-			route.Path = &parsedURL.Path
+			routeVar.Path = &parsedURL.Path
 		}
 
 		// Collect input names
-		var queryParams []*routefern.QueryParams
-		var bodyParams []*routefern.BodyParams
+		var queryParams []*route.QueryParams
+		var bodyParams []*route.BodyParams
 		s.Find("input[name], select[name], textarea[name]").Each(func(_ int, input *goquery.Selection) {
 			name, _ := input.Attr("name")
 			if name != "" {
 				if method == "POST" || method == "PUT" || method == "PATCH" {
 					// For POST, PUT, PATCH methods, add to BodyParams
-					param := &routefern.BodyParams{Name: name}
+					param := &route.BodyParams{Name: name}
 					bodyParams = append(bodyParams, param)
 				} else {
 					// For GET and other methods, add to QueryParams
-					param := &routefern.QueryParams{Name: name}
+					param := &route.QueryParams{Name: name}
 					queryParams = append(queryParams, param)
 				}
 			}
 		})
 
 		if len(queryParams) > 0 {
-			route.QueryParams = queryParams
+			routeVar.QueryParams = queryParams
 		}
 		if len(bodyParams) > 0 {
-			route.BodyParams = bodyParams
+			routeVar.BodyParams = bodyParams
 		}
 
-		routes = append(routes, &route)
+		routes = append(routes, &routeVar)
 	})
 
 	return mergeWebRoutes(routes), setToListString(urls), []string{}
 }
 
-func extractAnchorRoutes(doc *goquery.Document, baseURL string, baseURLsOnly bool, captureStaticAssets bool) ([]*routefern.WebRoute, []string, []string) {
-	routes := []*routefern.WebRoute{}
+func extractAnchorRoutes(doc *goquery.Document, baseURL string, baseURLsOnly bool, captureStaticAssets bool) ([]*route.WebRoute, []string, []string) {
+	routes := []*route.WebRoute{}
 	urls := make(map[string]struct{})
 	errors := []string{}
 
@@ -120,21 +124,21 @@ func extractAnchorRoutes(doc *goquery.Document, baseURL string, baseURLsOnly boo
 				return
 			}
 
-			route := &routefern.WebRoute{
+			routeVar := &route.WebRoute{
 				Url:    urlNoQuery,
 				Path:   &parsedURL.Path,
 				Method: common.HttpMethodGet.Ptr(), // Anchor links are accessed via GET
 			}
 
-			routes = append(routes, route)
+			routes = append(routes, routeVar)
 		}
 	})
 
 	return mergeWebRoutes(routes), setToListString(urls), errors
 }
 
-func extractLinkRoutes(doc *goquery.Document, baseURL string, baseURLsOnly bool, captureStaticAssets bool) ([]*routefern.WebRoute, []string, []string) {
-	routes := []*routefern.WebRoute{}
+func extractLinkRoutes(doc *goquery.Document, baseURL string, baseURLsOnly bool, captureStaticAssets bool) ([]*route.WebRoute, []string, []string) {
+	routes := []*route.WebRoute{}
 	urls := make(map[string]struct{})
 	errors := []string{}
 
@@ -164,13 +168,13 @@ func extractLinkRoutes(doc *goquery.Document, baseURL string, baseURLsOnly bool,
 				return
 			}
 
-			route := &routefern.WebRoute{
+			routeVar := &route.WebRoute{
 				Url:    urlNoQuery,
 				Path:   &parsedURL.Path,
 				Method: common.HttpMethodGet.Ptr(), // Link elements are accessed via GET
 			}
 
-			routes = append(routes, route)
+			routes = append(routes, routeVar)
 		}
 	})
 

@@ -1,6 +1,7 @@
 package apiapplication
 
 import (
+	// Standard
 	"context"
 	"encoding/base64"
 	"fmt"
@@ -8,11 +9,13 @@ import (
 	"strings"
 	"time"
 
+	// Generated
 	enumerateapiapplicationfern "github.com/Method-Security/webscan/generated/go/app/enumerate/apiapplication"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/reflection/grpc_reflection_v1alpha"
-	"google.golang.org/protobuf/proto"
+	// External
+	grpc "google.golang.org/grpc"
+	insecure "google.golang.org/grpc/credentials/insecure"
+	grpc_reflection_v1alpha "google.golang.org/grpc/reflection/grpc_reflection_v1alpha"
+	proto "google.golang.org/protobuf/proto"
 	descriptorpb "google.golang.org/protobuf/types/descriptorpb"
 )
 

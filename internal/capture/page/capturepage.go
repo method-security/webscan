@@ -1,10 +1,13 @@
 package capturepage
 
 import (
+	// Standard
 	"context"
-
+	// Generated
 	capturepagefern "github.com/Method-Security/webscan/generated/go/capture/page"
-	"github.com/Method-Security/webscan/generated/go/common"
+	common "github.com/Method-Security/webscan/generated/go/common"
+
+	// Internal
 	html "github.com/Method-Security/webscan/internal/capture/page/helpers"
 	screenshot "github.com/Method-Security/webscan/internal/capture/page/helpers/screenshot"
 )

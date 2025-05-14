@@ -1,13 +1,15 @@
-package routecapture
+package captureroute
 
 import (
+	// Standard
 	"encoding/json"
 	"fmt"
 	"net/url"
 	"path"
 	"strings"
 
-	routefern "github.com/Method-Security/webscan/generated/go/capture/route"
+	// Generated
+	route "github.com/Method-Security/webscan/generated/go/capture/route"
 )
 
 // setToListString converts a set of strings to a list of strings.
@@ -29,8 +31,8 @@ func addListToSetString(set map[string]struct{}, list []string) map[string]struc
 
 // mergeWebRoutes merges WebRoutes, retaining only unique routes
 // unique routes are defined by the combination of method and URL
-func mergeWebRoutes(routes []*routefern.WebRoute) []*routefern.WebRoute {
-	routeMap := make(map[string]*routefern.WebRoute)
+func mergeWebRoutes(routes []*route.WebRoute) []*route.WebRoute {
+	routeMap := make(map[string]*route.WebRoute)
 
 	for _, route := range routes {
 		// Create a unique key based on method and URL
@@ -54,7 +56,7 @@ func mergeWebRoutes(routes []*routefern.WebRoute) []*routefern.WebRoute {
 	}
 
 	// Convert map back to slice
-	var mergedRoutes []*routefern.WebRoute
+	var mergedRoutes []*route.WebRoute
 	for _, route := range routeMap {
 		mergedRoutes = append(mergedRoutes, route)
 	}
@@ -64,7 +66,7 @@ func mergeWebRoutes(routes []*routefern.WebRoute) []*routefern.WebRoute {
 
 // Helper function to merge QueryParams only retaining those that are unique
 // When the same param name is encountered, the example values are merged
-func mergeQueryParams(params1 []*routefern.QueryParams, params2 []*routefern.QueryParams) []*routefern.QueryParams {
+func mergeQueryParams(params1 []*route.QueryParams, params2 []*route.QueryParams) []*route.QueryParams {
 	// If either is nil return the other
 	if params1 == nil && params2 == nil {
 		return nil
@@ -75,7 +77,7 @@ func mergeQueryParams(params1 []*routefern.QueryParams, params2 []*routefern.Que
 	}
 
 	// Merge
-	paramMap := make(map[string]*routefern.QueryParams)
+	paramMap := make(map[string]*route.QueryParams)
 	for _, param := range params1 {
 		paramMap[param.Name] = param
 	}
@@ -92,7 +94,7 @@ func mergeQueryParams(params1 []*routefern.QueryParams, params2 []*routefern.Que
 	}
 
 	// Convert map back to slice
-	var mergedParams []*routefern.QueryParams
+	var mergedParams []*route.QueryParams
 	for _, param := range paramMap {
 		mergedParams = append(mergedParams, param)
 	}
@@ -101,7 +103,7 @@ func mergeQueryParams(params1 []*routefern.QueryParams, params2 []*routefern.Que
 
 // Helper function to merge BodyParams only retaining those that are unique
 // When the same param name is encountered, the example values are merged
-func mergeBodyParams(params1 []*routefern.BodyParams, params2 []*routefern.BodyParams) []*routefern.BodyParams {
+func mergeBodyParams(params1 []*route.BodyParams, params2 []*route.BodyParams) []*route.BodyParams {
 	// If either is nil return the other
 	if params1 == nil && params2 == nil {
 		return nil
@@ -112,7 +114,7 @@ func mergeBodyParams(params1 []*routefern.BodyParams, params2 []*routefern.BodyP
 	}
 
 	// Merge
-	paramMap := make(map[string]*routefern.BodyParams)
+	paramMap := make(map[string]*route.BodyParams)
 	for _, param := range params1 {
 		paramMap[param.Name] = param
 	}
@@ -129,7 +131,7 @@ func mergeBodyParams(params1 []*routefern.BodyParams, params2 []*routefern.BodyP
 	}
 
 	// Convert map back to slice
-	var mergedParams []*routefern.BodyParams
+	var mergedParams []*route.BodyParams
 	for _, param := range paramMap {
 		mergedParams = append(mergedParams, param)
 	}
@@ -137,10 +139,10 @@ func mergeBodyParams(params1 []*routefern.BodyParams, params2 []*routefern.BodyP
 }
 
 // Helper to parse query parameters from the URL
-func parseQueryParams(reqURL *url.URL) []*routefern.QueryParams {
-	var queryParams []*routefern.QueryParams
+func parseQueryParams(reqURL *url.URL) []*route.QueryParams {
+	var queryParams []*route.QueryParams
 	for key, values := range reqURL.Query() {
-		queryParams = append(queryParams, &routefern.QueryParams{
+		queryParams = append(queryParams, &route.QueryParams{
 			Name:          key,
 			ExampleValues: values,
 		})
@@ -149,8 +151,8 @@ func parseQueryParams(reqURL *url.URL) []*routefern.QueryParams {
 }
 
 // Helper to parse body parameters
-func parseBodyParams(postData string) ([]*routefern.BodyParams, error) {
-	var bodyParams []*routefern.BodyParams
+func parseBodyParams(postData string) ([]*route.BodyParams, error) {
+	var bodyParams []*route.BodyParams
 
 	// For simplicity, assume the body is JSON or form-urlencoded
 	if strings.HasPrefix(postData, "{") {
@@ -161,7 +163,7 @@ func parseBodyParams(postData string) ([]*routefern.BodyParams, error) {
 				// Stringify the value to ensure it's a string
 				valueStr, err := json.Marshal(value)
 				if err == nil {
-					bodyParams = append(bodyParams, &routefern.BodyParams{
+					bodyParams = append(bodyParams, &route.BodyParams{
 						Name:          key,
 						ExampleValues: []string{string(valueStr)}, // Store as a string
 					})
@@ -177,7 +179,7 @@ func parseBodyParams(postData string) ([]*routefern.BodyParams, error) {
 		formData, err := url.ParseQuery(postData)
 		if err == nil {
 			for key, values := range formData {
-				bodyParams = append(bodyParams, &routefern.BodyParams{
+				bodyParams = append(bodyParams, &route.BodyParams{
 					Name:          key,
 					ExampleValues: values,
 				})

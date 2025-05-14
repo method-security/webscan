@@ -13,7 +13,7 @@ types:
       - HEAD
       - CONNECT
       - TRACE
-  # Represents the request parameters for a request
+  # Struct for the request parameters of a request
   RequestParams:
     properties:
       pathParams: optional<map<string, string>>
@@ -37,7 +37,7 @@ types:
       headlessConfig: optional<config.HeadlessConfig>
       browserbaseConfig: optional<config.BrowserbaseConfig>
       browserbaseSecrets: optional<config.BrowserbaseSecrets>
-  # Request Structure (Signal)
+  # Request Struct
   RequestInfo:
     properties:
       baseUrl: string

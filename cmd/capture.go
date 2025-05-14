@@ -1,23 +1,27 @@
 package cmd
 
 import (
+	// Standard
 	"fmt"
 	"strings"
 
+	// Generated
 	capturepagefern "github.com/Method-Security/webscan/generated/go/capture/page"
-	routefern "github.com/Method-Security/webscan/generated/go/capture/route"
+	route "github.com/Method-Security/webscan/generated/go/capture/route"
 	captureroutestaticassetfern "github.com/Method-Security/webscan/generated/go/capture/route/staticasset"
 	common "github.com/Method-Security/webscan/generated/go/common"
+
+	// Internal
 	capturepage "github.com/Method-Security/webscan/internal/capture/page"
-	routecapture "github.com/Method-Security/webscan/internal/capture/route"
+	captureroute "github.com/Method-Security/webscan/internal/capture/route"
 	captureroutestaticasset "github.com/Method-Security/webscan/internal/capture/route/staticasset"
-	"github.com/Method-Security/webscan/utils/request/helpers/headless/browserbase"
-	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
-	"github.com/spf13/cobra"
+
+	// Utils
+	browserbase "github.com/Method-Security/webscan/utils/request/helpers/headless/browserbase"
+	// External
+	cobra "github.com/spf13/cobra"
 )
 
-// InitCaptureCommand initializes the capture command for the webscan CLI. This command is used to collect
-// the HTML, screenshots, and routes of a webpage from a URL target.
 func (a *WebScan) InitCaptureCommand() {
 	captureCmd := &cobra.Command{
 		Use:   "capture",
@@ -41,17 +45,17 @@ func (a *WebScan) InitCaptureCommand() {
 			}
 
 			// Config flags
-			timeout, err := cmd.Flags().GetInt("timeout")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
 			maxRedirects, err := cmd.Flags().GetInt("max-redirects")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
 			insecure, err := cmd.Flags().GetBool("insecure")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			timeout, err := cmd.Flags().GetInt("timeout")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -70,17 +74,18 @@ func (a *WebScan) InitCaptureCommand() {
 			}
 
 			// Get screenshot flag
+			// Screenshot flag is not supported for headless or Browserbase capture methods
 			takeScreenshot, err := cmd.Flags().GetBool("screenshot")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			if takeScreenshot && (requestMethodEnum == common.RequestMethodHeadless || requestMethodEnum == common.RequestMethodBrowserbase) {
-				a.OutputSignal.AddError(fmt.Errorf("screenshot flag is not supported for headless or browserbase capture methods"))
+			if takeScreenshot && (requestMethodEnum == common.RequestMethodStandard || requestMethodEnum == common.RequestMethodBrowserbase) {
+				a.OutputSignal.AddError(fmt.Errorf("screenshot flag is not supported for standard or browserbase capture methods"))
 				return
 			}
 
-			// Flags for headless browser or browserbase
+			// Flags for headless browser or Browserbase
 			var headlessConfig *common.HeadlessConfig
 			if requestMethodEnum == common.RequestMethodHeadless || requestMethodEnum == common.RequestMethodBrowserbase {
 				bPath, err := cmd.Flags().GetString("headless-path")
@@ -137,28 +142,30 @@ func (a *WebScan) InitCaptureCommand() {
 			}
 
 			// Set Config
-			config := getCapturePageConfig(target, timeout, takeScreenshot, insecure, maxRedirects, requestMethodEnum, headlessConfig, browserbaseConfig)
+			config := getCapturePageConfig(target, maxRedirects, insecure, timeout, takeScreenshot, requestMethodEnum, headlessConfig, browserbaseConfig)
 
-			// Perform Capture
+			// Generate a report
 			report := capturepage.PerformCapturePage(cmd.Context(), config, browserbaseSecrets)
 			a.OutputSignal.Content = report
 		},
 	}
 	capturePageCmd.Flags().String("target", "", "URL target to perform webpage capture")
 	capturePageCmd.Flags().Bool("screenshot", false, "Take a screenshot in addition to capturing HTML")
-	capturePageCmd.Flags().Int("timeout", 30, "Timeout in seconds for the capture")
+	capturePageCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
 	capturePageCmd.Flags().Bool("insecure", false, "Allow insecure connections")
+	capturePageCmd.Flags().Int("timeout", 30, "Timeout in seconds for the capture")
 
 	_ = capturePageCmd.MarkFlagRequired("target")
+
+	captureCmd.AddCommand(capturePageCmd)
 
 	// Route capture subcommand
 	captureRouteCmd := &cobra.Command{
 		Use:   "route",
 		Short: "Capture routes and URLs from a webpage",
-		Long:  `Capture routes and URLs from a webpage using a capture method.`,
+		Long:  `Capture routes and URLs from a webpage using a given request method.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			defer a.OutputSignal.PanicHandler(cmd.Context())
-			log := svc1log.FromContext(cmd.Context())
 
 			// Get Target flag
 			target, err := cmd.Flags().GetString("target")
@@ -178,12 +185,12 @@ func (a *WebScan) InitCaptureCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			timeout, err := cmd.Flags().GetInt("timeout")
+			insecure, err := cmd.Flags().GetBool("insecure")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			insecure, err := cmd.Flags().GetBool("insecure")
+			timeout, err := cmd.Flags().GetInt("timeout")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -257,17 +264,18 @@ func (a *WebScan) InitCaptureCommand() {
 				}
 			}
 
-			config := getCaptureRouteConfig(target, baseURLsOnly, maxRedirects, timeout, insecure, requestMethodEnum, headlessConfig, browserbaseConfig)
+			// Set Config
 
-			report := routecapture.PerformRouteCapture(cmd.Context(), config, browserbaseSecrets)
-			log.Info("Route capture successful", svc1log.SafeParam("target", target))
+			config := getCaptureRouteConfig(target, baseURLsOnly, maxRedirects, insecure, timeout, requestMethodEnum, headlessConfig, browserbaseConfig)
 
+			// Generate a report
+			report := captureroute.PerformCaptureRoute(cmd.Context(), config, browserbaseSecrets)
 			a.OutputSignal.Content = report
 		},
 	}
 	captureRouteCmd.Flags().String("target", "", "URL target to perform webpage capture")
-	captureRouteCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
 	captureRouteCmd.Flags().Bool("base-urls-only", true, "Only match routes and urls that share the base URLs domain")
+	captureRouteCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
 	captureRouteCmd.Flags().Int("timeout", 30, "Timeout in seconds for the capture")
 	captureRouteCmd.Flags().Bool("insecure", false, "Allow insecure connections")
 
@@ -295,22 +303,12 @@ func (a *WebScan) InitCaptureCommand() {
 				return
 			}
 			fingerprints := captureroutestaticasset.GrabStaticAssetTakeOverFingerprints(fingerprintPaths)
-			successfulOnly, err := cmd.Flags().GetBool("successful-only")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			timeout, err := cmd.Flags().GetInt("timeout")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			insecure, err := cmd.Flags().GetBool("insecure")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
 			baseURLsOnly, err := cmd.Flags().GetBool("base-urls-only")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			successfulOnly, err := cmd.Flags().GetBool("successful-only")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -320,14 +318,24 @@ func (a *WebScan) InitCaptureCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-
-			// Get Capture Method flag
-			captureMethod, err := cmd.Flags().GetString("capture-method")
+			insecure, err := cmd.Flags().GetBool("insecure")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			captureMethodEnum, err := common.NewRequestMethodFromString(strings.ToUpper(captureMethod))
+			timeout, err := cmd.Flags().GetInt("timeout")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Get Capture Method flag
+			requestMethod, err := cmd.Flags().GetString("request-method")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			requestMethodEnum, err := common.NewRequestMethodFromString(strings.ToUpper(requestMethod))
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -335,7 +343,7 @@ func (a *WebScan) InitCaptureCommand() {
 
 			// Handle Headless Browser flags
 			var headlessConfig *common.HeadlessConfig
-			if captureMethodEnum == common.RequestMethodHeadless {
+			if requestMethodEnum == common.RequestMethodHeadless {
 				bPath, err := cmd.Flags().GetString("headless-path")
 				if err != nil {
 					a.OutputSignal.AddError(err)
@@ -349,7 +357,7 @@ func (a *WebScan) InitCaptureCommand() {
 			// Handle Browserbase flags
 			var browserbaseConfig *common.BrowserbaseConfig
 			var browserbaseSecrets *common.BrowserbaseSecrets
-			if captureMethodEnum == common.RequestMethodBrowserbase {
+			if requestMethodEnum == common.RequestMethodBrowserbase {
 				// Config flags
 				proxy, err := cmd.Flags().GetBool("proxy")
 				if err != nil {
@@ -383,67 +391,69 @@ func (a *WebScan) InitCaptureCommand() {
 				}
 			}
 
-			config := getCaptureRouteStaticAssetTakeOverConfig(target, baseURLsOnly, maxRedirects, timeout, insecure, successfulOnly, fingerprints, captureMethodEnum, headlessConfig, browserbaseConfig)
+			// Set Config
+			config := getCaptureRouteStaticAssetTakeOverConfig(target, fingerprints, baseURLsOnly, successfulOnly, maxRedirects, insecure, timeout, requestMethodEnum, headlessConfig, browserbaseConfig)
 
-			// Perform Static Asset Takeover Analysis
+			// Generate a report
 			report := captureroutestaticasset.PerformStaticAssetTakeOverAnalysis(cmd.Context(), config, browserbaseSecrets)
 			a.OutputSignal.Content = report
 
 		},
 	}
 	staticCaptureCmd.Flags().String("target", "", "URL target to perform webpage capture")
-	staticCaptureCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
-	staticCaptureCmd.Flags().Int("timeout", 30, "Timeout in seconds for the capture")
-	staticCaptureCmd.Flags().Bool("insecure", false, "Allow insecure connections")
-	staticCaptureCmd.Flags().StringSlice("fingerprint-file-paths", []string{"configs/staticassettakeover.json"}, "Fingerprint filepaths to use for fingerprinting")
-	staticCaptureCmd.Flags().Bool("successful-only", false, "Only show successful attempts")
 	staticCaptureCmd.Flags().Bool("base-urls-only", true, "Only match routes and urls that share the base URLs domain")
+	staticCaptureCmd.Flags().Bool("successful-only", false, "Only show successful attempts")
+	staticCaptureCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
+	staticCaptureCmd.Flags().Bool("insecure", false, "Allow insecure connections")
+	staticCaptureCmd.Flags().Int("timeout", 30, "Timeout in seconds for the capture")
+	staticCaptureCmd.Flags().StringSlice("fingerprint-file-paths", []string{"configs/capture/route/staticassettakeover.json"}, "Fingerprint filepaths to use for fingerprinting")
 
 	_ = staticCaptureCmd.MarkFlagRequired("target")
 
-	captureCmd.AddCommand(capturePageCmd, captureRouteCmd, staticCaptureCmd)
+	captureRouteCmd.AddCommand(staticCaptureCmd)
+
+	captureCmd.AddCommand(captureRouteCmd)
+
+	captureCmd.AddCommand(capturePageCmd)
 	a.RootCmd.AddCommand(captureCmd)
 }
 
-func getCapturePageConfig(target string, timeout int, takeScreenshot bool, insecure bool, maxRedirects int, requestMethod common.RequestMethod, headlessConfig *common.HeadlessConfig, browserbaseConfig *common.BrowserbaseConfig) capturepagefern.CapturePageConfig {
+func getCapturePageConfig(target string, maxRedirects int, insecure bool, timeout int, takeScreenshot bool, requestMethod common.RequestMethod, headlessConfig *common.HeadlessConfig, browserbaseConfig *common.BrowserbaseConfig) capturepagefern.CapturePageConfig {
 	capturePageConfig := capturepagefern.CapturePageConfig{
 		Target:            target,
-		RequestMethod:     requestMethod,
-		TakeScreenshot:    takeScreenshot,
-		Insecure:          insecure,
 		MaxRedirects:      maxRedirects,
+		Insecure:          insecure,
+		Timeout:           max(timeout, 0),
+		TakeScreenshot:    takeScreenshot,
+		RequestMethod:     requestMethod,
 		HeadlessConfig:    headlessConfig,
 		BrowserbaseConfig: browserbaseConfig,
-	}
-	if timeout > 0 {
-		capturePageConfig.Timeout = timeout
-	} else {
-		capturePageConfig.Timeout = 0
 	}
 	return capturePageConfig
 }
 
-func getCaptureRouteConfig(target string, baseURLSOnly bool, maxRedirects int, timeout int, insecure bool, requestMethod common.RequestMethod, headlessConfig *common.HeadlessConfig, browserbaseConfig *common.BrowserbaseConfig) routefern.CaptureRouteConfig {
-	routeCaptureConfig := routefern.CaptureRouteConfig{
+func getCaptureRouteConfig(target string, baseURLSOnly bool, maxRedirects int, insecure bool, timeout int, requestMethod common.RequestMethod, headlessConfig *common.HeadlessConfig, browserbaseConfig *common.BrowserbaseConfig) route.CaptureRouteConfig {
+	capturerouteConfig := route.CaptureRouteConfig{
 		Target:            target,
 		StaticAssets:      false,
 		MaxRedirects:      maxRedirects,
 		BaseUrLsOnly:      baseURLSOnly,
-		Timeout:           timeout,
 		Insecure:          insecure,
+		Timeout:           max(timeout, 0),
 		RequestMethod:     requestMethod,
 		HeadlessConfig:    headlessConfig,
 		BrowserbaseConfig: browserbaseConfig,
 	}
-	return routeCaptureConfig
+	return capturerouteConfig
 }
 
-func getCaptureRouteStaticAssetTakeOverConfig(target string, baseURLSOnly bool, maxRedirects int, timeout int, insecure bool, successfulOnly bool, fingerprints []*captureroutestaticassetfern.StaticAssetTakeOverFingerprint, requestMethod common.RequestMethod, headlessConfig *common.HeadlessConfig, browserBaseConfig *common.BrowserbaseConfig) captureroutestaticassetfern.StaticAssetTakeOverConfig {
-	captureRouteConfig := &routefern.CaptureRouteConfig{
+func getCaptureRouteStaticAssetTakeOverConfig(target string, fingerprints []*captureroutestaticassetfern.StaticAssetTakeOverFingerprint, baseURLSOnly bool, successfulOnly bool, maxRedirects int, insecure bool, timeout int, requestMethod common.RequestMethod, headlessConfig *common.HeadlessConfig, browserBaseConfig *common.BrowserbaseConfig) captureroutestaticassetfern.StaticAssetTakeOverConfig {
+	captureRouteConfig := &route.CaptureRouteConfig{
 		Target:            target,
+		StaticAssets:      true,
 		BaseUrLsOnly:      baseURLSOnly,
-		Timeout:           timeout,
 		Insecure:          insecure,
+		Timeout:           max(timeout, 0),
 		RequestMethod:     requestMethod,
 		MaxRedirects:      maxRedirects,
 		HeadlessConfig:    headlessConfig,
@@ -452,7 +462,7 @@ func getCaptureRouteStaticAssetTakeOverConfig(target string, baseURLSOnly bool, 
 
 	return captureroutestaticassetfern.StaticAssetTakeOverConfig{
 		CaptureRouteConfig: captureRouteConfig,
-		SuccessfulOnly:     successfulOnly,
 		Fingerprints:       fingerprints,
+		SuccessfulOnly:     successfulOnly,
 	}
 }

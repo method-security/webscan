@@ -13,7 +13,11 @@ RUN \
   mkdir -p /opt/method/${CLI_NAME}/var/data/tmp && \
   mkdir -p /opt/method/${CLI_NAME}/var/conf && \
   mkdir -p /opt/method/${CLI_NAME}/var/conf/app && \
-  mkdir -p /opt/method/${CLI_NAME}/var/conf/wordpress && \
+  mkdir -p /opt/method/${CLI_NAME}/var/conf/capture && \
+  mkdir -p /opt/method/${CLI_NAME}/var/conf/capture/route && \
+  mkdir -p /opt/method/${CLI_NAME}/var/conf/cms && \
+  mkdir -p /opt/method/${CLI_NAME}/var/conf/cms/wordpress && \
+  mkdir -p /opt/method/${CLI_NAME}/var/conf/cms/wordpress/plugins && \
   mkdir -p /opt/method/${CLI_NAME}/var/log && \
   mkdir -p /opt/method/${CLI_NAME}/service/bin && \
   mkdir -p /mnt/output
@@ -21,7 +25,12 @@ RUN \
 
 COPY configs/*                     /opt/method/${CLI_NAME}/var/conf/
 COPY configs/app/*                 /opt/method/${CLI_NAME}/var/conf/app/
-COPY configs/wordpress/*           /opt/method/${CLI_NAME}/var/conf/wordpress/
+COPY configs/capture/*             /opt/method/${CLI_NAME}/var/conf/capture/
+COPY configs/capture/route/*       /opt/method/${CLI_NAME}/var/conf/capture/route/
+COPY configs/cms/*                 /opt/method/${CLI_NAME}/var/conf/cms/
+COPY configs/cms/wordpress/*       /opt/method/${CLI_NAME}/var/conf/cms/wordpress/
+COPY configs/cms/wordpress/plugins/* /opt/method/${CLI_NAME}/var/conf/cms/wordpress/plugins
+
 
 COPY ${CLI_NAME} /opt/method/${CLI_NAME}/service/bin/${CLI_NAME}
 

@@ -1,26 +1,31 @@
 package kube
 
 import (
+	// Standard
 	"context"
+	"fmt"
 
+	// Generated
 	enumeratekubefern "github.com/Method-Security/webscan/generated/go/app/enumerate/kube"
 	common "github.com/Method-Security/webscan/generated/go/common"
-	"github.com/Method-Security/webscan/utils"
+
+	// Utils
+	utils "github.com/Method-Security/webscan/utils"
 	request "github.com/Method-Security/webscan/utils/request"
 )
 
-var commonK8spaths = []string{"/api", "/livez", "/version"}
+var commonKubepaths = []string{"/api", "/livez", "/version"}
 
-func createEnumerateK8sRequestConfig(baseURL, path string, timeout int) common.RequestConfig {
+func createRequestConfig(baseURL, path string, timeout int) common.RequestConfig {
 	return common.RequestConfig{
 		BaseUrl:            baseURL,
 		Path:               path,
 		Method:             common.HttpMethodGet,
 		RequestParams:      &common.RequestParams{},
-		Timeout:            timeout,
 		FollowRedirects:    false,
 		MaxRedirects:       nil,
 		Insecure:           true,
+		Timeout:            timeout,
 		RequestMethod:      common.RequestMethodStandard,
 		HeadlessConfig:     nil,
 		BrowserbaseConfig:  nil,
@@ -28,7 +33,7 @@ func createEnumerateK8sRequestConfig(baseURL, path string, timeout int) common.R
 	}
 }
 
-func PerformAppEnumerateK8s(ctx context.Context, target string, timeout int) *enumeratekubefern.AppEnumerateKubeReport {
+func PerformAppEnumerateKube(ctx context.Context, target string, timeout int) *enumeratekubefern.AppEnumerateKubeReport {
 	report := &enumeratekubefern.AppEnumerateKubeReport{Target: target}
 	var errors []string
 
@@ -40,9 +45,9 @@ func PerformAppEnumerateK8s(ctx context.Context, target string, timeout int) *en
 	}
 
 	attempts := []*enumeratekubefern.AppEnumerateKubeAttemptInfo{}
-	for _, path := range commonK8spaths {
+	for _, path := range commonKubepaths {
 		attempt := enumeratekubefern.AppEnumerateKubeAttemptInfo{Path: path}
-		request, err := request.SendRequest(ctx, createEnumerateK8sRequestConfig(baseURL, parsedTargetPath+path, timeout))
+		request, err := request.SendRequest(ctx, createRequestConfig(baseURL, fmt.Sprintf("%s%s", parsedTargetPath, path), timeout))
 		if err != nil {
 			errors = append(errors, err.Error())
 			report.Errors = errors

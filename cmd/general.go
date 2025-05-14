@@ -1,13 +1,19 @@
 package cmd
 
 import (
+	// Standard
+	"errors"
 	"strings"
 
+	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
 	generalfern "github.com/Method-Security/webscan/generated/go/general"
 	general "github.com/Method-Security/webscan/internal/general"
-	"github.com/Method-Security/webscan/utils/request/helpers/headless/browserbase"
-	"github.com/spf13/cobra"
+
+	// Utils
+	browserbase "github.com/Method-Security/webscan/utils/request/helpers/headless/browserbase"
+	// External
+	cobra "github.com/spf13/cobra"
 )
 
 // InitGeneralCommand initializes the general command for the webscan CLI. This command is used to perform detection tests for web applications.
@@ -17,61 +23,6 @@ func (a *WebScan) InitGeneralCommand() {
 		Short: "Perform detection tests for web applications",
 		Long:  `Perform detection tests for web applications`,
 	}
-
-	ratelimitCmd := &cobra.Command{
-		Use:   "ratelimit",
-		Short: "Perform detection tests for rate limiting",
-		Long:  `Perform detection tests for rate limiting`,
-		Run: func(cmd *cobra.Command, args []string) {
-			defer a.OutputSignal.PanicHandler(cmd.Context())
-
-			// Target flags
-			targets, err := cmd.Flags().GetStringSlice("targets")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-
-			// Configuration flags
-			maxRequests, err := cmd.Flags().GetInt("max-requests")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-
-			timespan, err := cmd.Flags().GetInt("timespan")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-
-			timeout, err := cmd.Flags().GetInt("timeout")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-
-			// Load configuration
-			config := LoadGeneralRatelimitConfig(targets, maxRequests, timespan, timeout)
-
-			// Generate report
-			report := general.PerformGeneralRatelimit(cmd.Context(), config)
-			if len(report.Errors) > 0 {
-				a.OutputSignal.Status = 1
-			}
-			a.OutputSignal.Content = report
-		},
-	}
-
-	ratelimitCmd.Flags().StringSlice("targets", []string{}, "URL of target")
-	ratelimitCmd.Flags().Int("max-requests", 0, "Number of requests to perform")
-	ratelimitCmd.Flags().Int("timespan", 0, "Length of time to send the requests (Seconds)")
-	ratelimitCmd.Flags().Int("timeout", 30, "Timeout per request (Seconds)")
-
-	_ = ratelimitCmd.MarkFlagRequired("targets")
-	_ = ratelimitCmd.MarkFlagRequired("max-requests")
-
-	generalCmd.AddCommand(ratelimitCmd)
 
 	probeCmd := &cobra.Command{
 		Use:   "probe",
@@ -87,13 +38,18 @@ func (a *WebScan) InitGeneralCommand() {
 				return
 			}
 
-			// Configuration flags
-			timeout, err := cmd.Flags().GetInt("timeout")
+			// Config flags
+			maxRedirects, err := cmd.Flags().GetInt("max-redirects")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			maxRedirects, err := cmd.Flags().GetInt("max-redirects")
+			onlyHTTPS, err := cmd.Flags().GetBool("only-https")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			timeout, err := cmd.Flags().GetInt("timeout")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -167,8 +123,8 @@ func (a *WebScan) InitGeneralCommand() {
 				}
 			}
 
-			// Load configuration
-			config := LoadGeneralProbeConfig(targets, maxRedirects, timeout, requestMethodEnum, headlessConfig, browserbaseConfig)
+			// Set Config
+			config := LoadGeneralProbeConfig(targets, maxRedirects, onlyHTTPS, timeout, requestMethodEnum, headlessConfig, browserbaseConfig)
 
 			// Generate report
 			report, err := general.PerformGeneralProbe(cmd.Context(), config, browserbaseSecrets)
@@ -180,21 +136,92 @@ func (a *WebScan) InitGeneralCommand() {
 		},
 	}
 
-	probeCmd.Flags().StringSlice("targets", []string{}, "Address targets to perform web application probing agains, comma delimited list")
+	probeCmd.Flags().StringSlice("targets", []string{}, "Address targets to perform web application probing against, comma delimited list")
+	probeCmd.Flags().Bool("only-https", false, "Only perform probing over HTTPS")
 	probeCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
 	probeCmd.Flags().Int("timeout", 30, "Timeout limit (Seconds)")
 
 	_ = probeCmd.MarkFlagRequired("targets")
 
 	generalCmd.AddCommand(probeCmd)
+
+	ratelimitCmd := &cobra.Command{
+		Use:   "ratelimit",
+		Short: "Perform detection tests for rate limiting",
+		Long:  `Perform detection tests for rate limiting`,
+		Run: func(cmd *cobra.Command, args []string) {
+			defer a.OutputSignal.PanicHandler(cmd.Context())
+
+			// Target flags
+			targets, err := cmd.Flags().GetStringSlice("targets")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Config flags
+			maxRequests, err := cmd.Flags().GetInt("max-requests")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			timespan, err := cmd.Flags().GetInt("timespan")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			timeout, err := cmd.Flags().GetInt("timeout")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Request method flag
+			requestMethod, err := cmd.Flags().GetString("request-method")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			requestMethodEnum, err := common.NewRequestMethodFromString(strings.ToUpper(requestMethod))
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			if requestMethodEnum != common.RequestMethodStandard {
+				a.OutputSignal.AddError(errors.New("only standard request method is supported"))
+				return
+			}
+
+			// Set Config
+			config := LoadGeneralRatelimitConfig(targets, maxRequests, timespan, timeout)
+
+			// Generate report
+			report := general.PerformGeneralRatelimit(cmd.Context(), config)
+			if len(report.Errors) > 0 {
+				a.OutputSignal.Status = 1
+			}
+			a.OutputSignal.Content = report
+		},
+	}
+
+	ratelimitCmd.Flags().StringSlice("targets", []string{}, "URL of target")
+	ratelimitCmd.Flags().Int("max-requests", 0, "Number of requests to perform")
+	ratelimitCmd.Flags().Int("timespan", 0, "Length of time to send the requests (Seconds)")
+	ratelimitCmd.Flags().Int("timeout", 30, "Timeout per request (Seconds)")
+
+	_ = ratelimitCmd.MarkFlagRequired("targets")
+	_ = ratelimitCmd.MarkFlagRequired("max-requests")
+
+	generalCmd.AddCommand(ratelimitCmd)
 	a.RootCmd.AddCommand(generalCmd)
 }
 
-func LoadGeneralProbeConfig(targets []string, maxRedirects int, timeout int, requestMethod common.RequestMethod, headlessConfig *common.HeadlessConfig, browserbaseConfig *common.BrowserbaseConfig) *generalfern.GeneralProbeConfig {
+func LoadGeneralProbeConfig(targets []string, maxRedirects int, onlyHTTPS bool, timeout int, requestMethod common.RequestMethod, headlessConfig *common.HeadlessConfig, browserbaseConfig *common.BrowserbaseConfig) *generalfern.GeneralProbeConfig {
 	config := &generalfern.GeneralProbeConfig{
 		Targets:           targets,
 		MaxRedirects:      maxRedirects,
-		Timeout:           timeout,
+		OnlyHttps:         onlyHTTPS,
+		Timeout:           max(timeout, 0),
 		RequestMethod:     requestMethod,
 		HeadlessConfig:    headlessConfig,
 		BrowserbaseConfig: browserbaseConfig,
@@ -207,8 +234,8 @@ func LoadGeneralRatelimitConfig(targets []string, maxRequests int, timespan int,
 	config := &generalfern.GeneralRateLimitConfig{
 		Targets:     targets,
 		MaxRequests: maxRequests,
-		Timespan:    timespan,
-		Timeout:     timeout,
+		Timespan:    max(timespan, 0),
+		Timeout:     max(timeout, 0),
 	}
 	return config
 }

@@ -1,6 +1,7 @@
 package enumerate
 
 import (
+	// Standard
 	"context"
 	"fmt"
 	"math/rand"
@@ -9,15 +10,17 @@ import (
 	"sync"
 	"time"
 
+	// Generated
 	enumerateWebserverFern "github.com/Method-Security/webscan/generated/go/app/enumerate/webserver"
 	common "github.com/Method-Security/webscan/generated/go/common"
+
+	// Utils
 	utils "github.com/Method-Security/webscan/utils"
 	request "github.com/Method-Security/webscan/utils/request"
 	standard "github.com/Method-Security/webscan/utils/request/helpers/standard"
 )
 
-// createEnumerateWebserverIisRequestConfig creates a common.RequestConfig for an IIS enumeration capture
-func createEnumerateWebserverIisRequestConfig(baseURL, path string, config *enumerateWebserverFern.AppEnumerateIisConfig) common.RequestConfig {
+func createRequestConfig(baseURL, path string, config *enumerateWebserverFern.AppEnumerateIisConfig) common.RequestConfig {
 	return common.RequestConfig{
 		BaseUrl:            baseURL,
 		Path:               path,
@@ -104,7 +107,7 @@ func enumerateSite(ctx context.Context, target string, config *enumerateWebserve
 		return nil, nil, []string{fmt.Sprintf("invalid URL %s: %v", target, err)}
 	}
 
-	requestConfig := createEnumerateWebserverIisRequestConfig(baseURL, path, config)
+	requestConfig := createRequestConfig(baseURL, path, config)
 
 	// Baseline GET
 	root, err := request.SendRequest(ctx, requestConfig)
@@ -124,7 +127,7 @@ func enumerateSite(ctx context.Context, target string, config *enumerateWebserve
 	if site.Server == nil || site.Server.Version == nil {
 		r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-		requestConfig := createEnumerateWebserverIisRequestConfig(baseURL, fmt.Sprintf("%s/nonexistent_%d.aspx", path, r.Intn(9e6)), config)
+		requestConfig := createRequestConfig(baseURL, fmt.Sprintf("%s/nonexistent_%d.aspx", path, r.Intn(9e6)), config)
 
 		nf, err := request.SendRequest(ctx, requestConfig)
 		if err != nil {

@@ -1,7 +1,9 @@
 package request
 
 import (
+	// Standard
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -12,145 +14,116 @@ import (
 	"strings"
 	"time"
 
-	"maps"
-
+	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
-	"github.com/valyala/fasthttp"
+	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
-func StandardCapture(options common.RequestConfig) common.RequestInfo {
+// StandardCapture performs an HTTP request based on the provided configuration
+// and returns detailed request information including response data.
+func StandardCapture(ctx context.Context, config common.RequestConfig) common.RequestInfo {
+	log := svc1log.FromContext(ctx)
+	log.Info("Starting Standard request", svc1log.SafeParam("url", fmt.Sprintf("%s%s", config.BaseUrl, config.Path)))
+	log.Info("Redirect Config", svc1log.SafeParam("followRedirects", config.FollowRedirects))
+
+	// Initialize the returned struct
 	request := common.RequestInfo{
-		BaseUrl:   options.BaseUrl,
-		Path:      options.Path,
-		Method:    options.Method,
+		BaseUrl:   config.BaseUrl,
+		Path:      config.Path,
+		Method:    config.Method,
 		Timestamp: time.Now(),
+	}
+	if len(config.RequestParams.PathParams) > 0 {
+		request.PathParams = config.RequestParams.PathParams
+	}
+	if len(config.RequestParams.QueryParams) > 0 {
+		request.QueryParams = config.RequestParams.QueryParams
+	}
+	if len(config.RequestParams.HeaderParams) > 0 {
+		request.HeaderParams = config.RequestParams.HeaderParams
+	}
+	if config.RequestParams.BodyParams != nil && *config.RequestParams.BodyParams != "" {
+		request.BodyParams = config.RequestParams.BodyParams
+	}
+	if len(config.RequestParams.FormParams) > 0 {
+		request.FormParams = config.RequestParams.FormParams
+	}
+	if len(config.RequestParams.MultipartParams) > 0 {
+		request.MultipartParams = config.RequestParams.MultipartParams
 	}
 
 	// Construct the URL
-	fullURL, err := constructURL(options.BaseUrl, options.Path, options.RequestParams.PathParams, options.RequestParams.QueryParams)
+	fullURL, err := constructURL(ctx, config.BaseUrl, config.Path, &config.RequestParams.PathParams, &config.RequestParams.QueryParams)
 	if err != nil {
-		request.Errors = append(request.Errors, err.Error())
+		request.Errors = append(request.Errors, fmt.Sprintf("URL construction failed: %v", err))
 		return request
 	}
+	log.Info("Constructed URL", svc1log.SafeParam("url", fullURL.String()))
 
 	// Prepare request body and content type
-	reqBody, contentType, err := prepareRequestBody(options.RequestParams)
+	reqBody, contentType, err := prepareRequestBody(config.RequestParams)
 	if err != nil {
-		request.Errors = append(request.Errors, err.Error())
+		request.Errors = append(request.Errors, fmt.Sprintf("Request body preparation failed: %v", err))
 		return request
 	}
 
-	// Check for escape characters in headers
-	hasEscapeChars := false
-	for key, value := range options.RequestParams.HeaderParams {
-		if strings.Contains(key, "\r") || strings.Contains(key, "\n") || strings.Contains(key, "\\") || strings.Contains(key, "\u0000") {
-			hasEscapeChars = true
-			break
-		}
-		if strings.Contains(value, "\r") || strings.Contains(value, "\n") || strings.Contains(value, "\\") || strings.Contains(value, "\u0000") {
-			hasEscapeChars = true
-			break
-		}
+	// Send the request and handle response
+	resp, redirectChain, err := sendRequest(log, fullURL, contentType, reqBody, config)
+	if err != nil {
+		request.Errors = append(request.Errors, fmt.Sprintf("Request failed: %v", err))
+		return request
 	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			request.Errors = append(request.Errors, fmt.Sprintf("Failed to close response body: %v", err))
+		}
+	}()
 
-	var statusCode int
-	var responseBody string
-	responseHeader := make(map[string]string)
-	var redirectChain []string
-
-	// Create and send the request based on the presence of escape characters
-	if !hasEscapeChars {
-		resp, chain, err := sendRequest(fullURL, contentType, reqBody, options)
-		if err != nil {
-			request.Errors = append(request.Errors, err.Error())
-			return request
-		}
-		redirectChain = chain
-		defer func() {
-			if err := resp.Body.Close(); err != nil {
-				request.Errors = append(request.Errors, fmt.Sprintf("Error closing response body: %v", err))
-			}
-		}()
-
-		// Read response body
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			request.Errors = append(request.Errors, fmt.Sprintf("Failed to read response body: %v", err))
-			return request
-		}
-		statusCode = resp.StatusCode
-		responseBody = string(body)
-		for key, values := range resp.Header {
-			if len(values) > 0 {
-				responseHeader[key] = values[0]
-			}
-		}
-	} else {
-		// Use sendFastHTTPRequest if escape characters are present
-		resp, chain, err := sendFastHTTPRequest(string(options.Method), fullURL.String(), responseBody, contentType, options.RequestParams.HeaderParams, options.FollowRedirects, options)
-		if err != nil {
-			request.Errors = append(request.Errors, err.Error())
-			return request
-		}
-		redirectChain = chain
-		statusCode = resp.StatusCode()
-		responseBody = string(resp.Body())
-		resp.Header.VisitAll(func(key, value []byte) {
-			responseHeader[string(key)] = string(value)
-		})
-		fasthttp.ReleaseResponse(resp)
+	// Process response
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		request.Errors = append(request.Errors, fmt.Sprintf("Failed to read response body: %v", err))
+		return request
 	}
-
-	// Set the redirect chain in the request info
+	// Populate response data
 	request.RedirectChain = redirectChain
-
-	// Populate the rest of the report
-	if headers := responseHeader; headers != nil {
-		request.ResponseHeaders = make(map[string]string)
-		maps.Copy(request.ResponseHeaders, headers)
-	}
-
-	request.ResponseBody = &responseBody
+	statusCode := resp.StatusCode
 	request.StatusCode = &statusCode
-
-	if len(options.RequestParams.PathParams) > 0 {
-		request.PathParams = options.RequestParams.PathParams
+	responseHeader := make(map[string]string)
+	for key, values := range resp.Header {
+		if len(values) > 0 {
+			responseHeader[key] = values[0]
+		}
 	}
-	if len(options.RequestParams.QueryParams) > 0 {
-		request.QueryParams = options.RequestParams.QueryParams
-	}
-	if len(options.RequestParams.HeaderParams) > 0 {
-		request.HeaderParams = options.RequestParams.HeaderParams
-	}
-	if options.RequestParams.BodyParams != nil && *options.RequestParams.BodyParams != "" {
-		request.BodyParams = options.RequestParams.BodyParams
-	}
-	if len(options.RequestParams.FormParams) > 0 {
-		request.FormParams = options.RequestParams.FormParams
-	}
-	if len(options.RequestParams.MultipartParams) > 0 {
-		request.MultipartParams = options.RequestParams.MultipartParams
-	}
+	request.ResponseHeaders = responseHeader
+	responseBody := string(body)
+	request.ResponseBody = &responseBody
 
 	return request
 }
 
-func constructURL(baseURL, path string, pathParams, queryParams map[string]string) (*url.URL, error) {
+// constructURL builds a complete URL from base URL, path, and parameters
+func constructURL(ctx context.Context, baseURL, path string, pathParams, queryParams *map[string]string) (*url.URL, error) {
+	log := svc1log.FromContext(ctx)
 	fullURL, err := url.Parse(baseURL)
 	if err != nil {
+		log.Error("Failed to parse base URL", svc1log.SafeParam("error", err))
 		return nil, fmt.Errorf("failed to parse base URL: %v", err)
 	}
 
+	// Process path parameters
 	endpoint := path
-	for key, value := range pathParams {
-		endpoint = strings.TrimRight(endpoint, "/")
-		endpoint = endpoint + "/"
-		endpoint = strings.ReplaceAll(endpoint, fmt.Sprintf("{%s}", key), url.PathEscape(value))
+	if pathParams != nil {
+		endpoint = strings.TrimRight(path, "/")
+		for key, value := range *pathParams {
+			endpoint = strings.ReplaceAll(endpoint, fmt.Sprintf("{%s}", key), url.PathEscape(value))
+		}
 	}
 	fullURL.Path = endpoint
 
+	// Add query parameters
 	q := fullURL.Query()
-	for key, value := range queryParams {
+	for key, value := range *queryParams {
 		q.Add(key, value)
 	}
 	fullURL.RawQuery = q.Encode()
@@ -158,10 +131,13 @@ func constructURL(baseURL, path string, pathParams, queryParams map[string]strin
 	return fullURL, nil
 }
 
+// prepareRequestBody prepares the request body and determines content type
 func prepareRequestBody(params *common.RequestParams) (io.Reader, string, error) {
 	if params == nil {
 		return nil, "", nil
 	}
+
+	// Handle JSON or plain text body
 	if params.BodyParams != nil && *params.BodyParams != "" {
 		if json.Valid([]byte(*params.BodyParams)) {
 			return strings.NewReader(*params.BodyParams), "application/json", nil
@@ -169,16 +145,16 @@ func prepareRequestBody(params *common.RequestParams) (io.Reader, string, error)
 		return bytes.NewReader([]byte(*params.BodyParams)), "text/plain", nil
 	}
 
+	// Handle form data
 	if len(params.FormParams) > 0 {
 		formValues := url.Values{}
 		for key, value := range params.FormParams {
 			formValues.Set(key, value)
 		}
-
-		encodedForm := formValues.Encode()
-		return strings.NewReader(encodedForm), "application/x-www-form-urlencoded", nil
+		return strings.NewReader(formValues.Encode()), "application/x-www-form-urlencoded", nil
 	}
 
+	// Handle multipart form data
 	if len(params.MultipartParams) > 0 {
 		body := &bytes.Buffer{}
 		writer := multipart.NewWriter(body)
@@ -196,228 +172,128 @@ func prepareRequestBody(params *common.RequestParams) (io.Reader, string, error)
 	return nil, "", nil
 }
 
-func sendRequest(fullURL *url.URL, contentType string, body io.Reader, options common.RequestConfig) (*http.Response, []string, error) {
-	req, err := http.NewRequest(string(options.Method), fullURL.String(), body)
+// sendRequest performs the HTTP request and handles redirects if configured
+func sendRequest(log svc1log.Logger, fullURL *url.URL, contentType string, body io.Reader, config common.RequestConfig) (*http.Response, []string, error) {
+	client := &http.Client{
+		Timeout: time.Duration(config.Timeout) * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: config.Insecure},
+		},
+		// Disable automatic redirect following
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+	// Send the request and handle redirects if configured
+	if !config.FollowRedirects {
+		return sendSingleRequest(log, client, fullURL.String(), contentType, body, config.RequestParams.HeaderParams)
+	}
+	// Handle redirects
+	return handleRedirects(log, client, fullURL.String(), contentType, body, config)
+}
+
+// sendSingleRequest performs a single HTTP request without following redirects
+func sendSingleRequest(log svc1log.Logger, client *http.Client, url string, contentType string, body io.Reader, headers map[string]string) (*http.Response, []string, error) {
+	log.Info("Sending request", svc1log.SafeParam("url", url))
+	req, err := http.NewRequest("GET", url, body)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create request: %v", err)
+		return nil, []string{url}, fmt.Errorf("failed to create request: %v", err)
 	}
 
-	for key, value := range options.RequestParams.HeaderParams {
+	for key, value := range headers {
 		req.Header.Add(key, value)
 	}
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
 	}
 
-	redirectChain := []string{fullURL.String()}
-	client := &http.Client{
-		Timeout: time.Duration(options.Timeout) * time.Second,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: options.Insecure},
-		},
-	}
-
-	if options.FollowRedirects {
-		// Manually follow redirects
-		redirectCount := 0
-		currentURL := fullURL.String()
-		var lastResp *http.Response
-
-		for redirectCount < *options.MaxRedirects {
-			// Create a new request for each redirect
-			req, err = http.NewRequest(string(options.Method), currentURL, body)
-			if err != nil {
-				return nil, redirectChain, fmt.Errorf("failed to create request: %v", err)
-			}
-
-			// Re-add headers for each request
-			for key, value := range options.RequestParams.HeaderParams {
-				req.Header.Add(key, value)
-			}
-			if contentType != "" {
-				req.Header.Set("Content-Type", contentType)
-			}
-
-			resp, err := client.Do(req)
-			if err != nil {
-				return nil, redirectChain, fmt.Errorf("failed to perform request: %v", err)
-			}
-
-			lastResp = resp
-			statusCode := resp.StatusCode
-
-			// Add current URL to chain if it's not already there
-			if len(redirectChain) == 0 || redirectChain[len(redirectChain)-1] != currentURL {
-				redirectChain = append(redirectChain, currentURL)
-			}
-
-			// If we got a 200, we're done
-			if statusCode >= 200 && statusCode < 300 {
-				break
-			}
-
-			// Check if we should follow redirect
-			if statusCode < 300 || statusCode >= 400 {
-				break
-			}
-
-			// Get the Location header
-			location := resp.Header.Get("Location")
-			if location == "" {
-				break
-			}
-
-			// Resolve relative URL
-			locationURL, err := resp.Request.URL.Parse(location)
-			if err != nil {
-				return nil, redirectChain, fmt.Errorf("failed to parse Location header: %v", err)
-			}
-
-			// Update current URL for next request
-			currentURL = locationURL.String()
-			redirectCount++
-		}
-
-		if lastResp == nil {
-			return nil, redirectChain, fmt.Errorf("no response received")
-		}
-
-		return lastResp, redirectChain, nil
-	}
-	// Single request without following redirects
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, redirectChain, fmt.Errorf("failed to perform request: %v", err)
+		return nil, []string{url}, fmt.Errorf("failed to perform request: %v", err)
 	}
-	return resp, redirectChain, nil
+
+	return resp, []string{url}, nil
 }
 
-func sendFastHTTPRequest(method, urlStr string, body string, contentType string, headers map[string]string, followRedirects bool, options common.RequestConfig) (*fasthttp.Response, []string, error) {
-	// Prepare the fasthttp request and response objects
-	req := fasthttp.AcquireRequest()
-	defer fasthttp.ReleaseRequest(req)
+// handleRedirects manages the redirect chain and follows redirects up to the maximum limit
+func handleRedirects(log svc1log.Logger, client *http.Client, initialURL string, contentType string, body io.Reader, config common.RequestConfig) (*http.Response, []string, error) {
+	log.Info("Sending redirect request", svc1log.SafeParam("url", initialURL))
+	redirectCount := 0
+	currentURL := initialURL
+	redirectChain := []string{initialURL}
 
-	resp := fasthttp.AcquireResponse()
-
-	req.SetRequestURI(urlStr)
-	req.Header.SetMethod(method)
-	req.SetBodyString(body)
-
-	if contentType != "" {
-		req.Header.Set("Content-Type", contentType)
-	}
-
-	for key, value := range headers {
-		req.Header.Set(key, value)
-	}
-
-	redirectChain := []string{urlStr}
-	var err error
-	if followRedirects {
-		// Track redirects manually for FastHTTP
-		maxRedirects := *options.MaxRedirects
-		redirectCount := 0
-		currentURL := urlStr
-
-		for redirectCount < maxRedirects {
-			req.SetRequestURI(currentURL)
-			err = fasthttp.Do(req, resp)
-			if err != nil {
-				break
-			}
-
-			// Check for redirect
-			statusCode := resp.StatusCode()
-
-			// Add current URL to chain if it's not already there
-			if len(redirectChain) == 0 || redirectChain[len(redirectChain)-1] != currentURL {
-				redirectChain = append(redirectChain, currentURL)
-			}
-
-			// If we got a 200, we're done
-			if statusCode >= 200 && statusCode < 300 {
-				break
-			}
-
-			// Check if we should follow redirect
-			if statusCode < 300 || statusCode >= 400 {
-				break
-			}
-
-			location := resp.Header.Peek("Location")
-			if len(location) == 0 {
-				break
-			}
-
-			// Handle relative URLs in Location header
-			locationStr := string(location)
-			locationURL, err := url.Parse(locationStr)
-			if err != nil {
-				break
-			}
-
-			// If the location is relative, resolve it against the current URL
-			if !locationURL.IsAbs() {
-				baseURL, err := url.Parse(currentURL)
-				if err != nil {
-					break
-				}
-				locationURL = baseURL.ResolveReference(locationURL)
-			}
-
-			// Add the redirect URL if it's different
-			newURL := locationURL.String()
-			if len(redirectChain) == 0 || redirectChain[len(redirectChain)-1] != newURL {
-				redirectChain = append(redirectChain, newURL)
-			}
-			currentURL = newURL
-			redirectCount++
-		}
-	} else {
-		err = fasthttp.Do(req, resp)
-	}
-
-	if err != nil {
-		fasthttp.ReleaseResponse(resp)
-		return nil, redirectChain, fmt.Errorf("failed to perform request: %v", err)
-	}
-
-	return resp, redirectChain, nil
-}
-
-func populateReport(report *common.RequestInfo, statusCode int, headers map[string]string, body string, params common.RequestParams, redirectChain []string) {
-	if headers != nil {
-		report.ResponseHeaders = make(map[string]string)
-		for key, values := range headers {
-			report.ResponseHeaders[key] = values
+	// Buffer the original request body to reuse on redirects
+	var bodyBytes []byte
+	if body != nil {
+		var err error
+		bodyBytes, err = io.ReadAll(body)
+		if err != nil {
+			return nil, redirectChain, fmt.Errorf("failed to buffer request body: %v", err)
 		}
 	}
 
-	report.ResponseBody = &body
-	report.StatusCode = &statusCode
-	report.RedirectChain = redirectChain
+	for redirectCount < *config.MaxRedirects {
+		// Prepare a new reader for the request body
+		var reqBody io.Reader
+		if bodyBytes != nil {
+			reqBody = bytes.NewReader(bodyBytes)
+		}
 
-	if len(params.PathParams) > 0 {
-		report.PathParams = params.PathParams
+		// Create the request
+		req, err := http.NewRequest(string(config.Method), currentURL, reqBody)
+		if err != nil {
+			return nil, redirectChain, fmt.Errorf("failed to create request: %v", err)
+		}
+
+		// Set headers
+		for key, value := range config.RequestParams.HeaderParams {
+			req.Header.Set(key, value)
+		}
+		if contentType != "" {
+			req.Header.Set("Content-Type", contentType)
+		}
+
+		// Send the request
+		resp, err := client.Do(req)
+		if err != nil {
+			return nil, redirectChain, fmt.Errorf("failed to perform request: %v", err)
+		}
+
+		// If it's not a redirect, return the response
+		if resp.StatusCode < 300 || resp.StatusCode >= 400 {
+			return resp, redirectChain, nil
+		}
+
+		// Get the redirect location
+		location := resp.Header.Get("Location")
+		if location == "" {
+			// No location header, treat as final response
+			return resp, redirectChain, nil
+		}
+
+		// Resolve relative location
+		nextURL, err := resp.Request.URL.Parse(location)
+		if err != nil {
+			_ = resp.Body.Close()
+			return nil, redirectChain, fmt.Errorf("failed to parse redirect location: %v", err)
+		}
+
+		// Close response body before continuing
+		_ = resp.Body.Close()
+
+		// Add the redirect URL to the chain
+		redirectChain = append(redirectChain, nextURL.String())
+		log.Info("Following redirect", svc1log.SafeParam("from", currentURL), svc1log.SafeParam("to", nextURL.String()))
+
+		// Set up for next iteration
+		currentURL = nextURL.String()
+		redirectCount++
 	}
-	if len(params.QueryParams) > 0 {
-		report.QueryParams = params.QueryParams
-	}
-	if len(params.HeaderParams) > 0 {
-		report.HeaderParams = params.HeaderParams
-	}
-	if params.BodyParams != nil && *params.BodyParams != "" {
-		report.BodyParams = params.BodyParams
-	}
-	if len(params.FormParams) > 0 {
-		report.FormParams = params.FormParams
-	}
-	if len(params.MultipartParams) > 0 {
-		report.MultipartParams = params.MultipartParams
-	}
+
+	return nil, redirectChain, fmt.Errorf("maximum redirects (%d) exceeded", *config.MaxRedirects)
 }
 
-// GetHeader is a generic header helper (case‑insensitive)
+// GetHeader retrieves a header value case-insensitively
 func GetHeader(r *common.RequestInfo, name string) string {
 	if r.ResponseHeaders == nil {
 		return ""
@@ -433,7 +309,7 @@ func GetHeader(r *common.RequestInfo, name string) string {
 	return ""
 }
 
-// GetHeaderValues is a generic header helper (case‑insensitive)
+// GetHeaderValues retrieves and splits header values case-insensitively
 func GetHeaderValues(r *common.RequestInfo, name string) []string {
 	raw := GetHeader(r, name)
 	if raw == "" {

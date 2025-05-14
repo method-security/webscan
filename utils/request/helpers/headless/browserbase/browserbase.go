@@ -12,11 +12,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// Requester is a struct that contains a Client and a Requester
 type Requester struct {
 	Client    Client
 	Requester *headless.Requester
 }
 
+// NewBrowserbaseRequester creates a new BrowserbaseRequester
 func NewBrowserbaseRequester(
 	ctx context.Context,
 	timeout int,

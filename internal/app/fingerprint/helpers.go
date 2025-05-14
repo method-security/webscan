@@ -1,11 +1,13 @@
 package fingerprint
 
 import (
+	// Standard
 	"encoding/json"
 	"fmt"
 	"os"
 	"slices"
 
+	// Generated
 	appFern "github.com/Method-Security/webscan/generated/go/app"
 )
 

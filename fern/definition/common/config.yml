@@ -11,11 +11,11 @@ types:
       pathToBrowser: optional<string>
       minDOMStabalizeTime: integer
   # Browserbase Struct
-  BrowserbaseConfig: # Holds Non-Secret Configs
+  BrowserbaseConfig:
     properties:
       proxy: optional<boolean>
       countries: optional<list<string>>
-  BrowserbaseSecrets: # Holds Secrets
+  BrowserbaseSecrets:
     properties:
       token: string
       project: string

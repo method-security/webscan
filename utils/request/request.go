@@ -4,24 +4,32 @@ import (
 	"context"
 	"fmt"
 
+	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
-	"github.com/Method-Security/webscan/utils/request/helpers/headless"
-	"github.com/Method-Security/webscan/utils/request/helpers/headless/browserbase"
+	// Utils
+	headless "github.com/Method-Security/webscan/utils/request/helpers/headless"
+	browserbase "github.com/Method-Security/webscan/utils/request/helpers/headless/browserbase"
 	standard "github.com/Method-Security/webscan/utils/request/helpers/standard"
+
+	// External
+	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
 // SendRequest sends a request based on the specified request method
 func SendRequest(ctx context.Context, requestConfig common.RequestConfig) (*common.RequestInfo, error) {
+	log := svc1log.FromContext(ctx)
 	var request common.RequestInfo
 
 	switch requestConfig.RequestMethod {
 	// Standard capture
 	case common.RequestMethodStandard:
-		request = standard.StandardCapture(requestConfig)
+		log.Info("Sending standard request")
+		request = standard.StandardCapture(ctx, requestConfig)
 		return &request, nil
 
 	// Headless capture
 	case common.RequestMethodHeadless:
+		log.Info("Sending headless request")
 		headless := headless.NewRequester(requestConfig.HeadlessConfig, requestConfig.Timeout)
 		captureRequest, err := headless.Request(ctx, requestConfig)
 		if err != nil {
@@ -31,6 +39,7 @@ func SendRequest(ctx context.Context, requestConfig common.RequestConfig) (*comm
 
 	// Browserbase capture
 	case common.RequestMethodBrowserbase:
+		log.Info("Sending browserbase request")
 		client := browserbase.NewBrowserbaseClient(requestConfig.BrowserbaseConfig, requestConfig.BrowserbaseSecrets)
 		browserbase := browserbase.NewBrowserbaseRequester(ctx, requestConfig.Timeout, requestConfig.HeadlessConfig.MinDomStabalizeTime, *client)
 		if browserbase == nil {

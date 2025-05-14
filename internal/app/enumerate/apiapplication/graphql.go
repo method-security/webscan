@@ -1,6 +1,7 @@
 package apiapplication
 
 import (
+	// Standard
 	"bytes"
 	"context"
 	"encoding/base64"
@@ -12,6 +13,7 @@ import (
 	"net/url"
 	"strings"
 
+	// Generated
 	enumerateapiapplicationfern "github.com/Method-Security/webscan/generated/go/app/enumerate/apiapplication"
 )
 

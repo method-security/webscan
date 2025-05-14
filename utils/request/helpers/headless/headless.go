@@ -4,19 +4,19 @@ import (
 	"context"
 	"fmt"
 	"path"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	common "github.com/Method-Security/webscan/generated/go/common"
-	"github.com/go-rod/rod"
-	"github.com/go-rod/rod/lib/cdp"
-	"github.com/go-rod/rod/lib/launcher"
-	"github.com/go-rod/rod/lib/proto"
-	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
-	urlutil "github.com/projectdiscovery/utils/url"
+	rod "github.com/go-rod/rod"
+	cdp "github.com/go-rod/rod/lib/cdp"
+	launcher "github.com/go-rod/rod/lib/launcher"
+	proto "github.com/go-rod/rod/lib/proto"
+	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
-// Requester is a struct that captures a page from a browser
 type Requester struct {
 	PathToBrowser              *string
 	Browser                    *rod.Browser
@@ -42,25 +42,25 @@ func NewRequesterWithClient(client *cdp.Client, timeout int, minDOMStabalizeTime
 	}
 }
 
-// Request captures a page with a Headless Browser
-func (b *Requester) Request(ctx context.Context, options common.RequestConfig) (*common.RequestInfo, error) {
+func (b *Requester) Request(ctx context.Context, config common.RequestConfig) (*common.RequestInfo, error) {
 	log := svc1log.FromContext(ctx)
-
-	method := common.HttpMethodGet
-	if options.Method != "" {
-		method = options.Method
-	}
-
 	requestInfo := &common.RequestInfo{
-		BaseUrl: options.BaseUrl,
-		Path:    options.Path,
-		Method:  method,
+		BaseUrl:         config.BaseUrl,
+		Path:            config.Path,
+		Method:          config.Method,
+		PathParams:      config.RequestParams.PathParams,
+		QueryParams:     config.RequestParams.QueryParams,
+		HeaderParams:    config.RequestParams.HeaderParams,
+		FormParams:      config.RequestParams.FormParams,
+		MultipartParams: config.RequestParams.MultipartParams,
+		BodyParams:      config.RequestParams.BodyParams,
 	}
 
+	log.Info("Requesting", svc1log.SafeParam("url", config.BaseUrl+config.Path))
 	if b.Browser == nil {
 		log.Info("Initializing browser")
 		launch := launcher.New().Headless(true)
-		if options.Insecure {
+		if config.Insecure {
 			launch = launch.Set("ignore-certificate-errors")
 		}
 		if b.PathToBrowser != nil && *b.PathToBrowser != "" {
@@ -68,23 +68,25 @@ func (b *Requester) Request(ctx context.Context, options common.RequestConfig) (
 		}
 		browserURL := launch.MustLaunch()
 		b.Browser = rod.New().ControlURL(browserURL).MustConnect()
+		log.Info("Connected to browser")
 	}
 
 	pageCtx, cancel := context.WithTimeout(ctx, time.Duration(b.TimeoutSeconds)*time.Second)
 	defer cancel()
 
-	fullURL := fmt.Sprintf("%s%s", options.BaseUrl, options.Path)
-	var redirectChain = []string{fullURL}
+	fullURL := fmt.Sprintf("%s%s", config.BaseUrl, config.Path)
+	redirectChain := []string{fullURL}
+	headers := map[string]string{}
 	var statusCode int
-	var headers = map[string]string{}
-	redirectIntercepted := false
 
 	err := rod.Try(func() {
 		page := b.Browser.MustPage().Context(pageCtx)
 
+		// Enable fetch interception
 		err := proto.FetchEnable{
 			HandleAuthRequests: true,
 			Patterns: []*proto.FetchRequestPattern{
+				{RequestStage: proto.FetchRequestStageRequest},
 				{RequestStage: proto.FetchRequestStageResponse},
 			},
 		}.Call(page)
@@ -94,125 +96,117 @@ func (b *Requester) Request(ctx context.Context, options common.RequestConfig) (
 			return
 		}
 
-		var lastStatusCode int
-		var lastResponseURL string
+		// Create a channel to signal when the request is complete
+		requestComplete := make(chan struct{})
+		var once sync.Once
+
 		go page.EachEvent(func(e *proto.FetchRequestPaused) {
-			// Always capture headers
-			for _, h := range e.ResponseHeaders {
-				headers[h.Name] = h.Value
-			}
+			log.Info("Fetch request paused. Url grabbed from browser",
+				svc1log.SafeParam("url", e.Request.URL))
 
-			// Capture status code and URL
-			if e.ResponseStatusCode != nil {
-				lastStatusCode = *e.ResponseStatusCode
-				statusCode = lastStatusCode
-				lastResponseURL = e.Request.URL
-			}
-
-			// Handle redirects
-			if e.ResponseStatusCode != nil && *e.ResponseStatusCode >= 300 && *e.ResponseStatusCode < 400 {
-				// Add the current request URL to the chain if it's not already there
-				if len(redirectChain) == 0 || redirectChain[len(redirectChain)-1] != e.Request.URL {
-					redirectChain = append(redirectChain, e.Request.URL)
+			// Track status code of the final response
+			if e.ResponseStatusCode != nil && *e.ResponseStatusCode > 0 {
+				// Only update status code if it's a non-redirect response
+				if *e.ResponseStatusCode < 300 {
+					statusCode = *e.ResponseStatusCode
+					log.Info("Final response status code",
+						svc1log.SafeParam("status", strconv.Itoa(statusCode)))
 				}
+			}
 
-				// Add the Location header URL if it exists
-				if location := headers["Location"]; location != "" && !isStaticAsset(location) {
+			// Only track headers from non-redirect responses
+			if e.ResponseStatusCode != nil && *e.ResponseStatusCode < 300 {
+				headers = make(map[string]string) // Reset headers for final response
+				for _, h := range e.ResponseHeaders {
+					headers[h.Name] = h.Value
+				}
+			} else if e.ResponseStatusCode != nil && *e.ResponseStatusCode >= 300 && *e.ResponseStatusCode < 400 {
+				// Check for Location header in redirects
+				var location string
+				for _, h := range e.ResponseHeaders {
+					if h.Name == "Location" {
+						location = h.Value
+						break
+					}
+				}
+				if location != "" && !isStaticAsset(location) {
 					redirectChain = append(redirectChain, location)
+					log.Info("Adding redirect",
+						svc1log.SafeParam("location", location))
 				}
-
-				// Only abort if we're not following redirects
-				if !options.FollowRedirects && !redirectIntercepted {
-					redirectIntercepted = true
+				if !config.FollowRedirects {
 					_ = proto.FetchFailRequest{
 						RequestID:   e.RequestID,
 						ErrorReason: proto.NetworkErrorReasonAborted,
 					}.Call(page)
+					once.Do(func() { close(requestComplete) })
 					return
 				}
 			}
 
+			// Continue the request
 			_ = proto.FetchContinueRequest{RequestID: e.RequestID}.Call(page)
+			if e.ResponseStatusCode != nil && *e.ResponseStatusCode < 300 {
+				once.Do(func() { close(requestComplete) })
+			}
 		})()
 
-		if method == common.HttpMethodGet {
-			log.Info("Navigating with GET", svc1log.SafeParam("url", fullURL))
+		// Make the request
+		if config.FollowRedirects {
+			log.Info("Following redirect", svc1log.SafeParam("url", fullURL))
+			page.MustNavigate(fullURL)
 		} else {
-			// Build headers string
-			headersStr := ""
-			if options.RequestParams.HeaderParams != nil {
-				headersStr = "headers: {"
-				for k, v := range options.RequestParams.HeaderParams {
-					headersStr += fmt.Sprintf("'%s': '%s',", k, v)
-				}
-				headersStr += "},"
-			}
-
-			// Build body string
-			bodyStr := ""
-			if options.RequestParams.BodyParams != nil && *options.RequestParams.BodyParams != "" {
-				bodyStr = "body: " + *options.RequestParams.BodyParams + ","
-			}
-
+			log.Info("Not following redirects")
 			script := fmt.Sprintf(`
 				() => {
-					fetch(window.location.href, {
-						method: '%s',
-						%s
-						%s
-					}).then(response => {
-						window._lastResponseStatus = response.status;
-						return response.text();
-					}).then(text => {
-						window._lastResponseBody = text;
-					});
+					fetch("%s", {
+						method: "%s",
+						headers: %s,
+						body: %s,
+						credentials: "include",
+						redirect: "manual"
+					}).catch(e => console.error(e));
 				}
-			`, method, headersStr, bodyStr)
-			log.Info("Navigating with custom method", svc1log.SafeParam("method", method))
-			page.MustEvalOnNewDocument(script)
+			`, fullURL, requestInfo.Method,
+				marshalHeaders(config.RequestParams.HeaderParams),
+				marshalBody(config.RequestParams.BodyParams))
+
+			page.MustEval(script)
 		}
 
-		err = page.Navigate(fullURL)
-		if err != nil {
-			if strings.Contains(err.Error(), "net::ERR_ABORTED") && redirectIntercepted {
-				log.Info("Navigation aborted due to blocked redirect", svc1log.SafeParam("url", fullURL))
-				requestInfo.StatusCode = &statusCode
-				requestInfo.ResponseHeaders = headers
-				requestInfo.RedirectChain = redirectChain
-				return
-			}
-			log.Error("Unexpected navigation error", svc1log.SafeParam("error", err))
-			requestInfo.Errors = append(requestInfo.Errors, err.Error())
+		// Wait for the request to complete
+		select {
+		case <-requestComplete:
+		case <-pageCtx.Done():
+			requestInfo.Errors = append(requestInfo.Errors, "Request timed out")
 			return
 		}
 
-		// Wait for page load and any potential redirects
-		page.MustWaitLoad()
-		time.Sleep(time.Duration(b.MinDOMStabalizeTimeSeconds) * time.Second)
-
-		// Get the current URL after all redirects
-		currentURL := page.MustEval(`() => window.location.href`).Str()
-
-		// Add the final URL to the chain if it's different from the last one
-		if currentURL != "" && currentURL != lastResponseURL {
-			redirectChain = append(redirectChain, currentURL)
+		// Get the final URL after any redirects
+		finalURL := page.MustEval(`() => window.location.href`).Str()
+		if finalURL != fullURL && finalURL != "about:blank" {
+			redirectChain = append(redirectChain, finalURL)
 		}
 
-		// Get the status code from the fetch response or last captured status code
-		status := page.MustEval(`() => window._lastResponseStatus || ` + fmt.Sprintf("%d", lastStatusCode)).Int()
-		requestInfo.StatusCode = &status
+		// Wait for DOM stabilization
+		log.Info("Waiting for DOM stabilization", svc1log.SafeParam("seconds", strconv.Itoa(b.MinDOMStabalizeTimeSeconds)))
+		time.Sleep(time.Duration(b.MinDOMStabalizeTimeSeconds) * time.Second)
+
+		// Ensure page is fully loaded
+		page.MustWaitLoad().MustWaitStable()
+
+		log.Info("Final URL", svc1log.SafeParam("url", finalURL))
+
+		// Only get HTML content if we have a successful response
+		if statusCode >= 200 && statusCode < 300 {
+			htmlContent, _ := page.HTML()
+			requestInfo.ResponseBody = &htmlContent
+		}
+
+		requestInfo.StatusCode = &statusCode
 		requestInfo.RedirectChain = redirectChain
 		requestInfo.Timestamp = time.Now()
 		requestInfo.ResponseHeaders = headers
-
-		// Always get the response body after navigation
-		htmlContent, err := page.HTML()
-		if err != nil {
-			log.Error("Failed to get HTML content", svc1log.SafeParam("error", err))
-			requestInfo.Errors = append(requestInfo.Errors, err.Error())
-		} else {
-			requestInfo.ResponseBody = &htmlContent
-		}
 	})
 
 	if err != nil {
@@ -220,34 +214,22 @@ func (b *Requester) Request(ctx context.Context, options common.RequestConfig) (
 		requestInfo.Errors = append(requestInfo.Errors, err.Error())
 	}
 
-	if parsedURL, err := urlutil.Parse(fullURL); err == nil {
-		requestInfo.Path = parsedURL.Path
-		parsedURL.Query().Iterate(func(key string, value []string) bool {
-			requestInfo.QueryParams[key] = value[0]
-			return true
-		})
-	}
-
 	return requestInfo, nil
 }
 
 func (b *Requester) InitializeBrowser() {
-	var browserURL string
 	launch := launcher.New().Headless(true)
 	if b.PathToBrowser != nil && *b.PathToBrowser != "" {
 		launch = launch.Bin(*b.PathToBrowser)
 	}
-	browserURL = launch.MustLaunch()
+	browserURL := launch.MustLaunch()
 	b.Browser = rod.New().ControlURL(browserURL).MustConnect()
 }
 
 func (b *Requester) Close(ctx context.Context) error {
-	svc1log.FromContext(ctx).Debug("Closing browser with allowed timeout of 5 seconds")
 	if b.Browser != nil {
-		svc1log.FromContext(ctx).Debug("Attempting to close browser")
 		closeCtx, cancel := context.WithTimeout(ctx, time.Duration(b.TimeoutSeconds)*time.Second)
 		defer cancel()
-
 		closeChan := make(chan error)
 		go func() {
 			closeChan <- b.Browser.Close()
@@ -255,55 +237,56 @@ func (b *Requester) Close(ctx context.Context) error {
 
 		select {
 		case err := <-closeChan:
-			if err != nil {
-				svc1log.FromContext(ctx).Error("Failed to close browser", svc1log.SafeParam("error", err))
-				return err
-			}
-			svc1log.FromContext(ctx).Debug("Successfully closed browser")
+			return err
 		case <-closeCtx.Done():
-			svc1log.FromContext(ctx).Warn("Timeout while closing browser, skipping close operation")
+			return nil
 		}
 	}
 	return nil
 }
 
-// isStaticAsset determines whether a given URL points to a common static asset.
-// It checks the file extension after stripping any query strings or fragments.
-// Supported extensions include common formats like .css, .js, .png, .woff2, etc.
 func isStaticAsset(rawURL string) bool {
 	staticExts := []string{
-		// Images
 		".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".avif", ".ico", ".svg",
-		// Fonts
 		".woff", ".woff2", ".ttf", ".otf", ".eot", ".sfnt",
-		// Stylesheets
 		".css", ".scss", ".sass", ".less",
-		// Scripts
 		".js", ".mjs", ".cjs", ".ts", ".jsx", ".tsx",
-		// Documents
 		".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
-		// Media
 		".mp3", ".mp4", ".webm", ".ogg", ".wav", ".m4a", ".m4v",
-		// Archives
 		".zip", ".rar", ".7z", ".tar", ".gz",
-		// Data
 		".json", ".xml", ".csv", ".map",
-		// Other
 		".txt", ".md", ".markdown", ".yaml", ".yml", ".toml", ".ini",
 	}
 
-	// Strip query string and fragment
 	if i := strings.IndexAny(rawURL, "?#"); i != -1 {
 		rawURL = rawURL[:i]
 	}
 
-	// Get the lowercase file extension
 	ext := strings.ToLower(path.Ext(rawURL))
-
 	for _, staticExt := range staticExts {
 		if ext == staticExt {
 			return true
 		}
 	}
 	return false
+}
+
+// Helper functions for marshaling request parameters
+func marshalHeaders(headers map[string]string) string {
+	if headers == nil {
+		return "{}"
+	}
+	headerStr := "{"
+	for k, v := range headers {
+		headerStr += fmt.Sprintf("'%s': '%s',", k, v)
+	}
+	headerStr += "}"
+	return headerStr
+}
+
+func marshalBody(body *string) string {
+	if body == nil || *body == "" {
+		return "null"
+	}
+	return *body
 }

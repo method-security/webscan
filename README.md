@@ -30,11 +30,11 @@ For the full list of available installation options, please see the [Installatio
 ### Examples
 
 ```bash
-webscan spider --targets https://example.com,https://example.dev
+webscan general probe --targets https://example.com --targets https://example.dev
 ```
 
 ```bash
-webscan vuln --severity INFO --tags swagger --tags fastapi --tags api --target example.com
+webscan general ratelimit --max-requests 100 --targets example.com
 ```
 
 ### Building a Statically Compiled Container for Local Testing
@@ -50,7 +50,7 @@ webscan vuln --severity INFO --tags swagger --tags fastapi --tags api --target e
 
 5. Open shell: `docker run -it --rm --entrypoint /bin/bash webscan:local`
 
-6. OR run command without shell example: `docker run webscan:local app enumerate graphql --target https://countries.trevorblades.com/ -o json`
+6. OR run command without shell example: `docker run webscan:local general probe --targets example.com -o json`
 
 ### Fern
 If updating the fern yaml configuration you need to [install](https://buildwithfern.com/learn/cli-reference/overview) Fern CLI. After installation you can execute `fern generate` to generate the updates.

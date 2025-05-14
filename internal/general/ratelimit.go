@@ -1,28 +1,31 @@
-package webapplication
+package general
 
 import (
+	// Standard
 	"context"
 	"net/http"
 	"strings"
 	"time"
 
+	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
 	generalfern "github.com/Method-Security/webscan/generated/go/general"
+
+	// Utils
 	utils "github.com/Method-Security/webscan/utils"
 	request "github.com/Method-Security/webscan/utils/request"
 )
 
-// createWebserverRateLimitRequestConfig creates a common request configuration
-func createWebserverRateLimitRequestConfig(baseURL, path string, config *generalfern.GeneralRateLimitConfig) common.RequestConfig {
+func createRateLimitRequestConfig(baseURL, path string, config *generalfern.GeneralRateLimitConfig) common.RequestConfig {
 	return common.RequestConfig{
 		BaseUrl:            baseURL,
 		Path:               path,
 		Method:             common.HttpMethodGet,
 		RequestParams:      &common.RequestParams{},
-		Timeout:            config.Timeout,
 		FollowRedirects:    false,
 		MaxRedirects:       nil,
 		Insecure:           true,
+		Timeout:            config.Timeout,
 		RequestMethod:      common.RequestMethodStandard,
 		BrowserbaseSecrets: nil,
 		HeadlessConfig:     nil,
@@ -51,7 +54,7 @@ func PerformGeneralRatelimit(ctx context.Context, config *generalfern.GeneralRat
 		// Track if a 200 OK response was previously detected for this target
 		var hasSeen200 bool
 		for requestNumber := 1; requestNumber <= config.MaxRequests; requestNumber++ {
-			requestConfig := createWebserverRateLimitRequestConfig(baseURL, parsedTargetPath, config)
+			requestConfig := createRateLimitRequestConfig(baseURL, parsedTargetPath, config)
 			request, err := request.SendRequest(ctx, requestConfig)
 			if err != nil {
 				errors = append(errors, err.Error())

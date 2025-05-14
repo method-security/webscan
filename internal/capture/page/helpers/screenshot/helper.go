@@ -1,15 +1,19 @@
 package capturepage
 
 import (
+	// Standard
 	"context"
 	"fmt"
 
+	// Generated
 	capturepagefern "github.com/Method-Security/webscan/generated/go/capture/page"
 	common "github.com/Method-Security/webscan/generated/go/common"
-	"github.com/Method-Security/webscan/utils/request/helpers/headless"
-	"github.com/go-rod/rod/lib/proto"
-	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
-	"github.com/ysmood/gson"
+	headless "github.com/Method-Security/webscan/utils/request/helpers/headless"
+
+	// External
+	proto "github.com/go-rod/rod/lib/proto"
+	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
+	gson "github.com/ysmood/gson"
 )
 
 func CaptureScreenshot(ctx context.Context, requester *headless.Requester, options *common.RequestConfig) *capturepagefern.CapturePageReport {

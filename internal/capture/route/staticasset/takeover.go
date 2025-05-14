@@ -1,6 +1,7 @@
-package routecapture
+package captureroute
 
 import (
+	// Standard
 	"context"
 	"encoding/json"
 	"fmt"
@@ -9,15 +10,19 @@ import (
 	"path/filepath"
 	"strings"
 
+	// Generated
 	captureroutestaticassetfern "github.com/Method-Security/webscan/generated/go/capture/route/staticasset"
-	"github.com/Method-Security/webscan/generated/go/common"
-	routecapture "github.com/Method-Security/webscan/internal/capture/route"
-	"github.com/Method-Security/webscan/utils"
+	common "github.com/Method-Security/webscan/generated/go/common"
+
+	// Internal
+	captureroute "github.com/Method-Security/webscan/internal/capture/route"
+	// Utils
+	utils "github.com/Method-Security/webscan/utils"
 	request "github.com/Method-Security/webscan/utils/request"
 )
 
 // createStaticAssetTakeOverRequestConfig creates a request config for seeing whats returned from a static asset
-func createStaticAssetTakeOverRequestConfig(targetBaseURL, targetPath string, requestMethod common.RequestMethod, config captureroutestaticassetfern.StaticAssetTakeOverConfig) common.RequestConfig {
+func createStaticAssetTakeOverRequestConfig(targetBaseURL, targetPath string, config captureroutestaticassetfern.StaticAssetTakeOverConfig, browserbaseSecrets *common.BrowserbaseSecrets) common.RequestConfig {
 	requestConfig := common.RequestConfig{
 		BaseUrl:            targetBaseURL,
 		Path:               targetPath,
@@ -25,11 +30,11 @@ func createStaticAssetTakeOverRequestConfig(targetBaseURL, targetPath string, re
 		RequestParams:      &common.RequestParams{},
 		Timeout:            config.CaptureRouteConfig.Timeout,
 		Insecure:           config.CaptureRouteConfig.Insecure,
-		FollowRedirects:    false,
-		RequestMethod:      requestMethod,
-		BrowserbaseConfig:  nil,
-		HeadlessConfig:     nil,
-		BrowserbaseSecrets: nil,
+		FollowRedirects:    true,
+		RequestMethod:      config.CaptureRouteConfig.RequestMethod,
+		BrowserbaseConfig:  config.CaptureRouteConfig.BrowserbaseConfig,
+		HeadlessConfig:     config.CaptureRouteConfig.HeadlessConfig,
+		BrowserbaseSecrets: browserbaseSecrets,
 	}
 
 	return requestConfig
@@ -43,21 +48,23 @@ func PerformStaticAssetTakeOverAnalysis(ctx context.Context, config captureroute
 	errors := []string{}
 
 	// Perform Route Capture
-	routeCaptureReport := routecapture.PerformRouteCapture(ctx, *config.CaptureRouteConfig, browserbaseSecrets)
-	if len(routeCaptureReport.Urls) == 0 {
+	captureRouteReport := captureroute.PerformCaptureRoute(ctx, *config.CaptureRouteConfig, browserbaseSecrets)
+	if len(captureRouteReport.Urls) == 0 {
 		errors = append(errors, "no urls found")
 		report.Errors = errors
 		return report
 	}
 
-	// Define Configs
+	// Split and standardize the target
 	targetBaseURL, targetPath, err := utils.SplitTarget(config.CaptureRouteConfig.Target)
 	if err != nil {
 		errors = append(errors, fmt.Sprintf("error splitting target: %s", err))
 		report.Errors = errors
 		return report
 	}
-	requestConfig := createStaticAssetTakeOverRequestConfig(targetBaseURL, targetPath, config.CaptureRouteConfig.RequestMethod, config)
+
+	// Send the request
+	requestConfig := createStaticAssetTakeOverRequestConfig(targetBaseURL, targetPath, config, browserbaseSecrets)
 	result, err := request.SendRequest(ctx, requestConfig)
 	if err != nil {
 		errors = append(errors, fmt.Sprintf("error performing request: %s", err))
@@ -68,8 +75,8 @@ func PerformStaticAssetTakeOverAnalysis(ctx context.Context, config captureroute
 
 	// Static Asset Take Over Attempts
 	StaticAssetTakeOverAttempts := []*captureroutestaticassetfern.StaticAssetTakeOverAttempt{}
-	for _, url := range routeCaptureReport.Urls {
-		if !routecapture.IsStaticAsset(url) {
+	for _, url := range captureRouteReport.Urls {
+		if !captureroute.IsStaticAsset(url) {
 			continue
 		}
 		StaticAssetTakeOverAttempt := captureroutestaticassetfern.StaticAssetTakeOverAttempt{StaticAsset: url}
@@ -82,7 +89,7 @@ func PerformStaticAssetTakeOverAnalysis(ctx context.Context, config captureroute
 		}
 
 		// Always send 'standard' requests as Browser is way to slow
-		requestConfig := createStaticAssetTakeOverRequestConfig(staticAssetBaseURL, staticAssetPath, common.RequestMethodStandard, config)
+		requestConfig := createStaticAssetTakeOverRequestConfig(staticAssetBaseURL, staticAssetPath, config, browserbaseSecrets)
 		result, err := request.SendRequest(ctx, requestConfig)
 		if err != nil {
 			errors = append(errors, fmt.Sprintf("error performing request: %s", err))

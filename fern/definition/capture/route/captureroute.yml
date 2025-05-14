@@ -7,11 +7,11 @@ types:
   CaptureRouteConfig:
     properties:
       target: string
+      staticAssets: boolean
       baseURLsOnly: boolean
       maxRedirects: integer
-      staticAssets: boolean
-      timeout: integer
       insecure: boolean
+      timeout: integer
       requestMethod: config.RequestMethod
       headlessConfig: optional<config.HeadlessConfig>
       browserbaseConfig: optional<config.BrowserbaseConfig>

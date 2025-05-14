@@ -1,6 +1,7 @@
 package apiapplication
 
 import (
+	// Standard
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -10,16 +11,21 @@ import (
 	"strings"
 	"time"
 
+	// Generated
 	enumerateapiapplicationfern "github.com/Method-Security/webscan/generated/go/app/enumerate/apiapplication"
-	"github.com/Method-Security/webscan/generated/go/common"
-	"github.com/Method-Security/webscan/utils"
+	common "github.com/Method-Security/webscan/generated/go/common"
+
+	// utils
+	utils "github.com/Method-Security/webscan/utils"
 	request "github.com/Method-Security/webscan/utils/request"
-	"github.com/pb33f/libopenapi"
-	"github.com/pb33f/libopenapi/datamodel/high/base"
+
+	// External
+	libopenapi "github.com/pb33f/libopenapi"
+	base "github.com/pb33f/libopenapi/datamodel/high/base"
 	v2 "github.com/pb33f/libopenapi/datamodel/high/v2"
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
-	"github.com/pb33f/libopenapi/orderedmap"
-	"gopkg.in/yaml.v3"
+	orderedmap "github.com/pb33f/libopenapi/orderedmap"
+	yaml "gopkg.in/yaml.v3"
 )
 
 // Common Swagger/OpenAPI endpoint paths to check
@@ -48,16 +54,16 @@ var commonSpecPaths = []string{
 	"/swagger-ui/openapi.json",
 }
 
-func createEnumerateSwaggerRequestConfig(baseURL, path string, timeout int) common.RequestConfig {
+func createRequestConfig(baseURL, path string, timeout int) common.RequestConfig {
 	return common.RequestConfig{
 		BaseUrl:            baseURL,
 		Path:               path,
 		Method:             common.HttpMethodGet,
 		RequestParams:      &common.RequestParams{},
-		Timeout:            timeout,
 		FollowRedirects:    false,
 		MaxRedirects:       nil,
 		Insecure:           true,
+		Timeout:            timeout,
 		RequestMethod:      common.RequestMethodStandard,
 		HeadlessConfig:     nil,
 		BrowserbaseConfig:  nil,
@@ -92,7 +98,7 @@ func PerformAppEnumerateSwagger(ctx context.Context, target string, timeout int)
 		}
 
 		// Create a request config for the Swagger/OpenAPI spec and send the request
-		requestConfig := createEnumerateSwaggerRequestConfig(baseURL, fmt.Sprintf("%s%s", parsedTargetPath, path), timeout)
+		requestConfig := createRequestConfig(baseURL, fmt.Sprintf("%s%s", parsedTargetPath, path), timeout)
 		request, err := request.SendRequest(ctx, requestConfig)
 		if err != nil {
 			report.Errors = append(report.Errors, err.Error())

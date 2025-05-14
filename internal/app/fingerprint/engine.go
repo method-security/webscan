@@ -1,27 +1,33 @@
 package fingerprint
 
 import (
+	// Standard
 	"context"
 	"strings"
 
+	// Generated
 	appFern "github.com/Method-Security/webscan/generated/go/app"
 	common "github.com/Method-Security/webscan/generated/go/common"
-	"github.com/Method-Security/webscan/utils"
+
+	// Utils
+	utils "github.com/Method-Security/webscan/utils"
 	request "github.com/Method-Security/webscan/utils/request"
 )
 
-// createAppFingerprintRequestConfig creates a request config for the app fingerprint engine
-func createAppFingerprintRequestConfig(baseURL, path string, method common.HttpMethod, requestParams common.RequestParams, config *appFern.AppFingerprintConfig) common.RequestConfig {
-	maxRedirects := 10 // Default max redirects value
+func createRequestConfig(baseURL, path string, method common.HttpMethod, requestParams common.RequestParams, config *appFern.AppFingerprintConfig, browserbaseSecrets *common.BrowserbaseSecrets) common.RequestConfig {
 	return common.RequestConfig{
-		BaseUrl:         baseURL,
-		Path:            path,
-		Method:          method,
-		RequestParams:   &requestParams,
-		Timeout:         config.Timeout,
-		FollowRedirects: true,
-		MaxRedirects:    &maxRedirects,
-		Insecure:        config.Insecure,
+		BaseUrl:            baseURL,
+		Path:               path,
+		Method:             method,
+		RequestParams:      &requestParams,
+		FollowRedirects:    false,
+		MaxRedirects:       nil,
+		Insecure:           config.Insecure,
+		Timeout:            config.Timeout,
+		RequestMethod:      config.RequestMethod,
+		HeadlessConfig:     config.HeadlessConfig,
+		BrowserbaseConfig:  config.BrowserbaseConfig,
+		BrowserbaseSecrets: browserbaseSecrets,
 	}
 }
 
@@ -63,7 +69,7 @@ func Run(ctx context.Context, target string, config *appFern.AppFingerprintConfi
 			}
 
 			// Perform Request (Request, Browser, or Browserbase)
-			requestConfig := createAppFingerprintRequestConfig(baseURL, fullPath, method, requestParams, config)
+			requestConfig := createRequestConfig(baseURL, fullPath, method, requestParams, config, browserbaseSecrets)
 			request, err := request.SendRequest(ctx, requestConfig)
 			if err != nil {
 				errors = append(errors, err.Error())

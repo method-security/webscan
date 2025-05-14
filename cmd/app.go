@@ -1,21 +1,29 @@
 package cmd
 
 import (
+	// Standard
 	"errors"
 	"fmt"
 	"strings"
 
+	// Generated
 	appFern "github.com/Method-Security/webscan/generated/go/app"
-	enumerateWordpressFern "github.com/Method-Security/webscan/generated/go/app/enumerate/cms/wordpress"
+	enumerateCmsWordpressFern "github.com/Method-Security/webscan/generated/go/app/enumerate/cms/wordpress"
 	enumerateWebserverFern "github.com/Method-Security/webscan/generated/go/app/enumerate/webserver"
 	common "github.com/Method-Security/webscan/generated/go/common"
+
+	// Internal
 	enumerateApiApplication "github.com/Method-Security/webscan/internal/app/enumerate/apiapplication"
 	enumerateCmsWordpress "github.com/Method-Security/webscan/internal/app/enumerate/cms/wordpress"
 	enumerateKube "github.com/Method-Security/webscan/internal/app/enumerate/kube"
 	enumerateWebserver "github.com/Method-Security/webscan/internal/app/enumerate/webserver"
 	fingerprint "github.com/Method-Security/webscan/internal/app/fingerprint"
-	"github.com/Method-Security/webscan/utils"
-	"github.com/Method-Security/webscan/utils/request/helpers/headless/browserbase"
+
+	// Utils
+	utils "github.com/Method-Security/webscan/utils"
+	browserbase "github.com/Method-Security/webscan/utils/request/helpers/headless/browserbase"
+
+	// External
 	"github.com/spf13/cobra"
 )
 
@@ -96,7 +104,7 @@ func (a *WebScan) InitAppCommand() {
 				return
 			}
 
-			// Flags for headless browser or browserbase
+			// Flags for headless browser or Browserbase
 			var headlessConfig *common.HeadlessConfig
 			if requestMethodEnum == common.RequestMethodHeadless || requestMethodEnum == common.RequestMethodBrowserbase {
 				bPath, err := cmd.Flags().GetString("headless-path")
@@ -115,7 +123,7 @@ func (a *WebScan) InitAppCommand() {
 				headlessConfig.MinDomStabalizeTime = domTime
 			}
 
-			// Flags for browserbase
+			// Flags for Browserbase
 			var browserbaseConfig *common.BrowserbaseConfig
 			var browserbaseSecrets *common.BrowserbaseSecrets
 			if requestMethodEnum == common.RequestMethodBrowserbase {
@@ -150,15 +158,16 @@ func (a *WebScan) InitAppCommand() {
 					Project: projectStr,
 					Token:   tokenStr,
 				}
-
 			}
 
-			config, err := newFingerprintConfig(targets, resourceType, modules, filteredFingerprints, timeout, successfulOnly, insecure, requestMethodEnum, headlessConfig, browserbaseConfig)
+			// Create config
+			config, err := newFingerprintConfig(targets, resourceType, modules, filteredFingerprints, successfulOnly, insecure, timeout, requestMethodEnum, headlessConfig, browserbaseConfig)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
 
+			// Generate report
 			report, err := fingerprint.Launch(cmd.Context(), config, browserbaseSecrets)
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -192,7 +201,7 @@ func (a *WebScan) InitAppCommand() {
 		Long:  `Perform API application enumeration scans against a target.`,
 	}
 
-	enumerateGraphqlCmd := &cobra.Command{
+	enumerateAPIApplicationGraphqlCmd := &cobra.Command{
 		Use:   "graphql",
 		Short: "Perform a GraphQL enumeration scan against a target",
 		Long:  `Perform a GraphQL enumeration scan against a target.`,
@@ -206,6 +215,22 @@ func (a *WebScan) InitAppCommand() {
 				return
 			}
 
+			// Request method flag
+			requestMethod, err := cmd.Flags().GetString("request-method")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			requestMethodEnum, err := common.NewRequestMethodFromString(strings.ToUpper(requestMethod))
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			if requestMethodEnum != common.RequestMethodStandard {
+				a.OutputSignal.AddError(errors.New("only standard request method is supported"))
+				return
+			}
+
 			// Generate report
 			report := enumerateApiApplication.PerformAppEnumerateGraphQL(cmd.Context(), target)
 			if len(report.Errors) > 0 {
@@ -215,13 +240,13 @@ func (a *WebScan) InitAppCommand() {
 		},
 	}
 
-	enumerateGraphqlCmd.Flags().String("target", "", "URL target to perform GraphQL enumeration against")
+	enumerateAPIApplicationGraphqlCmd.Flags().String("target", "", "URL target to perform GraphQL enumeration against")
 
-	_ = enumerateGraphqlCmd.MarkFlagRequired("target")
+	_ = enumerateAPIApplicationGraphqlCmd.MarkFlagRequired("target")
 
-	enumerateAPIApplicationCmd.AddCommand(enumerateGraphqlCmd)
+	enumerateAPIApplicationCmd.AddCommand(enumerateAPIApplicationGraphqlCmd)
 
-	enumerateGrpcCmd := &cobra.Command{
+	enumerateAPIApplicationGrpcCmd := &cobra.Command{
 		Use:   "grpc",
 		Short: "Perform a gRPC enumeration scan against a target",
 		Long:  `Perform a gRPC enumeration scan against a target.`,
@@ -244,13 +269,13 @@ func (a *WebScan) InitAppCommand() {
 		},
 	}
 
-	enumerateGrpcCmd.Flags().String("target", "", "URL target to perform gRPC enumeration against")
+	enumerateAPIApplicationGrpcCmd.Flags().String("target", "", "URL target to perform gRPC enumeration against")
 
-	_ = enumerateGrpcCmd.MarkFlagRequired("target")
+	_ = enumerateAPIApplicationGrpcCmd.MarkFlagRequired("target")
 
-	enumerateAPIApplicationCmd.AddCommand(enumerateGrpcCmd)
+	enumerateAPIApplicationCmd.AddCommand(enumerateAPIApplicationGrpcCmd)
 
-	enumerateSwaggerCmd := &cobra.Command{
+	enumerateAPIApplicationSwaggerCmd := &cobra.Command{
 		Use:   "swagger",
 		Short: "Perform a Swagger enumeration scan against a target",
 		Long:  `Perform a Swagger enumeration scan against a target.`,
@@ -271,6 +296,22 @@ func (a *WebScan) InitAppCommand() {
 				return
 			}
 
+			// Request method flag
+			requestMethod, err := cmd.Flags().GetString("request-method")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			requestMethodEnum, err := common.NewRequestMethodFromString(strings.ToUpper(requestMethod))
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			if requestMethodEnum != common.RequestMethodStandard {
+				a.OutputSignal.AddError(errors.New("only standard request method is supported"))
+				return
+			}
+
 			// Generate report
 			report := enumerateApiApplication.PerformAppEnumerateSwagger(cmd.Context(), target, timeout)
 			if len(report.Errors) > 0 {
@@ -280,12 +321,12 @@ func (a *WebScan) InitAppCommand() {
 		},
 	}
 
-	enumerateSwaggerCmd.Flags().String("target", "", "URL target to perform Swagger enumeration against")
-	enumerateSwaggerCmd.Flags().Int("timeout", 30, "Timeout per request (seconds)")
+	enumerateAPIApplicationSwaggerCmd.Flags().String("target", "", "URL target to perform Swagger enumeration against")
+	enumerateAPIApplicationSwaggerCmd.Flags().Int("timeout", 30, "Timeout per request (seconds)")
 
-	_ = enumerateSwaggerCmd.MarkFlagRequired("target")
+	_ = enumerateAPIApplicationSwaggerCmd.MarkFlagRequired("target")
 
-	enumerateAPIApplicationCmd.AddCommand(enumerateSwaggerCmd)
+	enumerateAPIApplicationCmd.AddCommand(enumerateAPIApplicationSwaggerCmd)
 	enumerateCmd.AddCommand(enumerateAPIApplicationCmd)
 
 	enumerateKubeCmd := &cobra.Command{
@@ -309,8 +350,24 @@ func (a *WebScan) InitAppCommand() {
 				return
 			}
 
+			// Request method flag
+			requestMethod, err := cmd.Flags().GetString("request-method")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			requestMethodEnum, err := common.NewRequestMethodFromString(strings.ToUpper(requestMethod))
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			if requestMethodEnum != common.RequestMethodStandard {
+				a.OutputSignal.AddError(errors.New("only standard request method is supported"))
+				return
+			}
+
 			// Generate report
-			report := enumerateKube.PerformAppEnumerateK8s(cmd.Context(), target, timeout)
+			report := enumerateKube.PerformAppEnumerateKube(cmd.Context(), target, timeout)
 			if len(report.Errors) > 0 {
 				a.OutputSignal.Status = 1
 			}
@@ -318,7 +375,7 @@ func (a *WebScan) InitAppCommand() {
 		},
 	}
 
-	enumerateKubeCmd.Flags().String("target", "", "URL target to perform K8s enumeration against")
+	enumerateKubeCmd.Flags().String("target", "", "URL target to perform Kube enumeration against")
 	enumerateKubeCmd.Flags().Int("timeout", 30, "Timeout per request (seconds)")
 
 	_ = enumerateKubeCmd.MarkFlagRequired("target")
@@ -348,6 +405,22 @@ func (a *WebScan) InitAppCommand() {
 			targets, err := cmd.Flags().GetStringSlice("targets")
 			if err != nil {
 				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Request method flag
+			requestMethod, err := cmd.Flags().GetString("request-method")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			requestMethodEnum, err := common.NewRequestMethodFromString(strings.ToUpper(requestMethod))
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			if requestMethodEnum != common.RequestMethodStandard {
+				a.OutputSignal.AddError(errors.New("only standard request method is supported"))
 				return
 			}
 
@@ -399,7 +472,7 @@ func (a *WebScan) InitAppCommand() {
 
 	enumerateCMSWordpressPluginsCmd.Flags().StringSlice("targets", []string{}, "URL targets to perform WordPress plugins enumeration against")
 	enumerateCMSWordpressPluginsCmd.Flags().StringSlice("plugins", []string{}, "WordPress plugins to try to detect")
-	enumerateCMSWordpressPluginsCmd.Flags().StringSlice("plugins-file-paths", []string{"configs/wordpress/wordpress_plugins_small.txt"}, "File paths containing common WordPress plugins to use for enumeration")
+	enumerateCMSWordpressPluginsCmd.Flags().StringSlice("plugins-file-paths", []string{"configs/cms/wordpress/plugins/wordpress_plugins_small.txt"}, "File paths containing common WordPress plugins to use for enumeration")
 	enumerateCMSWordpressPluginsCmd.Flags().Int("timeout", 30, "Timeout per request (seconds)")
 	enumerateCMSWordpressPluginsCmd.Flags().Int("threads", 0, "Number of threads to use during enumeration (default is number of CPUs)")
 
@@ -431,19 +504,34 @@ func (a *WebScan) InitAppCommand() {
 				return
 			}
 
-			// Threads flag
+			// Config flags
 			threads, err := cmd.Flags().GetInt("threads")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
-
-			// Timeout flag
 			timeout, err := cmd.Flags().GetInt("timeout")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
+
+			// Request method flag
+			requestMethod, err := cmd.Flags().GetString("request-method")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			requestMethodEnum, err := common.NewRequestMethodFromString(strings.ToUpper(requestMethod))
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			if requestMethodEnum != common.RequestMethodStandard {
+				a.OutputSignal.AddError(errors.New("only standard request method is supported"))
+				return
+			}
+
 			// Generate config
 			config := newEnumerateWebserverIISConfig(targets, threads, timeout)
 
@@ -471,30 +559,32 @@ func (a *WebScan) InitAppCommand() {
 	a.RootCmd.AddCommand(appCmd)
 }
 
-func newFingerprintConfig(targets []string, resourceEnum string, moduleEnums []string, fingerprints *appFern.AppResourceType, timeout int, successfulOnly bool, insecure bool, requestMethod common.RequestMethod, headlessConfig *common.HeadlessConfig, browserbaseConfig *common.BrowserbaseConfig) (*appFern.AppFingerprintConfig, error) {
+func newFingerprintConfig(targets []string, resource string, moduleEnums []string, fingerprints *appFern.AppResourceType, successfulOnly bool, insecure bool, timeout int, requestMethod common.RequestMethod, headlessConfig *common.HeadlessConfig, browserbaseConfig *common.BrowserbaseConfig) (*appFern.AppFingerprintConfig, error) {
+	resourceEnum, err := appFern.NewAppFingerprintResourceTypeFromString(resource)
+	if err != nil {
+		return nil, fmt.Errorf("invalid resource type: %s", resource)
+	}
+
 	config := &appFern.AppFingerprintConfig{
 		Targets:           targets,
 		ResourceType:      resourceEnum,
 		Modules:           moduleEnums,
 		Fingerprints:      fingerprints,
-		Timeout:           timeout,
 		SuccessfulOnly:    successfulOnly,
 		Insecure:          insecure,
+		Timeout:           max(timeout, 0),
 		RequestMethod:     requestMethod,
 		HeadlessConfig:    headlessConfig,
 		BrowserbaseConfig: browserbaseConfig,
 	}
-	if config.Timeout < 1 {
-		config.Timeout = 0
-	}
 	return config, nil
 }
 
-func newEnumerateCMSWordpressPluginsConfig(targets []string, plugins []string, timeout int, threads int) *enumerateWordpressFern.AppEnumerateWordpressPluginsConfig {
-	config := &enumerateWordpressFern.AppEnumerateWordpressPluginsConfig{
+func newEnumerateCMSWordpressPluginsConfig(targets []string, plugins []string, timeout int, threads int) *enumerateCmsWordpressFern.AppEnumerateWordpressPluginsConfig {
+	config := &enumerateCmsWordpressFern.AppEnumerateWordpressPluginsConfig{
 		Targets: targets,
 		Plugins: plugins,
-		Timeout: timeout,
+		Timeout: max(timeout, 0),
 	}
 	if threads > 0 {
 		config.Threads = &threads
@@ -505,7 +595,7 @@ func newEnumerateCMSWordpressPluginsConfig(targets []string, plugins []string, t
 func newEnumerateWebserverIISConfig(targets []string, threads int, timeout int) *enumerateWebserverFern.AppEnumerateIisConfig {
 	config := &enumerateWebserverFern.AppEnumerateIisConfig{
 		Targets: targets,
-		Timeout: timeout,
+		Timeout: max(timeout, 0),
 	}
 	if threads > 0 {
 		config.Threads = &threads

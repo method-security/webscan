@@ -1,21 +1,26 @@
-package routecapture
+package captureroute
 
 import (
+	// Standard
 	"context"
 	"net/url"
 	"time"
 
-	routefern "github.com/Method-Security/webscan/generated/go/capture/route"
+	// Generated
+	route "github.com/Method-Security/webscan/generated/go/capture/route"
 	common "github.com/Method-Security/webscan/generated/go/common"
+
+	// Utils
 	"github.com/Method-Security/webscan/utils/request/helpers/headless"
-	"github.com/go-rod/rod"
-	"github.com/go-rod/rod/lib/proto"
-	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
+	// External
+	rod "github.com/go-rod/rod"
+	proto "github.com/go-rod/rod/lib/proto"
+	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
 // extractNetworkRoutes fetches network requests, parses them, and populates []WebRoute.
-func extractNetworkRoutes(ctx context.Context, b *headless.Requester, target string, baseURLsOnly bool, captureStaticAssets bool) ([]*routefern.WebRoute, []string, []string) {
-	routes := []*routefern.WebRoute{}
+func extractNetworkRoutes(ctx context.Context, b *headless.Requester, target string, baseURLsOnly bool, captureStaticAssets bool) ([]*route.WebRoute, []string, []string) {
+	routes := []*route.WebRoute{}
 	urls := make(map[string]struct{})
 	errors := []string{}
 	log := svc1log.FromContext(ctx)
@@ -115,7 +120,7 @@ func extractNetworkRoutes(ctx context.Context, b *headless.Requester, target str
 		}
 
 		// Build WebRoute object
-		webRoute := &routefern.WebRoute{
+		webRoute := &route.WebRoute{
 			Url:    urlNoQuery,
 			Path:   &parsedURL.Path,
 			Method: common.HttpMethod(request.Method).Ptr(),

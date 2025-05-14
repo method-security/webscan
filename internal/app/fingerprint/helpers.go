@@ -6,17 +6,17 @@ import (
 	"os"
 	"slices"
 
-	webscan "github.com/Method-Security/webscan/generated/go/app"
+	appFern "github.com/Method-Security/webscan/generated/go/app"
 )
 
 // LoadFingerprints loads and unmarshals the fingerprints.json file into the generated AppFingerprints struct
-func LoadFingerprints(filePath string) (*webscan.AppFingerprints, error) {
+func LoadFingerprints(filePath string) (*appFern.AppFingerprints, error) {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, err
 	}
 
-	var config webscan.AppFingerprints
+	var config appFern.AppFingerprints
 	if err := json.Unmarshal(data, &config); err != nil {
 		return nil, err
 	}
@@ -26,15 +26,15 @@ func LoadFingerprints(filePath string) (*webscan.AppFingerprints, error) {
 
 // FilterFingerprints filters the fingerprints based on resource types and modules
 // Returns error if resource type or module doesn't exist
-func FilterFingerprints(fingerprints *webscan.AppFingerprints, resourceType string, modules []string) (*webscan.AppResourceType, error) {
+func FilterFingerprints(fingerprints *appFern.AppFingerprints, resourceType string, modules []string) (*appFern.AppResourceType, error) {
 	// Convert string to AppFingerprintResourceType
-	rt, err := webscan.NewAppFingerprintResourceTypeFromString(resourceType)
+	rt, err := appFern.NewAppFingerprintResourceTypeFromString(resourceType)
 	if err != nil {
 		return nil, fmt.Errorf("invalid resource type: %s", resourceType)
 	}
 
 	// Find the resource type
-	var foundResourceType *webscan.AppResourceType
+	var foundResourceType *appFern.AppResourceType
 	for _, r := range fingerprints.ResourceTypes {
 		if r.Name == rt {
 			foundResourceType = r
@@ -51,7 +51,7 @@ func FilterFingerprints(fingerprints *webscan.AppFingerprints, resourceType stri
 	}
 
 	// Find the module
-	var foundModules []*webscan.AppResourceModule
+	var foundModules []*appFern.AppResourceModule
 	for _, m := range foundResourceType.Modules {
 		if slices.Contains(modules, m.Name) {
 			foundModules = append(foundModules, m)
@@ -67,7 +67,7 @@ func FilterFingerprints(fingerprints *webscan.AppFingerprints, resourceType stri
 }
 
 // GetModule returns the module configuration for a given resource type and module
-func GetModule(resourceType webscan.AppFingerprintResourceType, module string, fingerprints *webscan.AppFingerprints) (*webscan.AppResourceModule, error) {
+func GetModule(resourceType appFern.AppFingerprintResourceType, module string, fingerprints *appFern.AppFingerprints) (*appFern.AppResourceModule, error) {
 	// Check if resource type exists
 	for _, rt := range fingerprints.ResourceTypes {
 		if rt.Name == resourceType {

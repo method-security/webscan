@@ -5,3 +5,13 @@ type RootFlags struct {
 	Quiet   bool
 	Verbose bool
 }
+
+type RequestFlags struct {
+	RequestMethod       *string
+	HeadlessPath        *string
+	MinDomStabalizeTime *int
+	BrowserbaseToken    *string
+	BrowserbaseProject  *string
+	Proxy               *bool
+	Countries           *[]string
+}

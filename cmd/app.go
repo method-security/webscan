@@ -2,15 +2,20 @@ package cmd
 
 import (
 	"errors"
+	"fmt"
+	"strings"
 
-	webscan "github.com/Method-Security/webscan/generated/go/app"
+	appFern "github.com/Method-Security/webscan/generated/go/app"
+	enumerateWordpressFern "github.com/Method-Security/webscan/generated/go/app/enumerate/cms/wordpress"
 	enumerateWebserverFern "github.com/Method-Security/webscan/generated/go/app/enumerate/webserver"
-	enumerateWordpressFern "github.com/Method-Security/webscan/generated/go/app/enumerate/wordpress"
-	"github.com/Method-Security/webscan/internal/app/enumerate"
+	common "github.com/Method-Security/webscan/generated/go/common"
+	enumerateApiApplication "github.com/Method-Security/webscan/internal/app/enumerate/apiapplication"
+	enumerateCmsWordpress "github.com/Method-Security/webscan/internal/app/enumerate/cms/wordpress"
+	enumerateKube "github.com/Method-Security/webscan/internal/app/enumerate/kube"
 	enumerateWebserver "github.com/Method-Security/webscan/internal/app/enumerate/webserver"
-	enumerateWordpress "github.com/Method-Security/webscan/internal/app/enumerate/wordpress"
 	fingerprint "github.com/Method-Security/webscan/internal/app/fingerprint"
 	"github.com/Method-Security/webscan/utils"
+	"github.com/Method-Security/webscan/utils/request/helpers/headless/browserbase"
 	"github.com/spf13/cobra"
 )
 
@@ -25,16 +30,11 @@ func (a *WebScan) InitAppCommand() {
 	fingerprintCmd := &cobra.Command{
 		Use:   "fingerprint",
 		Short: "Perform a fingerprinting scan against a target",
-		Long: `Perform a fingerprinting scan against a target using specified types.
-		
-The fingerprint command identifies the type of web application running on the target URL.
-It supports fingerprinting different resource types including API applications (FastAPI, Swagger, gRPC, GraphQL, K8s), and 
-cloud buckets (AWSS3, AzureBlob). The command accepts a list of modules to run
-for the specified resource type.`,
+		Long:  `Perform a fingerprinting scan against a target using specified types.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			defer a.OutputSignal.PanicHandler(cmd.Context())
 
-			// Target flag
+			// Targets flag
 			targets, err := cmd.Flags().GetStringSlice("targets")
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -42,7 +42,7 @@ for the specified resource type.`,
 			}
 
 			// Config flags
-			fingerprintFile, err := cmd.Flags().GetString("fingerprintfile")
+			fingerprintFile, err := cmd.Flags().GetString("fingerprint-file")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -52,7 +52,7 @@ for the specified resource type.`,
 				a.OutputSignal.AddError(err)
 				return
 			}
-			resourceType, err := cmd.Flags().GetString("resourcetype")
+			resourceType, err := cmd.Flags().GetString("resource-type")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -67,23 +67,99 @@ for the specified resource type.`,
 				a.OutputSignal.AddError(err)
 				return
 			}
+			successfulOnly, err := cmd.Flags().GetBool("successful-only")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			insecure, err := cmd.Flags().GetBool("insecure")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
 			timeout, err := cmd.Flags().GetInt("timeout")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			successfulOnly, err := cmd.Flags().GetBool("successfulonly")
+
+			// Request Method
+			requestMethod, err := cmd.Flags().GetString("request-method")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			config, err := newFingerprintConfig(targets, resourceType, modules, filteredFingerprints, timeout, successfulOnly)
+			requestMethodEnum, err := common.NewRequestMethodFromString(strings.ToUpper(requestMethod))
+			if err != nil {
+				err = fmt.Errorf("invalid request method: %s", requestMethod)
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Flags for headless browser or browserbase
+			var headlessConfig *common.HeadlessConfig
+			if requestMethodEnum == common.RequestMethodHeadless || requestMethodEnum == common.RequestMethodBrowserbase {
+				bPath, err := cmd.Flags().GetString("headless-path")
+				if err != nil {
+					a.OutputSignal.AddError(err)
+					return
+				}
+				headlessConfig = &common.HeadlessConfig{
+					PathToBrowser: &bPath,
+				}
+				domTime, err := cmd.Flags().GetInt("min-dom-stabalize-time")
+				if err != nil {
+					a.OutputSignal.AddError(err)
+					return
+				}
+				headlessConfig.MinDomStabalizeTime = domTime
+			}
+
+			// Flags for browserbase
+			var browserbaseConfig *common.BrowserbaseConfig
+			var browserbaseSecrets *common.BrowserbaseSecrets
+			if requestMethodEnum == common.RequestMethodBrowserbase {
+				// Config flags
+				proxy, err := cmd.Flags().GetBool("proxy")
+				if err != nil {
+					a.OutputSignal.AddError(err)
+					return
+				}
+				countries, err := cmd.Flags().GetStringSlice("countries")
+				if err != nil {
+					a.OutputSignal.AddError(err)
+					return
+				}
+				browserbaseConfig = &common.BrowserbaseConfig{
+					Proxy:     &proxy,
+					Countries: countries,
+				}
+
+				// Environment variables
+				tokenStr, err := browserbase.GetFlagOrEnvironmentVariable(cmd, "token", "BROWSERBASE_TOKEN")
+				if err != nil {
+					a.OutputSignal.AddError(err)
+					return
+				}
+				projectStr, err := browserbase.GetFlagOrEnvironmentVariable(cmd, "project", "BROWSERBASE_PROJECT")
+				if err != nil {
+					a.OutputSignal.AddError(err)
+					return
+				}
+				browserbaseSecrets = &common.BrowserbaseSecrets{
+					Project: projectStr,
+					Token:   tokenStr,
+				}
+
+			}
+
+			config, err := newFingerprintConfig(targets, resourceType, modules, filteredFingerprints, timeout, successfulOnly, insecure, requestMethodEnum, headlessConfig, browserbaseConfig)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
 
-			report, err := fingerprint.Launch(cmd.Context(), config)
+			report, err := fingerprint.Launch(cmd.Context(), config, browserbaseSecrets)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 			}
@@ -92,33 +168,34 @@ for the specified resource type.`,
 	}
 
 	fingerprintCmd.Flags().StringSlice("targets", []string{}, "URL target to perform fingerprint against")
-	fingerprintCmd.Flags().String("fingerprintfile", "configs/app/fingerprints.json", "Path to the fingerprint file to use for fingerprinting")
-	fingerprintCmd.Flags().String("resourcetype", "", "Defined resource type to fingerprint")
+	fingerprintCmd.Flags().String("fingerprint-file", "configs/app/fingerprints.json", "Path to the fingerprint file to use for fingerprinting")
+	fingerprintCmd.Flags().String("resource-type", "", "Defined resource type to fingerprint")
 	fingerprintCmd.Flags().StringSlice("modules", []string{}, "Defined resource type modules to run")
+	fingerprintCmd.Flags().Bool("successful-only", false, "Only show successful attempts")
+	fingerprintCmd.Flags().Bool("insecure", false, "Allow insecure SSL connections and transfers")
 	fingerprintCmd.Flags().Int("timeout", 30, "Timeout per request (seconds)")
-	fingerprintCmd.Flags().Bool("successfulonly", false, "Only show successful attempts")
 
 	_ = fingerprintCmd.MarkFlagRequired("targets")
-	_ = fingerprintCmd.MarkFlagRequired("resoursetype")
+	_ = fingerprintCmd.MarkFlagRequired("resource-type")
 
 	appCmd.AddCommand(fingerprintCmd)
 
 	enumerateCmd := &cobra.Command{
 		Use:   "enumerate",
 		Short: "Perform enumeration scans against a target",
-		Long: `Perform enumeration scans against a target using specified types.
-		
-The enumerate command details the routes and endpoints for an API application. 
-It extracts information such as available endpoints, HTTP methods, query parameters, and authentication mechanisms.`,
+		Long:  `Perform enumeration scans against a target using specified types.`,
+	}
+
+	enumerateAPIApplicationCmd := &cobra.Command{
+		Use:   "apiapplication",
+		Short: "Perform API application enumeration scans against a target",
+		Long:  `Perform API application enumeration scans against a target.`,
 	}
 
 	enumerateGraphqlCmd := &cobra.Command{
 		Use:   "graphql",
 		Short: "Perform a GraphQL enumeration scan against a target",
-		Long: `Perform a GraphQL enumeration scan against a target.
-		
-This involves querying the GraphQL schema to discover available types, queries, mutations, and subscriptions, 
-and extracting details about the fields and their types.`,
+		Long:  `Perform a GraphQL enumeration scan against a target.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			defer a.OutputSignal.PanicHandler(cmd.Context())
 
@@ -130,7 +207,7 @@ and extracting details about the fields and their types.`,
 			}
 
 			// Generate report
-			report := enumerate.PerformAppEnumerateGraphQL(cmd.Context(), target)
+			report := enumerateApiApplication.PerformAppEnumerateGraphQL(cmd.Context(), target)
 			if len(report.Errors) > 0 {
 				a.OutputSignal.Status = 1
 			}
@@ -142,19 +219,16 @@ and extracting details about the fields and their types.`,
 
 	_ = enumerateGraphqlCmd.MarkFlagRequired("target")
 
-	enumerateCmd.AddCommand(enumerateGraphqlCmd)
+	enumerateAPIApplicationCmd.AddCommand(enumerateGraphqlCmd)
 
 	enumerateGrpcCmd := &cobra.Command{
 		Use:   "grpc",
 		Short: "Perform a gRPC enumeration scan against a target",
-		Long: `Perform a gRPC enumeration scan against a target.
-		
-This involves connecting to the gRPC server, using reflection to discover available services and methods, 
-and extracting details about the methods, including their input and output types.`,
+		Long:  `Perform a gRPC enumeration scan against a target.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			defer a.OutputSignal.PanicHandler(cmd.Context())
 
-			// Target flag
+			// Get Target flag
 			target, err := cmd.Flags().GetString("target")
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -162,7 +236,7 @@ and extracting details about the methods, including their input and output types
 			}
 
 			// Generate report
-			report := enumerate.PerformAppEnumerateGrpc(cmd.Context(), target)
+			report := enumerateApiApplication.PerformAppEnumerateGrpc(cmd.Context(), target)
 			if len(report.Errors) > 0 {
 				a.OutputSignal.Status = 1
 			}
@@ -174,51 +248,12 @@ and extracting details about the methods, including their input and output types
 
 	_ = enumerateGrpcCmd.MarkFlagRequired("target")
 
-	enumerateCmd.AddCommand(enumerateGrpcCmd)
+	enumerateAPIApplicationCmd.AddCommand(enumerateGrpcCmd)
 
-	enumerateK8sCmd := &cobra.Command{
-		Use:   "k8s",
-		Short: "Perform a K8s enumeration scan against a target",
-		Long:  `Perform a K8s enumeration scan against a target.`,
-		Run: func(cmd *cobra.Command, args []string) {
-			defer a.OutputSignal.PanicHandler(cmd.Context())
-
-			// Target flag
-			target, err := cmd.Flags().GetString("target")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-
-			// Timeout flag
-			timeout, err := cmd.Flags().GetInt("timeout")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-
-			// Generate report
-			report := enumerate.PerformAppEnumerateK8s(cmd.Context(), target, timeout)
-			if len(report.Errors) > 0 {
-				a.OutputSignal.Status = 1
-			}
-			a.OutputSignal.Content = report
-		},
-	}
-
-	enumerateK8sCmd.Flags().String("target", "", "URL target to perform K8s enumeration against")
-	enumerateK8sCmd.Flags().Int("timeout", 30, "Timeout per request (seconds)")
-
-	_ = enumerateK8sCmd.MarkFlagRequired("target")
-
-	enumerateCmd.AddCommand(enumerateK8sCmd)
 	enumerateSwaggerCmd := &cobra.Command{
 		Use:   "swagger",
 		Short: "Perform a Swagger enumeration scan against a target",
-		Long: `Perform a Swagger enumeration scan against a target.
-		
-This involves fetching and parsing the Swagger (OpenAPI) documentation to extract details about the available endpoints, 
-HTTP methods, query parameters, and authentication mechanisms.`,
+		Long:  `Perform a Swagger enumeration scan against a target.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			defer a.OutputSignal.PanicHandler(cmd.Context())
 
@@ -237,7 +272,7 @@ HTTP methods, query parameters, and authentication mechanisms.`,
 			}
 
 			// Generate report
-			report := enumerate.PerformAppEnumerateSwagger(cmd.Context(), target, timeout)
+			report := enumerateApiApplication.PerformAppEnumerateSwagger(cmd.Context(), target, timeout)
 			if len(report.Errors) > 0 {
 				a.OutputSignal.Status = 1
 			}
@@ -250,29 +285,73 @@ HTTP methods, query parameters, and authentication mechanisms.`,
 
 	_ = enumerateSwaggerCmd.MarkFlagRequired("target")
 
-	enumerateCmd.AddCommand(enumerateSwaggerCmd)
+	enumerateAPIApplicationCmd.AddCommand(enumerateSwaggerCmd)
+	enumerateCmd.AddCommand(enumerateAPIApplicationCmd)
 
-	enumerateWordpressCmd := &cobra.Command{
+	enumerateKubeCmd := &cobra.Command{
+		Use:   "kube",
+		Short: "Perform a Kube enumeration scan against a target",
+		Long:  `Perform a Kube enumeration scan against a target.`,
+		Run: func(cmd *cobra.Command, args []string) {
+			defer a.OutputSignal.PanicHandler(cmd.Context())
+
+			// Get Target flag
+			target, err := cmd.Flags().GetString("target")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Get config flags
+			timeout, err := cmd.Flags().GetInt("timeout")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Generate report
+			report := enumerateKube.PerformAppEnumerateK8s(cmd.Context(), target, timeout)
+			if len(report.Errors) > 0 {
+				a.OutputSignal.Status = 1
+			}
+			a.OutputSignal.Content = report
+		},
+	}
+
+	enumerateKubeCmd.Flags().String("target", "", "URL target to perform K8s enumeration against")
+	enumerateKubeCmd.Flags().Int("timeout", 30, "Timeout per request (seconds)")
+
+	_ = enumerateKubeCmd.MarkFlagRequired("target")
+
+	enumerateCmd.AddCommand(enumerateKubeCmd)
+
+	enumerateCMSCmd := &cobra.Command{
+		Use:   "cms",
+		Short: "Perform CMS enumeration scans against a target",
+		Long:  `Perform CMS enumeration scans against a target.`,
+	}
+
+	enumerateCMSWordpressCmd := &cobra.Command{
 		Use:   "wordpress",
 		Short: "Perform WordPress specific enumeration scans against a target",
 		Long:  `Perform WordPress specific enumeration scans against a target.`,
 	}
 
-	enumerateWordpressPluginsCmd := &cobra.Command{
+	enumerateCMSWordpressPluginsCmd := &cobra.Command{
 		Use:   "plugins",
 		Short: "Attempt to enumerate WordPress plugins on a target",
 		Long:  `Attempt to enumerate WordPress plugins on a target.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			defer a.OutputSignal.PanicHandler(cmd.Context())
 
-			// Target flag
+			// Get Target flag
 			targets, err := cmd.Flags().GetStringSlice("targets")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
 
-			// Get common plugins
+			// Get config flags
 			plugins, err := cmd.Flags().GetStringSlice("plugins")
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -295,8 +374,6 @@ HTTP methods, query parameters, and authentication mechanisms.`,
 				a.OutputSignal.AddError(errors.New("no plugins provided"))
 				return
 			}
-
-			// Config flags
 			timeout, err := cmd.Flags().GetInt("timeout")
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -309,10 +386,10 @@ HTTP methods, query parameters, and authentication mechanisms.`,
 			}
 
 			// Generate config
-			config := newEnumerateWordpressPluginsConfig(targets, plugins, timeout, threads)
+			config := newEnumerateCMSWordpressPluginsConfig(targets, plugins, timeout, threads)
 
 			// Generate report
-			report := enumerateWordpress.PerformAppEnumerateWordpressPlugins(cmd.Context(), config)
+			report := enumerateCmsWordpress.PerformAppEnumerateCMSWordpressPlugins(cmd.Context(), config)
 			if len(report.Errors) > 0 {
 				a.OutputSignal.Status = 1
 			}
@@ -320,25 +397,24 @@ HTTP methods, query parameters, and authentication mechanisms.`,
 		},
 	}
 
-	enumerateWordpressPluginsCmd.Flags().StringSlice("targets", []string{}, "URL targets to perform WordPress plugins enumeration against")
-	enumerateWordpressPluginsCmd.Flags().StringSlice("plugins", []string{}, "WordPress plugins to try to detect")
-	enumerateWordpressPluginsCmd.Flags().StringSlice("plugins-file-paths", []string{"configs/wordpress/wordpress_plugins_small.txt"}, "File paths containing common WordPress plugins to use for enumeration")
-	enumerateWordpressPluginsCmd.Flags().Int("timeout", 30, "Timeout per request (seconds)")
-	enumerateWordpressPluginsCmd.Flags().Int("threads", 0, "Number of threads to use during enumeration (default is number of CPUs)")
+	enumerateCMSWordpressPluginsCmd.Flags().StringSlice("targets", []string{}, "URL targets to perform WordPress plugins enumeration against")
+	enumerateCMSWordpressPluginsCmd.Flags().StringSlice("plugins", []string{}, "WordPress plugins to try to detect")
+	enumerateCMSWordpressPluginsCmd.Flags().StringSlice("plugins-file-paths", []string{"configs/wordpress/wordpress_plugins_small.txt"}, "File paths containing common WordPress plugins to use for enumeration")
+	enumerateCMSWordpressPluginsCmd.Flags().Int("timeout", 30, "Timeout per request (seconds)")
+	enumerateCMSWordpressPluginsCmd.Flags().Int("threads", 0, "Number of threads to use during enumeration (default is number of CPUs)")
 
-	_ = enumerateWordpressPluginsCmd.MarkFlagRequired("targets")
+	_ = enumerateCMSWordpressPluginsCmd.MarkFlagRequired("targets")
 
-	enumerateWordpressCmd.AddCommand(enumerateWordpressPluginsCmd)
+	enumerateCMSWordpressCmd.AddCommand(enumerateCMSWordpressPluginsCmd)
 
-	enumerateCmd.AddCommand(enumerateWordpressCmd)
+	enumerateCMSCmd.AddCommand(enumerateCMSWordpressCmd)
+
+	enumerateCmd.AddCommand(enumerateCMSCmd)
 
 	enumerateWebserverCmd := &cobra.Command{
 		Use:   "webserver",
 		Short: "Perform webserver enumeration scans against a target",
-		Long: `Perform webserver enumeration scans against a target.
-		
-The webserver command identifies and catalogs detailed information about a webserver. 
-It extracts information such as server version, enabled modules, and more.`,
+		Long:  `Perform webserver enumeration scans against a target.`,
 	}
 
 	enumerateWebserverIISCmd := &cobra.Command{
@@ -395,14 +471,18 @@ It extracts information such as server version, enabled modules, and more.`,
 	a.RootCmd.AddCommand(appCmd)
 }
 
-func newFingerprintConfig(targets []string, resourceEnum string, moduleEnums []string, fingerprints *webscan.AppResourceType, timeout int, successfulOnly bool) (*webscan.AppFingerprintConfig, error) {
-	config := &webscan.AppFingerprintConfig{
-		Targets:        targets,
-		ResourceType:   resourceEnum,
-		Modules:        moduleEnums,
-		Fingerprints:   fingerprints,
-		Timeout:        timeout,
-		SuccessfulOnly: successfulOnly,
+func newFingerprintConfig(targets []string, resourceEnum string, moduleEnums []string, fingerprints *appFern.AppResourceType, timeout int, successfulOnly bool, insecure bool, requestMethod common.RequestMethod, headlessConfig *common.HeadlessConfig, browserbaseConfig *common.BrowserbaseConfig) (*appFern.AppFingerprintConfig, error) {
+	config := &appFern.AppFingerprintConfig{
+		Targets:           targets,
+		ResourceType:      resourceEnum,
+		Modules:           moduleEnums,
+		Fingerprints:      fingerprints,
+		Timeout:           timeout,
+		SuccessfulOnly:    successfulOnly,
+		Insecure:          insecure,
+		RequestMethod:     requestMethod,
+		HeadlessConfig:    headlessConfig,
+		BrowserbaseConfig: browserbaseConfig,
 	}
 	if config.Timeout < 1 {
 		config.Timeout = 0
@@ -410,13 +490,12 @@ func newFingerprintConfig(targets []string, resourceEnum string, moduleEnums []s
 	return config, nil
 }
 
-func newEnumerateWordpressPluginsConfig(targets []string, plugins []string, timeout int, threads int) *enumerateWordpressFern.AppEnumerateWordpressPluginsConfig {
+func newEnumerateCMSWordpressPluginsConfig(targets []string, plugins []string, timeout int, threads int) *enumerateWordpressFern.AppEnumerateWordpressPluginsConfig {
 	config := &enumerateWordpressFern.AppEnumerateWordpressPluginsConfig{
 		Targets: targets,
 		Plugins: plugins,
 		Timeout: timeout,
 	}
-
 	if threads > 0 {
 		config.Threads = &threads
 	}
@@ -428,10 +507,8 @@ func newEnumerateWebserverIISConfig(targets []string, threads int, timeout int) 
 		Targets: targets,
 		Timeout: timeout,
 	}
-
 	if threads > 0 {
 		config.Threads = &threads
 	}
-
 	return config
 }

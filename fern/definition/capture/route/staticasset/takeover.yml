@@ -1,0 +1,35 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/fern-api/fern/main/fern.schema.json
+imports:
+  requests: ../../../common/requests.yml
+  config: ../../../common/config.yml
+  captureroute: ../captureroute.yml
+types:
+  # Function Config
+  StaticAssetTakeOverConfig:
+    properties:
+      CaptureRouteConfig: captureroute.CaptureRouteConfig
+      successfulOnly: boolean
+      fingerprints: list<StaticAssetTakeOverFingerprint>
+  # Structure of the fingerprint file entries
+  StaticAssetTakeOverFingerprint:
+    properties:
+      name: string
+      description: string
+      responseBody: list<string>
+      statusCode: integer
+  # Signal Struct
+  StaticAssetTakeOverVulnerableInfo:
+    properties:
+      fingerprint: StaticAssetTakeOverFingerprint
+      vulnerable: boolean
+  StaticAssetTakeOverAttempt:
+    properties:
+      staticAsset: string
+      request: requests.RequestInfo
+      fingerprints: list<StaticAssetTakeOverVulnerableInfo>
+  StaticAssetTakeOverReport:
+    properties:
+      target: string
+      targetRequest: optional<requests.RequestInfo>
+      attempts: optional<list<StaticAssetTakeOverAttempt>>
+      errors: optional<list<string>>

@@ -1,6 +1,0 @@
-types:
-  CaptureMethod:
-    enum:
-      - REQUEST
-      - BROWSER
-      - BROWSERBASE

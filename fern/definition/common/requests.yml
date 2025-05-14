@@ -1,3 +1,5 @@
+imports:
+  config: config.yml
 types:
   # Http Method Enum
   HttpMethod:
@@ -11,7 +13,31 @@ types:
       - HEAD
       - CONNECT
       - TRACE
-  # Request Structure
+  # Represents the request parameters for a request
+  RequestParams:
+    properties:
+      pathParams: optional<map<string, string>>
+      queryParams: optional<map<string, string>>
+      headerParams: optional<map<string, string>>
+      bodyParams: optional<string>
+      formParams: optional<map<string, string>>
+      multipartParams: optional<map<string, string>>
+  # Internal Request Config (Used as a parameter for the SendRequest function)
+  RequestConfig:
+    properties:
+      baseURL: string
+      path: string
+      method: HttpMethod
+      requestParams: RequestParams
+      followRedirects: boolean
+      maxRedirects: optional<integer>
+      insecure: boolean
+      timeout: integer
+      requestMethod: config.RequestMethod
+      headlessConfig: optional<config.HeadlessConfig>
+      browserbaseConfig: optional<config.BrowserbaseConfig>
+      browserbaseSecrets: optional<config.BrowserbaseSecrets>
+  # Request Structure (Signal)
   RequestInfo:
     properties:
       baseUrl: string
@@ -29,12 +55,3 @@ types:
       responseHeaders: optional<map<string, string>>
       errors: optional<list<string>>
       timestamp: datetime
-  # Request Params
-  RequestParams:
-    properties:
-      pathParams: optional<map<string, string>>
-      queryParams: optional<map<string, string>>
-      headerParams: optional<map<string, string>>
-      bodyParams: optional<string>
-      formParams: optional<map<string, string>>
-      multipartParams: optional<map<string, string>>

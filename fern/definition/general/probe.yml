@@ -1,0 +1,20 @@
+imports:
+  config: ../common/config.yml
+  requests: ../common/requests.yml
+types:
+  # Config Struct
+  GeneralProbeConfig:
+    properties:
+      targets: list<string>
+      timeout: integer
+      maxRedirects: integer
+      insecure: boolean
+      requestMethod: config.RequestMethod
+      headlessConfig: optional<config.HeadlessConfig>
+      browserbaseConfig: optional<config.BrowserbaseConfig>
+  # GeneralProbeReport Struct
+  GeneralProbeReport:
+    properties:
+      targets: optional<list<requests.RequestInfo>>
+      config: GeneralProbeConfig
+      errors: optional<list<string>>

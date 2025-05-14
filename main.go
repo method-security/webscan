@@ -15,11 +15,9 @@ func main() {
 	webscan := cmd.NewWebScan(version)
 	webscan.InitRootCommand()
 	webscan.InitAppCommand()
-	webscan.InitPagecaptureCommand()
-	webscan.InitRoutecaptureCommand()
-	webscan.InitSpiderCommand()
-	webscan.InitURLCommand()
-	webscan.InitWebserverCommand()
+	webscan.InitCaptureCommand()
+	webscan.InitGeneralCommand()
+
 	if err := webscan.RootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}

@@ -1,4 +1,5 @@
 imports:
+  config: ../common/config.yml
   requests: ../common/requests.yml
 types:
   # AppFingerprint Enums
@@ -36,6 +37,10 @@ types:
       fingerprints: optional<AppResourceType>
       timeout: integer
       successfulOnly: boolean
+      insecure: boolean
+      requestMethod: config.RequestMethod
+      headlessConfig: optional<config.HeadlessConfig>
+      BrowserbaseConfig: optional<config.BrowserbaseConfig>
   # AppFingerprint Struct
   AppFingerprintAttemptInfo:
     properties:

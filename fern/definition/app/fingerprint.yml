@@ -8,10 +8,10 @@ types:
       - APIAPPLICATION
       - CLOUDBUCKET
       - CONTENTMANAGEMENTSYSTEM
+      - KUBE
       - FRAMEWORK
       - REMOTEACCESS
       - WEBSERVER
-      - KUBE
   # Fingerprint File Struct
   AppResourceModule:
     properties:

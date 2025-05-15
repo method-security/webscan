@@ -196,7 +196,7 @@ func (a *WebScan) InitAppCommand() {
 	}
 
 	enumerateAPIApplicationCmd := &cobra.Command{
-		Use:   "apiapplication",
+		Use:   "api-application",
 		Short: "Perform API application enumeration scans against a target",
 		Long:  `Perform API application enumeration scans against a target.`,
 	}
@@ -447,12 +447,12 @@ func (a *WebScan) InitAppCommand() {
 				a.OutputSignal.AddError(errors.New("no plugins provided"))
 				return
 			}
-			timeout, err := cmd.Flags().GetInt("timeout")
+			threads, err := cmd.Flags().GetInt("threads")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			threads, err := cmd.Flags().GetInt("threads")
+			timeout, err := cmd.Flags().GetInt("timeout")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -472,9 +472,9 @@ func (a *WebScan) InitAppCommand() {
 
 	enumerateCMSWordpressPluginsCmd.Flags().StringSlice("targets", []string{}, "URL targets to perform WordPress plugins enumeration against")
 	enumerateCMSWordpressPluginsCmd.Flags().StringSlice("plugins", []string{}, "WordPress plugins to try to detect")
-	enumerateCMSWordpressPluginsCmd.Flags().StringSlice("plugins-file-paths", []string{"configs/cms/wordpress/plugins/wordpress_plugins_small.txt"}, "File paths containing common WordPress plugins to use for enumeration")
-	enumerateCMSWordpressPluginsCmd.Flags().Int("timeout", 30, "Timeout per request (seconds)")
+	enumerateCMSWordpressPluginsCmd.Flags().StringSlice("plugins-file-paths", []string{"configs/cms/wordpress/plugins_small.txt"}, "File paths containing common WordPress plugins to use for enumeration")
 	enumerateCMSWordpressPluginsCmd.Flags().Int("threads", 0, "Number of threads to use during enumeration (default is number of CPUs)")
+	enumerateCMSWordpressPluginsCmd.Flags().Int("timeout", 30, "Timeout per request (seconds)")
 
 	_ = enumerateCMSWordpressPluginsCmd.MarkFlagRequired("targets")
 

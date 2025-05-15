@@ -265,7 +265,6 @@ func (a *WebScan) InitCaptureCommand() {
 			}
 
 			// Set Config
-
 			config := getCaptureRouteConfig(target, baseURLsOnly, maxRedirects, insecure, timeout, requestMethodEnum, headlessConfig, browserbaseConfig)
 
 			// Generate a report
@@ -276,14 +275,14 @@ func (a *WebScan) InitCaptureCommand() {
 	captureRouteCmd.Flags().String("target", "", "URL target to perform webpage capture")
 	captureRouteCmd.Flags().Bool("base-urls-only", true, "Only match routes and urls that share the base URLs domain")
 	captureRouteCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
-	captureRouteCmd.Flags().Int("timeout", 30, "Timeout in seconds for the capture")
 	captureRouteCmd.Flags().Bool("insecure", false, "Allow insecure connections")
+	captureRouteCmd.Flags().Int("timeout", 30, "Timeout in seconds for the capture")
 
 	_ = captureRouteCmd.MarkFlagRequired("target")
 
 	// Static asset capture subcommand
 	staticCaptureCmd := &cobra.Command{
-		Use:   "static",
+		Use:   "static-asset-takeover",
 		Short: "Capture static assets from a webpage and perform static asset takeover analysis",
 		Long:  `Capture static assets from a webpage and perform static asset takeover analysis using a fingerprinting method.`,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -401,7 +400,7 @@ func (a *WebScan) InitCaptureCommand() {
 		},
 	}
 	staticCaptureCmd.Flags().String("target", "", "URL target to perform webpage capture")
-	staticCaptureCmd.Flags().Bool("base-urls-only", true, "Only match routes and urls that share the base URLs domain")
+	staticCaptureCmd.Flags().Bool("base-urls-only", false, "Only match routes and urls that share the base URLs domain")
 	staticCaptureCmd.Flags().Bool("successful-only", false, "Only show successful attempts")
 	staticCaptureCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
 	staticCaptureCmd.Flags().Bool("insecure", false, "Allow insecure connections")

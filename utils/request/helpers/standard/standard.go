@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -85,10 +86,16 @@ func StandardCapture(ctx context.Context, config common.RequestConfig) common.Re
 		request.Errors = append(request.Errors, fmt.Sprintf("Failed to read response body: %v", err))
 		return request
 	}
-	// Populate response data
+
+	// Populate response struct
+	// Redirect chain
 	request.RedirectChain = redirectChain
+
+	// Status code
 	statusCode := resp.StatusCode
 	request.StatusCode = &statusCode
+
+	// Response headers
 	responseHeader := make(map[string]string)
 	for key, values := range resp.Header {
 		if len(values) > 0 {
@@ -96,8 +103,14 @@ func StandardCapture(ctx context.Context, config common.RequestConfig) common.Re
 		}
 	}
 	request.ResponseHeaders = responseHeader
+
+	// Response body
 	responseBody := string(body)
 	request.ResponseBody = &responseBody
+
+	// Encoded response body
+	encodedResponseBody := base64.StdEncoding.EncodeToString(body)
+	request.EncodedResponseBody = &encodedResponseBody
 
 	return request
 }

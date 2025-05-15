@@ -2,6 +2,7 @@ package headless
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"path"
 	"strconv"
@@ -199,8 +200,14 @@ func (b *Requester) Request(ctx context.Context, config common.RequestConfig) (*
 
 		// Only get HTML content if we have a successful response
 		if statusCode >= 200 && statusCode < 300 {
-			htmlContent, _ := page.HTML()
+			htmlContent, err := page.HTML()
+			if err != nil {
+				log.Error("Failed to get HTML content", svc1log.SafeParam("error", err))
+				requestInfo.Errors = append(requestInfo.Errors, err.Error())
+			}
 			requestInfo.ResponseBody = &htmlContent
+			encodedResponseBody := base64.StdEncoding.EncodeToString([]byte(htmlContent))
+			requestInfo.EncodedResponseBody = &encodedResponseBody
 		}
 
 		requestInfo.StatusCode = &statusCode

@@ -51,6 +51,7 @@ types:
       multipartParams: optional<map<string, string>>
       redirectChain: optional<list<string>>
       statusCode: optional<integer>
+      encodedResponseBody: optional<string>
       responseBody: optional<string>
       responseHeaders: optional<map<string, string>>
       errors: optional<list<string>>

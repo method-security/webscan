@@ -14,10 +14,10 @@ import (
 
 func NewBrowserbaseClient(browserbaseConfig *common.BrowserbaseConfig, browserbaseSecrets *common.BrowserbaseSecrets) *Client {
 	return &Client{
-		APIKey:        browserbaseSecrets.Token,
 		URL:           "https://www.browserbase.com",
 		ConnectionURL: "wss://connect.browserbase.com",
 		ProjectID:     browserbaseSecrets.Project,
+		APIKey:        browserbaseSecrets.Token,
 		Sessions:      []*Session{},
 		Options:       browserbaseConfig,
 	}
@@ -164,7 +164,7 @@ func (b *Client) createSession(ctx context.Context, createSessionRequest *Create
 
 	log.Debug(fmt.Sprintf("Creating session with payload: %s", string(payloadBytes)))
 
-	request, _ := http.NewRequest("POST", b.URL+"/v1/sessions", bytes.NewBuffer(payloadBytes))
+	request, _ := http.NewRequest("POST", fmt.Sprintf("%s/v1/sessions", b.URL), bytes.NewBuffer(payloadBytes))
 	request.Header.Add("Content-Type", "application/json")
 	request.Header.Add("X-BB-API-Key", b.APIKey)
 

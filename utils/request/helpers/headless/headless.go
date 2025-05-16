@@ -2,7 +2,6 @@ package headless
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 	"path"
 	"strconv"
@@ -19,16 +18,16 @@ import (
 )
 
 type Requester struct {
-	PathToBrowser              *string
 	Browser                    *rod.Browser
+	PathToBrowser              *string
 	TimeoutSeconds             int
 	MinDOMStabalizeTimeSeconds int
 }
 
-func NewRequester(config *common.HeadlessConfig, timeout int) *Requester {
+func NewRequester(timeout int, config *common.HeadlessConfig) *Requester {
 	return &Requester{
-		PathToBrowser:              config.PathToBrowser,
 		Browser:                    nil,
+		PathToBrowser:              config.PathToBrowser,
 		TimeoutSeconds:             timeout,
 		MinDOMStabalizeTimeSeconds: config.MinDomStabalizeTime,
 	}
@@ -36,8 +35,8 @@ func NewRequester(config *common.HeadlessConfig, timeout int) *Requester {
 
 func NewRequesterWithClient(client *cdp.Client, timeout int, minDOMStabalizeTime int) *Requester {
 	return &Requester{
-		PathToBrowser:              nil,
 		Browser:                    rod.New().Client(client).MustConnect(),
+		PathToBrowser:              nil,
 		TimeoutSeconds:             timeout,
 		MinDOMStabalizeTimeSeconds: minDOMStabalizeTime,
 	}
@@ -206,8 +205,6 @@ func (b *Requester) Request(ctx context.Context, config common.RequestConfig) (*
 				requestInfo.Errors = append(requestInfo.Errors, err.Error())
 			}
 			requestInfo.ResponseBody = &htmlContent
-			encodedResponseBody := base64.StdEncoding.EncodeToString([]byte(htmlContent))
-			requestInfo.EncodedResponseBody = &encodedResponseBody
 		}
 
 		requestInfo.StatusCode = &statusCode

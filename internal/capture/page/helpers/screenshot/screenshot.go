@@ -52,7 +52,7 @@ func PerformScreenshotPageCapture(ctx context.Context, config capturepagefern.Ca
 	switch config.RequestMethod {
 	case common.RequestMethodHeadless:
 		log.Info("Initiating page capture with browser method", svc1log.SafeParam("target", config.Target))
-		requester := headless.NewRequester(config.HeadlessConfig, config.Timeout)
+		requester := headless.NewRequester(config.Timeout, config.HeadlessConfig)
 		report := CaptureScreenshot(ctx, requester, requestConfig)
 		return report
 	default:

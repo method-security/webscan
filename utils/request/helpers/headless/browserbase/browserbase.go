@@ -21,9 +21,9 @@ type Requester struct {
 // NewBrowserbaseRequester creates a new BrowserbaseRequester
 func NewBrowserbaseRequester(
 	ctx context.Context,
+	browserbaseClient Client,
 	timeout int,
 	minDOMStabalizeTime int,
-	browserbaseClient Client,
 ) *Requester {
 	session, err := browserbaseClient.CreateSession(ctx)
 	if err != nil {

@@ -4,13 +4,11 @@ import (
 	// Standard
 	"errors"
 	"fmt"
-	"strings"
 
 	// Generated
 	appFern "github.com/Method-Security/webscan/generated/go/app"
 	enumerateCmsWordpressFern "github.com/Method-Security/webscan/generated/go/app/enumerate/cms/wordpress"
 	enumerateWebserverFern "github.com/Method-Security/webscan/generated/go/app/enumerate/webserver"
-	common "github.com/Method-Security/webscan/generated/go/common"
 
 	// Internal
 	enumerateApiApplication "github.com/Method-Security/webscan/internal/app/enumerate/apiapplication"
@@ -21,7 +19,6 @@ import (
 
 	// Utils
 	utils "github.com/Method-Security/webscan/utils"
-	browserbase "github.com/Method-Security/webscan/utils/request/helpers/headless/browserbase"
 
 	// External
 	"github.com/spf13/cobra"
@@ -91,84 +88,15 @@ func (a *WebScan) InitAppCommand() {
 				return
 			}
 
-			// Request Method
-			requestMethod, err := cmd.Flags().GetString("request-method")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			requestMethodEnum, err := common.NewRequestMethodFromString(strings.ToUpper(requestMethod))
-			if err != nil {
-				err = fmt.Errorf("invalid request method: %s", requestMethod)
-				a.OutputSignal.AddError(err)
-				return
-			}
-
-			// Flags for headless browser or Browserbase
-			var headlessConfig *common.HeadlessConfig
-			if requestMethodEnum == common.RequestMethodHeadless || requestMethodEnum == common.RequestMethodBrowserbase {
-				bPath, err := cmd.Flags().GetString("headless-path")
-				if err != nil {
-					a.OutputSignal.AddError(err)
-					return
-				}
-				headlessConfig = &common.HeadlessConfig{
-					PathToBrowser: &bPath,
-				}
-				domTime, err := cmd.Flags().GetInt("min-dom-stabalize-time")
-				if err != nil {
-					a.OutputSignal.AddError(err)
-					return
-				}
-				headlessConfig.MinDomStabalizeTime = domTime
-			}
-
-			// Flags for Browserbase
-			var browserbaseConfig *common.BrowserbaseConfig
-			var browserbaseSecrets *common.BrowserbaseSecrets
-			if requestMethodEnum == common.RequestMethodBrowserbase {
-				// Config flags
-				proxy, err := cmd.Flags().GetBool("proxy")
-				if err != nil {
-					a.OutputSignal.AddError(err)
-					return
-				}
-				countries, err := cmd.Flags().GetStringSlice("countries")
-				if err != nil {
-					a.OutputSignal.AddError(err)
-					return
-				}
-				browserbaseConfig = &common.BrowserbaseConfig{
-					Proxy:     &proxy,
-					Countries: countries,
-				}
-
-				// Environment variables
-				tokenStr, err := browserbase.GetFlagOrEnvironmentVariable(cmd, "token", "BROWSERBASE_TOKEN")
-				if err != nil {
-					a.OutputSignal.AddError(err)
-					return
-				}
-				projectStr, err := browserbase.GetFlagOrEnvironmentVariable(cmd, "project", "BROWSERBASE_PROJECT")
-				if err != nil {
-					a.OutputSignal.AddError(err)
-					return
-				}
-				browserbaseSecrets = &common.BrowserbaseSecrets{
-					Project: projectStr,
-					Token:   tokenStr,
-				}
-			}
-
 			// Create config
-			config, err := newFingerprintConfig(targets, resourceType, modules, filteredFingerprints, successfulOnly, insecure, timeout, requestMethodEnum, headlessConfig, browserbaseConfig)
+			config, err := newFingerprintConfig(targets, resourceType, modules, filteredFingerprints, successfulOnly, insecure, timeout)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
 
 			// Generate report
-			report, err := fingerprint.Launch(cmd.Context(), config, browserbaseSecrets)
+			report, err := fingerprint.Launch(cmd.Context(), config)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 			}
@@ -212,22 +140,6 @@ func (a *WebScan) InitAppCommand() {
 			target, err := cmd.Flags().GetString("target")
 			if err != nil {
 				a.OutputSignal.AddError(err)
-				return
-			}
-
-			// Request method flag
-			requestMethod, err := cmd.Flags().GetString("request-method")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			requestMethodEnum, err := common.NewRequestMethodFromString(strings.ToUpper(requestMethod))
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			if requestMethodEnum != common.RequestMethodStandard {
-				a.OutputSignal.AddError(errors.New("only standard request method is supported"))
 				return
 			}
 
@@ -296,22 +208,6 @@ func (a *WebScan) InitAppCommand() {
 				return
 			}
 
-			// Request method flag
-			requestMethod, err := cmd.Flags().GetString("request-method")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			requestMethodEnum, err := common.NewRequestMethodFromString(strings.ToUpper(requestMethod))
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			if requestMethodEnum != common.RequestMethodStandard {
-				a.OutputSignal.AddError(errors.New("only standard request method is supported"))
-				return
-			}
-
 			// Generate report
 			report := enumerateApiApplication.PerformAppEnumerateSwagger(cmd.Context(), target, timeout)
 			if len(report.Errors) > 0 {
@@ -347,22 +243,6 @@ func (a *WebScan) InitAppCommand() {
 			timeout, err := cmd.Flags().GetInt("timeout")
 			if err != nil {
 				a.OutputSignal.AddError(err)
-				return
-			}
-
-			// Request method flag
-			requestMethod, err := cmd.Flags().GetString("request-method")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			requestMethodEnum, err := common.NewRequestMethodFromString(strings.ToUpper(requestMethod))
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			if requestMethodEnum != common.RequestMethodStandard {
-				a.OutputSignal.AddError(errors.New("only standard request method is supported"))
 				return
 			}
 
@@ -405,22 +285,6 @@ func (a *WebScan) InitAppCommand() {
 			targets, err := cmd.Flags().GetStringSlice("targets")
 			if err != nil {
 				a.OutputSignal.AddError(err)
-				return
-			}
-
-			// Request method flag
-			requestMethod, err := cmd.Flags().GetString("request-method")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			requestMethodEnum, err := common.NewRequestMethodFromString(strings.ToUpper(requestMethod))
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			if requestMethodEnum != common.RequestMethodStandard {
-				a.OutputSignal.AddError(errors.New("only standard request method is supported"))
 				return
 			}
 
@@ -516,22 +380,6 @@ func (a *WebScan) InitAppCommand() {
 				return
 			}
 
-			// Request method flag
-			requestMethod, err := cmd.Flags().GetString("request-method")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			requestMethodEnum, err := common.NewRequestMethodFromString(strings.ToUpper(requestMethod))
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			if requestMethodEnum != common.RequestMethodStandard {
-				a.OutputSignal.AddError(errors.New("only standard request method is supported"))
-				return
-			}
-
 			// Generate config
 			config := newEnumerateWebserverIISConfig(targets, threads, timeout)
 
@@ -559,23 +407,20 @@ func (a *WebScan) InitAppCommand() {
 	a.RootCmd.AddCommand(appCmd)
 }
 
-func newFingerprintConfig(targets []string, resource string, moduleEnums []string, fingerprints *appFern.AppResourceType, successfulOnly bool, insecure bool, timeout int, requestMethod common.RequestMethod, headlessConfig *common.HeadlessConfig, browserbaseConfig *common.BrowserbaseConfig) (*appFern.AppFingerprintConfig, error) {
+func newFingerprintConfig(targets []string, resource string, moduleEnums []string, fingerprints *appFern.AppResourceType, successfulOnly bool, insecure bool, timeout int) (*appFern.AppFingerprintConfig, error) {
 	resourceEnum, err := appFern.NewAppFingerprintResourceTypeFromString(resource)
 	if err != nil {
 		return nil, fmt.Errorf("invalid resource type: %s", resource)
 	}
 
 	config := &appFern.AppFingerprintConfig{
-		Targets:           targets,
-		ResourceType:      resourceEnum,
-		Modules:           moduleEnums,
-		Fingerprints:      fingerprints,
-		SuccessfulOnly:    successfulOnly,
-		Insecure:          insecure,
-		Timeout:           max(timeout, 0),
-		RequestMethod:     requestMethod,
-		HeadlessConfig:    headlessConfig,
-		BrowserbaseConfig: browserbaseConfig,
+		Targets:        targets,
+		ResourceType:   resourceEnum,
+		Modules:        moduleEnums,
+		Fingerprints:   fingerprints,
+		SuccessfulOnly: successfulOnly,
+		Insecure:       insecure,
+		Timeout:        max(timeout, 0),
 	}
 	return config, nil
 }

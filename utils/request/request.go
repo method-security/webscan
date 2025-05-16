@@ -30,7 +30,7 @@ func SendRequest(ctx context.Context, requestConfig common.RequestConfig) (*comm
 	// Headless capture
 	case common.RequestMethodHeadless:
 		log.Info("Sending headless request")
-		headless := headless.NewRequester(requestConfig.HeadlessConfig, requestConfig.Timeout)
+		headless := headless.NewRequester(requestConfig.Timeout, requestConfig.HeadlessConfig)
 		captureRequest, err := headless.Request(ctx, requestConfig)
 		if err != nil {
 			return nil, fmt.Errorf("browser capture failed: %w", err)
@@ -41,7 +41,7 @@ func SendRequest(ctx context.Context, requestConfig common.RequestConfig) (*comm
 	case common.RequestMethodBrowserbase:
 		log.Info("Sending browserbase request")
 		client := browserbase.NewBrowserbaseClient(requestConfig.BrowserbaseConfig, requestConfig.BrowserbaseSecrets)
-		browserbase := browserbase.NewBrowserbaseRequester(ctx, requestConfig.Timeout, requestConfig.HeadlessConfig.MinDomStabalizeTime, *client)
+		browserbase := browserbase.NewBrowserbaseRequester(ctx, *client, requestConfig.Timeout, requestConfig.HeadlessConfig.MinDomStabalizeTime)
 		if browserbase == nil {
 			return nil, fmt.Errorf("failed to create browserbase capturer")
 		}

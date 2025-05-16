@@ -13,7 +13,7 @@ func SplitTarget(target string) (string, string, error) {
 		return "", "", fmt.Errorf("error parsing URL: %w", err)
 	}
 
-	// Standardize the base URL (ie. http://example.com/ -> http://example.com)
+	// Standardize the base URL (ie. http://example.com:8080/ -> http://example.com:8080)
 	baseURL := fmt.Sprintf("%s://%s", parsedURL.Scheme, parsedURL.Host)
 	baseURL = strings.TrimRight(baseURL, "/")
 

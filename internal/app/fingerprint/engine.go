@@ -14,7 +14,7 @@ import (
 	request "github.com/Method-Security/webscan/utils/request"
 )
 
-func createRequestConfig(baseURL, path string, method common.HttpMethod, requestParams common.RequestParams, config *appFern.AppFingerprintConfig, browserbaseSecrets *common.BrowserbaseSecrets) common.RequestConfig {
+func createRequestConfig(baseURL, path string, method common.HttpMethod, requestParams common.RequestParams, config *appFern.AppFingerprintConfig) common.RequestConfig {
 	return common.RequestConfig{
 		BaseUrl:            baseURL,
 		Path:               path,
@@ -24,14 +24,14 @@ func createRequestConfig(baseURL, path string, method common.HttpMethod, request
 		MaxRedirects:       nil,
 		Insecure:           config.Insecure,
 		Timeout:            config.Timeout,
-		RequestMethod:      config.RequestMethod,
-		HeadlessConfig:     config.HeadlessConfig,
-		BrowserbaseConfig:  config.BrowserbaseConfig,
-		BrowserbaseSecrets: browserbaseSecrets,
+		RequestMethod:      common.RequestMethodStandard,
+		HeadlessConfig:     nil,
+		BrowserbaseConfig:  nil,
+		BrowserbaseSecrets: nil,
 	}
 }
 
-func Run(ctx context.Context, target string, config *appFern.AppFingerprintConfig, browserbaseSecrets *common.BrowserbaseSecrets) ([]*appFern.AppFingerprintAttemptInfo, []string) {
+func Run(ctx context.Context, target string, config *appFern.AppFingerprintConfig) ([]*appFern.AppFingerprintAttemptInfo, []string) {
 	if config == nil || config.Fingerprints == nil || len(config.Fingerprints.Modules) == 0 {
 		return []*appFern.AppFingerprintAttemptInfo{}, []string{"invalid config: no resource types found"}
 	}
@@ -69,7 +69,7 @@ func Run(ctx context.Context, target string, config *appFern.AppFingerprintConfi
 			}
 
 			// Perform Request (Request, Browser, or Browserbase)
-			requestConfig := createRequestConfig(baseURL, fullPath, method, requestParams, config, browserbaseSecrets)
+			requestConfig := createRequestConfig(baseURL, fullPath, method, requestParams, config)
 			request, err := request.SendRequest(ctx, requestConfig)
 			if err != nil {
 				errors = append(errors, err.Error())
@@ -131,29 +131,16 @@ func AnalyzeResponse(response *common.RequestInfo, module *appFern.AppResourceMo
 	return false
 }
 
-func Launch(ctx context.Context, config *appFern.AppFingerprintConfig, browserbaseSecrets *common.BrowserbaseSecrets) (*appFern.AppFingerprintReport, error) {
+func Launch(ctx context.Context, config *appFern.AppFingerprintConfig) (*appFern.AppFingerprintReport, error) {
 	report := appFern.AppFingerprintReport{Config: config}
 	errors := []string{}
 
 	var targets []*appFern.AppFingerprintTargetInfo
 	for _, target := range config.Targets {
 		var attempts []*appFern.AppFingerprintAttemptInfo
-
-		// Marshal Attempt results
-		if !strings.HasPrefix(target, "http://") && !strings.HasPrefix(target, "https://") {
-			// Try both http and https schemes
-			schemes := []string{"http://", "https://"}
-			for _, scheme := range schemes {
-				schemeTarget := scheme + target
-				attempt, errs := Run(ctx, schemeTarget, config, browserbaseSecrets)
-				attempts = append(attempts, attempt...)
-				errors = append(errors, errs...)
-			}
-		} else {
-			attempt, errs := Run(ctx, target, config, browserbaseSecrets)
-			attempts = append(attempts, attempt...)
-			errors = append(errors, errs...)
-		}
+		attempt, errs := Run(ctx, target, config)
+		attempts = append(attempts, attempt...)
+		errors = append(errors, errs...)
 
 		if config.SuccessfulOnly {
 			successfulAttempts := []*appFern.AppFingerprintAttemptInfo{}

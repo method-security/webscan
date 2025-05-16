@@ -2,7 +2,7 @@ package cmd
 
 import (
 	// Standard
-	"errors"
+
 	"strings"
 
 	// Generated
@@ -136,10 +136,20 @@ func (a *WebScan) InitGeneralCommand() {
 		},
 	}
 
+	// Target Flags
 	probeCmd.Flags().StringSlice("targets", []string{}, "Address targets to perform web application probing against, comma delimited list")
+	// Config Flags
 	probeCmd.Flags().Bool("only-https", false, "Only perform probing over HTTPS")
 	probeCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
 	probeCmd.Flags().Int("timeout", 30, "Timeout limit (Seconds)")
+	// Request Method Flags
+	probeCmd.Flags().String("request-method", "STANDARD", "Request method (standard, headless, browserbase)")
+	probeCmd.Flags().String("headless-path", "", "Path to a headless browser executable")
+	probeCmd.Flags().Int("min-dom-stabalize-time", 5, "Minimum time in seconds to wait for DOM to stabilize")
+	probeCmd.Flags().String("browserbase-token", "", "Browserbase API token")
+	probeCmd.Flags().String("browserbase-project", "", "Browserbase project ID")
+	probeCmd.Flags().Bool("proxy", false, "Instruct Browserbase to use a proxy")
+	probeCmd.Flags().StringSlice("countries", []string{}, "List of countries to use for the proxy")
 
 	_ = probeCmd.MarkFlagRequired("targets")
 
@@ -173,22 +183,6 @@ func (a *WebScan) InitGeneralCommand() {
 			timeout, err := cmd.Flags().GetInt("timeout")
 			if err != nil {
 				a.OutputSignal.AddError(err)
-				return
-			}
-
-			// Request method flag
-			requestMethod, err := cmd.Flags().GetString("request-method")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			requestMethodEnum, err := common.NewRequestMethodFromString(strings.ToUpper(requestMethod))
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			if requestMethodEnum != common.RequestMethodStandard {
-				a.OutputSignal.AddError(errors.New("only standard request method is supported"))
 				return
 			}
 

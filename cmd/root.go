@@ -26,7 +26,6 @@ type WebScan struct {
 	OutputSignal signal.Signal
 	RootCmd      *cobra.Command
 	VersionCmd   *cobra.Command
-	RequestFlags *config.RequestFlags
 }
 
 // NewWebScan creates a new WebScan struct with the provided version string. The Webscan struct is used throughout the
@@ -39,15 +38,6 @@ func NewWebScan(version string) *WebScan {
 		RootFlags: config.RootFlags{
 			Quiet:   false,
 			Verbose: false,
-		},
-		RequestFlags: &config.RequestFlags{
-			RequestMethod:       new(string), // ENUM(STANDARD, HEADLESS, BROWSERBASE)
-			HeadlessPath:        new(string), // Headless browser path
-			MinDomStabalizeTime: new(int),    // Headless browser DOM stabilization time
-			BrowserbaseToken:    new(string), // Browserbase API token
-			BrowserbaseProject:  new(string), // Browserbase project ID
-			Proxy:               new(bool),   // Instruct Browserbase to use a proxy
-			Countries:           &[]string{}, // List of countries to use for the proxy
 		},
 		OutputConfig: writer.NewOutputConfig(nil, writer.NewFormat(writer.SIGNAL)),
 		OutputSignal: signal.NewSignal(nil, &startedAt, nil, 0, nil),
@@ -103,19 +93,6 @@ func (a *WebScan) InitRootCommand() {
 	a.RootCmd.PersistentFlags().BoolVarP(&a.RootFlags.Verbose, "verbose", "v", false, "Verbose output")
 	a.RootCmd.PersistentFlags().StringVarP(&outputFile, "output-file", "f", "", "Path to output file. If blank, will output to STDOUT")
 	a.RootCmd.PersistentFlags().StringVarP(&outputFormat, "output", "o", "signal", "Output format (signal, json, yaml). Default value is signal")
-
-	// Capture flags for 'Standard', 'Headless', and 'Browserbase' request methods
-	a.RootCmd.PersistentFlags().StringVar(a.RequestFlags.RequestMethod, "request-method", "STANDARD", "Request method (standard, headless, browserbase)")
-
-	// Browser flags
-	a.RootCmd.PersistentFlags().StringVar(a.RequestFlags.HeadlessPath, "headless-path", "", "Path to a headless browser executable")
-	a.RootCmd.PersistentFlags().IntVar(a.RequestFlags.MinDomStabalizeTime, "min-dom-stabalize-time", 5, "Minimum time in seconds to wait for DOM to stabilize")
-
-	// Browserbase flags
-	a.RootCmd.PersistentFlags().StringVar(a.RequestFlags.BrowserbaseToken, "browserbase-token", "", "Browserbase API token")
-	a.RootCmd.PersistentFlags().StringVar(a.RequestFlags.BrowserbaseProject, "browserbase-project", "", "Browserbase project ID")
-	a.RootCmd.PersistentFlags().BoolVar(a.RequestFlags.Proxy, "proxy", false, "Instruct Browserbase to use a proxy")
-	a.RootCmd.PersistentFlags().StringSliceVar(a.RequestFlags.Countries, "countries", []string{}, "List of countries to use for the proxy")
 
 	a.VersionCmd = &cobra.Command{
 		Use:   "version",

@@ -7,6 +7,7 @@
                     "name": "GRAPHQL",
                     "method": "POST",
                     "paths": [
+                        "/",
                         "/graphql",
                         "/api/graphql",
                         "/v1/graphql",
@@ -26,6 +27,7 @@
                     "name": "GRPC",
                     "method": "GET",
                     "paths": [
+                        "/",
                         "/grpc.health.v1.Health/Check",
                         "/grpc.health.v1alpha.Health/Check",
                         "/grpc.health.v1beta.Health/Check",

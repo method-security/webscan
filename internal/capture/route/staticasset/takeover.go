@@ -88,8 +88,12 @@ func PerformStaticAssetTakeOverAnalysis(ctx context.Context, config captureroute
 			continue
 		}
 
-		// Always send 'standard' requests as Browser is way to slow
-		requestConfig := createStaticAssetTakeOverRequestConfig(staticAssetBaseURL, staticAssetPath, config, browserbaseSecrets)
+		// Always send 'STANDARD' requests even when HEADLESS was used to capture the route as HEADLESS is too slow to
+		// perform the request
+		config.CaptureRouteConfig.RequestMethod = common.RequestMethodStandard
+		config.CaptureRouteConfig.HeadlessConfig = nil
+		config.CaptureRouteConfig.BrowserbaseConfig = nil
+		requestConfig := createStaticAssetTakeOverRequestConfig(staticAssetBaseURL, staticAssetPath, config, nil)
 		result, err := request.SendRequest(ctx, requestConfig)
 		if err != nil {
 			errors = append(errors, fmt.Sprintf("error performing request: %s", err))

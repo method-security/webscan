@@ -38,9 +38,6 @@ types:
       successfulOnly: boolean
       insecure: boolean
       timeout: integer
-      requestMethod: config.RequestMethod
-      headlessConfig: optional<config.HeadlessConfig>
-      browserbaseConfig: optional<config.BrowserbaseConfig>
   # AppFingerprint Struct
   AppFingerprintAttemptInfo:
     properties:

@@ -28,6 +28,14 @@ func (a *WebScan) InitCaptureCommand() {
 		Short: "Perform a webpage capture against a URL target",
 		Long:  `Perform a webpage capture against a URL target using various capture methods including request, browser, and browserbase.`,
 	}
+	// Request Method Flags for all capture subcommands
+	captureCmd.PersistentFlags().String("request-method", "STANDARD", "Request method (standard, headless, browserbase)")
+	captureCmd.PersistentFlags().String("headless-path", "", "Path to a headless browser executable")
+	captureCmd.PersistentFlags().Int("min-dom-stabalize-time", 10, "Minimum time in seconds to wait for DOM to stabilize")
+	captureCmd.PersistentFlags().String("browserbase-token", "", "Browserbase API token")
+	captureCmd.PersistentFlags().String("browserbase-project", "", "Browserbase project ID")
+	captureCmd.PersistentFlags().Bool("proxy", false, "Instruct Browserbase to use a proxy")
+	captureCmd.PersistentFlags().StringSlice("countries", []string{}, "List of countries to use for the proxy")
 
 	// Page capture subcommand
 	capturePageCmd := &cobra.Command{
@@ -405,7 +413,7 @@ func (a *WebScan) InitCaptureCommand() {
 	staticCaptureCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
 	staticCaptureCmd.Flags().Bool("insecure", false, "Allow insecure connections")
 	staticCaptureCmd.Flags().Int("timeout", 30, "Timeout in seconds for the capture")
-	staticCaptureCmd.Flags().StringSlice("fingerprint-file-paths", []string{"configs/capture/route/staticassettakeover.json"}, "Fingerprint filepaths to use for fingerprinting")
+	staticCaptureCmd.Flags().StringSlice("fingerprint-file-paths", []string{"configs/capture/route/static_asset_takeover.json"}, "Fingerprint filepaths to use for fingerprinting")
 
 	_ = staticCaptureCmd.MarkFlagRequired("target")
 

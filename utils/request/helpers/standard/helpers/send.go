@@ -16,7 +16,7 @@ import (
 )
 
 func SendHTTPRequest(log svc1log.Logger, url string, headers map[string]string, bodyReader io.Reader, config common.SendHttpRequestConfig) (*http.Response, []string, error) {
-	log.Info("Sending request with redirects", svc1log.SafeParam("url", url))
+	log.Info("Sending request", svc1log.SafeParam("url", url), svc1log.SafeParam("maxRedirects", config.MaxRedirects))
 
 	// Configure HTTP Client
 	client := &http.Client{
@@ -101,5 +101,5 @@ func SendHTTPRequest(log svc1log.Logger, url string, headers map[string]string, 
 		currentURL = nextURL.String()
 	}
 
-	return nil, redirectChain, fmt.Errorf("maximum redirects (%d) exceeded", config.MaxRedirects)
+	return nil, redirectChain, fmt.Errorf("maximum redirects (%d) exceeded for %s", config.MaxRedirects, url)
 }

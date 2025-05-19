@@ -26,7 +26,7 @@ func ExtractNetworkRoutes(ctx context.Context, b *headless.Requester, target str
 	errors := []string{}
 	log := svc1log.FromContext(ctx)
 
-	log.Info("Initiating network events capture with browser method", svc1log.SafeParam("target", target))
+	log.Info("Initiating network events capture with Headless method", svc1log.SafeParam("target", target))
 	// Ensure the browser is initialized
 	if b.Browser == nil {
 		log.Debug("Initializing browser for network capture")

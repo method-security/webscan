@@ -1,7 +1,12 @@
 imports:
   graphql: ./graphql.yml
 types:
-  SecuritySchemeName: string
+  # Enums
+  ApiType:
+    enum:
+      - GraphQL
+      - SwaggerV2
+      - SwaggerV3
   SecuritySchemeType:
     enum:
       - basic
@@ -10,11 +15,24 @@ types:
       - oauth2
       - openIdConnect
       - mutualTLS
+  # Report Struct
+  OAuthFlowDetails:
+    properties:
+      authorizationUrl: optional<string>
+      tokenUrl: optional<string>
+      refreshUrl: optional<string>
+      scopes: optional<map<string, string>>
+  OAuthFlow:
+    properties:
+      implicit: optional<OAuthFlowDetails>
+      password: optional<OAuthFlowDetails>
+      clientCredentials: optional<OAuthFlowDetails>
+      authorizationCode: optional<OAuthFlowDetails>
   SecurityScheme:
     properties:
       type: SecuritySchemeType
       description: optional<string>
-      name: optional<SecuritySchemeName>
+      name: optional<string>
       in: optional<string>
       scheme: optional<string>
       bearerFormat: optional<string>
@@ -22,35 +40,11 @@ types:
       authorizationUrl: optional<string> # oauth v2
       tokenUrl: optional<string> # oauth v2
       scopes: optional<map<string, string>>
-      flows: optional<OAuthFlows> # oauth v3
+      oAuthFlow: optional<OAuthFlow> # oauth v3
       openIdConnectUrl: optional<string>
-  OAuthFlows:
-    properties:
-      implicit: optional<OAuthFlow>
-      password: optional<OAuthFlow>
-      clientCredentials: optional<OAuthFlow>
-      authorizationCode: optional<OAuthFlow>
-  OAuthFlow:
-    properties:
-      authorizationUrl: optional<string>
-      tokenUrl: optional<string>
-      refreshUrl: optional<string>
-      scopes: optional<map<string, string>>
   SecurityRequirement:
     properties:
       schemes: map<string, optional<list<string>>>
-  SchemaProperty:
-    properties:
-      name: string
-      type: list<string>
-      format: optional<string>
-      description: optional<string>
-      required: optional<boolean>
-      items: optional<RequestSchema>
-      properties: optional<list<SchemaProperty>>
-      additionalProperties: optional<RequestSchema>
-      enum: optional<list<string>>
-      example: optional<string>
   RequestSchema:
     properties:
       type: list<string>
@@ -80,32 +74,38 @@ types:
       uniqueItems: optional<boolean>
       maxProperties: optional<integer>
       minProperties: optional<integer>
-  Route:
+  SchemaProperty:
+    properties:
+      name: string
+      type: list<string>
+      format: optional<string>
+      description: optional<string>
+      required: optional<boolean>
+      items: optional<RequestSchema>
+      properties: optional<list<SchemaProperty>>
+      additionalProperties: optional<RequestSchema>
+      enum: optional<list<string>>
+      example: optional<string>
+  ApiApplicationRouteDetails:
     properties:
       path: string
       queryParams: optional<list<string>>
       security: optional<SecurityRequirement>
       method: string
-      type: APIType
+      type: ApiType
       description: string
       responseProperties: optional<map<string, list<string>>>
       requestSchema: optional<RequestSchema>
-  RoutesReport:
+  EnumerateApiApplicationRoutesReport:
     properties:
-      target: string
-      appType: APIType
+      target: string  
+      appType: ApiType  
       baseEndpointUrl: string
       version: optional<string>
       schemaUrl: optional<string>
-      routes: optional<list<Route>>
-      securitySchemes: optional<map<SecuritySchemeName, SecurityScheme>>
+      routes: optional<list<ApiApplicationRouteDetails>>
+      securitySchemes: optional<map<string, SecurityScheme>>
       security: optional<list<SecurityRequirement>>
-      queries: optional<list<graphql.GraphQLQuery>>
+      queries: optional<list<graphql.GraphQlQuery>>
       raw: string
       errors: optional<list<string>>
-  APIType:
-    enum:
-      - Grpc
-      - GraphQL
-      - SwaggerV2
-      - SwaggerV3

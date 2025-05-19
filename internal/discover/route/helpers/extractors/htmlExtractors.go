@@ -18,7 +18,7 @@ import (
 // ExtractFormRoutes extracts WebRoutes from form elements in the HTML document
 // It returns a slice of WebRoutes, a slice of URLs and a slice of errors
 // WebRoutes are merged to only return unique routes
-func ExtractFormRoutes(doc *goquery.Document, httpRequestResponse *common.HttpRequestResponse, routeCaptureConfig discoverroutefern.RouteCaptureConfig) ([]*discoverroutefern.RouteDetails, []string, []string) {
+func ExtractFormRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig discoverroutefern.RouteCaptureConfig) ([]*discoverroutefern.RouteDetails, []string, []string) {
 	routes := []*discoverroutefern.RouteDetails{}
 	urls := make(map[string]struct{})
 	errors := []string{}
@@ -34,10 +34,10 @@ func ExtractFormRoutes(doc *goquery.Document, httpRequestResponse *common.HttpRe
 		}
 
 		// Resolve the action URL relative to the base URL
-		fullURL := discoverroutehelpers.ResolveURL(httpRequestResponse.Request.BaseUrl, action)
+		fullURL := discoverroutehelpers.ResolveURL(baseURL, action)
 
 		// Check if the URL is allowed
-		if !discoverroutehelpers.IsURLAllowed(httpRequestResponse.Request.BaseUrl, fullURL, routeCaptureConfig.RequireBaseUrlMatch, routeCaptureConfig.IgnoreStaticAssets) {
+		if !discoverroutehelpers.IsURLAllowed(baseURL, fullURL, routeCaptureConfig.RequireBaseUrlMatch, routeCaptureConfig.IgnoreStaticAssets) {
 			return
 		}
 
@@ -47,7 +47,7 @@ func ExtractFormRoutes(doc *goquery.Document, httpRequestResponse *common.HttpRe
 			errors = append(errors, err.Error())
 			return
 		}
-		routeVar.BaseUrl = httpRequestResponse.Request.BaseUrl
+		routeVar.BaseUrl = baseURL
 		routeVar.Path = urlNoQuery
 		urls[urlNoQuery] = struct{}{}
 
@@ -97,7 +97,7 @@ func ExtractFormRoutes(doc *goquery.Document, httpRequestResponse *common.HttpRe
 	return discoverroutehelpers.MergeWebRoutes(routes), discoverroutehelpers.SetToListString(urls), []string{}
 }
 
-func ExtractAnchorRoutes(doc *goquery.Document, httpRequestResponse *common.HttpRequestResponse, routeCaptureConfig discoverroutefern.RouteCaptureConfig) ([]*discoverroutefern.RouteDetails, []string, []string) {
+func ExtractAnchorRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig discoverroutefern.RouteCaptureConfig) ([]*discoverroutefern.RouteDetails, []string, []string) {
 	routes := []*discoverroutefern.RouteDetails{}
 	urls := make(map[string]struct{})
 	errors := []string{}
@@ -105,7 +105,7 @@ func ExtractAnchorRoutes(doc *goquery.Document, httpRequestResponse *common.Http
 	doc.Find("a[href]").Each(func(i int, s *goquery.Selection) {
 		href, exists := s.Attr("href")
 		if exists && href != "" {
-			fullURL := discoverroutehelpers.ResolveURL(httpRequestResponse.Request.BaseUrl, href)
+			fullURL := discoverroutehelpers.ResolveURL(baseURL, href)
 
 			// The route URL should not have query params, those are stored in QueryParams
 			urlNoQuery, err := discoverroutehelpers.URLRemoveQueryParams(fullURL)
@@ -115,7 +115,7 @@ func ExtractAnchorRoutes(doc *goquery.Document, httpRequestResponse *common.Http
 			}
 
 			// Check if the URL is allowed
-			if !discoverroutehelpers.IsURLAllowed(httpRequestResponse.Request.BaseUrl, fullURL, routeCaptureConfig.RequireBaseUrlMatch, routeCaptureConfig.IgnoreStaticAssets) {
+			if !discoverroutehelpers.IsURLAllowed(baseURL, fullURL, routeCaptureConfig.RequireBaseUrlMatch, routeCaptureConfig.IgnoreStaticAssets) {
 				return
 			}
 			urls[urlNoQuery] = struct{}{}
@@ -128,7 +128,7 @@ func ExtractAnchorRoutes(doc *goquery.Document, httpRequestResponse *common.Http
 			}
 
 			routeVar := &discoverroutefern.RouteDetails{
-				BaseUrl: httpRequestResponse.Request.BaseUrl,
+				BaseUrl: baseURL,
 				Path:    parsedURL.Path,
 				Method:  common.HttpMethodGet.Ptr(), // Anchor links are accessed via GET
 			}
@@ -140,7 +140,7 @@ func ExtractAnchorRoutes(doc *goquery.Document, httpRequestResponse *common.Http
 	return discoverroutehelpers.MergeWebRoutes(routes), discoverroutehelpers.SetToListString(urls), errors
 }
 
-func ExtractLinkRoutes(doc *goquery.Document, httpRequestResponse *common.HttpRequestResponse, routeCaptureConfig discoverroutefern.RouteCaptureConfig) ([]*discoverroutefern.RouteDetails, []string, []string) {
+func ExtractLinkRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig discoverroutefern.RouteCaptureConfig) ([]*discoverroutefern.RouteDetails, []string, []string) {
 	routes := []*discoverroutefern.RouteDetails{}
 	urls := make(map[string]struct{})
 	errors := []string{}
@@ -148,7 +148,7 @@ func ExtractLinkRoutes(doc *goquery.Document, httpRequestResponse *common.HttpRe
 	doc.Find("link[href]").Each(func(i int, s *goquery.Selection) {
 		href, exists := s.Attr("href")
 		if exists && href != "" {
-			fullURL := discoverroutehelpers.ResolveURL(httpRequestResponse.Request.BaseUrl, href)
+			fullURL := discoverroutehelpers.ResolveURL(baseURL, href)
 
 			// The route URL should not have query params, those are stored in QueryParams
 			urlNoQuery, err := discoverroutehelpers.URLRemoveQueryParams(fullURL)
@@ -158,7 +158,7 @@ func ExtractLinkRoutes(doc *goquery.Document, httpRequestResponse *common.HttpRe
 			}
 
 			// Check if the URL is allowed
-			if !discoverroutehelpers.IsURLAllowed(httpRequestResponse.Request.BaseUrl, fullURL, routeCaptureConfig.RequireBaseUrlMatch, !routeCaptureConfig.IgnoreStaticAssets) {
+			if !discoverroutehelpers.IsURLAllowed(baseURL, fullURL, routeCaptureConfig.RequireBaseUrlMatch, routeCaptureConfig.IgnoreStaticAssets) {
 				return
 			}
 
@@ -172,7 +172,7 @@ func ExtractLinkRoutes(doc *goquery.Document, httpRequestResponse *common.HttpRe
 			}
 
 			routeVar := &discoverroutefern.RouteDetails{
-				BaseUrl: httpRequestResponse.Request.BaseUrl,
+				BaseUrl: baseURL,
 				Path:    parsedURL.Path,
 				Method:  common.HttpMethodGet.Ptr(), // Link elements are accessed via GET
 			}

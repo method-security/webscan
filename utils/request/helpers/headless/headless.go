@@ -67,18 +67,39 @@ func getHost(rawURL string) string {
 // setupHeaderInterception sets up the header interception for the page
 func setupHeaderInterception(page *rod.Page) {
 	page.MustEvalOnNewDocument(`
-		window.responseHeaders = {};
+		window.responseHeaders = new Map();
 		const originalFetch = window.fetch;
 		window.fetch = async function(url, options) {
 			const response = await originalFetch(url, options);
-			window.responseHeaders = Object.fromEntries(response.headers.entries());
+			// Store headers for this URL
+			window.responseHeaders.set(url, Object.fromEntries(response.headers.entries()));
+			
+			// If this is a redirect, follow it and capture those headers too
+			if (response.redirected) {
+				const redirectResponse = await fetch(response.url, options);
+				window.responseHeaders.set(response.url, Object.fromEntries(redirectResponse.headers.entries()));
+				return redirectResponse;
+			}
 			return response;
+		};
+
+		// Also intercept XMLHttpRequest
+		const originalXHR = window.XMLHttpRequest.prototype.open;
+		window.XMLHttpRequest.prototype.open = function(method, url) {
+			this.addEventListener('load', function() {
+				window.responseHeaders.set(url, Object.fromEntries(this.getAllResponseHeaders().split('\r\n').reduce((acc, line) => {
+					const [key, value] = line.split(': ');
+					if (key && value) acc[key] = value;
+					return acc;
+				}, {})));
+			});
+			return originalXHR.apply(this, arguments);
 		};
 	`)
 }
 
 // setupNavigationTracking sets up tracking for top-level frame navigations
-func setupNavigationTracking(page *rod.Page, redirectChain *[]string, requestComplete chan struct{}, once *sync.Once, log svc1log.Logger) {
+func setupNavigationTracking(page *rod.Page, redirectChain *[]string, requestComplete chan struct{}, once *sync.Once, log svc1log.Logger, maxRedirects int, redirectError chan error) {
 	go page.EachEvent(func(e *proto.PageFrameNavigated) {
 		if e.Frame.ParentID == "" && e.Frame.URL != "" && !utils.IsStaticAsset(e.Frame.URL) {
 			// Check if URL is already in chain
@@ -90,6 +111,15 @@ func setupNavigationTracking(page *rod.Page, redirectChain *[]string, requestCom
 				}
 			}
 			if !exists {
+				// Check if we've exceeded max redirects
+				if len(*redirectChain) > maxRedirects {
+					log.Info("Max redirects reached", svc1log.SafeParam("maxRedirects", strconv.Itoa(maxRedirects)))
+					once.Do(func() {
+						redirectError <- fmt.Errorf("max redirects (%d) exceeded", maxRedirects)
+						close(requestComplete)
+					})
+					return
+				}
 				*redirectChain = append(*redirectChain, e.Frame.URL)
 				log.Info("Top-level frame navigated", svc1log.SafeParam("url", e.Frame.URL))
 				once.Do(func() { close(requestComplete) })
@@ -128,10 +158,10 @@ func filterRedirectChain(redirectChain []string, originalHost string) []string {
 // performNavigation handles the actual page navigation based on config
 func performNavigation(page *rod.Page, config common.SendHttpRequestConfig, constructedURL *string, request *common.HttpRequest, log svc1log.Logger) {
 	if config.MaxRedirects > 0 {
-		log.Info("Following redirect", svc1log.SafeParam("url", *constructedURL))
+		log.Info("Following redirects with limit", svc1log.SafeParam("maxRedirects", strconv.Itoa(config.MaxRedirects)))
 		page.MustNavigate(*constructedURL)
 	} else {
-		log.Info("Not following redirects")
+		log.Info("Not following redirects", svc1log.SafeParam("maxRedirects", strconv.Itoa(config.MaxRedirects)))
 		script := fmt.Sprintf(`
 			() => {
 				fetch("%s", {
@@ -159,7 +189,13 @@ func waitForPageLoad(page *rod.Page, minDOMStabalizeTimeSeconds int, log svc1log
 
 // getResponseHeaders retrieves the captured response headers
 func getResponseHeaders(page *rod.Page, log svc1log.Logger) map[string][]string {
-	responseHeaders, err := page.Eval(`() => window.responseHeaders`)
+	responseHeaders, err := page.Eval(`() => {
+		const headers = {};
+		window.responseHeaders.forEach((value, key) => {
+			Object.assign(headers, value);
+		});
+		return headers;
+	}`)
 	if err != nil {
 		log.Error("Failed to get response headers", svc1log.SafeParam("error", err))
 		return nil
@@ -209,19 +245,25 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 	var statusCode int
 	var once sync.Once
 	requestComplete := make(chan struct{})
+	redirectError := make(chan error, 1)
 	var result common.HttpRequestResponse
+	var redirectErr error
 
 	err = rod.Try(func() {
 		page := b.Browser.MustPage().Context(pageCtx)
 
 		// Setup header interception and navigation tracking
 		setupHeaderInterception(page)
-		setupNavigationTracking(page, &redirectChain, requestComplete, &once, log)
+		setupNavigationTracking(page, &redirectChain, requestComplete, &once, log, config.MaxRedirects, redirectError)
 
 		// Perform the navigation
 		performNavigation(page, config, constructedURL, request, log)
 
 		select {
+		case err := <-redirectError:
+			log.Error("Redirect error occurred", svc1log.SafeParam("error", err))
+			redirectErr = err
+			return
 		case <-requestComplete:
 			log.Info("Request complete, redirect chain", svc1log.SafeParam("chain", strings.Join(redirectChain, " -> ")))
 		case <-pageCtx.Done():
@@ -304,6 +346,20 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 	if err != nil {
 		log.Error("Failed during headless capture", svc1log.SafeParam("url", *constructedURL), svc1log.SafeParam("error", err))
 		return common.HttpRequestResponse{Request: request}, fmt.Errorf("headless capture failed: %v", err)
+	}
+
+	if redirectErr != nil {
+		// Create a response with error status
+		response := requesthelpers.CreateHTTPResponse(
+			0, // Status code 0 indicates error
+			redirectChain,
+			headers,
+			redirectErr.Error(),
+		)
+		return common.HttpRequestResponse{
+			Request:  request,
+			Response: &response,
+		}, redirectErr
 	}
 
 	return result, nil

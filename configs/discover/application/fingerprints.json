@@ -18,10 +18,8 @@
                     "requestParams": {
                         "body": {
                             "kind": "json",
-                            "json": {
-                                "data": "{\"query\": \"{ __schema { queryType { name } } }\"}",
-                                "mimeType": "application/json"
-                            }
+                            "data": "{\"query\": \"{ __schema { queryType { name } } }\"}",
+                            "mimeType": "application/json"
                         }
                     },
                     "bodyIndicators": [

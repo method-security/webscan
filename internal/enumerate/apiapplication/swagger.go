@@ -74,8 +74,8 @@ func createSendHTTPRequestConfig(baseURL, path string, timeout int) common.SendH
 }
 
 // PerformAppEnumerateSwagger performs a Swagger scan against a target URL and returns the report.
-func PerformAppEnumerateSwagger(ctx context.Context, target string, timeout int) enumerateapiapplicationfern.RoutesReport {
-	report := enumerateapiapplicationfern.RoutesReport{Target: target}
+func PerformAppEnumerateSwagger(ctx context.Context, target string, timeout int) enumerateapiapplicationfern.EnumerateApiApplicationRoutesReport {
+	report := enumerateapiapplicationfern.EnumerateApiApplicationRoutesReport{Target: target}
 
 	// Normalize target URL
 	if !strings.HasPrefix(target, "http://") && !strings.HasPrefix(target, "https://") {
@@ -176,7 +176,7 @@ func PerformAppEnumerateSwagger(ctx context.Context, target string, timeout int)
 	return report
 }
 
-func handleSwaggerV2(document libopenapi.Document, report *enumerateapiapplicationfern.RoutesReport) error {
+func handleSwaggerV2(document libopenapi.Document, report *enumerateapiapplicationfern.EnumerateApiApplicationRoutesReport) error {
 	report.AppType = enumerateapiapplicationfern.ApiTypeSwaggerV2
 	var errors []error
 	var v2Model *libopenapi.DocumentModel[v2.Swagger]
@@ -233,7 +233,7 @@ func handleSwaggerV2(document libopenapi.Document, report *enumerateapiapplicati
 			requestSchema := extractRequestSchemaV2(operation, document, report)
 
 			securityRequirements := convertSecurityRequirementsV2(operation.Security)
-			route := enumerateapiapplicationfern.Route{
+			route := enumerateapiapplicationfern.ApiApplicationRouteDetails{
 				Path:               path,
 				Method:             method,
 				QueryParams:        getQueryParamsV2(operation.Parameters),
@@ -251,7 +251,7 @@ func handleSwaggerV2(document libopenapi.Document, report *enumerateapiapplicati
 	return nil
 }
 
-func handleOpenAPIV3(document libopenapi.Document, report *enumerateapiapplicationfern.RoutesReport, target string) error {
+func handleOpenAPIV3(document libopenapi.Document, report *enumerateapiapplicationfern.EnumerateApiApplicationRoutesReport, target string) error {
 	report.AppType = enumerateapiapplicationfern.ApiTypeSwaggerV3
 	var errors []error
 	var v3Model *libopenapi.DocumentModel[v3.Document]
@@ -317,7 +317,7 @@ func handleOpenAPIV3(document libopenapi.Document, report *enumerateapiapplicati
 			requestSchema := extractRequestSchemaV3(operation, document, report)
 
 			securityRequirements := convertSecurityRequirementsV3(operation.Security)
-			route := enumerateapiapplicationfern.Route{
+			route := enumerateapiapplicationfern.ApiApplicationRouteDetails{
 				Path:               path,
 				Method:             method,
 				QueryParams:        getQueryParamsV3(operation.Parameters),
@@ -446,7 +446,7 @@ func convertSecurityDefinitionsV3(securityDefinitions map[string]*v3.SecuritySch
 			webscanScheme.Scheme = &scheme.Scheme
 			webscanScheme.BearerFormat = &scheme.BearerFormat
 		case "oauth2":
-			webscanScheme.Flows = convertOAuthFlowsV3(scheme.Flows)
+			webscanScheme.OAuthFlow = convertOAuthFlowV3(scheme.Flows)
 		case "openIdConnect":
 			webscanScheme.OpenIdConnectUrl = &scheme.OpenIdConnectUrl
 		}
@@ -458,23 +458,23 @@ func convertSecurityDefinitionsV3(securityDefinitions map[string]*v3.SecuritySch
 	return schemes
 }
 
-func convertOAuthFlowsV3(flows *v3.OAuthFlows) *enumerateapiapplicationfern.OAuthFlows {
+func convertOAuthFlowV3(flows *v3.OAuthFlows) *enumerateapiapplicationfern.OAuthFlow {
 	if flows == nil {
 		return nil
 	}
-	return &enumerateapiapplicationfern.OAuthFlows{
-		Implicit:          convertOAuthFlowV3(flows.Implicit),
-		Password:          convertOAuthFlowV3(flows.Password),
-		ClientCredentials: convertOAuthFlowV3(flows.ClientCredentials),
-		AuthorizationCode: convertOAuthFlowV3(flows.AuthorizationCode),
+	return &enumerateapiapplicationfern.OAuthFlow{
+		Implicit:          convertOAuthFlowDetailsV3(flows.Implicit),
+		Password:          convertOAuthFlowDetailsV3(flows.Password),
+		ClientCredentials: convertOAuthFlowDetailsV3(flows.ClientCredentials),
+		AuthorizationCode: convertOAuthFlowDetailsV3(flows.AuthorizationCode),
 	}
 }
 
-func convertOAuthFlowV3(flow *v3.OAuthFlow) *enumerateapiapplicationfern.OAuthFlow {
+func convertOAuthFlowDetailsV3(flow *v3.OAuthFlow) *enumerateapiapplicationfern.OAuthFlowDetails {
 	if flow == nil {
 		return nil
 	}
-	return &enumerateapiapplicationfern.OAuthFlow{
+	return &enumerateapiapplicationfern.OAuthFlowDetails{
 		AuthorizationUrl: &flow.AuthorizationUrl,
 		TokenUrl:         &flow.TokenUrl,
 		RefreshUrl:       &flow.RefreshUrl,
@@ -582,7 +582,7 @@ func extractResponsePropertiesV3(operation *v3.Operation) (map[string][]string, 
 	return responseProperties, nil
 }
 
-func convertSchemaToRequestSchema(s *base.Schema, seenSchemas map[*base.Schema]bool, report *enumerateapiapplicationfern.RoutesReport) *enumerateapiapplicationfern.RequestSchema {
+func convertSchemaToRequestSchema(s *base.Schema, seenSchemas map[*base.Schema]bool, report *enumerateapiapplicationfern.EnumerateApiApplicationRoutesReport) *enumerateapiapplicationfern.RequestSchema {
 	if s == nil {
 		report.Errors = append(report.Errors, "Encountered nil schema")
 		return nil
@@ -767,7 +767,7 @@ func contains(slice []string, item string) bool {
 	return false
 }
 
-func extractRequestSchemaV2(operation *v2.Operation, doc libopenapi.Document, report *enumerateapiapplicationfern.RoutesReport) *enumerateapiapplicationfern.RequestSchema {
+func extractRequestSchemaV2(operation *v2.Operation, doc libopenapi.Document, report *enumerateapiapplicationfern.EnumerateApiApplicationRoutesReport) *enumerateapiapplicationfern.RequestSchema {
 	if operation.Parameters == nil {
 		report.Errors = append(report.Errors, "No parameters found in operation")
 		return nil
@@ -784,7 +784,7 @@ func extractRequestSchemaV2(operation *v2.Operation, doc libopenapi.Document, re
 	return nil
 }
 
-func extractRequestSchemaV3(operation *v3.Operation, doc libopenapi.Document, report *enumerateapiapplicationfern.RoutesReport) *enumerateapiapplicationfern.RequestSchema {
+func extractRequestSchemaV3(operation *v3.Operation, doc libopenapi.Document, report *enumerateapiapplicationfern.EnumerateApiApplicationRoutesReport) *enumerateapiapplicationfern.RequestSchema {
 	if operation.RequestBody == nil || operation.RequestBody.Content == nil {
 		report.Errors = append(report.Errors, "No request body or content found in operation")
 		return nil
@@ -802,7 +802,7 @@ func extractRequestSchemaV3(operation *v3.Operation, doc libopenapi.Document, re
 	return nil
 }
 
-func convertEnumValues(s *base.Schema, rs *enumerateapiapplicationfern.RequestSchema, report *enumerateapiapplicationfern.RoutesReport) {
+func convertEnumValues(s *base.Schema, rs *enumerateapiapplicationfern.RequestSchema, report *enumerateapiapplicationfern.EnumerateApiApplicationRoutesReport) {
 	if len(s.Enum) > 0 {
 		rs.Enum = make([]interface{}, len(s.Enum))
 		for i, v := range s.Enum {
@@ -811,7 +811,7 @@ func convertEnumValues(s *base.Schema, rs *enumerateapiapplicationfern.RequestSc
 	}
 }
 
-func convertEnumValue(v *yaml.Node, report *enumerateapiapplicationfern.RoutesReport) interface{} {
+func convertEnumValue(v *yaml.Node, report *enumerateapiapplicationfern.EnumerateApiApplicationRoutesReport) interface{} {
 	switch v.Kind {
 	case yaml.ScalarNode:
 		switch v.Tag {

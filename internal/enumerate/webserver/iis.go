@@ -15,6 +15,7 @@ import (
 	enumeratewebserverfern "github.com/Method-Security/webscan/generated/go/enumerate/webserver"
 
 	// Utils
+	"github.com/Method-Security/webscan/internal/enumerate/general"
 	request "github.com/Method-Security/webscan/utils/request"
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
 )
@@ -114,6 +115,10 @@ func enumerateSite(ctx context.Context, target string, config *enumeratewebserve
 	root, err := request.SendRequest(ctx, requestConfig)
 	if err != nil {
 		errs = append(errs, fmt.Sprintf("error capturing content for %s: %v", target, err))
+		if root != nil && general.RateLimitDetected(root, false) {
+			errs = append(errs, "rate limit detected")
+		}
+		return nil, reqs, errs
 	}
 	reqs = append(reqs, root)
 
@@ -129,8 +134,11 @@ func enumerateSite(ctx context.Context, target string, config *enumeratewebserve
 		nf, err := request.SendRequest(ctx, requestConfig)
 		if err != nil {
 			errs = append(errs, fmt.Sprintf("error capturing 404 page for %s: %v", target, err))
+			if nf != nil && general.RateLimitDetected(nf, root.Response != nil && root.Response.StatusCode != nil && *root.Response.StatusCode == 200) {
+				errs = append(errs, "rate limit detected")
+			}
 		}
-		if nf.Response != nil && nf.Response.ResponseBody != nil {
+		if nf != nil && nf.Response != nil && nf.Response.ResponseBody != nil {
 			if v := parseIisVersionFromBody(*requesthelpers.GetResponseBodyStringFromBodyStruct(nf.Response.ResponseBody)); v != "" {
 				site.Server = &enumeratewebserverfern.IisWebServerDetails{Name: "Microsoft-IIS", Version: &v}
 			}
@@ -152,6 +160,10 @@ var iisRe = regexp.MustCompile(`(?i)(Microsoft-IIS)/(\d+\.\d+)`)
 
 // parseBanners is a helper: banner & header parsing
 func parseBanners(s *enumeratewebserverfern.IisSiteDetails, r *common.HttpRequestResponse) {
+	if r == nil || r.Response == nil || r.Response.ResponseHeaders == nil {
+		return
+	}
+
 	serverHdr := requesthelpers.GetHeaderValueFromHeaderMap(r.Response.ResponseHeaders, "Server")
 	if serverHdr != nil {
 		if matches := iisRe.FindStringSubmatch(*serverHdr); len(matches) > 2 {

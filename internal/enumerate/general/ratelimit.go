@@ -4,6 +4,7 @@ import (
 	// Standard
 	"context"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -70,7 +71,7 @@ func PerformGeneralRatelimit(ctx context.Context, config enumerategeneralfern.De
 			}
 
 			// Check if rate limit was detected
-			if rateLimitDetected(request, hasSeen200) {
+			if RateLimitDetected(request, hasSeen200) {
 				targetInfo.DetectedRequest = &enumerategeneralfern.RateLimitAttempt{
 					RequestNumber: requestNumber,
 					Request:       request,
@@ -100,16 +101,16 @@ func PerformGeneralRatelimit(ctx context.Context, config enumerategeneralfern.De
 	return report
 }
 
-// rateLimitDetected checks if a response explicitly indicates that a request was rate-limited
+// RateLimitDetected checks if a response explicitly indicates that a request was rate-limited
 // or if a 403 response is returned after a 200 response was previously seen.
-func rateLimitDetected(request *common.HttpRequestResponse, hasSeen200 bool) bool {
+func RateLimitDetected(request *common.HttpRequestResponse, hasSeen200 bool) bool {
 	if request == nil || request.Response == nil {
 		return false
 	}
 
 	response := request.Response
 
-	// Check status codes
+	// Check status codes first - these are definitive
 	if response.StatusCode != nil {
 		switch *response.StatusCode {
 		case http.StatusTooManyRequests:
@@ -124,6 +125,11 @@ func rateLimitDetected(request *common.HttpRequestResponse, hasSeen200 bool) boo
 		}
 	}
 
+	// If we got a 200 OK, we're not rate limited
+	if response.StatusCode != nil && *response.StatusCode == http.StatusOK {
+		return false
+	}
+
 	// Check response headers
 	if response.ResponseHeaders == nil {
 		return false
@@ -132,25 +138,48 @@ func rateLimitDetected(request *common.HttpRequestResponse, hasSeen200 bool) boo
 	// Common rate limit header patterns
 	rateLimitHeaders := map[string]func(string) bool{
 		"retry-after": func(value string) bool {
-			// Check if retry-after has a valid value
-			return strings.TrimSpace(value) != ""
+			// Check if retry-after has a valid number
+			value = strings.TrimSpace(value)
+			if value == "" {
+				return false
+			}
+			// Try to parse as number
+			if _, err := strconv.Atoi(value); err == nil {
+				return true
+			}
+			// Try to parse as HTTP date
+			if _, err := time.Parse(time.RFC1123, value); err == nil {
+				return true
+			}
+			return false
 		},
 		"ratelimit-remaining": func(value string) bool {
-			// Check if remaining requests is 0
-			return strings.TrimSpace(value) == "0"
+			// Check if remaining requests is 0 or negative
+			value = strings.TrimSpace(value)
+			if value == "" {
+				return false
+			}
+			if remaining, err := strconv.Atoi(value); err == nil {
+				return remaining <= 0
+			}
+			return false
 		},
 		"x-ratelimit-remaining": func(value string) bool {
-			return strings.TrimSpace(value) == "0"
-		},
-		"x-ratelimit-limit": func(value string) bool {
-			// If limit is set but remaining is 0, it's rate limited
-			return strings.TrimSpace(value) != ""
-		},
-		"x-ratelimit-reset": func(value string) bool {
-			// If reset time is set, it's likely rate limited
-			return strings.TrimSpace(value) != ""
+			// Check if remaining requests is 0 or negative
+			value = strings.TrimSpace(value)
+			if value == "" {
+				return false
+			}
+			if remaining, err := strconv.Atoi(value); err == nil {
+				return remaining <= 0
+			}
+			return false
 		},
 	}
+
+	// Track if we have both limit and remaining headers
+	hasRemaining := false
+	remainingZero := false
 
 	for key, values := range response.ResponseHeaders {
 		if len(values) == 0 {
@@ -161,13 +190,44 @@ func rateLimitDetected(request *common.HttpRequestResponse, hasSeen200 bool) boo
 		value := strings.TrimSpace(values[0])
 
 		// Check for exact header matches
-		if checkFunc, exists := rateLimitHeaders[keyLower]; exists && checkFunc(value) {
-			return true
+		if checkFunc, exists := rateLimitHeaders[keyLower]; exists {
+			if keyLower == "x-ratelimit-remaining" || keyLower == "ratelimit-remaining" {
+				hasRemaining = true
+				if value == "0" {
+					remainingZero = true
+				}
+			} else if checkFunc(value) {
+				return true
+			}
 		}
 
 		// Check for partial matches in header names
 		for headerPattern, checkFunc := range rateLimitHeaders {
 			if strings.Contains(keyLower, headerPattern) && checkFunc(value) {
+				return true
+			}
+		}
+	}
+
+	// If we have remaining header and it's 0, we're rate limited
+	if hasRemaining && remainingZero {
+		return true
+	}
+
+	// Check response body for common rate limit messages
+	if response.ResponseBody != nil {
+		body := *requesthelpers.GetResponseBodyStringFromBodyStruct(response.ResponseBody)
+		body = strings.ToLower(body)
+		rateLimitPhrases := []string{
+			"rate limit exceeded",
+			"too many requests",
+			"request limit exceeded",
+			"quota exceeded",
+			"try again later",
+			"please try again",
+		}
+		for _, phrase := range rateLimitPhrases {
+			if strings.Contains(body, phrase) {
 				return true
 			}
 		}

@@ -44,79 +44,43 @@ func createSendHTTPRequestConfig(targetBaseURL, targetPath string, config discov
 	return requestConfig
 }
 
-func DetectStaticAssetTakeovers(ctx context.Context, config discoverroutefern.StaticAssetTakeoverConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) discoverroutefern.StaticAssetTakeoverReport {
-	// Create Report
-	report := discoverroutefern.StaticAssetTakeoverReport{
-		Target: config.RouteCaptureConfig.Target,
-		Config: &config,
-	}
-	errors := []string{}
+// GrabStaticAssetTakeOverFingerprints grabs the fingerprints from the given file paths
+func GrabStaticAssetTakeOverFingerprints(fingerprintFilePaths []string) []*discoverroutefern.StaticAssetTakeoverFingerprint {
+	fingerprints := []*discoverroutefern.StaticAssetTakeoverFingerprint{}
 
-	// Perform Route Capture
-	captureRouteReport := discoverroute.PerformRouteCapture(ctx, *config.RouteCaptureConfig, browserbaseSecrets)
-	if len(captureRouteReport.Routes) == 0 {
-		errors = append(errors, "no routes found")
-		report.Errors = errors
-		return report
-	}
-
-	// Split and standardize the target
-	targetBaseURL, targetPath, err := requesthelpers.SplitTargetURL(config.RouteCaptureConfig.Target)
-	if err != nil {
-		errors = append(errors, fmt.Sprintf("error splitting target: %s", err))
-		report.Errors = errors
-		return report
-	}
-
-	// Send the request
-	requestConfig := createSendHTTPRequestConfig(targetBaseURL, targetPath, config, browserbaseSecrets)
-	httpRequestResponse, err := request.SendRequest(ctx, requestConfig)
-	if err != nil {
-		errors = append(errors, fmt.Sprintf("error performing request: %s", err))
-		report.Errors = errors
-		return report
-	}
-	report.BaseRequest = httpRequestResponse
-
-	// Static Asset Take Over Attempts
-	StaticAssetTakeOverAttempts := []*discoverroutefern.StaticAssetTakeoverAttempt{}
-	for _, staticAsset := range captureRouteReport.StaticAssets {
-		if !utils.IsStaticAsset(staticAsset) {
-			continue
-		}
-		StaticAssetTakeOverAttempt := discoverroutefern.StaticAssetTakeoverAttempt{StaticAsset: staticAsset}
-
-		// Perform Request
-		staticAssetBaseURL, staticAssetPath, err := requesthelpers.SplitTargetURL(staticAsset)
+	for _, path := range fingerprintFilePaths {
+		absPath, err := filepath.Abs(path)
 		if err != nil {
-			errors = append(errors, fmt.Sprintf("error splitting target: %s", err))
 			continue
 		}
-
-		// Always send 'STANDARD' requests even when HEADLESS was used to capture the route as HEADLESS is too slow to
-		// perform the request
-		config.RouteCaptureConfig.RequestMethod = common.RequestMethodStandard
-		config.RouteCaptureConfig.HeadlessConfig = nil
-		config.RouteCaptureConfig.BrowserbaseConfig = nil
-		requestConfig := createSendHTTPRequestConfig(staticAssetBaseURL, staticAssetPath, config, nil)
-		result, err := request.SendRequest(ctx, requestConfig)
+		file, err := os.Open(absPath)
 		if err != nil {
-			errors = append(errors, fmt.Sprintf("error performing request: %s", err))
 			continue
 		}
-		StaticAssetTakeOverAttempt.Request = result
 
-		// Check if the request is vulnerable
-		info := isStaticAssetTakeOver(result, config.Fingerprints, config.SuccessfulOnly)
-		if len(info) > 0 {
-			StaticAssetTakeOverAttempt.Fingerprints = info
-			StaticAssetTakeOverAttempts = append(StaticAssetTakeOverAttempts, &StaticAssetTakeOverAttempt)
+		// Read the entire file
+		data, err := io.ReadAll(file)
+		if err != nil {
+			continue
 		}
+
+		var config struct {
+			Fingerprints []*discoverroutefern.StaticAssetTakeoverFingerprint
+		}
+
+		if err := json.Unmarshal(data, &config); err != nil {
+			continue
+		}
+
+		err = file.Close()
+		if err != nil {
+			continue
+		}
+
+		fingerprints = append(fingerprints, config.Fingerprints...)
 	}
 
-	report.Attempts = StaticAssetTakeOverAttempts
-	report.Errors = errors
-	return report
+	return fingerprints
 }
 
 // isStaticAssetTakeOver checks if the request is vulnerable to static asset take over
@@ -155,41 +119,78 @@ func isStaticAssetTakeOver(httpRequestResponse *common.HttpRequestResponse, fing
 	return info
 }
 
-// GrabStaticAssetTakeOverFingerprints grabs the fingerprints from the given file paths
-func GrabStaticAssetTakeOverFingerprints(fingerprintFilePaths []string) []*discoverroutefern.StaticAssetTakeoverFingerprint {
-	fingerprints := []*discoverroutefern.StaticAssetTakeoverFingerprint{}
+func DetectStaticAssetTakeovers(ctx context.Context, config discoverroutefern.StaticAssetTakeoverConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) discoverroutefern.StaticAssetTakeoverReport {
+	// Create Report
+	report := discoverroutefern.StaticAssetTakeoverReport{
+		Target: config.RouteCaptureConfig.Target,
+		Config: &config,
+	}
+	errors := []string{}
 
-	for _, path := range fingerprintFilePaths {
-		absPath, err := filepath.Abs(path)
-		if err != nil {
-			continue
-		}
-		file, err := os.Open(absPath)
-		if err != nil {
-			continue
-		}
-
-		// Read the entire file
-		data, err := io.ReadAll(file)
-		if err != nil {
-			continue
-		}
-
-		var config struct {
-			Fingerprints []*discoverroutefern.StaticAssetTakeoverFingerprint
-		}
-
-		if err := json.Unmarshal(data, &config); err != nil {
-			continue
-		}
-
-		err = file.Close()
-		if err != nil {
-			continue
-		}
-
-		fingerprints = append(fingerprints, config.Fingerprints...)
+	// Perform Route Capture
+	captureRouteReport := discoverroute.PerformRouteCapture(ctx, *config.RouteCaptureConfig, browserbaseSecrets)
+	if len(captureRouteReport.StaticAssets) == 0 {
+		errors = append(errors, "no static assets found")
+		report.Errors = errors
+		return report
 	}
 
-	return fingerprints
+	// Split and standardize the target
+	targetBaseURL, targetPath, err := requesthelpers.SplitTargetURL(config.RouteCaptureConfig.Target)
+	if err != nil {
+		errors = append(errors, fmt.Sprintf("error splitting target: %s", err))
+		report.Errors = errors
+		return report
+	}
+
+	// Send the request
+	requestConfig := createSendHTTPRequestConfig(targetBaseURL, targetPath, config, browserbaseSecrets)
+	httpRequestResponse, err := request.SendRequest(ctx, requestConfig)
+	if err != nil {
+		errors = append(errors, fmt.Sprintf("error performing request: %s", err))
+		report.Errors = errors
+		return report
+	}
+	report.BaseRequest = httpRequestResponse
+
+	// Static Asset Take Over Attempts
+	StaticAssetTakeOverAttempts := []*discoverroutefern.StaticAssetTakeoverAttempt{}
+	for _, staticAsset := range captureRouteReport.StaticAssets {
+		if !utils.IsStaticAsset(staticAsset) {
+			continue
+		}
+		StaticAssetTakeOverAttempt := discoverroutefern.StaticAssetTakeoverAttempt{StaticAsset: staticAsset}
+
+		// Perform Request
+		staticAssetBaseURL, staticAssetPath, err := requesthelpers.SplitTargetURL(staticAsset)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("error splitting target: %s", err))
+			continue
+		}
+
+		// Set the request method to 'STANDARD' even when original request was HEADLESS as HEADLESS is too slow to
+		// perform the static asset request
+		config.RouteCaptureConfig.RequestMethod = common.RequestMethodStandard
+		config.RouteCaptureConfig.MaxRedirects = 0 // Don't follow any redirects on static asset requests
+		config.RouteCaptureConfig.HeadlessConfig = nil
+		config.RouteCaptureConfig.BrowserbaseConfig = nil
+		requestConfig := createSendHTTPRequestConfig(staticAssetBaseURL, staticAssetPath, config, nil)
+		result, err := request.SendRequest(ctx, requestConfig)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("error performing request: %s", err))
+			continue
+		}
+		StaticAssetTakeOverAttempt.Request = result
+
+		// Check if the request is vulnerable
+		info := isStaticAssetTakeOver(result, config.Fingerprints, config.SuccessfulOnly)
+		if len(info) > 0 {
+			StaticAssetTakeOverAttempt.Fingerprints = info
+			StaticAssetTakeOverAttempts = append(StaticAssetTakeOverAttempts, &StaticAssetTakeOverAttempt)
+		}
+	}
+
+	report.Attempts = StaticAssetTakeOverAttempts
+	report.Errors = errors
+	return report
 }

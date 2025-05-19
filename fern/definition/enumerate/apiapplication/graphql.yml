@@ -1,23 +1,24 @@
 types:
-  GraphQLSchema:
+  # Specfic GraphQL Structs
+  GraphQlField:
     properties:
-      data: optional<GraphQLData>
-  GraphQLData:
-    properties:
-      __schema: optional<GraphQLSchemaData>
-  GraphQLSchemaData:
-    properties:
-      types: optional<list<GraphQLType>>
-  GraphQLType:
+      name: string
+  GraphQlType:
     properties:
       name: string
       kind: string
       description: optional<string>
-      fields: optional<list<GraphQLField>>
-  GraphQLField:
+      fields: optional<list<GraphQlField>>
+  GraphQlSchemaData:
     properties:
-      name: string
-  GraphQLQuery:
+      types: optional<list<GraphQlType>>
+  GraphQlData:
+    properties:
+      __schema: optional<GraphQlSchemaData>
+  GraphQlSchema:
+    properties:
+      data: optional<GraphQlData>
+  GraphQlQuery:
     properties:
       type: string
       fields: optional<list<string>>

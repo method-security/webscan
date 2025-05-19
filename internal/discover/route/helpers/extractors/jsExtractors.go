@@ -20,7 +20,7 @@ import (
 )
 
 // extractScriptContentRoutes takes JavaScript code as a string, parses it using the Otto parser library to find all routes (including POST and GET methods with bodyParams and queryParams), and returns them.
-func extractScriptContentRoutes(scriptContent string, httpRequestResponse *common.HttpRequestResponse, routeCaptureConfig discoverroutefern.RouteCaptureConfig) ([]*discoverroutefern.RouteDetails, []string, []string) {
+func extractScriptContentRoutes(scriptContent string, baseURL string, routeCaptureConfig discoverroutefern.RouteCaptureConfig) ([]*discoverroutefern.RouteDetails, []string, []string) {
 	routes := []*discoverroutefern.RouteDetails{}
 	urls := make(map[string]struct{})
 	errors := []string{}
@@ -34,7 +34,7 @@ func extractScriptContentRoutes(scriptContent string, httpRequestResponse *commo
 	}
 
 	// Traverse the AST to find relevant nodes
-	ast.Walk(&visitor{routes: &routes, urls: urls, baseURL: httpRequestResponse.Request.BaseUrl, baseURLsOnly: routeCaptureConfig.RequireBaseUrlMatch, captureStaticAssets: !routeCaptureConfig.IgnoreStaticAssets, errors: &errors}, program)
+	ast.Walk(&visitor{routes: &routes, urls: urls, baseURL: baseURL, baseURLsOnly: routeCaptureConfig.RequireBaseUrlMatch, captureStaticAssets: !routeCaptureConfig.IgnoreStaticAssets, errors: &errors}, program)
 
 	return discoverroutehelpers.MergeWebRoutes(routes), discoverroutehelpers.SetToListString(urls), errors
 }
@@ -144,7 +144,7 @@ func (v *visitor) addRoute(urlStr, method string, bodyParams []*discoverroutefer
 }
 
 // ExtractScriptRoutes finds script elements with a src attribute, fetches the JavaScript data, converts it to a string, then calls extractScriptContentRoutes and returns the results. If onlybaseURLs is set, only request script src that are relative.
-func ExtractScriptRoutes(doc *goquery.Document, httpRequestResponse *common.HttpRequestResponse, routeCaptureConfig discoverroutefern.RouteCaptureConfig) ([]*discoverroutefern.RouteDetails, []string, []string) {
+func ExtractScriptRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig discoverroutefern.RouteCaptureConfig) ([]*discoverroutefern.RouteDetails, []string, []string) {
 	routes := []*discoverroutefern.RouteDetails{}
 	urls := make(map[string]struct{})
 	errors := []string{}
@@ -162,10 +162,10 @@ func ExtractScriptRoutes(doc *goquery.Document, httpRequestResponse *common.Http
 				return
 			}
 
-			fullURL := discoverroutehelpers.ResolveURL(httpRequestResponse.Request.BaseUrl, src)
+			fullURL := discoverroutehelpers.ResolveURL(baseURL, src)
 
 			// Check if the URL is allowed
-			if !discoverroutehelpers.IsURLAllowed(httpRequestResponse.Request.BaseUrl, fullURL, routeCaptureConfig.RequireBaseUrlMatch, !routeCaptureConfig.IgnoreStaticAssets) {
+			if !discoverroutehelpers.IsURLAllowed(baseURL, fullURL, routeCaptureConfig.RequireBaseUrlMatch, !routeCaptureConfig.IgnoreStaticAssets) {
 				return
 			}
 
@@ -197,7 +197,7 @@ func ExtractScriptRoutes(doc *goquery.Document, httpRequestResponse *common.Http
 			scriptContent := string(bodyBytes)
 
 			// Extract routes from the JavaScript content
-			contentRoutes, contentUrls, contentErrors := extractScriptContentRoutes(scriptContent, httpRequestResponse, routeCaptureConfig)
+			contentRoutes, contentUrls, contentErrors := extractScriptContentRoutes(scriptContent, baseURL, routeCaptureConfig)
 			routes = append(routes, contentRoutes...)
 			for _, u := range contentUrls {
 				urls[u] = struct{}{}
@@ -210,14 +210,14 @@ func ExtractScriptRoutes(doc *goquery.Document, httpRequestResponse *common.Http
 }
 
 // ExtractInlineScriptRoutes finds inline JavaScript code within script tags, and for each, passes the string contents to extractScriptContentRoutes and returns the results.
-func ExtractInlineScriptRoutes(doc *goquery.Document, httpRequestResponse *common.HttpRequestResponse, routeCaptureConfig discoverroutefern.RouteCaptureConfig) ([]*discoverroutefern.RouteDetails, []string, []string) {
+func ExtractInlineScriptRoutes(doc *goquery.Document, url string, routeCaptureConfig discoverroutefern.RouteCaptureConfig) ([]*discoverroutefern.RouteDetails, []string, []string) {
 	routes := []*discoverroutefern.RouteDetails{}
 	urls := make(map[string]struct{})
 	errors := []string{}
 
 	doc.Find("script:not([src])").Each(func(i int, s *goquery.Selection) {
 		scriptContent := s.Text()
-		contentRoutes, contentUrls, contentErrors := extractScriptContentRoutes(scriptContent, httpRequestResponse, routeCaptureConfig)
+		contentRoutes, contentUrls, contentErrors := extractScriptContentRoutes(scriptContent, url, routeCaptureConfig)
 		routes = append(routes, contentRoutes...)
 		for _, u := range contentUrls {
 			urls[u] = struct{}{}

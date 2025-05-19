@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -59,11 +58,9 @@ func PrepareRequestBody(log svc1log.Logger, request *common.HttpRequest) (io.Rea
 
 	switch body.GetKind() {
 	case "json":
-		// Marshal the JSON body
-		jsonData, err := json.Marshal(body.Json.Data)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal JSON body: %v", err)
-		}
+		// Use the JSON string directly
+		jsonData := []byte(body.Json.Data)
+
 		if body.Json.MimeType != nil {
 			contentType = body.Json.MimeType
 		} else {

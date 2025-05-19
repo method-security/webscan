@@ -32,6 +32,19 @@ func AddListToSetString(set map[string]struct{}, list []string) map[string]struc
 	return set
 }
 
+// MergeStaticAssets merges StaticAssets, retaining only unique static assets
+func MergeStaticAssets(staticAssets []string) []string {
+	staticAssetMap := make(map[string]struct{})
+
+	for _, staticAsset := range staticAssets {
+		if utils.IsStaticAsset(staticAsset) {
+			staticAssetMap[staticAsset] = struct{}{}
+		}
+	}
+
+	return SetToListString(staticAssetMap)
+}
+
 // MergeWebRoutes merges WebRoutes, retaining only unique routes
 // unique routes are defined by the combination of method and URL
 func MergeWebRoutes(routes []*discoverroutefern.RouteDetails) []*discoverroutefern.RouteDetails {
@@ -227,7 +240,7 @@ func IsURLAllowed(baseURL string, targetURL string, requireBaseURLMatch bool, ig
 	// First check to see if the targetURL is a static asset type
 	if !ignoreStaticAssets {
 		if utils.IsStaticAsset(targetURL) {
-			return false
+			return true // Allow static assets when ignoreStaticAssets is false
 		}
 	}
 

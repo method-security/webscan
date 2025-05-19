@@ -4,14 +4,16 @@ import (
 	// Standard
 	"context"
 	"fmt"
+	"runtime"
 	"strings"
+	"sync"
 
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
 	discoverroutefern "github.com/Method-Security/webscan/generated/go/discover/route"
+	"github.com/Method-Security/webscan/utils"
 
 	// Utils
-	utils "github.com/Method-Security/webscan/utils"
 	request "github.com/Method-Security/webscan/utils/request"
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
 	headless "github.com/Method-Security/webscan/utils/request/helpers/headless"
@@ -59,32 +61,41 @@ func extractRoutes(ctx context.Context, httpRequestResponse *common.HttpRequestR
 		return routes, discoverroutehelpers.SetToListString(urls), errors
 	}
 
+	redirectedURL := httpRequestResponse.Response.RedirectChain[len(httpRequestResponse.Response.RedirectChain)-1]
+	log.Info("Redirected URL", svc1log.SafeParam("url", redirectedURL))
+	redirectedURLBase, redirectedURLPath, err := requesthelpers.SplitTargetURL(redirectedURL)
+	if err != nil {
+		log.Error("Failed to split redirected URL", svc1log.SafeParam("error", err))
+		errors = append(errors, err.Error())
+		return routes, discoverroutehelpers.SetToListString(urls), errors
+	}
+
 	log.Info("Extracting routes from form elements")
-	formRoutes, formUrls, formErrors := capturerouteextractors.ExtractFormRoutes(doc, httpRequestResponse, routeCaptureConfig)
+	formRoutes, formUrls, formErrors := capturerouteextractors.ExtractFormRoutes(doc, redirectedURLBase, routeCaptureConfig)
 	routes = append(routes, formRoutes...)
 	urls = discoverroutehelpers.AddListToSetString(urls, formUrls)
 	errors = append(errors, formErrors...)
 
 	log.Info("Extracting routes from anchor elements")
-	anchorRoutes, anchorUrls, anchorErrors := capturerouteextractors.ExtractAnchorRoutes(doc, httpRequestResponse, routeCaptureConfig)
+	anchorRoutes, anchorUrls, anchorErrors := capturerouteextractors.ExtractAnchorRoutes(doc, redirectedURLBase, routeCaptureConfig)
 	routes = append(routes, anchorRoutes...)
 	urls = discoverroutehelpers.AddListToSetString(urls, anchorUrls)
 	errors = append(errors, anchorErrors...)
 
 	log.Info("Extracting routes from link elements")
-	linkRoutes, linkUrls, linkErrors := capturerouteextractors.ExtractLinkRoutes(doc, httpRequestResponse, routeCaptureConfig)
+	linkRoutes, linkUrls, linkErrors := capturerouteextractors.ExtractLinkRoutes(doc, redirectedURLBase, routeCaptureConfig)
 	routes = append(routes, linkRoutes...)
 	urls = discoverroutehelpers.AddListToSetString(urls, linkUrls)
 	errors = append(errors, linkErrors...)
 
 	log.Info("Extracting routes from script elements")
-	scriptRoutes, scriptUrls, scriptErrors := capturerouteextractors.ExtractScriptRoutes(doc, httpRequestResponse, routeCaptureConfig)
+	scriptRoutes, scriptUrls, scriptErrors := capturerouteextractors.ExtractScriptRoutes(doc, redirectedURLBase, routeCaptureConfig)
 	routes = append(routes, scriptRoutes...)
 	urls = discoverroutehelpers.AddListToSetString(urls, scriptUrls)
 	errors = append(errors, scriptErrors...)
 
 	log.Info("Extracting routes from inline script elements")
-	inlineScriptRoutes, inlineScriptUrls, inlineScriptErrors := capturerouteextractors.ExtractInlineScriptRoutes(doc, httpRequestResponse, routeCaptureConfig)
+	inlineScriptRoutes, inlineScriptUrls, inlineScriptErrors := capturerouteextractors.ExtractInlineScriptRoutes(doc, redirectedURLBase, routeCaptureConfig)
 	routes = append(routes, inlineScriptRoutes...)
 	urls = discoverroutehelpers.AddListToSetString(urls, inlineScriptUrls)
 	errors = append(errors, inlineScriptErrors...)
@@ -96,22 +107,40 @@ func extractRoutes(ctx context.Context, httpRequestResponse *common.HttpRequestR
 			TimeoutSeconds: requestConfig.Timeout,
 		}
 		browser.InitializeBrowser()
-		networkRoutes, networkUrls, networkErrors := capturerouteextractors.ExtractNetworkRoutes(ctx, browser, httpRequestResponse.Request.BaseUrl, routeCaptureConfig.RequireBaseUrlMatch, !routeCaptureConfig.IgnoreStaticAssets)
+
+		fullRedirectedURL := fmt.Sprintf("%s%s", redirectedURLBase, redirectedURLPath)
+		networkRoutes, networkUrls, networkErrors := capturerouteextractors.ExtractNetworkRoutes(ctx, browser, fullRedirectedURL, routeCaptureConfig.RequireBaseUrlMatch, !routeCaptureConfig.IgnoreStaticAssets)
 		routes = append(routes, networkRoutes...)
 		urls = discoverroutehelpers.AddListToSetString(urls, networkUrls)
 		errors = append(errors, networkErrors...)
 	}
 
 	log.Info("Returning results")
+
+	// Merge routes to remove duplicates
 	mergedRoutes := discoverroutehelpers.MergeWebRoutes(routes) // For uniqueness across techniques
-	return mergedRoutes, discoverroutehelpers.SetToListString(urls), errors
+
+	// Filter out static assets from all Route + Static Asset URLs
+	staticAssets := make(map[string]struct{})
+	for url := range urls {
+		if !routeCaptureConfig.IgnoreStaticAssets && utils.IsStaticAsset(url) {
+			staticAssets[url] = struct{}{}
+		}
+	}
+	staticAssetsList := discoverroutehelpers.SetToListString(staticAssets)
+
+	return mergedRoutes, staticAssetsList, errors
 }
 
 func PerformRouteCapture(ctx context.Context, config discoverroutefern.RouteCaptureConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) discoverroutefern.RouteCaptureReport {
+	log := svc1log.FromContext(ctx)
+
+	// Initialize Report
 	report := discoverroutefern.RouteCaptureReport{
 		Target: config.Target,
-		Errors: []string{},
+		Config: &config,
 	}
+	errors := []string{}
 
 	// Track visited URLs to avoid cycles
 	visitedURLs := make(map[string]struct{})
@@ -122,56 +151,114 @@ func PerformRouteCapture(ctx context.Context, config discoverroutefern.RouteCapt
 	allRoutes := []*discoverroutefern.RouteDetails{}
 	allStaticAssets := []string{}
 
-	// Spider through URLs up to the specified depth
-	for len(urlsToVisit) > 0 && currentDepth <= config.SpiderDepth {
-		// Get the next URL to visit
-		currentURL := urlsToVisit[0]
-		urlsToVisit = urlsToVisit[1:]
+	// Mutex to protect shared data structures
+	var mu sync.Mutex
 
-		// Skip if already visited
-		if _, visited := visitedURLs[currentURL]; visited {
-			continue
-		}
-		visitedURLs[currentURL] = struct{}{}
+	// Spider through Route URLs up to the specified depth
+	for len(urlsToVisit) > 0 && currentDepth < config.SpiderDepth {
+		// Process all URLs at the current depth
+		urlsAtCurrentDepth := urlsToVisit
+		nextDepthUrls := []string{}
+		var nextDepthMu sync.Mutex
 
-		// Split and standardize the current URL
-		currentBaseURL, currentPath, err := requesthelpers.SplitTargetURL(currentURL)
-		if err != nil {
-			report.Errors = append(report.Errors, fmt.Sprintf("error splitting URL %s: %s", currentURL, err))
-			continue
-		}
+		log.Info("Visiting URLs at depth", svc1log.SafeParam("depth", currentDepth))
 
-		// Send the request
-		requestConfig := createSendHTTPRequestConfig(currentBaseURL, currentPath, config, browserbaseSecrets)
-		request, err := request.SendRequest(ctx, requestConfig)
-		if err != nil {
-			report.Errors = append(report.Errors, fmt.Sprintf("error performing request to %s: %s", currentURL, err))
-			continue
+		// Create a wait group to wait for all goroutines to complete
+		var wg sync.WaitGroup
+		// Create a channel to collect errors
+		errChan := make(chan string, len(urlsAtCurrentDepth))
+
+		// Determine number of concurrent goroutines
+		maxGoroutines := runtime.GOMAXPROCS(0) // Default to number of CPUs
+		if config.Threads > 0 {
+			maxGoroutines = config.Threads
 		}
 
-		// Extract the routes and urls
-		routes, urls, errors := extractRoutes(ctx, request, requestConfig, config)
-		report.Errors = append(report.Errors, errors...)
+		// Create a semaphore to limit concurrent goroutines
+		semaphore := make(chan struct{}, maxGoroutines)
 
-		// Add discovered routes
-		allRoutes = append(allRoutes, routes...)
+		// Process each URL concurrently
+		for _, currentURL := range urlsAtCurrentDepth {
+			wg.Add(1)
 
-		// Process static assets
-		for _, url := range urls {
-			if utils.IsStaticAsset(url) {
-				allStaticAssets = append(allStaticAssets, url)
-			} else if currentDepth < config.SpiderDepth {
-				// Add non-static URLs to visit in the next depth level
-				urlsToVisit = append(urlsToVisit, url)
-			}
+			// Acquire semaphore (blocks if maxGoroutines are running)
+			semaphore <- struct{}{}
+
+			go func(url string) {
+				defer wg.Done()
+				defer func() { <-semaphore }() // Release semaphore when done
+
+				// Skip if already visited
+				mu.Lock()
+				if _, visited := visitedURLs[url]; visited {
+					mu.Unlock()
+					return
+				}
+				visitedURLs[url] = struct{}{}
+				mu.Unlock()
+
+				// Split and standardize the current URL
+				currentBaseURL, currentPath, err := requesthelpers.SplitTargetURL(url)
+				if err != nil {
+					errChan <- fmt.Sprintf("error splitting URL %s: %s", url, err)
+					return
+				}
+
+				// Send the request
+				requestConfig := createSendHTTPRequestConfig(currentBaseURL, currentPath, config, browserbaseSecrets)
+				request, err := request.SendRequest(ctx, requestConfig)
+				if err != nil {
+					errChan <- fmt.Sprintf("error performing request to %s: %s", url, err)
+					return
+				}
+
+				// Extract the routes and if enabled, static assets
+				if request.Response == nil || request.Response.ResponseBody == nil {
+					log.Info("No response from", svc1log.SafeParam("url", url))
+					errChan <- fmt.Sprintf("no response from %s", url)
+					return
+				}
+
+				routes, staticAssets, newErrors := extractRoutes(ctx, request, requestConfig, config)
+
+				// Safely append to shared data structures
+				mu.Lock()
+				allRoutes = append(allRoutes, routes...)
+				allStaticAssets = append(allStaticAssets, staticAssets...)
+				errors = append(errors, newErrors...)
+				mu.Unlock()
+
+				// Collect routes to spider
+				for _, route := range routes {
+					routeURL := route.BaseUrl + route.Path
+					mu.Lock()
+					if _, visited := visitedURLs[routeURL]; !visited {
+						nextDepthMu.Lock()
+						nextDepthUrls = append(nextDepthUrls, routeURL)
+						nextDepthMu.Unlock()
+					}
+					mu.Unlock()
+				}
+			}(currentURL)
 		}
 
+		// Wait for all goroutines to complete
+		wg.Wait()
+		close(errChan)
+
+		// Collect errors from the channel
+		for err := range errChan {
+			report.Errors = append(report.Errors, err)
+		}
+
+		// Move to next depth
+		urlsToVisit = nextDepthUrls
 		currentDepth++
 	}
 
-	// Merge routes to remove duplicates
+	// Remove duplicate Routes and Static Assets
 	report.Routes = discoverroutehelpers.MergeWebRoutes(allRoutes)
-	report.StaticAssets = allStaticAssets
-
+	report.StaticAssets = discoverroutehelpers.MergeStaticAssets(allStaticAssets)
+	report.Errors = errors
 	return report
 }

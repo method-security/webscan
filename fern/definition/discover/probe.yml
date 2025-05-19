@@ -1,0 +1,21 @@
+imports:
+  http: ../common/http.yml
+  method: ../common/method.yml
+types:
+  # Config Struct
+  WebProbeConfig:
+    properties:
+      targets: list<string>
+      maxRedirects: integer
+      onlyHttps: boolean
+      insecure: boolean
+      timeout: integer
+      requestMethod: method.RequestMethod
+      headlessConfig: optional<method.HeadlessRequestConfig>
+      browserbaseConfig: optional<method.BrowserbaseRequestConfig>
+  # Report Struct
+  WebProbeReport:
+    properties:
+      targets: optional<list<http.HttpRequestResponse>>
+      config: WebProbeConfig
+      errors: optional<list<string>>

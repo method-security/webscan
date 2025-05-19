@@ -6,7 +6,8 @@ import (
 	"path/filepath"
 )
 
-func GetEntriesFromFiles(paths []string) ([]string, error) {
+// GetEntriesFromTXTFiles returns a list of entries from a list of text files
+func GetEntriesFromTXTFiles(paths []string) ([]string, error) {
 	entries := []string{}
 	for _, path := range paths {
 		absPath, err := filepath.Abs(path)

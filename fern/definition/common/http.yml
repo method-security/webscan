@@ -1,0 +1,81 @@
+imports:
+  method: method.yml
+types:
+  # Http Method Enum
+  HttpMethod:
+    enum:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - PATCH
+      - OPTIONS
+      - HEAD
+      - CONNECT
+      - TRACE
+  # Request Body Structs (For Request Params Struct)
+  JsonBody:
+    properties:
+      data: string
+      mimeType: optional<string>
+  FormBody:
+    properties:
+      fields: map<string, string>
+      mimeType: optional<string>
+  BinaryBody:
+    properties:
+      base64: base64
+      mimeType: optional<string>
+  MultipartPart:
+    properties:
+      headers: optional<map<string, string>>
+      content: BinaryBody
+  MultipartBody:
+    properties:
+      parts: list<MultipartPart>
+      mimeType: optional<string>
+  TextBody:
+    properties:
+      value: string
+      mimeType: optional<string>
+      encoding: optional<string>
+  Body:
+    discriminant: kind
+    union:
+      json: JsonBody
+      form: FormBody
+      multipart: MultipartBody
+      text: TextBody
+      binary: BinaryBody
+  # Request Params
+  HttpRequestParams:
+    properties:
+      path: optional<map<string, string>>
+      query: optional<map<string, string>>
+      headers: optional<map<string, list<string>>>
+      body: optional<Body>
+  # Request Struct
+  HttpRequest:
+    properties:
+      baseUrl: string
+      path: string
+      method: HttpMethod
+      baseHeaders: optional<map<string, list<string>>>
+      params: optional<HttpRequestParams>
+      sentAt: optional<datetime>
+  # Response Struct
+  HttpResponse:
+    properties:
+      redirectChain: optional<list<string>>
+      statusCode: optional<integer>
+      responseHeaders: optional<map<string, list<string>>>
+      responseBody: optional<Body>
+      receivedAt: optional<datetime>
+      sizeBytes: optional<integer>
+  # Returned Struct
+  HttpRequestResponse:
+    properties:
+      request: HttpRequest
+      response: optional<HttpResponse>
+
+

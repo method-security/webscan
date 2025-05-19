@@ -1,0 +1,39 @@
+types:
+  # Function Config Struct
+  EnumerateWordpressPluginsConfig:
+    properties:
+      targets: list<string>
+      plugins: optional<list<string>>
+      insecure: boolean
+      timeout: integer
+      threads: integer
+  # Fingerprint File Struct
+  DetectionSource:
+    enum:
+      - CSS_REFERENCE
+      - HTML
+      - README_TXT
+      - REGISTERED_SCRIPT
+      - REST_API_DIRECT
+      - REST_API_NAMESPACE
+  # WordPress API Response Struct
+  WordpressApiResponse:
+    properties:
+      namespaces: list<string>
+      routes: map<string, unknown>
+  # Report Struct
+  WordpressPluginDetails:
+    properties:
+      name: string
+      version: optional<string>
+      description: optional<string>
+      source: list<DetectionSource>
+  WordpressPluginsTarget:
+    properties:
+      target: string
+      plugins: optional<list<WordpressPluginDetails>>
+  EnumerateWordpressPluginsReport:
+    properties:
+      targets: optional<list<WordpressPluginsTarget>>
+      config: EnumerateWordpressPluginsConfig
+      errors: optional<list<string>>

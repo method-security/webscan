@@ -1,25 +1,34 @@
 package utils
 
 import (
-	"fmt"
-	"net/url"
+	// Standard
+	"path"
 	"strings"
 )
 
-// SplitTarget splits a target URL and standardizes it into its base URL and path components.
-func SplitTarget(target string) (string, string, error) {
-	parsedURL, err := url.Parse(target)
-	if err != nil {
-		return "", "", fmt.Errorf("error parsing URL: %w", err)
+// IsStaticAsset returns true if the URL is a static asset, false otherwise
+func IsStaticAsset(url string) bool {
+	staticExts := []string{
+		".7z", ".avif", ".bmp", ".cjs", ".css", ".csv",
+		".doc", ".docx", ".eot", ".gif", ".gz", ".ico",
+		".ini", ".jpg", ".jpeg", ".js", ".jsx", ".json",
+		".less", ".m4a", ".m4v", ".map", ".markdown", ".md",
+		".mjs", ".mp3", ".mp4", ".ogg", ".otf", ".pdf",
+		".png", ".ppt", ".pptx", ".rar", ".sass", ".scss",
+		".sfnt", ".svg", ".tar", ".toml", ".ts", ".tsx",
+		".ttf", ".txt", ".webm", ".webp", ".woff", ".woff2",
+		".xls", ".xlsx", ".xml", ".yaml", ".yml", ".zip",
 	}
 
-	// Standardize the base URL (ie. http://example.com:8080/ -> http://example.com:8080)
-	baseURL := fmt.Sprintf("%s://%s", parsedURL.Scheme, parsedURL.Host)
-	baseURL = strings.TrimRight(baseURL, "/")
+	if i := strings.IndexAny(url, "?#"); i != -1 {
+		url = url[:i]
+	}
 
-	// Standardize the path
-	// If the path is empty, set it to "", else trim the trailing slash (ie. "/foo/" -> "/foo")
-	path := strings.TrimRight(parsedURL.Path, "/")
-
-	return baseURL, path, nil
+	ext := strings.ToLower(path.Ext(url))
+	for _, staticExt := range staticExts {
+		if ext == staticExt {
+			return true
+		}
+	}
+	return false
 }

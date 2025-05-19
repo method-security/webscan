@@ -1,6 +1,7 @@
 package browserbase
 
 import (
+	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
 )
 
@@ -45,5 +46,5 @@ type Client struct {
 	ConnectionURL string
 	ProjectID     string
 	Sessions      []*Session
-	Options       *common.BrowserbaseConfig
+	Options       *common.BrowserbaseRequestConfig
 }

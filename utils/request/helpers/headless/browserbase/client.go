@@ -1,18 +1,21 @@
 package browserbase
 
 import (
+	// Standard
 	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"net/http"
 
+	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
+	// External
 	"github.com/palantir/pkg/safejson"
 	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
-func NewBrowserbaseClient(browserbaseConfig *common.BrowserbaseConfig, browserbaseSecrets *common.BrowserbaseSecrets) *Client {
+func NewBrowserbaseClient(browserbaseConfig *common.BrowserbaseRequestConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) *Client {
 	return &Client{
 		URL:           "https://www.browserbase.com",
 		ConnectionURL: "wss://connect.browserbase.com",

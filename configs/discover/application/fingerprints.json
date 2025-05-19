@@ -1,0 +1,897 @@
+{
+    "fingerprints": [
+        {
+            "name": "APIAPPLICATION",
+            "modules": [
+                {
+                    "name": "GRAPHQL",
+                    "method": "POST",
+                    "paths": [
+                        "/",
+                        "/graphql",
+                        "/api/graphql",
+                        "/v1/graphql",
+                        "/graphql/v1",
+                        "/query",
+                        "/api"
+                    ],
+                    "requestParams": {
+                        "body": {
+                            "kind": "json",
+                            "json": {
+                                "data": "{\"query\": \"{ __schema { queryType { name } } }\"}",
+                                "mimeType": "application/json"
+                            }
+                        }
+                    },
+                    "bodyIndicators": [
+                        "__schema",
+                        "queryType"
+                    ]
+                },
+                {
+                    "name": "SWAGGER",
+                    "method": "GET",
+                    "paths": [
+                        "/",
+                        "/swagger-ui-bundle.js",
+                        "/swagger-ui.html",
+                        "/swagger/index.html",
+                        "/swagger",
+                        "/api-docs",
+                        "/v2/api-docs",
+                        "/swagger/v1/swagger.json",
+                        "/api/swagger",
+                        "/swagger.json",
+                        "/swagger.yaml"
+                    ],
+                    "headerIndicators": {
+                        "x-swagger-router-basepath": [
+                            ""
+                        ],
+                        "x-swagger-router-controller": [
+                            ""
+                        ],
+                        "x-powered-by": [
+                            "swagger"
+                        ],
+                        "x-generator": [
+                            "swagger codegen",
+                            "openapi generator"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "<div id=\"swagger-ui\">",
+                        "\"openapi\":",
+                        "\"swagger\":"
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "CLOUDBUCKET",
+            "modules": [
+                {
+                    "name": "AWSS3",
+                    "method": "GET",
+                    "paths": [
+                        "/"
+                    ],
+                    "headerIndicators": {
+                        "server": [
+                            "amazons3"
+                        ],
+                        "x-amz-bucket-region": [
+                            ""
+                        ]
+                    }
+                },
+                {
+                    "name": "AZUREBLOB",
+                    "method": "GET",
+                    "paths": [
+                        "/"
+                    ],
+                    "headerIndicators": {
+                        "server": [
+                            "blob"
+                        ],
+                        "x-ms-blob-type": [
+                            ""
+                        ]
+                    }
+                }
+            ]
+        },
+        {
+            "name": "CONTENTMANAGEMENTSYSTEM",
+            "modules": [
+                {
+                    "name": "DRUPAL",
+                    "method": "GET",
+                    "paths": [
+                        "/",
+                        "/user/login",
+                        "/core/install.php",
+                        "/admin",
+                        "/sites/default",
+                        "/misc/drupal.js"
+                    ],
+                    "headerIndicators": {
+                        "x-generator": [
+                            "drupal"
+                        ],
+                        "x-drupal-cache": [
+                            ""
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "content=\"drupal",
+                        "drupal.settings",
+                        "drupalSettings ="
+                    ]
+                },
+                {
+                    "name": "GHOST",
+                    "method": "GET",
+                    "paths": [
+                        "/",
+                        "/ghost/",
+                        "/ghost/api/content/posts/"
+                    ],
+                    "headerIndicators": {
+                        "x-ghost-cache-status": [
+                            ""
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "meta name=\"generator\" content=\"ghost",
+                        "ghost_url",
+                        "ghost.init",
+                        "id=\"ghost-search\"",
+                        "class=\"ghost-search\"",
+                        "window.ghost"
+                    ]
+                },
+                {
+                    "name": "JOOMLA",
+                    "method": "GET",
+                    "paths": [
+                        "/",
+                        "/administrator",
+                        "/language/en-GB/en-GB.xml",
+                        "/templates/system/css/system.css"
+                    ],
+                    "headerIndicators": {
+                        "x-content-powered-by": [
+                            "joomla"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "content=\"joomla",
+                        "joomla!"
+                    ]
+                },
+                {
+                    "name": "MODX",
+                    "method": "GET",
+                    "paths": [
+                        "/",
+                        "/manager",
+                        "/connectors",
+                        "/assets"
+                    ],
+                    "headerIndicators": {
+                        "x-powered-by": [
+                            "modx"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "content=\"MODX",
+                        "modx.setup.js"
+                    ]
+                },
+                {
+                    "name": "WORDPRESS",
+                    "method": "GET",
+                    "paths": [
+                        "/",
+                        "/wp-login.php",
+                        "/wp-admin",
+                        "/xmlrpc.php",
+                        "/wp-content",
+                        "/wp-includes"
+                    ],
+                    "headerIndicators": {
+                        "x-pingback": [
+                            "wp engine",
+                            "wordpress",
+                            "xmlrpc.php"
+                        ],
+                        "link": [
+                            "wp-json",
+                            "wp engine",
+                            "wordpress"
+                        ],
+                        "x-powered-by": [
+                            "wp-json",
+                            "wp engine",
+                            "wordpress"
+                        ],
+                        "server": [
+                            "wordpress"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "\"generator\" content=\"wordpress",
+                        "/wp-admin/load-scripts.php",
+                        "/wp-admin/admin-ajax.php",
+                        "id=\"wp-admin-bar",
+                        "wp-emoji-release.min.js",
+                        "/wp-json/",
+                        "var wpApiSettings =",
+                        "class=\"login hentry\"",
+                        "window._wpemojisettings"
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "FRAMEWORK",
+            "modules": [
+                {
+                    "name": "ANGULAR",
+                    "method": "GET",
+                    "paths": [
+                        "/",
+                        "/main.js",
+                        "/runtime.js",
+                        "/polyfills.js"
+                    ],
+                    "headerIndicators": {
+                        "x-powered-by": [
+                            "angular"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "<app-root>",
+                        "_ngcontent-",
+                        "_nghost-"
+                    ]
+                },
+                {
+                    "name": "DJANGO",
+                    "method": "GET",
+                    "paths": [
+                        "/admin",
+                        "/static/admin/css/base.css"
+                    ],
+                    "bodyIndicators": [
+                        "django administration",
+                        "powered by django"
+                    ]
+                },
+                {
+                    "name": "FASTAPI",
+                    "method": "GET",
+                    "paths": [
+                        "/docs",
+                        "/redoc",
+                        "/openapi.json"
+                    ],
+                    "bodyIndicators": [
+                        "<title>fastapi - swagger ui</title>",
+                        "<title>fastapi - redoc</title>",
+                        "https://fastapi.tiangolo.com"
+                    ]
+                },
+                {
+                    "name": "FLASK",
+                    "method": "GET",
+                    "paths": [
+                        "/",
+                        "/static",
+                        "/favicon.ico"
+                    ],
+                    "bodyIndicators": [
+                        "<title>werkzeug debugger</title>",
+                        "__traceback_hide__ = true",
+                        "flask/_app.py",
+                        "The debugger caught an exception in your wsgi application"
+                    ]
+                },
+                {
+                    "name": "LARAVEL",
+                    "method": "GET",
+                    "paths": [
+                        "/",
+                        "/login",
+                        "/home"
+                    ],
+                    "bodyIndicators": [
+                        "laravel.log",
+                        "<!-- laravel v",
+                        "ignition\\exceptions\\viewexception"
+                    ]
+                },
+                {
+                    "name": "NEXTJS",
+                    "method": "GET",
+                    "paths": [
+                        "/"
+                    ],
+                    "headerIndicators": {
+                        "x-powered-by": [
+                            "next.js"
+                        ],
+                        "x-nextjs-cache": [
+                            ""
+                        ],
+                        "vary": [
+                            "next-router"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "/_next/static/",
+                        "/_next/image?",
+                        "window.__next_data__",
+                        "id=\"__next\""
+                    ]
+                },
+                {
+                    "name": "RAILS",
+                    "method": "GET",
+                    "paths": [
+                        "/rails/info",
+                        "/rails/info/routes"
+                    ],
+                    "headerIndicators": {
+                        "x-powered-by": [
+                            "phusion passenger",
+                            "mod_rails"
+                        ],
+                        "x-rails": [
+                            ""
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "ruby on rails",
+                        "rails application"
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "KUBE",
+            "modules": [
+                {
+                    "name": "KUBE",
+                    "method": "GET",
+                    "paths": [
+                        "/"
+                    ],
+                    "headerIndicators": {
+                        "x-kubernetes-pf-flowschema-uid": [
+                            ""
+                        ],
+                        "x-kubernetes-pf-prioritylevel-uid": [
+                            ""
+                        ]
+                    }
+                }
+            ]
+        },
+        {
+            "name": "REMOTEACCESS",
+            "modules": [
+                {
+                    "name": "CISCOANYCONNECT",
+                    "method": "GET",
+                    "paths": [
+                        "/",
+                        "/+webvpn+/index.html",
+                        "/+CSCOE+/logon.html",
+                        "/+webvpn+/login"
+                    ],
+                    "headerIndicators": {
+                        "x-cisco": [
+                            ""
+                        ],
+                        "server": [
+                            "cisco"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "cisco anyconnect",
+                        "cisco ssl vpn",
+                        "csco_webvpn_cookie"
+                    ]
+                },
+                {
+                    "name": "CITRIXGATEWAY",
+                    "method": "GET",
+                    "paths": [
+                        "/",
+                        "/citrix",
+                        "/logon/logonPoint/tmindex.html",
+                        "/nf/auth/login.html",
+                        "/selfservice",
+                        "/vpn",
+                        "/vpn/index.html"
+                    ],
+                    "headerIndicators": {
+                        "server": [
+                            "citrix",
+                            "netscaler"
+                        ],
+                        "x-citrix": [
+                            ""
+                        ],
+                        "x-citrix-gateway": [
+                            ""
+                        ],
+                        "x-citrix-application": [
+                            ""
+                        ],
+                        "citrix-transactionid": [
+                            ""
+                        ],
+                        "x-ns-client-ip": [
+                            ""
+                        ],
+                        "x-ns-location": [
+                            ""
+                        ],
+                        "x-aaa-session": [
+                            ""
+                        ],
+                        "x-aaaauth": [
+                            ""
+                        ],
+                        "x-ns-aaa": [
+                            ""
+                        ],
+                        "aaa-cookie": [
+                            ""
+                        ],
+                        "set-cookie": [
+                            "citrix_ns",
+                            "nsc_user",
+                            "nsc_vpn",
+                            "nsc_wj",
+                            "nsc_lb",
+                            "nsc_aaac",
+                            "nsc_tass",
+                            "nsc_aaa"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "citrix gateway",
+                        "netscaler gateway",
+                        "citrix adc",
+                        "citrix_ns_id",
+                        "nsapimgr",
+                        "citrix virtual apps",
+                        "citrix workspace",
+                        "citrix access gateway",
+                        "citrixauthentication",
+                        "ctx_login_handler",
+                        "netscaler gateway plugin",
+                        "netscaler aaa",
+                        "netscaleraaa",
+                        "aaalogin.js"
+                    ]
+                },
+                {
+                    "name": "FORTIGATEVPN",
+                    "method": "GET",
+                    "paths": [
+                        "/",
+                        "/remote/login",
+                        "/remote/fgt_lang",
+                        "/remote/fortissl/login"
+                    ],
+                    "headerIndicators": {
+                        "server": [
+                            "fortigate",
+                            "fortinet"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "var fgt_lang =",
+                        "FortiGate-SSL VPN",
+                        "Welcome to Fortinet",
+                        "/fortisslvpn/",
+                        "name=\"fgtLang\"",
+                        "FortiGate Web Management"
+                    ]
+                },
+                {
+                    "name": "OPENVPN",
+                    "method": "GET",
+                    "paths": [
+                        "/",
+                        "/admin",
+                        "/admin/login",
+                        "/__session_start__"
+                    ],
+                    "headerIndicators": {
+                        "server": [
+                            "openvpn"
+                        ],
+                        "set-cookie": [
+                            "openvpn_sess"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "openvpn access server"
+                    ]
+                },
+                {
+                    "name": "PULSESECURE",
+                    "method": "GET",
+                    "paths": [
+                        "/",
+                        "/dana-na/",
+                        "/dana-na/auth/url_default/welcome.cgi",
+                        "/dana/home/index.cgi"
+                    ],
+                    "headerIndicators": {
+                        "server": [
+                            "pulse secure",
+                            "ivanti"
+                        ],
+                        "set-cookie": [
+                            "DSPREAUTH",
+                            "DSSIGNIN"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "pulse secure",
+                        "ivanti connect secure",
+                        "pulseclient",
+                        "dspreauth.cgi"
+                    ]
+                },
+                {
+                    "name": "SONICWALLVPN",
+                    "method": "GET",
+                    "paths": [
+                        "/",
+                        "/cgi-bin/userLogin",
+                        "/auth.html",
+                        "/status.html"
+                    ],
+                    "headerIndicators": {
+                        "server": [
+                            "sonicwall"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "sonicwall ssl vpn"
+                    ]
+                },
+                {
+                    "name": "VMWAREHORIZON",
+                    "method": "GET",
+                    "paths": [
+                        "/",
+                        "/broker/xml",
+                        "/portal",
+                        "/admin",
+                        "/view-client"
+                    ],
+                    "headerIndicators": {
+                        "server": [
+                            "vmware",
+                            "horizon"
+                        ],
+                        "x-vmware-csrf-token": [
+                            ""
+                        ],
+                        "x-vmware": [
+                            ""
+                        ],
+                        "set-cookie": [
+                            "blastsession"
+                        ],
+                        "x-blast": [
+                            ""
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "vmware horizon",
+                        "horizon client",
+                        "vmware blast",
+                        "horizon connection server",
+                        "vmware-view",
+                        "vmware-blast",
+                        "vmware horizon html access"
+                    ]
+                },
+                {
+                    "name": "WINDOWSRDP",
+                    "method": "GET",
+                    "paths": [
+                        "/",
+                        "/rdweb",
+                        "/rds",
+                        "/rdweb/pages",
+                        "/rdweb/pages/default.aspx",
+                        "/rdweb/pages/login.aspx",
+                        "/remote/logon.aspx"
+                    ],
+                    "headerIndicators": {
+                        "server": [
+                            "rdweb",
+                            "rdgateway"
+                        ],
+                        "x-powered-by": [
+                            "rdweb"
+                        ],
+                        "x-rdweb-version": [
+                            ""
+                        ],
+                        "x-rds-version": [
+                            ""
+                        ],
+                        "x-ms-rdp": [
+                            ""
+                        ],
+                        "set-cookie": [
+                            "rdpcookie",
+                            "rdp_fx_"
+                        ],
+                        "x-rdwebstartmode": [
+                            ""
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "remote desktop gateway",
+                        "rd gateway",
+                        "rd web access",
+                        "rdpclientlauncher",
+                        "msrdpclient"
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "WEBSERVER",
+            "modules": [
+                {
+                    "name": "ABYSS",
+                    "method": "GET",
+                    "paths": [
+                        "/",
+                        "/abyss-status",
+                        "/admin"
+                    ],
+                    "headerIndicators": {
+                        "server": [
+                            "abyss"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "abyss web server",
+                        "<title>abyss</title>"
+                    ]
+                },
+                {
+                    "name": "APACHE",
+                    "method": "GET",
+                    "paths": [
+                        "/",
+                        "/icons",
+                        "/manual",
+                        "/cgi-bin",
+                        "/server-status"
+                    ],
+                    "headerIndicators": {
+                        "server": [
+                            "apache"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "apache http server"
+                    ]
+                },
+                {
+                    "name": "CADDY",
+                    "method": "GET",
+                    "paths": [
+                        "/"
+                    ],
+                    "headerIndicators": {
+                        "server": [
+                            "caddy"
+                        ]
+                    }
+                },
+                {
+                    "name": "CHEROKEE",
+                    "method": "GET",
+                    "paths": [
+                        "/",
+                        "/cherokee-admin",
+                        "/admin"
+                    ],
+                    "headerIndicators": {
+                        "server": [
+                            "cherokee"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "cherokee web server"
+                    ]
+                },
+                {
+                    "name": "IIS",
+                    "method": "GET",
+                    "paths": [
+                        "/",
+                        "/aspnet_client",
+                        "/iisstart.htm",
+                        "/iishelp",
+                        "/iisadmpwd",
+                        "/webadmin",
+                        "/localstart.asp"
+                    ],
+                    "headerIndicators": {
+                        "server": [
+                            "Microsoft-IIS"
+                        ],
+                        "x-powered-by": [
+                            "ASP.NET"
+                        ]
+                    }
+                },
+                {
+                    "name": "JETTY",
+                    "method": "GET",
+                    "paths": [
+                        "/"
+                    ],
+                    "headerIndicators": {
+                        "server": [
+                            "jetty"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "<title>jetty</title>",
+                        "org.eclipse.jetty",
+                        "jetty-server"
+                    ]
+                },
+                {
+                    "name": "LITESPEED",
+                    "method": "GET",
+                    "paths": [
+                        "/",
+                        "/litespeed-status",
+                        "/server-status",
+                        "/admin"
+                    ],
+                    "headerIndicators": {
+                        "server": [
+                            "litespeed"
+                        ],
+                        "x-powered-by": [
+                            "litespeed"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "<title>litespeed web server</title>",
+                        "litespeed web server"
+                    ]
+                },
+                {
+                    "name": "NGINX",
+                    "method": "GET",
+                    "paths": [
+                        "/",
+                        "/nginx_status",
+                        "/status",
+                        "/.nginx-debian.html",
+                        "/50x.html",
+                        "/404.html"
+                    ],
+                    "headerIndicators": {
+                        "server": [
+                            "nginx"
+                        ],
+                        "x-powered-by": [
+                            "nginx"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "<title>welcome to nginx</title>",
+                        "<title>test page for nginx</title>",
+                        "<h1>welcome to nginx!</h1>",
+                        "<center>nginx</center>",
+                        "<hr><center>nginx/"
+                    ]
+                },
+                {
+                    "name": "OPENRESTY",
+                    "method": "GET",
+                    "paths": [
+                        "/"
+                    ],
+                    "headerIndicators": {
+                        "server": [
+                            "openresty"
+                        ]
+                    }
+                },
+                {
+                    "name": "TENGINE",
+                    "method": "GET",
+                    "paths": [
+                        "/",
+                        "/nginx_status"
+                    ],
+                    "headerIndicators": {
+                        "server": [
+                            "tengine"
+                        ]
+                    }
+                },
+                {
+                    "name": "TOMCAT",
+                    "method": "GET",
+                    "paths": [
+                        "/",
+                        "/manager/html",
+                        "/host-manager/html",
+                        "/docs",
+                        "/examples",
+                        "/webdav"
+                    ],
+                    "headerIndicators": {
+                        "server": [
+                            "apache-coyote"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "apache tomcat",
+                        "tomcat web application manager",
+                        "tomcat documentation"
+                    ]
+                },
+                {
+                    "name": "YAWS",
+                    "method": "GET",
+                    "paths": [
+                        "/",
+                        "/status",
+                        "/yaws"
+                    ],
+                    "headerIndicators": {
+                        "server": [
+                            "yaws"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "<title>yaws</title>"
+                    ]
+                },
+                {
+                    "name": "ZWS",
+                    "method": "GET",
+                    "paths": [
+                        "/"
+                    ],
+                    "headerIndicators": {
+                        "server": [
+                            "zws"
+                        ]
+                    },
+                    "bodyIndicators": [
+                        "<title>zws</title>"
+                    ]
+                }
+            ]
+        }
+    ]
+}

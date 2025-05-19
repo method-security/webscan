@@ -1,0 +1,22 @@
+imports:
+  http: ../common/http.yml
+  method: ../common/method.yml
+types:
+  # Function Config Struct
+  PageCaptureConfig:
+    properties:
+      target: string
+      takeScreenshot: boolean
+      maxRedirects: integer
+      insecure: boolean
+      timeout: integer
+      requestMethod: method.RequestMethod
+      headlessConfig: optional<method.HeadlessRequestConfig>
+      browserbaseConfig: optional<method.BrowserbaseRequestConfig>
+  # Report Struct
+  PageCaptureReport:
+    properties:
+      request: optional<http.HttpRequestResponse>
+      screenshot: optional<base64>
+      config: PageCaptureConfig
+      errors: optional<list<string>>

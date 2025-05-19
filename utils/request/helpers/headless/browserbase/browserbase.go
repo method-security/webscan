@@ -31,7 +31,7 @@ func NewBrowserbaseRequester(
 		return nil
 	}
 
-	websocket := headless.NewWebSocket(ctx, browserbaseClient.ConnectionString(*session))
+	websocket := NewWebSocket(ctx, browserbaseClient.ConnectionString(*session))
 	client := cdp.New().Start(websocket)
 	return &Requester{
 		Requester: headless.NewRequesterWithClient(client, timeout, minDOMStabalizeTime),
@@ -39,8 +39,8 @@ func NewBrowserbaseRequester(
 	}
 }
 
-func (b *Requester) Request(ctx context.Context, options common.RequestConfig) (*common.RequestInfo, error) {
-	return b.Requester.Request(ctx, options)
+func (b *Requester) SendRequest(ctx context.Context, options common.SendHttpRequestConfig) (common.HttpRequestResponse, error) {
+	return b.Requester.SendRequest(ctx, options)
 }
 
 func (b *Requester) Close(ctx context.Context) error {

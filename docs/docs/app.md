@@ -15,12 +15,12 @@ webscan app [command]
 The `webscan app fingerprint` command fingerprints a URL by identifying the web application type.
 
 Fingerprint uses a randge of modules as the means for identifying an application type.
-For example, `--resourcetype APIAPPLICATION  --modules SWAGGER` finds an active Swagger API. `--resourcetype APIAPPLICATION  --modules AWSS3` finds AWS S3 buckets.
+For example, `--resourcetype API_APPLICATION  --modules SWAGGER` finds an active Swagger API. `--resourcetype API_APPLICATION  --modules AWSS3` finds AWS S3 buckets.
 
 #### Usage
 
 ```bash
-webscan app fingerprint --resourcetype APIAPPLICATION  --modules GRAPHQL --targets https://example.com 
+webscan app fingerprint --resourcetype API_APPLICATION  --modules GRAPHQL --targets https://example.com 
 ```
 
 #### Help Text
@@ -40,7 +40,7 @@ Usage:
 Flags:
   -h, --help                  help for fingerprint
       --modules strings       Modules to run (APIApplication: FASTAPI, GRAPHQL, GRPC, SWAGGER, K8S, WORDPRESS; CloudBucket: AWSS3, AZUREBLOB; WebApplication: APACHE, NGINX, IIS)
-      --resourcetype string   Resource type to fingerprint (APIAPPLICATION, CLOUDBUCKET, WEBAPPLICATION)
+      --resourcetype string   Resource type to fingerprint (API_APPLICATION, CLOUD_BUCKET, WEBAPPLICATION)
       --successfulonly        Only show successful attempts
       --targets strings       URL target to perform fingerprint against
       --timeout int           Timeout per request (seconds) (default 30)

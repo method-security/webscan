@@ -1,0 +1,55 @@
+imports:
+  http: ../../common/http.yml
+  method: ../../common/method.yml
+types:
+  # File JSON Schema
+  SaasFingerprintProfile:
+    properties:
+      headers: optional<map<string, list<string>>>
+      body: optional<list<string>>
+      pageNotFound: optional<list<string>>
+  SaasFingerprintEntry:
+    properties:
+      fingerprintProfile: SaasFingerprintProfile
+      domainSlugs: list<string>
+  SaasFingerprintFile:
+    properties:
+      fingerprints: map<string, SaasFingerprintEntry>
+  # CLI Config
+  DiscoverSaasActiveConfig:
+    properties:
+      orgs: list<string>
+      saasFingerprints: SaasFingerprintFile
+      ssoFingerprints: SaasFingerprintFile
+      saasCompanies: optional<list<string>>
+      ssoCompanies: optional<list<string>>
+      successfulOnly: boolean
+      httpsOnly: boolean
+      maxRedirects: integer
+      insecure: boolean
+      timeout: integer
+      requestMethod: method.RequestMethod
+      headlessConfig: optional<method.HeadlessRequestConfig>
+      browserbaseConfig: optional<method.BrowserbaseRequestConfig>
+  # Report
+  SaasActiveFinding:
+    properties:
+      ssoPage: optional<string>
+      companyPage: optional<boolean>
+  SaasActiveRequest:
+    properties:
+      request: http.HttpRequestResponse
+      findings: optional<SaasActiveFinding>
+  SaasActiveCompany:
+    properties:
+      company: string
+      requests: optional<list<SaasActiveRequest>>
+  SaasActiveAttempt:
+    properties:
+      org: string
+      companies: list<SaasActiveCompany>
+  DiscoverSaasActiveReport:
+    properties:
+      orgs: optional<list<SaasActiveAttempt>>
+      config: DiscoverSaasActiveConfig
+      errors: optional<list<string>>

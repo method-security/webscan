@@ -3,22 +3,18 @@ package cmd
 import (
 	// Standard
 	"fmt"
-
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
-	discoverfern "github.com/Method-Security/webscan/generated/go/discover"
-	discoverroutefern "github.com/Method-Security/webscan/generated/go/discover/route"
+	discover "github.com/Method-Security/webscan/generated/go/discover"
 
 	// Internal
-	discover "github.com/Method-Security/webscan/internal/discover"
+	discoverprobe "github.com/Method-Security/webscan/internal/discover"
 	discoverapplication "github.com/Method-Security/webscan/internal/discover/application"
 	discoverpage "github.com/Method-Security/webscan/internal/discover/page"
 	discoverroute "github.com/Method-Security/webscan/internal/discover/route"
-	discoverroutestaticasset "github.com/Method-Security/webscan/internal/discover/route/staticasset"
 
 	// Utils
 	utils "github.com/Method-Security/webscan/utils"
-
 	// External
 	cobra "github.com/spf13/cobra"
 )
@@ -87,7 +83,7 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Create config
-			config, err := newDiscoverApplicationFingerprintConfig(targets, resourceType, modules, filteredFingerprints, successfulOnly, insecure, timeout)
+			config, err := getDiscoverApplicationFingerprintConfig(targets, resourceType, modules, filteredFingerprints, successfulOnly, insecure, timeout)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -245,7 +241,7 @@ func (a *WebScan) InitDiscoverCommand() {
 			config := getDiscoverProbeConfig(targets, maxRedirects, HTTPSOnly, insecure, timeout, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
 
 			// Generate report
-			report, err := discover.PerformWebProbe(cmd.Context(), config, requestMethodConfig.BrowserbaseSecrets)
+			report, err := discoverprobe.PerformWebProbe(cmd.Context(), config, requestMethodConfig.BrowserbaseSecrets)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -363,103 +359,6 @@ func (a *WebScan) InitDiscoverCommand() {
 	// Mark Required Flags
 	_ = discoverRouteCmd.MarkFlagRequired("target")
 
-	discoverRouteStaticAssetTakeoverCmd := &cobra.Command{
-		Use:   "static-asset-takeover",
-		Short: "Detect static asset takeover vulnerabilities",
-		Long:  `Analyze static assets (JS, CSS, images) to detect potential takeover vulnerabilities through misconfigured CDNs or storage services.`,
-		Run: func(cmd *cobra.Command, args []string) {
-			defer a.OutputSignal.PanicHandler(cmd.Context())
-
-			// Get Target flag
-			target, err := cmd.Flags().GetString("target")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-
-			// Get Config flags
-			fingerprintPaths, err := cmd.Flags().GetStringSlice("fingerprint-file-paths")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			fingerprints := discoverroutestaticasset.GrabStaticAssetTakeOverFingerprints(fingerprintPaths)
-			if len(fingerprints) == 0 {
-				a.OutputSignal.AddError(fmt.Errorf("no fingerprints found"))
-				return
-			}
-			requireBaseURLMatch, err := cmd.Flags().GetBool("require-base-url-match")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			successfulOnly, err := cmd.Flags().GetBool("successful-only")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			maxRedirects, err := cmd.Flags().GetInt("max-redirects")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			insecure, err := cmd.Flags().GetBool("insecure")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			timeout, err := cmd.Flags().GetInt("timeout")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			threads, err := cmd.Flags().GetInt("threads")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-
-			// Get Request Method flag
-			requestMethodConfig, err := utils.GetRequestMethodFlags(cmd)
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-
-			// Set Config
-			config := getStaticAssetTakeoverConfig(target, fingerprints, requireBaseURLMatch, successfulOnly, maxRedirects, insecure, timeout, threads, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
-
-			// Generate a report
-			report := discoverroutestaticasset.DetectStaticAssetTakeovers(cmd.Context(), config, requestMethodConfig.BrowserbaseSecrets)
-			a.OutputSignal.Content = report
-
-		},
-	}
-	// Target Flags
-	discoverRouteStaticAssetTakeoverCmd.Flags().String("target", "", "URL target to analyze for static asset takeover")
-	// Config Flags
-	discoverRouteStaticAssetTakeoverCmd.Flags().StringSlice("fingerprint-file-paths", []string{"configs/discover/route/static_asset_takeover.json"}, "Paths to fingerprint definition files")
-	discoverRouteStaticAssetTakeoverCmd.Flags().Bool("require-base-url-match", false, "Only scan assets sharing the target's base URL")
-	discoverRouteStaticAssetTakeoverCmd.Flags().Bool("successful-only", false, "Only show successful takeover attempts")
-	discoverRouteStaticAssetTakeoverCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
-	discoverRouteStaticAssetTakeoverCmd.Flags().Bool("insecure", false, "Allow insecure SSL/TLS connections")
-	discoverRouteStaticAssetTakeoverCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
-	discoverRouteStaticAssetTakeoverCmd.Flags().Int("threads", 0, "Number of concurrent threads for scanning")
-	// Request Method Flags for all capture subcommands
-	discoverRouteStaticAssetTakeoverCmd.Flags().String("request-method", "STANDARD", "Request method to use (standard, headless, browserbase)")
-	discoverRouteStaticAssetTakeoverCmd.Flags().String("headless-path", "", "Path to headless browser executable")
-	discoverRouteStaticAssetTakeoverCmd.Flags().Int("min-dom-stabalize-time", 5, "Minimum time to wait for DOM stabilization in seconds")
-	discoverRouteStaticAssetTakeoverCmd.Flags().String("browserbase-token", "", "Browserbase API token for cloud browser access")
-	discoverRouteStaticAssetTakeoverCmd.Flags().String("browserbase-project", "", "Browserbase project ID")
-	discoverRouteStaticAssetTakeoverCmd.Flags().Bool("browserbase-proxy", false, "Use Browserbase proxy for requests")
-	discoverRouteStaticAssetTakeoverCmd.Flags().StringSlice("browserbase-countries", []string{}, "List of countries to use for Browserbase proxy")
-
-	// Mark Required Flags
-	_ = discoverRouteStaticAssetTakeoverCmd.MarkFlagRequired("target")
-
-	// Add Command to 'Discover Route' Command
-	discoverRouteCmd.AddCommand(discoverRouteStaticAssetTakeoverCmd)
-
 	// Add Command to 'Discover' Command
 	discoverCmd.AddCommand(discoverRouteCmd)
 
@@ -467,12 +366,12 @@ func (a *WebScan) InitDiscoverCommand() {
 	a.RootCmd.AddCommand(discoverCmd)
 }
 
-func newDiscoverApplicationFingerprintConfig(targets []string, resource string, moduleEnums []string, fingerprints *discoverfern.ApplicationFingerprintResource, successfulOnly bool, insecure bool, timeout int) (*discoverfern.DiscoverApplicationFingerprintConfig, error) {
-	resourceEnum, err := discoverfern.NewApplicationFingerprintResourceTypeFromString(resource)
+func getDiscoverApplicationFingerprintConfig(targets []string, resource string, moduleEnums []string, fingerprints *discover.ApplicationFingerprintResource, successfulOnly bool, insecure bool, timeout int) (*discover.DiscoverApplicationFingerprintConfig, error) {
+	resourceEnum, err := discover.NewApplicationFingerprintResourceTypeFromString(resource)
 	if err != nil {
 		return nil, fmt.Errorf("invalid resource type: %s", resource)
 	}
-	config := &discoverfern.DiscoverApplicationFingerprintConfig{
+	config := &discover.DiscoverApplicationFingerprintConfig{
 		Targets:        targets,
 		ResourceType:   resourceEnum,
 		Modules:        moduleEnums,
@@ -484,8 +383,8 @@ func newDiscoverApplicationFingerprintConfig(targets []string, resource string, 
 	return config, nil
 }
 
-func getDiscoverPageConfig(target string, maxRedirects int, insecure bool, timeout int, takeScreenshot bool, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) discoverfern.DiscoverPageConfig {
-	config := discoverfern.DiscoverPageConfig{
+func getDiscoverPageConfig(target string, maxRedirects int, insecure bool, timeout int, takeScreenshot bool, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) discover.DiscoverPageConfig {
+	config := discover.DiscoverPageConfig{
 		Target:            target,
 		MaxRedirects:      maxRedirects,
 		Insecure:          insecure,
@@ -498,8 +397,8 @@ func getDiscoverPageConfig(target string, maxRedirects int, insecure bool, timeo
 	return config
 }
 
-func getDiscoverProbeConfig(targets []string, maxRedirects int, HTTPSOnly bool, insecure bool, timeout int, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) *discoverfern.DiscoverProbeConfig {
-	config := &discoverfern.DiscoverProbeConfig{
+func getDiscoverProbeConfig(targets []string, maxRedirects int, HTTPSOnly bool, insecure bool, timeout int, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) *discover.DiscoverProbeConfig {
+	config := &discover.DiscoverProbeConfig{
 		Targets:           targets,
 		MaxRedirects:      maxRedirects,
 		HttpsOnly:         HTTPSOnly,
@@ -513,8 +412,8 @@ func getDiscoverProbeConfig(targets []string, maxRedirects int, HTTPSOnly bool, 
 	return config
 }
 
-func getDiscoverRouteConfig(target string, requiredBaseURLMatch bool, ignoreStaticAssets bool, spiderDepth int, maxRedirects int, insecure bool, timeout int, threads int, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) discoverroutefern.DiscoverRouteConfig {
-	config := discoverroutefern.DiscoverRouteConfig{
+func getDiscoverRouteConfig(target string, requiredBaseURLMatch bool, ignoreStaticAssets bool, spiderDepth int, maxRedirects int, insecure bool, timeout int, threads int, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) discover.DiscoverRouteConfig {
+	config := discover.DiscoverRouteConfig{
 		Target:              target,
 		IgnoreStaticAssets:  ignoreStaticAssets,
 		RequireBaseUrlMatch: requiredBaseURLMatch,
@@ -527,30 +426,5 @@ func getDiscoverRouteConfig(target string, requiredBaseURLMatch bool, ignoreStat
 		HeadlessConfig:      headlessConfig,
 		BrowserbaseConfig:   browserbaseConfig,
 	}
-	return config
-}
-
-func getStaticAssetTakeoverConfig(target string, fingerprints []*discoverroutefern.StaticAssetTakeoverFingerprint, requireBaseURLMatch bool, successfulOnly bool, maxRedirects int, insecure bool, timeout int, threads int, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserBaseConfig *common.BrowserbaseRequestConfig) discoverroutefern.StaticAssetTakeoverConfig {
-	// Create Route Capture Config
-	routeCaptureConfig := &discoverroutefern.DiscoverRouteConfig{
-		Target:              target,
-		IgnoreStaticAssets:  false,
-		RequireBaseUrlMatch: requireBaseURLMatch,
-		SpiderDepth:         1,
-		Insecure:            insecure,
-		Timeout:             max(timeout, 0),
-		Threads:             max(threads, 0),
-		RequestMethod:       requestMethod,
-		MaxRedirects:        maxRedirects,
-		HeadlessConfig:      headlessConfig,
-		BrowserbaseConfig:   browserBaseConfig,
-	}
-	// Create Static Asset Takeover Config
-	config := discoverroutefern.StaticAssetTakeoverConfig{
-		RouteCaptureConfig: routeCaptureConfig,
-		Fingerprints:       fingerprints,
-		SuccessfulOnly:     successfulOnly,
-	}
-
 	return config
 }

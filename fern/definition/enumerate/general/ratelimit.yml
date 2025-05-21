@@ -2,7 +2,7 @@ imports:
   http: ../../common/http.yml
 types:
   # Config Struct
-  DetectRateLimitConfig:
+  EnumerateGeneralRateLimitConfig:
     properties:
       targets: list<string>
       maxRequests: integer
@@ -23,5 +23,5 @@ types:
   DetectRateLimitReport:
     properties:
       targets: optional<list<RateLimitTarget>>
-      config: DetectRateLimitConfig
+      config: EnumerateGeneralRateLimitConfig
       errors: optional<list<string>>

@@ -3,7 +3,6 @@ package cmd
 import (
 	// Standard
 	"errors"
-
 	// Generated
 	enumeratecmswordpressfern "github.com/Method-Security/webscan/generated/go/enumerate/cms/wordpress"
 	enumerategeneralfern "github.com/Method-Security/webscan/generated/go/enumerate/general"
@@ -19,7 +18,6 @@ import (
 
 	// Utils
 	utils "github.com/Method-Security/webscan/utils"
-
 	// External
 	cobra "github.com/spf13/cobra"
 )
@@ -361,7 +359,7 @@ func (a *WebScan) InitEnumerateCommand() {
 			}
 
 			// Generate config
-			config := getDetectRateLimitConfig(targets, maxRequests, timespan, insecure, timeout)
+			config := getEnumerateGeneralRateLimitConfig(targets, maxRequests, timespan, insecure, timeout)
 
 			// Generate report
 			report := enumerategeneral.PerformGeneralRatelimit(cmd.Context(), config)
@@ -421,8 +419,8 @@ func getEnumerateWebserverIISConfig(targets []string, insecure bool, timeout int
 	return config
 }
 
-func getDetectRateLimitConfig(targets []string, maxRequests int, timespan int, insecure bool, timeout int) enumerategeneralfern.DetectRateLimitConfig {
-	config := enumerategeneralfern.DetectRateLimitConfig{
+func getEnumerateGeneralRateLimitConfig(targets []string, maxRequests int, timespan int, insecure bool, timeout int) enumerategeneralfern.EnumerateGeneralRateLimitConfig {
+	config := enumerategeneralfern.EnumerateGeneralRateLimitConfig{
 		Targets:     targets,
 		MaxRequests: maxRequests,
 		Timespan:    max(timespan, 0),

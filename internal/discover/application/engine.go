@@ -7,14 +7,14 @@ import (
 
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
-	discoverfern "github.com/Method-Security/webscan/generated/go/discover"
+	"github.com/Method-Security/webscan/generated/go/discover"
 
 	// Utils
 	request "github.com/Method-Security/webscan/utils/request"
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
 )
 
-func createSendHTTPRequestConfig(baseURL, path string, method common.HttpMethod, requestParams common.HttpRequestParams, config *discoverfern.DiscoverApplicationFingerprintConfig) common.SendHttpRequestConfig {
+func createSendHTTPRequestConfig(baseURL, path string, method common.HttpMethod, requestParams common.HttpRequestParams, config *discover.DiscoverApplicationFingerprintConfig) common.SendHttpRequestConfig {
 	request := common.HttpRequest{
 		BaseUrl: baseURL,
 		Path:    path,
@@ -33,28 +33,28 @@ func createSendHTTPRequestConfig(baseURL, path string, method common.HttpMethod,
 	}
 }
 
-func Run(ctx context.Context, target string, config *discoverfern.DiscoverApplicationFingerprintConfig) ([]*discoverfern.ApplicationFingerprintAttempt, []string) {
+func Run(ctx context.Context, target string, config *discover.DiscoverApplicationFingerprintConfig) ([]*discover.ApplicationFingerprintAttempt, []string) {
 	if config == nil || config.Fingerprints == nil || len(config.Fingerprints.Modules) == 0 {
-		return []*discoverfern.ApplicationFingerprintAttempt{}, []string{"invalid config: no resource types found"}
+		return []*discover.ApplicationFingerprintAttempt{}, []string{"invalid config: no resource types found"}
 	}
 
 	// Get the first (and should be only) resource type from the filtered config
 	resourceType := config.Fingerprints
 	if len(resourceType.Modules) == 0 {
-		return []*discoverfern.ApplicationFingerprintAttempt{}, []string{"invalid config: no modules found for resource type"}
+		return []*discover.ApplicationFingerprintAttempt{}, []string{"invalid config: no modules found for resource type"}
 	}
 
 	baseURL, parsedTargetPath, err := requesthelpers.SplitTargetURL(target)
 	if err != nil {
-		return []*discoverfern.ApplicationFingerprintAttempt{}, []string{err.Error()}
+		return []*discover.ApplicationFingerprintAttempt{}, []string{err.Error()}
 	}
 
-	var attempts []*discoverfern.ApplicationFingerprintAttempt
+	var attempts []*discover.ApplicationFingerprintAttempt
 	var errors []string
 
 	// Process each module separately
 	for _, module := range resourceType.Modules {
-		attempt := &discoverfern.ApplicationFingerprintAttempt{
+		attempt := &discover.ApplicationFingerprintAttempt{
 			Name:    module.Name,
 			Finding: false,
 		}
@@ -92,7 +92,7 @@ func Run(ctx context.Context, target string, config *discoverfern.DiscoverApplic
 	return attempts, errors
 }
 
-func AnalyzeResponse(httpRequestResponse *common.HttpRequestResponse, module *discoverfern.ApplicationFingerprintModule) bool {
+func AnalyzeResponse(httpRequestResponse *common.HttpRequestResponse, module *discover.ApplicationFingerprintModule) bool {
 	// Check if response is nil
 	if httpRequestResponse == nil || httpRequestResponse.Response == nil || httpRequestResponse.Response.StatusCode == nil {
 		return false
@@ -142,18 +142,18 @@ func AnalyzeResponse(httpRequestResponse *common.HttpRequestResponse, module *di
 	return false
 }
 
-func LaunchFingerprintEngine(ctx context.Context, config *discoverfern.DiscoverApplicationFingerprintConfig) (*discoverfern.DiscoverApplicationFingerprintReport, error) {
-	report := discoverfern.DiscoverApplicationFingerprintReport{Config: config}
+func LaunchFingerprintEngine(ctx context.Context, config *discover.DiscoverApplicationFingerprintConfig) (*discover.DiscoverApplicationFingerprintReport, error) {
+	report := discover.DiscoverApplicationFingerprintReport{Config: config}
 	errors := []string{}
 
-	var targets []*discoverfern.ApplicationFingerprintTarget
+	var targets []*discover.ApplicationFingerprintTarget
 	for _, target := range config.Targets {
-		var attempts []*discoverfern.ApplicationFingerprintAttempt
+		var attempts []*discover.ApplicationFingerprintAttempt
 		attempt, errs := Run(ctx, target, config)
 		attempts = append(attempts, attempt...)
 		errors = append(errors, errs...)
 
-		filteredAttempts := []*discoverfern.ApplicationFingerprintAttempt{}
+		filteredAttempts := []*discover.ApplicationFingerprintAttempt{}
 		for _, attempt := range attempts {
 			if !config.SuccessfulOnly || attempt.Finding {
 				filteredAttempts = append(filteredAttempts, attempt)
@@ -161,7 +161,7 @@ func LaunchFingerprintEngine(ctx context.Context, config *discoverfern.DiscoverA
 		}
 		attempts = filteredAttempts
 
-		target := discoverfern.ApplicationFingerprintTarget{Target: target, Attempts: attempts}
+		target := discover.ApplicationFingerprintTarget{Target: target, Attempts: attempts}
 		targets = append(targets, &target)
 	}
 

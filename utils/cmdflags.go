@@ -8,12 +8,11 @@ import (
 
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
-
 	// External
 	cobra "github.com/spf13/cobra"
 )
 
-// RequestMethodConfig holds all the configuration related to request methods
+// RequestMethodFlagData holds all the configuration related to request methods
 type RequestMethodFlagData struct {
 	RequestMethodEnum  common.RequestMethod
 	HeadlessConfig     *common.HeadlessRequestConfig

@@ -7,18 +7,18 @@ import (
 	"os"
 	"slices"
 
+	"github.com/Method-Security/webscan/generated/go/discover"
 	// Generated
-	discoverfern "github.com/Method-Security/webscan/generated/go/discover"
 )
 
 // LoadFingerprints loads and unmarshals the fingerprints.json file into the generated AppFingerprints struct
-func LoadFingerprints(filePath string) (*discoverfern.ApplicationFingerprints, error) {
+func LoadFingerprints(filePath string) (*discover.ApplicationFingerprints, error) {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, err
 	}
 
-	var config discoverfern.ApplicationFingerprints
+	var config discover.ApplicationFingerprints
 	if err := json.Unmarshal(data, &config); err != nil {
 		return nil, err
 	}
@@ -28,15 +28,15 @@ func LoadFingerprints(filePath string) (*discoverfern.ApplicationFingerprints, e
 
 // FilterFingerprints filters the fingerprints based on resource types and modules
 // Returns error if resource type or module doesn't exist
-func FilterFingerprints(fingerprints *discoverfern.ApplicationFingerprints, resourceType string, modules []string) (*discoverfern.ApplicationFingerprintResource, error) {
+func FilterFingerprints(fingerprints *discover.ApplicationFingerprints, resourceType string, modules []string) (*discover.ApplicationFingerprintResource, error) {
 	// Convert string to AppFingerprintResourceType
-	resourceTypeEnum, err := discoverfern.NewApplicationFingerprintResourceTypeFromString(resourceType)
+	resourceTypeEnum, err := discover.NewApplicationFingerprintResourceTypeFromString(resourceType)
 	if err != nil {
 		return nil, fmt.Errorf("invalid resource type: %s", resourceType)
 	}
 
 	// Find the resource type
-	var foundResourceType *discoverfern.ApplicationFingerprintResource
+	var foundResourceType *discover.ApplicationFingerprintResource
 	for _, resourceType := range fingerprints.Fingerprints {
 		if resourceType.Name == resourceTypeEnum {
 			foundResourceType = resourceType
@@ -53,7 +53,7 @@ func FilterFingerprints(fingerprints *discoverfern.ApplicationFingerprints, reso
 	}
 
 	// Find the module
-	var foundModules []*discoverfern.ApplicationFingerprintModule
+	var foundModules []*discover.ApplicationFingerprintModule
 	for _, m := range foundResourceType.Modules {
 		if slices.Contains(modules, m.Name) {
 			foundModules = append(foundModules, m)
@@ -69,7 +69,7 @@ func FilterFingerprints(fingerprints *discoverfern.ApplicationFingerprints, reso
 }
 
 // GetModule returns the module configuration for a given resource type and module
-func GetModule(resourceType discoverfern.ApplicationFingerprintResourceType, module string, fingerprints *discoverfern.ApplicationFingerprints) (*discoverfern.ApplicationFingerprintModule, error) {
+func GetModule(resourceType discover.ApplicationFingerprintResourceType, module string, fingerprints *discover.ApplicationFingerprints) (*discover.ApplicationFingerprintModule, error) {
 	// Check if resource type exists
 	for _, rt := range fingerprints.Fingerprints {
 		if rt.Name == resourceType {

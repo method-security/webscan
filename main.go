@@ -16,6 +16,7 @@ func main() {
 	webscan.InitRootCommand()
 	webscan.InitDiscoverCommand()
 	webscan.InitEnumerateCommand()
+	webscan.InitPentestCommand()
 
 	if err := webscan.RootCmd.Execute(); err != nil {
 		os.Exit(1)

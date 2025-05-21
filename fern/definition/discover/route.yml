@@ -1,6 +1,6 @@
 imports:
-  http: ../../common/http.yml
-  method: ../../common/method.yml
+  http: ../common/http.yml
+  method: ../common/method.yml
 types:
   # Function Config Struct
   DiscoverRouteConfig:

@@ -5,7 +5,7 @@ import (
 	"context"
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
-	discoverfern "github.com/Method-Security/webscan/generated/go/discover"
+	"github.com/Method-Security/webscan/generated/go/discover"
 	"github.com/Method-Security/webscan/utils/request/helpers/headless"
 
 	// Internal
@@ -14,7 +14,7 @@ import (
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
 )
 
-func getHTTPRequestConfig(baseURL string, path string, config discoverfern.DiscoverPageConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) common.SendHttpRequestConfig {
+func getHTTPRequestConfig(baseURL string, path string, config discover.DiscoverPageConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) common.SendHttpRequestConfig {
 	request := common.HttpRequest{
 		BaseUrl: baseURL,
 		Path:    path,
@@ -36,11 +36,11 @@ func getHTTPRequestConfig(baseURL string, path string, config discoverfern.Disco
 // PerformPageCapture determines whether to perform a screenshot or HTML capture based on the takeScreenshot parameter
 func PerformPageCapture(
 	ctx context.Context,
-	config discoverfern.DiscoverPageConfig,
+	config discover.DiscoverPageConfig,
 	browserbaseSecrets *common.BrowserbaseRequestSecrets,
-) *discoverfern.DiscoverPageReport {
+) *discover.DiscoverPageReport {
 	// Initialize report
-	report := discoverfern.DiscoverPageReport{Config: &config}
+	report := discover.DiscoverPageReport{Config: &config}
 	errors := []string{}
 
 	// Split target

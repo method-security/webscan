@@ -7,7 +7,7 @@ import (
 
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
-	discoverroutefern "github.com/Method-Security/webscan/generated/go/discover/route"
+	discover "github.com/Method-Security/webscan/generated/go/discover"
 
 	// Internal
 	discoverroutehelpers "github.com/Method-Security/webscan/internal/discover/route/helpers"
@@ -18,14 +18,14 @@ import (
 // ExtractFormRoutes extracts WebRoutes from form elements in the HTML document
 // It returns a slice of WebRoutes, a slice of URLs and a slice of errors
 // WebRoutes are merged to only return unique routes
-func ExtractFormRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig discoverroutefern.DiscoverRouteConfig) ([]*discoverroutefern.RouteDetails, []string, []string) {
-	routes := []*discoverroutefern.RouteDetails{}
+func ExtractFormRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig discover.DiscoverRouteConfig) ([]*discover.RouteDetails, []string, []string) {
+	routes := []*discover.RouteDetails{}
 	urls := make(map[string]struct{})
 	errors := []string{}
 
 	doc.Find("form").Each(func(i int, s *goquery.Selection) {
 
-		routeVar := discoverroutefern.RouteDetails{}
+		routeVar := discover.RouteDetails{}
 
 		// Extract action attribute
 		action, exists := s.Attr("action")
@@ -67,18 +67,18 @@ func ExtractFormRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig
 		}
 
 		// Collect input names
-		var queryParams []*discoverroutefern.RouteQueryParam
-		var bodyParams []*discoverroutefern.RouteBodyParam
+		var queryParams []*discover.RouteQueryParam
+		var bodyParams []*discover.RouteBodyParam
 		s.Find("input[name], select[name], textarea[name]").Each(func(_ int, input *goquery.Selection) {
 			name, _ := input.Attr("name")
 			if name != "" {
 				if method == "POST" || method == "PUT" || method == "PATCH" {
 					// For POST, PUT, PATCH methods, add to BodyParams
-					param := &discoverroutefern.RouteBodyParam{Name: name}
+					param := &discover.RouteBodyParam{Name: name}
 					bodyParams = append(bodyParams, param)
 				} else {
 					// For GET and other methods, add to QueryParams
-					param := &discoverroutefern.RouteQueryParam{Name: name}
+					param := &discover.RouteQueryParam{Name: name}
 					queryParams = append(queryParams, param)
 				}
 			}
@@ -97,8 +97,8 @@ func ExtractFormRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig
 	return discoverroutehelpers.MergeWebRoutes(routes), discoverroutehelpers.SetToListString(urls), []string{}
 }
 
-func ExtractAnchorRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig discoverroutefern.DiscoverRouteConfig) ([]*discoverroutefern.RouteDetails, []string, []string) {
-	routes := []*discoverroutefern.RouteDetails{}
+func ExtractAnchorRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig discover.DiscoverRouteConfig) ([]*discover.RouteDetails, []string, []string) {
+	routes := []*discover.RouteDetails{}
 	urls := make(map[string]struct{})
 	errors := []string{}
 
@@ -127,7 +127,7 @@ func ExtractAnchorRoutes(doc *goquery.Document, baseURL string, routeCaptureConf
 				return
 			}
 
-			routeVar := &discoverroutefern.RouteDetails{
+			routeVar := &discover.RouteDetails{
 				BaseUrl: baseURL,
 				Path:    parsedURL.Path,
 				Method:  common.HttpMethodGet.Ptr(), // Anchor links are accessed via GET
@@ -140,8 +140,8 @@ func ExtractAnchorRoutes(doc *goquery.Document, baseURL string, routeCaptureConf
 	return discoverroutehelpers.MergeWebRoutes(routes), discoverroutehelpers.SetToListString(urls), errors
 }
 
-func ExtractLinkRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig discoverroutefern.DiscoverRouteConfig) ([]*discoverroutefern.RouteDetails, []string, []string) {
-	routes := []*discoverroutefern.RouteDetails{}
+func ExtractLinkRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig discover.DiscoverRouteConfig) ([]*discover.RouteDetails, []string, []string) {
+	routes := []*discover.RouteDetails{}
 	urls := make(map[string]struct{})
 	errors := []string{}
 
@@ -171,7 +171,7 @@ func ExtractLinkRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig
 				return
 			}
 
-			routeVar := &discoverroutefern.RouteDetails{
+			routeVar := &discover.RouteDetails{
 				BaseUrl: baseURL,
 				Path:    parsedURL.Path,
 				Method:  common.HttpMethodGet.Ptr(), // Link elements are accessed via GET

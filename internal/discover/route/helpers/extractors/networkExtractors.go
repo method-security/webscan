@@ -8,7 +8,7 @@ import (
 
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
-	discoverroutefern "github.com/Method-Security/webscan/generated/go/discover/route"
+	discover "github.com/Method-Security/webscan/generated/go/discover"
 	discoverroutehelpers "github.com/Method-Security/webscan/internal/discover/route/helpers"
 
 	// Utils
@@ -20,8 +20,8 @@ import (
 )
 
 // ExtractNetworkRoutes fetches network requests, parses them, and populates []WebRoute.
-func ExtractNetworkRoutes(ctx context.Context, b *headless.Requester, target string, baseURLsOnly bool, captureStaticAssets bool) ([]*discoverroutefern.RouteDetails, []string, []string) {
-	routes := []*discoverroutefern.RouteDetails{}
+func ExtractNetworkRoutes(ctx context.Context, b *headless.Requester, target string, baseURLsOnly bool, captureStaticAssets bool) ([]*discover.RouteDetails, []string, []string) {
+	routes := []*discover.RouteDetails{}
 	urls := make(map[string]struct{})
 	errors := []string{}
 	log := svc1log.FromContext(ctx)
@@ -121,7 +121,7 @@ func ExtractNetworkRoutes(ctx context.Context, b *headless.Requester, target str
 		}
 
 		// Build WebRoute object
-		webRoute := &discoverroutefern.RouteDetails{
+		webRoute := &discover.RouteDetails{
 			BaseUrl: urlNoQuery,
 			Path:    parsedURL.Path,
 			Method:  common.HttpMethod(request.Method).Ptr(),

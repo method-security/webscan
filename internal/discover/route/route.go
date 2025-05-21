@@ -10,7 +10,7 @@ import (
 
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
-	discoverroutefern "github.com/Method-Security/webscan/generated/go/discover/route"
+	"github.com/Method-Security/webscan/generated/go/discover"
 	"github.com/Method-Security/webscan/utils"
 
 	// Utils
@@ -27,7 +27,7 @@ import (
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
-func createSendHTTPRequestConfig(baseURL, path string, config discoverroutefern.DiscoverRouteConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) common.SendHttpRequestConfig {
+func createSendHTTPRequestConfig(baseURL, path string, config discover.DiscoverRouteConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) common.SendHttpRequestConfig {
 	request := common.HttpRequest{
 		BaseUrl: baseURL,
 		Path:    path,
@@ -46,9 +46,9 @@ func createSendHTTPRequestConfig(baseURL, path string, config discoverroutefern.
 	}
 }
 
-func extractRoutes(ctx context.Context, httpRequestResponse *common.HttpRequestResponse, requestConfig common.SendHttpRequestConfig, routeCaptureConfig discoverroutefern.DiscoverRouteConfig) ([]*discoverroutefern.RouteDetails, []string, []string) {
+func extractRoutes(ctx context.Context, httpRequestResponse *common.HttpRequestResponse, requestConfig common.SendHttpRequestConfig, routeCaptureConfig discover.DiscoverRouteConfig) ([]*discover.RouteDetails, []string, []string) {
 	log := svc1log.FromContext(ctx)
-	routes := []*discoverroutefern.RouteDetails{}
+	routes := []*discover.RouteDetails{}
 	urls := make(map[string]struct{})
 	errors := []string{}
 
@@ -132,11 +132,11 @@ func extractRoutes(ctx context.Context, httpRequestResponse *common.HttpRequestR
 	return mergedRoutes, staticAssetsList, errors
 }
 
-func PerformRouteCapture(ctx context.Context, config discoverroutefern.DiscoverRouteConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) discoverroutefern.DiscoverRouteReport {
+func PerformRouteCapture(ctx context.Context, config discover.DiscoverRouteConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) discover.DiscoverRouteReport {
 	log := svc1log.FromContext(ctx)
 
 	// Initialize Report
-	report := discoverroutefern.DiscoverRouteReport{
+	report := discover.DiscoverRouteReport{
 		Target: config.Target,
 		Config: &config,
 	}
@@ -148,7 +148,7 @@ func PerformRouteCapture(ctx context.Context, config discoverroutefern.DiscoverR
 	currentDepth := 0
 
 	// Keep track of all discovered routes and static assets
-	allRoutes := []*discoverroutefern.RouteDetails{}
+	allRoutes := []*discover.RouteDetails{}
 	allStaticAssets := []string{}
 
 	// Mutex to protect shared data structures

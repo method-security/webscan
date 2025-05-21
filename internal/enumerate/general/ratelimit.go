@@ -17,7 +17,7 @@ import (
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
 )
 
-func createRateLimitRequestConfig(baseURL, path string, config enumerategeneralfern.DetectRateLimitConfig) common.SendHttpRequestConfig {
+func createRateLimitRequestConfig(baseURL, path string, config enumerategeneralfern.EnumerateGeneralRateLimitConfig) common.SendHttpRequestConfig {
 	request := common.HttpRequest{
 		BaseUrl: baseURL,
 		Path:    path,
@@ -37,7 +37,7 @@ func createRateLimitRequestConfig(baseURL, path string, config enumerategeneralf
 }
 
 // PerformGeneralRatelimit performs rate limit detection on target URLs within a specified timespan
-func PerformGeneralRatelimit(ctx context.Context, config enumerategeneralfern.DetectRateLimitConfig) *enumerategeneralfern.DetectRateLimitReport {
+func PerformGeneralRatelimit(ctx context.Context, config enumerategeneralfern.EnumerateGeneralRateLimitConfig) *enumerategeneralfern.DetectRateLimitReport {
 	// Initialize report
 	report := &enumerategeneralfern.DetectRateLimitReport{Config: &config}
 	errors := []string{}

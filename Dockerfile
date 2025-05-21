@@ -16,7 +16,7 @@ RUN \
   mkdir -p /opt/method/${CLI_NAME}/var/conf/discover/application && \
   mkdir -p /opt/method/${CLI_NAME}/var/conf/discover/route && \
   mkdir -p /opt/method/${CLI_NAME}/var/conf/discover/saas && \
-  mkdir -p /opt/method/${CLI_NAME}/var/conf/discover/saas/bruteforce && \
+  mkdir -p /opt/method/${CLI_NAME}/var/conf/discover/saas/active && \
   mkdir -p /opt/method/${CLI_NAME}/var/conf/enumerate && \
   mkdir -p /opt/method/${CLI_NAME}/var/conf/enumerate/cms && \
   mkdir -p /opt/method/${CLI_NAME}/var/conf/enumerate/cms/wordpress && \
@@ -30,7 +30,7 @@ COPY configs/*                                    /opt/method/${CLI_NAME}/var/co
 COPY configs/discover/*                           /opt/method/${CLI_NAME}/var/conf/discover/
 COPY configs/discover/application/*               /opt/method/${CLI_NAME}/var/conf/discover/application/
 COPY configs/discover/saas/*                      /opt/method/${CLI_NAME}/var/conf/discover/saas/
-COPY configs/discover/saas/bruteforce/*           /opt/method/${CLI_NAME}/var/conf/discover/saas/bruteforce/
+COPY configs/discover/saas/active/*               /opt/method/${CLI_NAME}/var/conf/discover/saas/active/
 COPY configs/enumerate/*                          /opt/method/${CLI_NAME}/var/conf/enumerate/
 COPY configs/enumerate/cms/*                      /opt/method/${CLI_NAME}/var/conf/enumerate/cms/
 COPY configs/enumerate/cms/wordpress/*            /opt/method/${CLI_NAME}/var/conf/enumerate/cms/wordpress/

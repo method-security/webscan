@@ -3,6 +3,7 @@ package cmd
 import (
 	// Standard
 	"errors"
+
 	// Generated
 	enumeratecmswordpressfern "github.com/Method-Security/webscan/generated/go/enumerate/cms/wordpress"
 	enumerategeneralfern "github.com/Method-Security/webscan/generated/go/enumerate/general"
@@ -18,27 +19,28 @@ import (
 
 	// Utils
 	utils "github.com/Method-Security/webscan/utils"
+
 	// External
-	"github.com/spf13/cobra"
+	cobra "github.com/spf13/cobra"
 )
 
 func (a *WebScan) InitEnumerateCommand() {
 	enumerateCmd := &cobra.Command{
 		Use:   "enumerate",
 		Short: "Perform various enumeration scans",
-		Long:  `Perform various enumeration scans`,
+		Long:  `Perform various enumeration scans to identify and analyze web application components, APIs, and security controls.`,
 	}
 
 	enumerateAPIApplicationCmd := &cobra.Command{
 		Use:   "api-application",
-		Short: "Perform API application enumeration scans against a target",
-		Long:  `Perform API application enumeration scans against a target.`,
+		Short: "Enumerate API applications",
+		Long:  `Discover and analyze API endpoints, documentation, and potential vulnerabilities in web APIs.`,
 	}
 
 	enumerateAPIApplicationGraphqlCmd := &cobra.Command{
 		Use:   "graphql",
-		Short: "Perform a GraphQL enumeration scan against a target",
-		Long:  `Perform a GraphQL enumeration scan against a target.`,
+		Short: "Enumerate GraphQL endpoints",
+		Long:  `Discover and analyze GraphQL endpoints, including introspection queries and potential security issues.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			defer a.OutputSignal.PanicHandler(cmd.Context())
 
@@ -67,8 +69,8 @@ func (a *WebScan) InitEnumerateCommand() {
 
 	enumerateAPIApplicationSwaggerCmd := &cobra.Command{
 		Use:   "swagger",
-		Short: "Perform a Swagger enumeration scan against a target",
-		Long:  `Perform a Swagger enumeration scan against a target.`,
+		Short: "Enumerate Swagger/OpenAPI documentation",
+		Long:  `Discover and analyze Swagger/OpenAPI documentation to identify API endpoints and their specifications.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			defer a.OutputSignal.PanicHandler(cmd.Context())
 
@@ -97,7 +99,7 @@ func (a *WebScan) InitEnumerateCommand() {
 	// Target Flags
 	enumerateAPIApplicationSwaggerCmd.Flags().String("target", "", "URL target to perform Swagger enumeration against")
 	// Config Flags
-	enumerateAPIApplicationSwaggerCmd.Flags().Int("timeout", 30, "Timeout per request (seconds)")
+	enumerateAPIApplicationSwaggerCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
 
 	_ = enumerateAPIApplicationSwaggerCmd.MarkFlagRequired("target")
 
@@ -109,8 +111,8 @@ func (a *WebScan) InitEnumerateCommand() {
 
 	enumerateKubeCmd := &cobra.Command{
 		Use:   "kube",
-		Short: "Perform a Kube enumeration scan against a target",
-		Long:  `Perform a Kube enumeration scan against a target.`,
+		Short: "Enumerate Kubernetes resources",
+		Long:  `Discover and analyze Kubernetes resources, including pods, services, and potential security misconfigurations.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			defer a.OutputSignal.PanicHandler(cmd.Context())
 
@@ -145,10 +147,10 @@ func (a *WebScan) InitEnumerateCommand() {
 		},
 	}
 	// Target Flags
-	enumerateKubeCmd.Flags().String("target", "", "URL target to perform Kube enumeration against")
+	enumerateKubeCmd.Flags().String("target", "", "URL target to perform Kubernetes enumeration against")
 	// Config Flags
 	enumerateKubeCmd.Flags().Bool("insecure", false, "Allow insecure SSL/TLS connections")
-	enumerateKubeCmd.Flags().Int("timeout", 30, "Timeout per request (seconds)")
+	enumerateKubeCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
 
 	// Mark required flags
 	_ = enumerateKubeCmd.MarkFlagRequired("target")
@@ -158,20 +160,20 @@ func (a *WebScan) InitEnumerateCommand() {
 
 	enumerateCMSCmd := &cobra.Command{
 		Use:   "cms",
-		Short: "Perform CMS enumeration scans against a target",
-		Long:  `Perform CMS enumeration scans against a target.`,
+		Short: "Enumerate content management systems",
+		Long:  `Discover and analyze content management systems, their components, and potential security issues.`,
 	}
 
 	enumerateCMSWordpressCmd := &cobra.Command{
 		Use:   "wordpress",
-		Short: "Perform WordPress specific enumeration scans against a target",
-		Long:  `Perform WordPress specific enumeration scans against a target.`,
+		Short: "Enumerate WordPress installations",
+		Long:  `Discover and analyze WordPress installations, including themes, plugins, and potential vulnerabilities.`,
 	}
 
 	enumerateCMSWordpressPluginsCmd := &cobra.Command{
 		Use:   "plugins",
-		Short: "Attempt to enumerate WordPress plugins on a target",
-		Long:  `Attempt to enumerate WordPress plugins on a target.`,
+		Short: "Enumerate WordPress plugins",
+		Long:  `Discover and analyze WordPress plugins to identify installed components and potential security issues.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			defer a.OutputSignal.PanicHandler(cmd.Context())
 
@@ -233,13 +235,13 @@ func (a *WebScan) InitEnumerateCommand() {
 		},
 	}
 	// Target Flags
-	enumerateCMSWordpressPluginsCmd.Flags().StringSlice("targets", []string{}, "URL targets to perform WordPress plugins enumeration against")
+	enumerateCMSWordpressPluginsCmd.Flags().StringSlice("targets", []string{}, "URL targets to perform WordPress plugin enumeration against")
 	// Config Flags
-	enumerateCMSWordpressPluginsCmd.Flags().StringSlice("plugins", []string{}, "WordPress plugins to try to detect")
-	enumerateCMSWordpressPluginsCmd.Flags().StringSlice("plugins-file-paths", []string{"configs/enumerate/cms/wordpress/plugins_small.txt"}, "File paths containing common WordPress plugins to use for enumeration")
+	enumerateCMSWordpressPluginsCmd.Flags().StringSlice("plugins", []string{}, "Specific WordPress plugins to check for")
+	enumerateCMSWordpressPluginsCmd.Flags().StringSlice("plugins-file-paths", []string{"configs/enumerate/cms/wordpress/plugins_small.txt"}, "Paths to files containing WordPress plugin lists")
 	enumerateCMSWordpressPluginsCmd.Flags().Bool("insecure", false, "Allow insecure SSL/TLS connections")
-	enumerateCMSWordpressPluginsCmd.Flags().Int("timeout", 30, "Timeout per request (seconds)")
-	enumerateCMSWordpressPluginsCmd.Flags().Int("threads", 0, "Number of threads to use during enumeration (default is number of CPUs)")
+	enumerateCMSWordpressPluginsCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
+	enumerateCMSWordpressPluginsCmd.Flags().Int("threads", 0, "Number of concurrent threads for scanning")
 
 	// Mark required flags
 	_ = enumerateCMSWordpressPluginsCmd.MarkFlagRequired("targets")
@@ -255,14 +257,14 @@ func (a *WebScan) InitEnumerateCommand() {
 
 	enumerateWebserverCmd := &cobra.Command{
 		Use:   "webserver",
-		Short: "Perform webserver enumeration scans against a target",
-		Long:  `Perform webserver enumeration scans against a target.`,
+		Short: "Enumerate web servers",
+		Long:  `Discover and analyze web server configurations, versions, and potential security misconfigurations.`,
 	}
 
 	enumerateWebserverIISCmd := &cobra.Command{
 		Use:   "iis",
-		Short: "Perform IIS enumeration scans against a target",
-		Long:  `Perform IIS enumeration scans against a target.`,
+		Short: "Enumerate IIS servers",
+		Long:  `Discover and analyze IIS server configurations, features, and potential security vulnerabilities.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			defer a.OutputSignal.PanicHandler(cmd.Context())
 
@@ -305,8 +307,8 @@ func (a *WebScan) InitEnumerateCommand() {
 	enumerateWebserverIISCmd.Flags().StringSlice("targets", []string{}, "URL targets to perform IIS enumeration against")
 	// Config Flags
 	enumerateWebserverIISCmd.Flags().Bool("insecure", false, "Allow insecure SSL/TLS connections")
-	enumerateWebserverIISCmd.Flags().Int("timeout", 30, "Timeout per request (seconds)")
-	enumerateWebserverIISCmd.Flags().Int("threads", 0, "Number of threads to use during enumeration (default is number of CPUs)")
+	enumerateWebserverIISCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
+	enumerateWebserverIISCmd.Flags().Int("threads", 0, "Number of concurrent threads for scanning")
 
 	_ = enumerateWebserverIISCmd.MarkFlagRequired("targets")
 
@@ -318,14 +320,14 @@ func (a *WebScan) InitEnumerateCommand() {
 
 	enumerateGeneralCmd := &cobra.Command{
 		Use:   "general",
-		Short: "Perform general enumeration scans against a target",
-		Long:  `Perform general enumeration scans against a target.`,
+		Short: "Perform general enumeration",
+		Long:  `Perform general enumeration tasks to identify security controls and potential vulnerabilities.`,
 	}
 
 	enumerateGeneralRatelimitCmd := &cobra.Command{
 		Use:   "ratelimit",
-		Short: "Perform rate limit enumeration scans against a target",
-		Long:  `Perform rate limit enumeration scans against a target.`,
+		Short: "Enumerate rate limiting controls",
+		Long:  `Analyze and test rate limiting controls to identify potential bypasses or misconfigurations.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			defer a.OutputSignal.PanicHandler(cmd.Context())
 
@@ -373,9 +375,9 @@ func (a *WebScan) InitEnumerateCommand() {
 	enumerateGeneralRatelimitCmd.Flags().StringSlice("targets", []string{}, "URL targets to perform rate limit enumeration against")
 	// Config Flags
 	enumerateGeneralRatelimitCmd.Flags().Int("max-requests", 10, "Maximum number of requests to send")
-	enumerateGeneralRatelimitCmd.Flags().Int("timespan", 10, "Timespan to perform rate limit enumeration against")
+	enumerateGeneralRatelimitCmd.Flags().Int("timespan", 10, "Time window for rate limit testing in seconds")
 	enumerateGeneralRatelimitCmd.Flags().Bool("insecure", false, "Allow insecure SSL/TLS connections")
-	enumerateGeneralRatelimitCmd.Flags().Int("timeout", 30, "Timeout per request (seconds)")
+	enumerateGeneralRatelimitCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
 
 	_ = enumerateGeneralRatelimitCmd.MarkFlagRequired("targets")
 

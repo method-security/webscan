@@ -82,7 +82,7 @@ func MergeWebRoutes(routes []*discoverroutefern.RouteDetails) []*discoverroutefe
 
 // MergeQueryParams Helper function to merge QueryParams only retaining those that are unique
 // When the same param name is encountered, the example values are merged
-func MergeQueryParams(params1 []*discoverroutefern.RouteQueryParams, params2 []*discoverroutefern.RouteQueryParams) []*discoverroutefern.RouteQueryParams {
+func MergeQueryParams(params1 []*discoverroutefern.RouteQueryParam, params2 []*discoverroutefern.RouteQueryParam) []*discoverroutefern.RouteQueryParam {
 	// If either is nil return the other
 	if params1 == nil && params2 == nil {
 		return nil
@@ -93,7 +93,7 @@ func MergeQueryParams(params1 []*discoverroutefern.RouteQueryParams, params2 []*
 	}
 
 	// Merge
-	paramMap := make(map[string]*discoverroutefern.RouteQueryParams)
+	paramMap := make(map[string]*discoverroutefern.RouteQueryParam)
 	for _, param := range params1 {
 		paramMap[param.Name] = param
 	}
@@ -110,7 +110,7 @@ func MergeQueryParams(params1 []*discoverroutefern.RouteQueryParams, params2 []*
 	}
 
 	// Convert map back to slice
-	var mergedParams []*discoverroutefern.RouteQueryParams
+	var mergedParams []*discoverroutefern.RouteQueryParam
 	for _, param := range paramMap {
 		mergedParams = append(mergedParams, param)
 	}
@@ -119,7 +119,7 @@ func MergeQueryParams(params1 []*discoverroutefern.RouteQueryParams, params2 []*
 
 // MergeBodyParams helper function to merge BodyParams only retaining those that are unique
 // When the same param name is encountered, the example values are merged
-func MergeBodyParams(params1 []*discoverroutefern.RouteBodyParams, params2 []*discoverroutefern.RouteBodyParams) []*discoverroutefern.RouteBodyParams {
+func MergeBodyParams(params1 []*discoverroutefern.RouteBodyParam, params2 []*discoverroutefern.RouteBodyParam) []*discoverroutefern.RouteBodyParam {
 	// If either is nil return the other
 	if params1 == nil && params2 == nil {
 		return nil
@@ -130,7 +130,7 @@ func MergeBodyParams(params1 []*discoverroutefern.RouteBodyParams, params2 []*di
 	}
 
 	// Merge
-	paramMap := make(map[string]*discoverroutefern.RouteBodyParams)
+	paramMap := make(map[string]*discoverroutefern.RouteBodyParam)
 	for _, param := range params1 {
 		paramMap[param.Name] = param
 	}
@@ -147,7 +147,7 @@ func MergeBodyParams(params1 []*discoverroutefern.RouteBodyParams, params2 []*di
 	}
 
 	// Convert map back to slice
-	var mergedParams []*discoverroutefern.RouteBodyParams
+	var mergedParams []*discoverroutefern.RouteBodyParam
 	for _, param := range paramMap {
 		mergedParams = append(mergedParams, param)
 	}
@@ -155,10 +155,10 @@ func MergeBodyParams(params1 []*discoverroutefern.RouteBodyParams, params2 []*di
 }
 
 // ParseQueryParams helper function to parse query parameters from the URL
-func ParseQueryParams(reqURL *url.URL) []*discoverroutefern.RouteQueryParams {
-	var queryParams []*discoverroutefern.RouteQueryParams
+func ParseQueryParams(reqURL *url.URL) []*discoverroutefern.RouteQueryParam {
+	var queryParams []*discoverroutefern.RouteQueryParam
 	for key, values := range reqURL.Query() {
-		queryParams = append(queryParams, &discoverroutefern.RouteQueryParams{
+		queryParams = append(queryParams, &discoverroutefern.RouteQueryParam{
 			Name:          key,
 			ExampleValues: values,
 		})
@@ -167,8 +167,8 @@ func ParseQueryParams(reqURL *url.URL) []*discoverroutefern.RouteQueryParams {
 }
 
 // ParseBodyParams helper function to parse body parameters
-func ParseBodyParams(postData string) ([]*discoverroutefern.RouteBodyParams, error) {
-	var bodyParams []*discoverroutefern.RouteBodyParams
+func ParseBodyParams(postData string) ([]*discoverroutefern.RouteBodyParam, error) {
+	var bodyParams []*discoverroutefern.RouteBodyParam
 
 	// For simplicity, assume the body is JSON or form-urlencoded
 	if strings.HasPrefix(postData, "{") {
@@ -179,7 +179,7 @@ func ParseBodyParams(postData string) ([]*discoverroutefern.RouteBodyParams, err
 				// Stringify the value to ensure it's a string
 				valueStr, err := json.Marshal(value)
 				if err == nil {
-					bodyParams = append(bodyParams, &discoverroutefern.RouteBodyParams{
+					bodyParams = append(bodyParams, &discoverroutefern.RouteBodyParam{
 						Name:          key,
 						ExampleValues: []string{string(valueStr)}, // Store as a string
 					})
@@ -195,7 +195,7 @@ func ParseBodyParams(postData string) ([]*discoverroutefern.RouteBodyParams, err
 		formData, err := url.ParseQuery(postData)
 		if err == nil {
 			for key, values := range formData {
-				bodyParams = append(bodyParams, &discoverroutefern.RouteBodyParams{
+				bodyParams = append(bodyParams, &discoverroutefern.RouteBodyParam{
 					Name:          key,
 					ExampleValues: values,
 				})

@@ -27,7 +27,7 @@ import (
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
-func createSendHTTPRequestConfig(baseURL, path string, config discoverroutefern.RouteCaptureConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) common.SendHttpRequestConfig {
+func createSendHTTPRequestConfig(baseURL, path string, config discoverroutefern.DiscoverRouteConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) common.SendHttpRequestConfig {
 	request := common.HttpRequest{
 		BaseUrl: baseURL,
 		Path:    path,
@@ -46,7 +46,7 @@ func createSendHTTPRequestConfig(baseURL, path string, config discoverroutefern.
 	}
 }
 
-func extractRoutes(ctx context.Context, httpRequestResponse *common.HttpRequestResponse, requestConfig common.SendHttpRequestConfig, routeCaptureConfig discoverroutefern.RouteCaptureConfig) ([]*discoverroutefern.RouteDetails, []string, []string) {
+func extractRoutes(ctx context.Context, httpRequestResponse *common.HttpRequestResponse, requestConfig common.SendHttpRequestConfig, routeCaptureConfig discoverroutefern.DiscoverRouteConfig) ([]*discoverroutefern.RouteDetails, []string, []string) {
 	log := svc1log.FromContext(ctx)
 	routes := []*discoverroutefern.RouteDetails{}
 	urls := make(map[string]struct{})
@@ -132,11 +132,11 @@ func extractRoutes(ctx context.Context, httpRequestResponse *common.HttpRequestR
 	return mergedRoutes, staticAssetsList, errors
 }
 
-func PerformRouteCapture(ctx context.Context, config discoverroutefern.RouteCaptureConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) discoverroutefern.RouteCaptureReport {
+func PerformRouteCapture(ctx context.Context, config discoverroutefern.DiscoverRouteConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) discoverroutefern.DiscoverRouteReport {
 	log := svc1log.FromContext(ctx)
 
 	// Initialize Report
-	report := discoverroutefern.RouteCaptureReport{
+	report := discoverroutefern.DiscoverRouteReport{
 		Target: config.Target,
 		Config: &config,
 	}

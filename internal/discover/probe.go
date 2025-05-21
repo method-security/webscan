@@ -14,7 +14,7 @@ import (
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
 )
 
-func createSendHTTPRequestConfig(baseURL, path string, config *discoverfern.WebProbeConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) common.SendHttpRequestConfig {
+func createSendHTTPRequestConfig(baseURL, path string, config *discoverfern.DiscoverProbeConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) common.SendHttpRequestConfig {
 	request := common.HttpRequest{
 		BaseUrl: baseURL,
 		Path:    path,
@@ -34,7 +34,7 @@ func createSendHTTPRequestConfig(baseURL, path string, config *discoverfern.WebP
 }
 
 // sendRequests attempts to connect to a target using both HTTPS and HTTP protocols
-func sendRequests(ctx context.Context, target string, config *discoverfern.WebProbeConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) ([]*common.HttpRequestResponse, []string) {
+func sendRequests(ctx context.Context, target string, config *discoverfern.DiscoverProbeConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) ([]*common.HttpRequestResponse, []string) {
 	httpRequestResponses := []*common.HttpRequestResponse{}
 	errors := []string{}
 
@@ -54,7 +54,7 @@ func sendRequests(ctx context.Context, target string, config *discoverfern.WebPr
 	}
 
 	// Send HTTP Request
-	if !config.OnlyHttps {
+	if !config.HttpsOnly {
 		httpURL := "http://" + target
 		baseURL, path, err = requesthelpers.SplitTargetURL(httpURL)
 		if err != nil {
@@ -71,8 +71,8 @@ func sendRequests(ctx context.Context, target string, config *discoverfern.WebPr
 	return httpRequestResponses, errors
 }
 
-func PerformWebProbe(ctx context.Context, config *discoverfern.WebProbeConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) (*discoverfern.WebProbeReport, error) {
-	report := &discoverfern.WebProbeReport{Config: config}
+func PerformWebProbe(ctx context.Context, config *discoverfern.DiscoverProbeConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) (*discoverfern.DiscoverProbeReport, error) {
+	report := &discoverfern.DiscoverProbeReport{Config: config}
 	errors := []string{}
 
 	// Single loop to process all targets

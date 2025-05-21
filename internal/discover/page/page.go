@@ -14,7 +14,7 @@ import (
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
 )
 
-func getHTTPRequestConfig(baseURL string, path string, config discoverfern.PageCaptureConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) common.SendHttpRequestConfig {
+func getHTTPRequestConfig(baseURL string, path string, config discoverfern.DiscoverPageConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) common.SendHttpRequestConfig {
 	request := common.HttpRequest{
 		BaseUrl: baseURL,
 		Path:    path,
@@ -36,11 +36,11 @@ func getHTTPRequestConfig(baseURL string, path string, config discoverfern.PageC
 // PerformPageCapture determines whether to perform a screenshot or HTML capture based on the takeScreenshot parameter
 func PerformPageCapture(
 	ctx context.Context,
-	config discoverfern.PageCaptureConfig,
+	config discoverfern.DiscoverPageConfig,
 	browserbaseSecrets *common.BrowserbaseRequestSecrets,
-) *discoverfern.PageCaptureReport {
+) *discoverfern.DiscoverPageReport {
 	// Initialize report
-	report := discoverfern.PageCaptureReport{Config: &config}
+	report := discoverfern.DiscoverPageReport{Config: &config}
 	errors := []string{}
 
 	// Split target

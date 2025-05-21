@@ -3,7 +3,7 @@ imports:
   method: ../common/method.yml
 types:
   # Function Config Struct
-  PageCaptureConfig:
+  DiscoverPageConfig:
     properties:
       target: string
       takeScreenshot: boolean
@@ -14,9 +14,9 @@ types:
       headlessConfig: optional<method.HeadlessRequestConfig>
       browserbaseConfig: optional<method.BrowserbaseRequestConfig>
   # Report Struct
-  PageCaptureReport:
+  DiscoverPageReport:
     properties:
       request: optional<http.HttpRequestResponse>
       screenshot: optional<base64>
-      config: PageCaptureConfig
+      config: DiscoverPageConfig
       errors: optional<list<string>>

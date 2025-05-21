@@ -3,7 +3,6 @@ package cmd
 import (
 	// Standard
 	"fmt"
-	"strings"
 
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
@@ -18,7 +17,8 @@ import (
 	discoverroutestaticasset "github.com/Method-Security/webscan/internal/discover/route/staticasset"
 
 	// Utils
-	browserbase "github.com/Method-Security/webscan/utils/request/helpers/headless/browserbase"
+	utils "github.com/Method-Security/webscan/utils"
+
 	// External
 	cobra "github.com/spf13/cobra"
 )
@@ -27,13 +27,13 @@ func (a *WebScan) InitDiscoverCommand() {
 	discoverCmd := &cobra.Command{
 		Use:   "discover",
 		Short: "Perform various discovery scans",
-		Long:  `Perform various discovery scans`,
+		Long:  `Perform various discovery scans to identify web applications, routes, and static assets.`,
 	}
 
 	discoverApplicationCmd := &cobra.Command{
 		Use:   "application",
-		Short: "Perform a application fingerprint scan against a target",
-		Long:  `Perform a application fingerprint scan against a target using specified types.`,
+		Short: "Perform application fingerprinting against targets",
+		Long:  `Perform application fingerprinting to identify web technologies, frameworks, and services running on target URLs.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			defer a.OutputSignal.PanicHandler(cmd.Context())
 
@@ -87,7 +87,7 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Create config
-			config, err := newApplicationFingerprintConfig(targets, resourceType, modules, filteredFingerprints, successfulOnly, insecure, timeout)
+			config, err := newDiscoverApplicationFingerprintConfig(targets, resourceType, modules, filteredFingerprints, successfulOnly, insecure, timeout)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -102,14 +102,14 @@ func (a *WebScan) InitDiscoverCommand() {
 		},
 	}
 	// Target Flags
-	discoverApplicationCmd.Flags().StringSlice("targets", []string{}, "URL target to perform fingerprint against")
+	discoverApplicationCmd.Flags().StringSlice("targets", []string{}, "URL targets to perform fingerprinting against")
 	// Config Flags
-	discoverApplicationCmd.Flags().String("fingerprint-file", "configs/discover/application/fingerprints.json", "Path to the fingerprint file to use for fingerprinting")
-	discoverApplicationCmd.Flags().String("resource-type", "", "Defined resource type to fingerprint")
-	discoverApplicationCmd.Flags().StringSlice("modules", []string{}, "Defined resource type modules to run")
-	discoverApplicationCmd.Flags().Bool("successful-only", false, "Only show successful attempts")
-	discoverApplicationCmd.Flags().Bool("insecure", false, "Allow insecure SSL connections and transfers")
-	discoverApplicationCmd.Flags().Int("timeout", 30, "Timeout per request (seconds)")
+	discoverApplicationCmd.Flags().String("fingerprint-file", "configs/discover/application/fingerprints.json", "Path to the fingerprint definitions file")
+	discoverApplicationCmd.Flags().String("resource-type", "", "Type of resource to fingerprint (e.g., web, api, cms)")
+	discoverApplicationCmd.Flags().StringSlice("modules", []string{}, "Specific fingerprinting modules to run")
+	discoverApplicationCmd.Flags().Bool("successful-only", false, "Only show successful fingerprint matches")
+	discoverApplicationCmd.Flags().Bool("insecure", false, "Allow insecure SSL/TLS connections")
+	discoverApplicationCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
 
 	// Mark Required Flags
 	_ = discoverApplicationCmd.MarkFlagRequired("targets")
@@ -120,8 +120,8 @@ func (a *WebScan) InitDiscoverCommand() {
 
 	discoverPageCmd := &cobra.Command{
 		Use:   "page",
-		Short: "Perform a page discovery scan against a target",
-		Long:  `Perform a page discovery scan against a target using a given request method.`,
+		Short: "Capture and analyze web pages",
+		Long:  `Capture and analyze web pages to extract content, take screenshots, and perform various page-level analysis.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			defer a.OutputSignal.PanicHandler(cmd.Context())
 
@@ -150,12 +150,7 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Get Request Method flag
-			requestMethod, err := cmd.Flags().GetString("request-method")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			requestMethodEnum, err := common.NewRequestMethodFromString(strings.ToUpper(requestMethod))
+			requestMethodConfig, err := utils.GetRequestMethodFlags(cmd)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -168,90 +163,34 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			if takeScreenshot && (requestMethodEnum == common.RequestMethodStandard || requestMethodEnum == common.RequestMethodBrowserbase) {
+			if takeScreenshot && (requestMethodConfig.RequestMethodEnum == common.RequestMethodStandard || requestMethodConfig.RequestMethodEnum == common.RequestMethodBrowserbase) {
 				a.OutputSignal.AddError(fmt.Errorf("screenshot flag is not supported for standard or browserbase capture methods"))
 				return
 			}
 
-			// Flags for headless browser or Browserbase
-			var headlessConfig *common.HeadlessRequestConfig
-			if requestMethodEnum == common.RequestMethodHeadless || requestMethodEnum == common.RequestMethodBrowserbase {
-				bPath, err := cmd.Flags().GetString("headless-path")
-				if err != nil {
-					a.OutputSignal.AddError(err)
-					return
-				}
-				headlessConfig = &common.HeadlessRequestConfig{
-					PathToBrowserShell: &bPath,
-				}
-				domTime, err := cmd.Flags().GetInt("min-dom-stabalize-time")
-				if err != nil {
-					a.OutputSignal.AddError(err)
-					return
-				}
-				headlessConfig.MinDomStabalizeTime = domTime
-			}
-
-			// Flags for browserbase
-			var browserbaseConfig *common.BrowserbaseRequestConfig
-			var browserbaseSecrets *common.BrowserbaseRequestSecrets
-			if requestMethodEnum == common.RequestMethodBrowserbase {
-				// Config flags
-				proxy, err := cmd.Flags().GetBool("browserbase-proxy")
-				if err != nil {
-					a.OutputSignal.AddError(err)
-					return
-				}
-				countries, err := cmd.Flags().GetStringSlice("browserbase-countries")
-				if err != nil {
-					a.OutputSignal.AddError(err)
-					return
-				}
-				browserbaseConfig = &common.BrowserbaseRequestConfig{
-					Proxy:     &proxy,
-					Countries: countries,
-				}
-
-				// Environment variables
-				tokenStr, err := browserbase.GetFlagOrEnvironmentVariable(cmd, "browserbase-token", "BROWSERBASE_TOKEN")
-				if err != nil {
-					a.OutputSignal.AddError(err)
-					return
-				}
-				projectStr, err := browserbase.GetFlagOrEnvironmentVariable(cmd, "browserbase-project", "BROWSERBASE_PROJECT")
-				if err != nil {
-					a.OutputSignal.AddError(err)
-					return
-				}
-				browserbaseSecrets = &common.BrowserbaseRequestSecrets{
-					Project: projectStr,
-					Token:   tokenStr,
-				}
-			}
-
 			// Set Config
-			config := getPageCaptureConfig(target, maxRedirects, insecure, timeout, takeScreenshot, requestMethodEnum, headlessConfig, browserbaseConfig)
+			config := getDiscoverPageConfig(target, maxRedirects, insecure, timeout, takeScreenshot, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
 
 			// Generate a report
-			report := discoverpage.PerformPageCapture(cmd.Context(), config, browserbaseSecrets)
+			report := discoverpage.PerformPageCapture(cmd.Context(), config, requestMethodConfig.BrowserbaseSecrets)
 			a.OutputSignal.Content = report
 		},
 	}
 	// Target Flags
-	discoverPageCmd.Flags().String("target", "", "URL target to perform webpage capture")
+	discoverPageCmd.Flags().String("target", "", "URL target to capture and analyze")
 	// Config Flags
-	discoverPageCmd.Flags().Bool("screenshot", false, "Take a screenshot in addition to capturing HTML")
+	discoverPageCmd.Flags().Bool("screenshot", false, "Capture a screenshot of the page")
 	discoverPageCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
-	discoverPageCmd.Flags().Bool("insecure", false, "Allow insecure connections")
-	discoverPageCmd.Flags().Int("timeout", 30, "Timeout in seconds for the capture")
+	discoverPageCmd.Flags().Bool("insecure", false, "Allow insecure SSL/TLS connections")
+	discoverPageCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
 	// Request Method Flags for all capture subcommands
-	discoverPageCmd.Flags().String("request-method", "STANDARD", "Request method (standard, headless, browserbase)")
-	discoverPageCmd.Flags().String("headless-path", "", "Path to a headless browser executable")
-	discoverPageCmd.Flags().Int("min-dom-stabalize-time", 5, "Minimum time in seconds to wait for DOM to stabilize")
-	discoverPageCmd.Flags().String("browserbase-token", "", "Browserbase API token")
+	discoverPageCmd.Flags().String("request-method", "STANDARD", "Request method to use (standard, headless, browserbase)")
+	discoverPageCmd.Flags().String("headless-path", "", "Path to headless browser executable")
+	discoverPageCmd.Flags().Int("min-dom-stabalize-time", 5, "Minimum time to wait for DOM stabilization in seconds")
+	discoverPageCmd.Flags().String("browserbase-token", "", "Browserbase API token for cloud browser access")
 	discoverPageCmd.Flags().String("browserbase-project", "", "Browserbase project ID")
-	discoverPageCmd.Flags().Bool("browserbase-proxy", false, "Instruct Browserbase to use a proxy")
-	discoverPageCmd.Flags().StringSlice("browserbase-countries", []string{}, "List of countries to use for the browserbase proxy")
+	discoverPageCmd.Flags().Bool("browserbase-proxy", false, "Use Browserbase proxy for requests")
+	discoverPageCmd.Flags().StringSlice("browserbase-countries", []string{}, "List of countries to use for Browserbase proxy")
 
 	// Mark Required Flags
 	_ = discoverPageCmd.MarkFlagRequired("target")
@@ -261,8 +200,8 @@ func (a *WebScan) InitDiscoverCommand() {
 
 	discoverProbeCmd := &cobra.Command{
 		Use:   "probe",
-		Short: "Perform a web probe against targets to identify existence of web applications",
-		Long:  `Perform a web probe against targets to identify existence of web applications`,
+		Short: "Probe targets for web application existence",
+		Long:  `Probe target URLs to identify if they are running web applications and determine their basic characteristics.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			defer a.OutputSignal.PanicHandler(cmd.Context())
 
@@ -279,7 +218,7 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			onlyHTTPS, err := cmd.Flags().GetBool("only-https")
+			HTTPSOnly, err := cmd.Flags().GetBool("https-only")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -296,78 +235,17 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Get Request Method flag
-			requestMethod, err := cmd.Flags().GetString("request-method")
+			requestMethodConfig, err := utils.GetRequestMethodFlags(cmd)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
-			}
-			requestMethodEnum, err := common.NewRequestMethodFromString(strings.ToUpper(requestMethod))
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-
-			// Flags for headless browser or browserbase
-			var headlessConfig *common.HeadlessRequestConfig
-			if requestMethodEnum == common.RequestMethodHeadless || requestMethodEnum == common.RequestMethodBrowserbase {
-				bPath, err := cmd.Flags().GetString("headless-path")
-				if err != nil {
-					a.OutputSignal.AddError(err)
-					return
-				}
-				headlessConfig = &common.HeadlessRequestConfig{
-					PathToBrowserShell: &bPath,
-				}
-				domTime, err := cmd.Flags().GetInt("min-dom-stabalize-time")
-				if err != nil {
-					a.OutputSignal.AddError(err)
-					return
-				}
-				headlessConfig.MinDomStabalizeTime = domTime
-			}
-
-			// Flags for browserbase
-			var browserbaseConfig *common.BrowserbaseRequestConfig
-			var browserbaseSecrets *common.BrowserbaseRequestSecrets
-			if requestMethodEnum == common.RequestMethodBrowserbase {
-				// Config flags
-				proxy, err := cmd.Flags().GetBool("browserbase-proxy")
-				if err != nil {
-					a.OutputSignal.AddError(err)
-					return
-				}
-				countries, err := cmd.Flags().GetStringSlice("browserbase-countries")
-				if err != nil {
-					a.OutputSignal.AddError(err)
-					return
-				}
-				browserbaseConfig = &common.BrowserbaseRequestConfig{
-					Proxy:     &proxy,
-					Countries: countries,
-				}
-
-				// Environment variables
-				tokenStr, err := browserbase.GetFlagOrEnvironmentVariable(cmd, "browserbase-token", "BROWSERBASE_TOKEN")
-				if err != nil {
-					a.OutputSignal.AddError(err)
-					return
-				}
-				projectStr, err := browserbase.GetFlagOrEnvironmentVariable(cmd, "browserbase-project", "BROWSERBASE_PROJECT")
-				if err != nil {
-					a.OutputSignal.AddError(err)
-					return
-				}
-				browserbaseSecrets = &common.BrowserbaseRequestSecrets{
-					Project: projectStr,
-					Token:   tokenStr,
-				}
 			}
 
 			// Set Config
-			config := getWebProbeConfig(targets, maxRedirects, onlyHTTPS, insecure, timeout, requestMethodEnum, headlessConfig, browserbaseConfig)
+			config := getDiscoverProbeConfig(targets, maxRedirects, HTTPSOnly, insecure, timeout, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
 
 			// Generate report
-			report, err := discover.PerformWebProbe(cmd.Context(), config, browserbaseSecrets)
+			report, err := discover.PerformWebProbe(cmd.Context(), config, requestMethodConfig.BrowserbaseSecrets)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -376,20 +254,20 @@ func (a *WebScan) InitDiscoverCommand() {
 		},
 	}
 	// Target Flags
-	discoverProbeCmd.Flags().StringSlice("targets", []string{}, "Address targets to perform web application probing against, comma delimited list")
+	discoverProbeCmd.Flags().StringSlice("targets", []string{}, "URL targets to probe for web applications")
 	// Config Flags
-	discoverProbeCmd.Flags().Bool("only-https", true, "Only perform probing over HTTPS")
+	discoverProbeCmd.Flags().Bool("https-only", true, "Only probe HTTPS URLs")
 	discoverProbeCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
-	discoverProbeCmd.Flags().Bool("insecure", false, "Allow insecure connections")
-	discoverProbeCmd.Flags().Int("timeout", 30, "Timeout limit (Seconds)")
+	discoverProbeCmd.Flags().Bool("insecure", false, "Allow insecure SSL/TLS connections")
+	discoverProbeCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
 	// Request Method Flags
-	discoverProbeCmd.Flags().String("request-method", "STANDARD", "Request method (standard, headless, browserbase)")
-	discoverProbeCmd.Flags().String("headless-path", "", "Path to a headless browser executable")
-	discoverProbeCmd.Flags().Int("min-dom-stabalize-time", 5, "Minimum time in seconds to wait for DOM to stabilize")
-	discoverProbeCmd.Flags().String("browserbase-token", "", "Browserbase API token")
+	discoverProbeCmd.Flags().String("request-method", "STANDARD", "Request method to use (standard, headless, browserbase)")
+	discoverProbeCmd.Flags().String("headless-path", "", "Path to headless browser executable")
+	discoverProbeCmd.Flags().Int("min-dom-stabalize-time", 5, "Minimum time to wait for DOM stabilization in seconds")
+	discoverProbeCmd.Flags().String("browserbase-token", "", "Browserbase API token for cloud browser access")
 	discoverProbeCmd.Flags().String("browserbase-project", "", "Browserbase project ID")
-	discoverProbeCmd.Flags().Bool("browserbase-proxy", false, "Instruct Browserbase to use a proxy")
-	discoverProbeCmd.Flags().StringSlice("browserbase-countries", []string{}, "List of countries to use for the Browserbase proxy")
+	discoverProbeCmd.Flags().Bool("browserbase-proxy", false, "Use Browserbase proxy for requests")
+	discoverProbeCmd.Flags().StringSlice("browserbase-countries", []string{}, "List of countries to use for Browserbase proxy")
 
 	// Mark Required Flags
 	_ = discoverProbeCmd.MarkFlagRequired("targets")
@@ -399,8 +277,8 @@ func (a *WebScan) InitDiscoverCommand() {
 
 	discoverRouteCmd := &cobra.Command{
 		Use:   "route",
-		Short: "Capture routes and URLs from a webpage",
-		Long:  `Capture routes and URLs from a webpage using a given request method.`,
+		Short: "Discover and analyze web routes",
+		Long:  `Discover and analyze web routes to map application structure, identify endpoints, and detect potential vulnerabilities.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			defer a.OutputSignal.PanicHandler(cmd.Context())
 
@@ -448,108 +326,47 @@ func (a *WebScan) InitDiscoverCommand() {
 				return
 			}
 			// Get Request Method flag
-			requestMethod, err := cmd.Flags().GetString("request-method")
+			requestMethodConfig, err := utils.GetRequestMethodFlags(cmd)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
-			}
-			requestMethodEnum, err := common.NewRequestMethodFromString(strings.ToUpper(requestMethod))
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-
-			// Handle headless or browserbase-specific flags
-			var headlessConfig *common.HeadlessRequestConfig
-			if requestMethodEnum == common.RequestMethodHeadless || requestMethodEnum == common.RequestMethodBrowserbase {
-				bPath, err := cmd.Flags().GetString("headless-path")
-				if err != nil {
-					a.OutputSignal.AddError(err)
-					return
-				}
-				headlessConfig = &common.HeadlessRequestConfig{
-					PathToBrowserShell: &bPath,
-				}
-				domTime, err := cmd.Flags().GetInt("min-dom-stabalize-time")
-				if err != nil {
-					a.OutputSignal.AddError(err)
-					return
-				}
-				headlessConfig.MinDomStabalizeTime = domTime
-			}
-
-			// Handle browserbase-specific flags
-			var browserbaseConfig *common.BrowserbaseRequestConfig
-			var browserbaseSecrets *common.BrowserbaseRequestSecrets
-			if requestMethodEnum == common.RequestMethodBrowserbase {
-				// Config flags
-				proxy, err := cmd.Flags().GetBool("browserbase-proxy")
-				if err != nil {
-					a.OutputSignal.AddError(err)
-					return
-				}
-				countries, err := cmd.Flags().GetStringSlice("browserbase-countries")
-				if err != nil {
-					a.OutputSignal.AddError(err)
-					return
-				}
-				browserbaseConfig = &common.BrowserbaseRequestConfig{
-					Proxy:     &proxy,
-					Countries: countries,
-				}
-
-				// Environment variables
-				tokenStr, err := browserbase.GetFlagOrEnvironmentVariable(cmd, "browserbase-token", "BROWSERBASE_TOKEN")
-				if err != nil {
-					a.OutputSignal.AddError(err)
-					return
-				}
-				projectStr, err := browserbase.GetFlagOrEnvironmentVariable(cmd, "browserbase-project", "BROWSERBASE_PROJECT")
-				if err != nil {
-					a.OutputSignal.AddError(err)
-					return
-				}
-				browserbaseSecrets = &common.BrowserbaseRequestSecrets{
-					Token:   tokenStr,
-					Project: projectStr,
-				}
 			}
 
 			// Set Config
-			config := getRouteCaptureConfig(target, requireBaseURLMatch, ignoreStaticAssets, spiderDepth, maxRedirects, insecure, timeout, threads, requestMethodEnum, headlessConfig, browserbaseConfig)
+			config := getDiscoverRouteConfig(target, requireBaseURLMatch, ignoreStaticAssets, spiderDepth, maxRedirects, insecure, timeout, threads, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
 
 			// Generate a report
-			report := discoverroute.PerformRouteCapture(cmd.Context(), config, browserbaseSecrets)
+			report := discoverroute.PerformRouteCapture(cmd.Context(), config, requestMethodConfig.BrowserbaseSecrets)
 			a.OutputSignal.Content = report
 		},
 	}
 	// Target Flags
-	discoverRouteCmd.Flags().String("target", "", "URL target to perform webpage capture")
+	discoverRouteCmd.Flags().String("target", "", "URL target to discover routes from")
 	// Config Flags
-	discoverRouteCmd.Flags().Bool("require-base-url-match", true, "Only scan routes that share the base url as the target")
-	discoverRouteCmd.Flags().Bool("ignore-static-assets", true, "Ignore static assets when spidering routes")
-	discoverRouteCmd.Flags().Int("spider-depth", 1, "Maximum number of hops to follow when spidering routes")
+	discoverRouteCmd.Flags().Bool("require-base-url-match", true, "Only scan routes sharing the target's base URL")
+	discoverRouteCmd.Flags().Bool("ignore-static-assets", true, "Exclude static assets from route discovery")
+	discoverRouteCmd.Flags().Int("spider-depth", 1, "Maximum depth for route spidering")
 	discoverRouteCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
-	discoverRouteCmd.Flags().Bool("insecure", false, "Allow insecure connections")
-	discoverRouteCmd.Flags().Int("timeout", 30, "Timeout in seconds for the capture")
-	discoverRouteCmd.Flags().Int("threads", 0, "Number of threads to use for the capture")
+	discoverRouteCmd.Flags().Bool("insecure", false, "Allow insecure SSL/TLS connections")
+	discoverRouteCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
+	discoverRouteCmd.Flags().Int("threads", 0, "Number of concurrent threads for scanning")
 
 	// Request Method Flags
-	discoverRouteCmd.Flags().String("request-method", "STANDARD", "Request method (standard, headless, browserbase)")
-	discoverRouteCmd.Flags().String("headless-path", "", "Path to a headless browser executable")
-	discoverRouteCmd.Flags().Int("min-dom-stabalize-time", 5, "Minimum time in seconds to wait for DOM to stabilize")
-	discoverRouteCmd.Flags().String("browserbase-token", "", "Browserbase API token")
+	discoverRouteCmd.Flags().String("request-method", "STANDARD", "Request method to use (standard, headless, browserbase)")
+	discoverRouteCmd.Flags().String("headless-path", "", "Path to headless browser executable")
+	discoverRouteCmd.Flags().Int("min-dom-stabalize-time", 5, "Minimum time to wait for DOM stabilization in seconds")
+	discoverRouteCmd.Flags().String("browserbase-token", "", "Browserbase API token for cloud browser access")
 	discoverRouteCmd.Flags().String("browserbase-project", "", "Browserbase project ID")
-	discoverRouteCmd.Flags().Bool("browserbase-proxy", false, "Instruct Browserbase to use a proxy")
-	discoverRouteCmd.Flags().StringSlice("browserbase-countries", []string{}, "List of countries to use for the proxy")
+	discoverRouteCmd.Flags().Bool("browserbase-proxy", false, "Use Browserbase proxy for requests")
+	discoverRouteCmd.Flags().StringSlice("browserbase-countries", []string{}, "List of countries to use for Browserbase proxy")
 
 	// Mark Required Flags
 	_ = discoverRouteCmd.MarkFlagRequired("target")
 
 	discoverRouteStaticAssetTakeoverCmd := &cobra.Command{
 		Use:   "static-asset-takeover",
-		Short: "Capture static assets from a webpage and assess them for static asset takeover",
-		Long:  `Capture static assets from a webpage and assess them for static asset takeover using a fingerprinting method.`,
+		Short: "Detect static asset takeover vulnerabilities",
+		Long:  `Analyze static assets (JS, CSS, images) to detect potential takeover vulnerabilities through misconfigured CDNs or storage services.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			defer a.OutputSignal.PanicHandler(cmd.Context())
 
@@ -603,100 +420,39 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Get Request Method flag
-			requestMethod, err := cmd.Flags().GetString("request-method")
+			requestMethodConfig, err := utils.GetRequestMethodFlags(cmd)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
-			}
-			requestMethodEnum, err := common.NewRequestMethodFromString(strings.ToUpper(requestMethod))
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-
-			// Handle Headless Browser flags
-			var headlessConfig *common.HeadlessRequestConfig
-			if requestMethodEnum == common.RequestMethodHeadless {
-				bPath, err := cmd.Flags().GetString("headless-path")
-				if err != nil {
-					a.OutputSignal.AddError(err)
-					return
-				}
-				headlessConfig = &common.HeadlessRequestConfig{
-					PathToBrowserShell: &bPath,
-				}
-				domTime, err := cmd.Flags().GetInt("min-dom-stabalize-time")
-				if err != nil {
-					a.OutputSignal.AddError(err)
-					return
-				}
-				headlessConfig.MinDomStabalizeTime = domTime
-			}
-
-			// Handle Browserbase flags
-			var browserbaseConfig *common.BrowserbaseRequestConfig
-			var browserbaseSecrets *common.BrowserbaseRequestSecrets
-			if requestMethodEnum == common.RequestMethodBrowserbase {
-				// Config flags
-				proxy, err := cmd.Flags().GetBool("browserbase-proxy")
-				if err != nil {
-					a.OutputSignal.AddError(err)
-					return
-				}
-				countries, err := cmd.Flags().GetStringSlice("browserbase-countries")
-				if err != nil {
-					a.OutputSignal.AddError(err)
-					return
-				}
-				browserbaseConfig = &common.BrowserbaseRequestConfig{
-					Proxy:     &proxy,
-					Countries: countries,
-				}
-
-				// Environment variables
-				tokenStr, err := browserbase.GetFlagOrEnvironmentVariable(cmd, "browserbase-token", "BROWSERBASE_TOKEN")
-				if err != nil {
-					a.OutputSignal.AddError(err)
-					return
-				}
-				projectStr, err := browserbase.GetFlagOrEnvironmentVariable(cmd, "browserbase-project", "BROWSERBASE_PROJECT")
-				if err != nil {
-					a.OutputSignal.AddError(err)
-					return
-				}
-				browserbaseSecrets = &common.BrowserbaseRequestSecrets{
-					Token:   tokenStr,
-					Project: projectStr,
-				}
 			}
 
 			// Set Config
-			config := getStaticAssetTakeoverConfig(target, fingerprints, requireBaseURLMatch, successfulOnly, maxRedirects, insecure, timeout, threads, requestMethodEnum, headlessConfig, browserbaseConfig)
+			config := getStaticAssetTakeoverConfig(target, fingerprints, requireBaseURLMatch, successfulOnly, maxRedirects, insecure, timeout, threads, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
 
 			// Generate a report
-			report := discoverroutestaticasset.DetectStaticAssetTakeovers(cmd.Context(), config, browserbaseSecrets)
+			report := discoverroutestaticasset.DetectStaticAssetTakeovers(cmd.Context(), config, requestMethodConfig.BrowserbaseSecrets)
 			a.OutputSignal.Content = report
 
 		},
 	}
 	// Target Flags
-	discoverRouteStaticAssetTakeoverCmd.Flags().String("target", "", "URL target to perform webpage capture")
+	discoverRouteStaticAssetTakeoverCmd.Flags().String("target", "", "URL target to analyze for static asset takeover")
 	// Config Flags
-	discoverRouteStaticAssetTakeoverCmd.Flags().StringSlice("fingerprint-file-paths", []string{"configs/discover/route/static_asset_takeover.json"}, "Fingerprint filepaths to use for fingerprinting")
-	discoverRouteStaticAssetTakeoverCmd.Flags().Bool("require-base-url-match", false, "Only scan routes and static assets that share the base url as the target")
-	discoverRouteStaticAssetTakeoverCmd.Flags().Bool("successful-only", false, "Only show successful attempts")
+	discoverRouteStaticAssetTakeoverCmd.Flags().StringSlice("fingerprint-file-paths", []string{"configs/discover/route/static_asset_takeover.json"}, "Paths to fingerprint definition files")
+	discoverRouteStaticAssetTakeoverCmd.Flags().Bool("require-base-url-match", false, "Only scan assets sharing the target's base URL")
+	discoverRouteStaticAssetTakeoverCmd.Flags().Bool("successful-only", false, "Only show successful takeover attempts")
 	discoverRouteStaticAssetTakeoverCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
-	discoverRouteStaticAssetTakeoverCmd.Flags().Bool("insecure", false, "Allow insecure connections")
-	discoverRouteStaticAssetTakeoverCmd.Flags().Int("timeout", 30, "Timeout in seconds for the capture")
-	discoverRouteStaticAssetTakeoverCmd.Flags().Int("threads", 0, "Number of threads to use for the capture")
+	discoverRouteStaticAssetTakeoverCmd.Flags().Bool("insecure", false, "Allow insecure SSL/TLS connections")
+	discoverRouteStaticAssetTakeoverCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
+	discoverRouteStaticAssetTakeoverCmd.Flags().Int("threads", 0, "Number of concurrent threads for scanning")
 	// Request Method Flags for all capture subcommands
-	discoverRouteStaticAssetTakeoverCmd.Flags().String("request-method", "STANDARD", "Request method (standard, headless, browserbase)")
-	discoverRouteStaticAssetTakeoverCmd.Flags().String("headless-path", "", "Path to a headless browser executable")
-	discoverRouteStaticAssetTakeoverCmd.Flags().Int("min-dom-stabalize-time", 5, "Minimum time in seconds to wait for DOM to stabilize")
-	discoverRouteStaticAssetTakeoverCmd.Flags().String("browserbase-token", "", "Browserbase API token")
+	discoverRouteStaticAssetTakeoverCmd.Flags().String("request-method", "STANDARD", "Request method to use (standard, headless, browserbase)")
+	discoverRouteStaticAssetTakeoverCmd.Flags().String("headless-path", "", "Path to headless browser executable")
+	discoverRouteStaticAssetTakeoverCmd.Flags().Int("min-dom-stabalize-time", 5, "Minimum time to wait for DOM stabilization in seconds")
+	discoverRouteStaticAssetTakeoverCmd.Flags().String("browserbase-token", "", "Browserbase API token for cloud browser access")
 	discoverRouteStaticAssetTakeoverCmd.Flags().String("browserbase-project", "", "Browserbase project ID")
-	discoverRouteStaticAssetTakeoverCmd.Flags().Bool("browserbase-proxy", false, "Instruct Browserbase to use a proxy")
-	discoverRouteStaticAssetTakeoverCmd.Flags().StringSlice("browserbase-countries", []string{}, "List of countries to use for the proxy")
+	discoverRouteStaticAssetTakeoverCmd.Flags().Bool("browserbase-proxy", false, "Use Browserbase proxy for requests")
+	discoverRouteStaticAssetTakeoverCmd.Flags().StringSlice("browserbase-countries", []string{}, "List of countries to use for Browserbase proxy")
 
 	// Mark Required Flags
 	_ = discoverRouteStaticAssetTakeoverCmd.MarkFlagRequired("target")
@@ -711,12 +467,12 @@ func (a *WebScan) InitDiscoverCommand() {
 	a.RootCmd.AddCommand(discoverCmd)
 }
 
-func newApplicationFingerprintConfig(targets []string, resource string, moduleEnums []string, fingerprints *discoverfern.ApplicationFingerprintResource, successfulOnly bool, insecure bool, timeout int) (*discoverfern.ApplicationFingerprintConfig, error) {
+func newDiscoverApplicationFingerprintConfig(targets []string, resource string, moduleEnums []string, fingerprints *discoverfern.ApplicationFingerprintResource, successfulOnly bool, insecure bool, timeout int) (*discoverfern.DiscoverApplicationFingerprintConfig, error) {
 	resourceEnum, err := discoverfern.NewApplicationFingerprintResourceTypeFromString(resource)
 	if err != nil {
 		return nil, fmt.Errorf("invalid resource type: %s", resource)
 	}
-	config := &discoverfern.ApplicationFingerprintConfig{
+	config := &discoverfern.DiscoverApplicationFingerprintConfig{
 		Targets:        targets,
 		ResourceType:   resourceEnum,
 		Modules:        moduleEnums,
@@ -728,8 +484,8 @@ func newApplicationFingerprintConfig(targets []string, resource string, moduleEn
 	return config, nil
 }
 
-func getPageCaptureConfig(target string, maxRedirects int, insecure bool, timeout int, takeScreenshot bool, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) discoverfern.PageCaptureConfig {
-	config := discoverfern.PageCaptureConfig{
+func getDiscoverPageConfig(target string, maxRedirects int, insecure bool, timeout int, takeScreenshot bool, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) discoverfern.DiscoverPageConfig {
+	config := discoverfern.DiscoverPageConfig{
 		Target:            target,
 		MaxRedirects:      maxRedirects,
 		Insecure:          insecure,
@@ -742,11 +498,11 @@ func getPageCaptureConfig(target string, maxRedirects int, insecure bool, timeou
 	return config
 }
 
-func getWebProbeConfig(targets []string, maxRedirects int, onlyHTTPS bool, insecure bool, timeout int, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) *discoverfern.WebProbeConfig {
-	config := &discoverfern.WebProbeConfig{
+func getDiscoverProbeConfig(targets []string, maxRedirects int, HTTPSOnly bool, insecure bool, timeout int, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) *discoverfern.DiscoverProbeConfig {
+	config := &discoverfern.DiscoverProbeConfig{
 		Targets:           targets,
 		MaxRedirects:      maxRedirects,
-		OnlyHttps:         onlyHTTPS,
+		HttpsOnly:         HTTPSOnly,
 		Insecure:          insecure,
 		Timeout:           max(timeout, 0),
 		RequestMethod:     requestMethod,
@@ -757,8 +513,8 @@ func getWebProbeConfig(targets []string, maxRedirects int, onlyHTTPS bool, insec
 	return config
 }
 
-func getRouteCaptureConfig(target string, requiredBaseURLMatch bool, ignoreStaticAssets bool, spiderDepth int, maxRedirects int, insecure bool, timeout int, threads int, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) discoverroutefern.RouteCaptureConfig {
-	config := discoverroutefern.RouteCaptureConfig{
+func getDiscoverRouteConfig(target string, requiredBaseURLMatch bool, ignoreStaticAssets bool, spiderDepth int, maxRedirects int, insecure bool, timeout int, threads int, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) discoverroutefern.DiscoverRouteConfig {
+	config := discoverroutefern.DiscoverRouteConfig{
 		Target:              target,
 		IgnoreStaticAssets:  ignoreStaticAssets,
 		RequireBaseUrlMatch: requiredBaseURLMatch,
@@ -776,7 +532,7 @@ func getRouteCaptureConfig(target string, requiredBaseURLMatch bool, ignoreStati
 
 func getStaticAssetTakeoverConfig(target string, fingerprints []*discoverroutefern.StaticAssetTakeoverFingerprint, requireBaseURLMatch bool, successfulOnly bool, maxRedirects int, insecure bool, timeout int, threads int, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserBaseConfig *common.BrowserbaseRequestConfig) discoverroutefern.StaticAssetTakeoverConfig {
 	// Create Route Capture Config
-	routeCaptureConfig := &discoverroutefern.RouteCaptureConfig{
+	routeCaptureConfig := &discoverroutefern.DiscoverRouteConfig{
 		Target:              target,
 		IgnoreStaticAssets:  false,
 		RequireBaseUrlMatch: requireBaseURLMatch,

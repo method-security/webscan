@@ -29,7 +29,7 @@ COPY configs/discover/application/*               /opt/method/${CLI_NAME}/var/co
 COPY configs/discover/route/*                     /opt/method/${CLI_NAME}/var/conf/discover/route/
 COPY configs/enumerate/*                          /opt/method/${CLI_NAME}/var/conf/enumerate/
 COPY configs/enumerate/cms/*                      /opt/method/${CLI_NAME}/var/conf/enumerate/cms/
-COPY configs/enumerate/cms/wordpress/*            /opt/method/${CLI_NAME}/var/conf/cms/wordpress/
+COPY configs/enumerate/cms/wordpress/*            /opt/method/${CLI_NAME}/var/conf/enumerate/cms/wordpress/
 
 
 COPY ${CLI_NAME} /opt/method/${CLI_NAME}/service/bin/${CLI_NAME}

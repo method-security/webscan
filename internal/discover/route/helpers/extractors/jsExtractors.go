@@ -20,7 +20,7 @@ import (
 )
 
 // extractScriptContentRoutes takes JavaScript code as a string, parses it using the Otto parser library to find all routes (including POST and GET methods with bodyParams and queryParams), and returns them.
-func extractScriptContentRoutes(scriptContent string, baseURL string, routeCaptureConfig discoverroutefern.RouteCaptureConfig) ([]*discoverroutefern.RouteDetails, []string, []string) {
+func extractScriptContentRoutes(scriptContent string, baseURL string, routeCaptureConfig discoverroutefern.DiscoverRouteConfig) ([]*discoverroutefern.RouteDetails, []string, []string) {
 	routes := []*discoverroutefern.RouteDetails{}
 	urls := make(map[string]struct{})
 	errors := []string{}
@@ -93,8 +93,8 @@ func (v *visitor) processFetchCall(node *ast.CallExpression) {
 	}
 
 	method := "GET" // Default method
-	var bodyParams []*discoverroutefern.RouteBodyParams
-	var queryParams []*discoverroutefern.RouteQueryParams
+	var bodyParams []*discoverroutefern.RouteBodyParam
+	var queryParams []*discoverroutefern.RouteQueryParam
 
 	// Second argument may be options object
 	if len(node.ArgumentList) > 1 {
@@ -107,7 +107,7 @@ func (v *visitor) processFetchCall(node *ast.CallExpression) {
 					}
 				case "body":
 					// Placeholder for body parameters
-					bodyParams = append(bodyParams, &discoverroutefern.RouteBodyParams{Name: "body"})
+					bodyParams = append(bodyParams, &discoverroutefern.RouteBodyParam{Name: "body"})
 				}
 			}
 		}
@@ -117,7 +117,7 @@ func (v *visitor) processFetchCall(node *ast.CallExpression) {
 }
 
 // addRoute adds a route to the list
-func (v *visitor) addRoute(urlStr, method string, bodyParams []*discoverroutefern.RouteBodyParams, queryParams []*discoverroutefern.RouteQueryParams) {
+func (v *visitor) addRoute(urlStr, method string, bodyParams []*discoverroutefern.RouteBodyParam, queryParams []*discoverroutefern.RouteQueryParam) {
 	// The route URL should not have query params, those are stored in QueryParams
 	urlNoQuery, err := discoverroutehelpers.URLRemoveQueryParams(urlStr)
 	if err != nil {
@@ -144,7 +144,7 @@ func (v *visitor) addRoute(urlStr, method string, bodyParams []*discoverroutefer
 }
 
 // ExtractScriptRoutes finds script elements with a src attribute, fetches the JavaScript data, converts it to a string, then calls extractScriptContentRoutes and returns the results. If onlybaseURLs is set, only request script src that are relative.
-func ExtractScriptRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig discoverroutefern.RouteCaptureConfig) ([]*discoverroutefern.RouteDetails, []string, []string) {
+func ExtractScriptRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig discoverroutefern.DiscoverRouteConfig) ([]*discoverroutefern.RouteDetails, []string, []string) {
 	routes := []*discoverroutefern.RouteDetails{}
 	urls := make(map[string]struct{})
 	errors := []string{}
@@ -210,7 +210,7 @@ func ExtractScriptRoutes(doc *goquery.Document, baseURL string, routeCaptureConf
 }
 
 // ExtractInlineScriptRoutes finds inline JavaScript code within script tags, and for each, passes the string contents to extractScriptContentRoutes and returns the results.
-func ExtractInlineScriptRoutes(doc *goquery.Document, url string, routeCaptureConfig discoverroutefern.RouteCaptureConfig) ([]*discoverroutefern.RouteDetails, []string, []string) {
+func ExtractInlineScriptRoutes(doc *goquery.Document, url string, routeCaptureConfig discoverroutefern.DiscoverRouteConfig) ([]*discoverroutefern.RouteDetails, []string, []string) {
 	routes := []*discoverroutefern.RouteDetails{}
 	urls := make(map[string]struct{})
 	errors := []string{}

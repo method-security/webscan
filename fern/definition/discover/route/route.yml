@@ -3,7 +3,7 @@ imports:
   method: ../../common/method.yml
 types:
   # Function Config Struct
-  RouteCaptureConfig:
+  DiscoverRouteConfig:
     properties:
       target: string
       ignoreStaticAssets: boolean
@@ -17,11 +17,11 @@ types:
       headlessConfig: optional<method.HeadlessRequestConfig>
       browserbaseConfig: optional<method.BrowserbaseRequestConfig>
   # Report Struct
-  RouteBodyParams:
+  RouteBodyParam:
     properties:
       name: string
       exampleValues: optional<list<string>>
-  RouteQueryParams:
+  RouteQueryParam:
     properties:
       name: string
       exampleValues: optional<list<string>>
@@ -30,12 +30,12 @@ types:
       baseURL: string 
       path: string
       method: optional<http.HttpMethod>
-      queryParams: optional<list<RouteQueryParams>>
-      bodyParams: optional<list<RouteBodyParams>>
-  RouteCaptureReport:
+      queryParams: optional<list<RouteQueryParam>>
+      bodyParams: optional<list<RouteBodyParam>>
+  DiscoverRouteReport:
     properties:
       target: string
       routes: optional<list<RouteDetails>>
       staticAssets: optional<list<string>>
-      config: RouteCaptureConfig
+      config: DiscoverRouteConfig
       errors: optional<list<string>>

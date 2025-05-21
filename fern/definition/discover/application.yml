@@ -4,13 +4,13 @@ types:
   # Application Fingerprint Enums
   ApplicationFingerprintResourceType:
     enum:
-      - APIAPPLICATION
-      - CLOUDBUCKET
-      - CONTENTMANAGEMENTSYSTEM
+      - API_APPLICATION
+      - CLOUD_BUCKET
+      - CONTENT_MANAGEMENT_SYSTEM
       - KUBE
       - FRAMEWORK
-      - REMOTEACCESS
-      - WEBSERVER
+      - REMOTE_ACCESS
+      - WEB_SERVER
   # Application Fingerprint File Struct
   ApplicationFingerprintModule:
     properties:
@@ -28,7 +28,7 @@ types:
     properties:
       fingerprints: list<ApplicationFingerprintResource>
   # Config Struct
-  ApplicationFingerprintConfig:
+  DiscoverApplicationFingerprintConfig:
     properties:
       targets: list<string>
       resourceType: ApplicationFingerprintResourceType
@@ -47,8 +47,8 @@ types:
     properties:
       target: string
       attempts: list<ApplicationFingerprintAttempt>
-  ApplicationFingerprintReport:
+  DiscoverApplicationFingerprintReport:
     properties:
       targets: optional<list<ApplicationFingerprintTarget>>
-      config: ApplicationFingerprintConfig
+      config: DiscoverApplicationFingerprintConfig
       errors: optional<list<string>>

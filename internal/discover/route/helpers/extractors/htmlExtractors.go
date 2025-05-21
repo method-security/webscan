@@ -18,7 +18,7 @@ import (
 // ExtractFormRoutes extracts WebRoutes from form elements in the HTML document
 // It returns a slice of WebRoutes, a slice of URLs and a slice of errors
 // WebRoutes are merged to only return unique routes
-func ExtractFormRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig discoverroutefern.RouteCaptureConfig) ([]*discoverroutefern.RouteDetails, []string, []string) {
+func ExtractFormRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig discoverroutefern.DiscoverRouteConfig) ([]*discoverroutefern.RouteDetails, []string, []string) {
 	routes := []*discoverroutefern.RouteDetails{}
 	urls := make(map[string]struct{})
 	errors := []string{}
@@ -67,18 +67,18 @@ func ExtractFormRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig
 		}
 
 		// Collect input names
-		var queryParams []*discoverroutefern.RouteQueryParams
-		var bodyParams []*discoverroutefern.RouteBodyParams
+		var queryParams []*discoverroutefern.RouteQueryParam
+		var bodyParams []*discoverroutefern.RouteBodyParam
 		s.Find("input[name], select[name], textarea[name]").Each(func(_ int, input *goquery.Selection) {
 			name, _ := input.Attr("name")
 			if name != "" {
 				if method == "POST" || method == "PUT" || method == "PATCH" {
 					// For POST, PUT, PATCH methods, add to BodyParams
-					param := &discoverroutefern.RouteBodyParams{Name: name}
+					param := &discoverroutefern.RouteBodyParam{Name: name}
 					bodyParams = append(bodyParams, param)
 				} else {
 					// For GET and other methods, add to QueryParams
-					param := &discoverroutefern.RouteQueryParams{Name: name}
+					param := &discoverroutefern.RouteQueryParam{Name: name}
 					queryParams = append(queryParams, param)
 				}
 			}
@@ -97,7 +97,7 @@ func ExtractFormRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig
 	return discoverroutehelpers.MergeWebRoutes(routes), discoverroutehelpers.SetToListString(urls), []string{}
 }
 
-func ExtractAnchorRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig discoverroutefern.RouteCaptureConfig) ([]*discoverroutefern.RouteDetails, []string, []string) {
+func ExtractAnchorRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig discoverroutefern.DiscoverRouteConfig) ([]*discoverroutefern.RouteDetails, []string, []string) {
 	routes := []*discoverroutefern.RouteDetails{}
 	urls := make(map[string]struct{})
 	errors := []string{}
@@ -140,7 +140,7 @@ func ExtractAnchorRoutes(doc *goquery.Document, baseURL string, routeCaptureConf
 	return discoverroutehelpers.MergeWebRoutes(routes), discoverroutehelpers.SetToListString(urls), errors
 }
 
-func ExtractLinkRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig discoverroutefern.RouteCaptureConfig) ([]*discoverroutefern.RouteDetails, []string, []string) {
+func ExtractLinkRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig discoverroutefern.DiscoverRouteConfig) ([]*discoverroutefern.RouteDetails, []string, []string) {
 	routes := []*discoverroutefern.RouteDetails{}
 	urls := make(map[string]struct{})
 	errors := []string{}

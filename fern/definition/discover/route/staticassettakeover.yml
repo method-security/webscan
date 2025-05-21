@@ -5,7 +5,7 @@ types:
   # Function Config Struct
   StaticAssetTakeoverConfig:
     properties:
-      routeCaptureConfig: route.RouteCaptureConfig
+      routeCaptureConfig: route.DiscoverRouteConfig
       successfulOnly: boolean
       fingerprints: list<StaticAssetTakeoverFingerprint>
   # Fingerprint File Struct

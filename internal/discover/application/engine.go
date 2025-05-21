@@ -14,7 +14,7 @@ import (
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
 )
 
-func createSendHTTPRequestConfig(baseURL, path string, method common.HttpMethod, requestParams common.HttpRequestParams, config *discoverfern.ApplicationFingerprintConfig) common.SendHttpRequestConfig {
+func createSendHTTPRequestConfig(baseURL, path string, method common.HttpMethod, requestParams common.HttpRequestParams, config *discoverfern.DiscoverApplicationFingerprintConfig) common.SendHttpRequestConfig {
 	request := common.HttpRequest{
 		BaseUrl: baseURL,
 		Path:    path,
@@ -33,7 +33,7 @@ func createSendHTTPRequestConfig(baseURL, path string, method common.HttpMethod,
 	}
 }
 
-func Run(ctx context.Context, target string, config *discoverfern.ApplicationFingerprintConfig) ([]*discoverfern.ApplicationFingerprintAttempt, []string) {
+func Run(ctx context.Context, target string, config *discoverfern.DiscoverApplicationFingerprintConfig) ([]*discoverfern.ApplicationFingerprintAttempt, []string) {
 	if config == nil || config.Fingerprints == nil || len(config.Fingerprints.Modules) == 0 {
 		return []*discoverfern.ApplicationFingerprintAttempt{}, []string{"invalid config: no resource types found"}
 	}
@@ -142,8 +142,8 @@ func AnalyzeResponse(httpRequestResponse *common.HttpRequestResponse, module *di
 	return false
 }
 
-func LaunchFingerprintEngine(ctx context.Context, config *discoverfern.ApplicationFingerprintConfig) (*discoverfern.ApplicationFingerprintReport, error) {
-	report := discoverfern.ApplicationFingerprintReport{Config: config}
+func LaunchFingerprintEngine(ctx context.Context, config *discoverfern.DiscoverApplicationFingerprintConfig) (*discoverfern.DiscoverApplicationFingerprintReport, error) {
+	report := discoverfern.DiscoverApplicationFingerprintReport{Config: config}
 	errors := []string{}
 
 	var targets []*discoverfern.ApplicationFingerprintTarget

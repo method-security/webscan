@@ -3,19 +3,19 @@ imports:
   method: ../common/method.yml
 types:
   # Config Struct
-  WebProbeConfig:
+  DiscoverProbeConfig:
     properties:
       targets: list<string>
       maxRedirects: integer
-      onlyHttps: boolean
+      HTTPSOnly: boolean
       insecure: boolean
       timeout: integer
       requestMethod: method.RequestMethod
       headlessConfig: optional<method.HeadlessRequestConfig>
       browserbaseConfig: optional<method.BrowserbaseRequestConfig>
   # Report Struct
-  WebProbeReport:
+  DiscoverProbeReport:
     properties:
       targets: optional<list<http.HttpRequestResponse>>
-      config: WebProbeConfig
+      config: DiscoverProbeConfig
       errors: optional<list<string>>

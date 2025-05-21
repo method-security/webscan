@@ -1,7 +1,7 @@
 {
     "fingerprints": [
         {
-            "name": "APIAPPLICATION",
+            "name": "API_APPLICATION",
             "modules": [
                 {
                     "name": "GRAPHQL",
@@ -67,7 +67,7 @@
             ]
         },
         {
-            "name": "CLOUDBUCKET",
+            "name": "CLOUD_BUCKET",
             "modules": [
                 {
                     "name": "AWSS3",
@@ -102,7 +102,7 @@
             ]
         },
         {
-            "name": "CONTENTMANAGEMENTSYSTEM",
+            "name": "CONTENT_MANAGEMENT_SYSTEM",
             "modules": [
                 {
                     "name": "DRUPAL",
@@ -655,7 +655,7 @@
             ]
         },
         {
-            "name": "WEBSERVER",
+            "name": "WEB_SERVER",
             "modules": [
                 {
                     "name": "ABYSS",

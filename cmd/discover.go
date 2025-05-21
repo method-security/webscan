@@ -377,9 +377,9 @@ func (a *WebScan) InitDiscoverCommand() {
 	}
 
 	saasActiveCmd := &cobra.Command{
-		Use:   "Active",
-		Short: "Active SaaS application instances and evalutate login pages",
-		Long:  `Active SaaS application instances and evalutate login pages`,
+		Use:   "active",
+		Short: "Active detection of SaaS application instances and evalutation of login pages",
+		Long:  `Active detection of SaaS application instances and evalutation of login pages`,
 		Run: func(cmd *cobra.Command, args []string) {
 			// Get the Orgs
 			orgs, err := cmd.Flags().GetStringSlice("orgs")

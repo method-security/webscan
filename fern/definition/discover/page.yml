@@ -1,0 +1,22 @@
+imports:
+  http: ../common/http.yml
+  method: ../common/method.yml
+types:
+  # Function Config Struct
+  DiscoverPageConfig:
+    properties:
+      target: string
+      takeScreenshot: boolean
+      maxRedirects: integer
+      insecure: boolean
+      timeout: integer
+      requestMethod: method.RequestMethod
+      headlessConfig: optional<method.HeadlessRequestConfig>
+      browserbaseConfig: optional<method.BrowserbaseRequestConfig>
+  # Report Struct
+  DiscoverPageReport:
+    properties:
+      request: optional<http.HttpRequestResponse>
+      screenshot: optional<base64>
+      config: DiscoverPageConfig
+      errors: optional<list<string>>

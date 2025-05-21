@@ -1,0 +1,27 @@
+imports:
+  http: ../../common/http.yml
+types:
+  # Config Struct
+  EnumerateGeneralRateLimitConfig:
+    properties:
+      targets: list<string>
+      maxRequests: integer
+      timespan: integer
+      insecure: boolean
+      timeout: integer
+  # Report Struct
+  RateLimitAttempt:
+    properties:
+      requestNumber: integer
+      request: http.HttpRequestResponse
+  RateLimitTarget:
+    properties:
+      target: string
+      startTimestamp: datetime
+      endTimestamp: datetime
+      detectedRequest: optional<RateLimitAttempt>
+  DetectRateLimitReport:
+    properties:
+      targets: optional<list<RateLimitTarget>>
+      config: EnumerateGeneralRateLimitConfig
+      errors: optional<list<string>>

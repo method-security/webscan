@@ -1,0 +1,41 @@
+imports:
+  http: ../common/http.yml
+  method: ../common/method.yml
+types:
+  # Function Config Struct
+  DiscoverRouteConfig:
+    properties:
+      target: string
+      ignoreStaticAssets: boolean
+      requireBaseUrlMatch: boolean
+      spiderDepth: integer
+      maxRedirects: integer
+      insecure: boolean
+      timeout: integer
+      threads: integer
+      requestMethod: method.RequestMethod
+      headlessConfig: optional<method.HeadlessRequestConfig>
+      browserbaseConfig: optional<method.BrowserbaseRequestConfig>
+  # Report Struct
+  RouteBodyParam:
+    properties:
+      name: string
+      exampleValues: optional<list<string>>
+  RouteQueryParam:
+    properties:
+      name: string
+      exampleValues: optional<list<string>>
+  RouteDetails:
+    properties:
+      baseURL: string 
+      path: string
+      method: optional<http.HttpMethod>
+      queryParams: optional<list<RouteQueryParam>>
+      bodyParams: optional<list<RouteBodyParam>>
+  DiscoverRouteReport:
+    properties:
+      target: string
+      routes: optional<list<RouteDetails>>
+      staticAssets: optional<list<string>>
+      config: DiscoverRouteConfig
+      errors: optional<list<string>>

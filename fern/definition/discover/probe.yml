@@ -1,0 +1,21 @@
+imports:
+  http: ../common/http.yml
+  method: ../common/method.yml
+types:
+  # Config Struct
+  DiscoverProbeConfig:
+    properties:
+      targets: list<string>
+      maxRedirects: integer
+      HTTPSOnly: boolean
+      insecure: boolean
+      timeout: integer
+      requestMethod: method.RequestMethod
+      headlessConfig: optional<method.HeadlessRequestConfig>
+      browserbaseConfig: optional<method.BrowserbaseRequestConfig>
+  # Report Struct
+  DiscoverProbeReport:
+    properties:
+      targets: optional<list<http.HttpRequestResponse>>
+      config: DiscoverProbeConfig
+      errors: optional<list<string>>

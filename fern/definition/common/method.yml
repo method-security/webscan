@@ -1,0 +1,20 @@
+types:
+  # Request Method Enum
+  RequestMethod:
+    enum:
+      - STANDARD
+      - HEADLESS
+      - BROWSERBASE
+  # Request Method Config Structs
+  HeadlessRequestConfig:
+    properties:
+      pathToBrowserShell: optional<string>
+      minDOMStabalizeTime: integer
+  BrowserbaseRequestConfig:
+    properties:
+      proxy: optional<boolean>
+      countries: optional<list<string>>
+  BrowserbaseRequestSecrets:
+    properties:
+      token: string
+      project: string

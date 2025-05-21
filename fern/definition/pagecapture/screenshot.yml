@@ -1,8 +1,0 @@
-imports:
-  requests: ../common/requests.yml
-types:
-  PageCaptureScreenshotReport:
-    properties:
-      request: optional<requests.RequestInfo>
-      screenshot: optional<base64>
-      errors: optional<list<string>>

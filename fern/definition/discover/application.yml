@@ -1,0 +1,54 @@
+imports:
+  http: ../common/http.yml
+types:
+  # Application Fingerprint Enums
+  ApplicationFingerprintResourceType:
+    enum:
+      - API_APPLICATION
+      - CLOUD_BUCKET
+      - CONTENT_MANAGEMENT_SYSTEM
+      - KUBE
+      - FRAMEWORK
+      - REMOTE_ACCESS
+      - WEB_SERVER
+  # Application Fingerprint File Struct
+  ApplicationFingerprintModule:
+    properties:
+      name: string
+      method: http.HttpMethod
+      paths : list<string>
+      requestParams: optional<http.HttpRequestParams>
+      headerIndicators : optional<map<string, optional<list<string>>>>
+      bodyIndicators : optional<list<string>>
+  ApplicationFingerprintResource:
+    properties:
+      name: ApplicationFingerprintResourceType
+      modules: list<ApplicationFingerprintModule>
+  ApplicationFingerprints:
+    properties:
+      fingerprints: list<ApplicationFingerprintResource>
+  # Config Struct
+  DiscoverApplicationFingerprintConfig:
+    properties:
+      targets: list<string>
+      resourceType: ApplicationFingerprintResourceType
+      modules: optional<list<string>>
+      fingerprints: optional<ApplicationFingerprintResource>
+      successfulOnly: boolean
+      insecure: boolean
+      timeout: integer
+  # Report Struct
+  ApplicationFingerprintAttempt:
+    properties:
+      name: string
+      requests: optional<list<http.HttpRequestResponse>>
+      finding : boolean
+  ApplicationFingerprintTarget:
+    properties:
+      target: string
+      attempts: list<ApplicationFingerprintAttempt>
+  DiscoverApplicationFingerprintReport:
+    properties:
+      targets: optional<list<ApplicationFingerprintTarget>>
+      config: DiscoverApplicationFingerprintConfig
+      errors: optional<list<string>>

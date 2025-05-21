@@ -1,0 +1,15 @@
+imports:
+  method: ./method.yml
+  http: ./http.yml
+types:
+  # Internal Request Config (Used as a parameter for the SendRequest utils function)
+  SendHTTPRequestConfig:
+    properties:
+      request: http.HttpRequest
+      maxRedirects: integer
+      insecure: boolean
+      timeout: integer
+      requestMethod: method.RequestMethod
+      headlessConfig: optional<method.HeadlessRequestConfig>
+      browserbaseConfig: optional<method.BrowserbaseRequestConfig>
+      browserbaseSecrets: optional<method.BrowserbaseRequestSecrets>

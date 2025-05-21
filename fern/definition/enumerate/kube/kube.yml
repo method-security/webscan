@@ -1,0 +1,16 @@
+imports: 
+  http: ../../common/http.yml
+types:
+  # Function Config Struct
+  EnumerateKubeConfig:
+    properties:
+      target: string
+      insecure: boolean
+      timeout: integer
+  # Report Struct
+  EnumerateKubeReport:
+    properties:
+      target: string
+      requests: optional<list<http.HttpRequestResponse>>
+      config: EnumerateKubeConfig
+      errors: optional<list<string>>

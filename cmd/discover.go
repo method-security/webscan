@@ -388,12 +388,12 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Get the SaaS and SSO fingerprints from the files
-			saasFilePaths, err := cmd.Flags().GetStringSlice("saas-filepaths")
+			saasFilePaths, err := cmd.Flags().GetStringSlice("saas-file-paths")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			ssoFilePaths, err := cmd.Flags().GetStringSlice("sso-filepaths")
+			ssoFilePaths, err := cmd.Flags().GetStringSlice("sso-file-paths")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -494,8 +494,8 @@ func (a *WebScan) InitDiscoverCommand() {
 	}
 
 	saasActiveCmd.Flags().StringSlice("orgs", []string{}, "The organization names to use for discovery")
-	saasActiveCmd.Flags().StringSlice("saas-filepaths", []string{"configs/discover/saas/Active/saas_fingerprints.json"}, "Files containing SaaS application fingerprints")
-	saasActiveCmd.Flags().StringSlice("sso-filepaths", []string{"configs/discover/saas/Active/sso_fingerprints.json"}, "Files containing SSO application fingerprints")
+	saasActiveCmd.Flags().StringSlice("saas-file-paths", []string{"configs/discover/saas/active/saas_fingerprints.json"}, "Files containing SaaS application fingerprints")
+	saasActiveCmd.Flags().StringSlice("sso-file-paths", []string{"configs/discover/saas/active/sso_fingerprints.json"}, "Files containing SSO application fingerprints")
 	saasActiveCmd.Flags().StringSlice("saas-companies", []string{}, "The specific SaaS companies to use for discovery (Must be present in the SaaS fingerprints file)")
 	saasActiveCmd.Flags().StringSlice("sso-companies", []string{}, "The specific SSO companies to use for discovery (Must be present in the SSO fingerprints file)")
 	saasActiveCmd.Flags().Bool("successful-only", false, "Only show successful attempts")

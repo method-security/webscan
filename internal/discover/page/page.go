@@ -24,7 +24,7 @@ func getHTTPRequestConfig(baseURL string, path string, config discover.DiscoverP
 	return common.SendHttpRequestConfig{
 		Request:            &request,
 		MaxRedirects:       config.MaxRedirects,
-		Insecure:           config.Insecure,
+		VerifyTls:          config.VerifyTls,
 		Timeout:            config.Timeout,
 		RequestMethod:      config.RequestMethod,
 		HeadlessConfig:     config.HeadlessConfig,

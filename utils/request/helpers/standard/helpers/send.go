@@ -22,7 +22,7 @@ func SendHTTPRequest(log svc1log.Logger, url string, headers map[string]string, 
 	client := &http.Client{
 		Timeout: time.Duration(config.Timeout) * time.Second,
 		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: config.Insecure},
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: !config.VerifyTls},
 		},
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse

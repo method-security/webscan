@@ -24,7 +24,7 @@ func createSendHTTPRequestConfig(baseURL, path string, method common.HttpMethod,
 	return common.SendHttpRequestConfig{
 		Request:            &request,
 		MaxRedirects:       0,
-		Insecure:           config.Insecure,
+		VerifyTls:          config.VerifyTls,
 		Timeout:            config.Timeout,
 		RequestMethod:      common.RequestMethodStandard,
 		HeadlessConfig:     nil,

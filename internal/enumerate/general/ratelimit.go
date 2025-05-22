@@ -27,7 +27,7 @@ func createRateLimitRequestConfig(baseURL, path string, config enumerategeneralf
 	return common.SendHttpRequestConfig{
 		Request:            &request,
 		MaxRedirects:       0,
-		Insecure:           config.Insecure,
+		VerifyTls:          config.VerifyTls,
 		Timeout:            config.Timeout,
 		RequestMethod:      common.RequestMethodStandard,
 		BrowserbaseSecrets: nil,

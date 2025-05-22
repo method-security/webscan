@@ -30,7 +30,7 @@ func createSendHTTPRequestConfig(baseURL, path string, config *enumeratecmswordp
 	return common.SendHttpRequestConfig{
 		Request:            &request,
 		MaxRedirects:       0,
-		Insecure:           true,
+		VerifyTls:          false,
 		Timeout:            config.Timeout,
 		RequestMethod:      common.RequestMethodStandard,
 		HeadlessConfig:     nil,

@@ -16,10 +16,10 @@ types:
     properties:
       name: string
       method: http.HttpMethod
-      paths : list<string>
+      paths: list<string>
       requestParams: optional<http.HttpRequestParams>
-      headerIndicators : optional<map<string, optional<list<string>>>>
-      bodyIndicators : optional<list<string>>
+      headerIndicators: optional<map<string, optional<list<string>>>>
+      bodyIndicators: optional<list<string>>
   ApplicationFingerprintResource:
     properties:
       name: ApplicationFingerprintResourceType
@@ -35,14 +35,14 @@ types:
       modules: optional<list<string>>
       fingerprints: optional<ApplicationFingerprintResource>
       successfulOnly: boolean
-      insecure: boolean
+      verifyTLS: boolean
       timeout: integer
   # Report Struct
   ApplicationFingerprintAttempt:
     properties:
       name: string
       requests: optional<list<http.HttpRequestResponse>>
-      finding : boolean
+      finding: boolean
   ApplicationFingerprintTarget:
     properties:
       target: string

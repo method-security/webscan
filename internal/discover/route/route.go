@@ -37,7 +37,7 @@ func createSendHTTPRequestConfig(baseURL, path string, config discover.DiscoverR
 	return common.SendHttpRequestConfig{
 		Request:            &request,
 		MaxRedirects:       config.MaxRedirects,
-		Insecure:           config.Insecure,
+		VerifyTls:          config.VerifyTls,
 		Timeout:            config.Timeout,
 		RequestMethod:      config.RequestMethod,
 		HeadlessConfig:     config.HeadlessConfig,

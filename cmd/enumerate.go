@@ -123,7 +123,7 @@ func (a *WebScan) InitEnumerateCommand() {
 			}
 
 			// Get config flags
-			insecure, err := cmd.Flags().GetBool("insecure")
+			verifyTLS, err := cmd.Flags().GetBool("verify-tls")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -135,7 +135,7 @@ func (a *WebScan) InitEnumerateCommand() {
 			}
 
 			// Set Config
-			config := getEnumerateKubeConfig(target, insecure, timeout)
+			config := getEnumerateKubeConfig(target, verifyTLS, timeout)
 
 			// Generate report
 			report := enumeratekube.PerformAppEnumerateKube(cmd.Context(), config)
@@ -148,7 +148,7 @@ func (a *WebScan) InitEnumerateCommand() {
 	// Target Flags
 	enumerateKubeCmd.Flags().String("target", "", "URL target to perform Kubernetes enumeration against")
 	// Config Flags
-	enumerateKubeCmd.Flags().Bool("insecure", false, "Allow insecure SSL/TLS connections")
+	enumerateKubeCmd.Flags().Bool("verify-tls", true, "Verify TLS certificates when making HTTPS requests")
 	enumerateKubeCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
 
 	// Mark required flags
@@ -206,7 +206,7 @@ func (a *WebScan) InitEnumerateCommand() {
 				a.OutputSignal.AddError(errors.New("no plugins provided"))
 				return
 			}
-			insecure, err := cmd.Flags().GetBool("insecure")
+			verifyTLS, err := cmd.Flags().GetBool("verify-tls")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -223,7 +223,7 @@ func (a *WebScan) InitEnumerateCommand() {
 			}
 
 			// Generate config
-			config := getEnumerateWordpressPluginsConfig(targets, plugins, insecure, timeout, threads)
+			config := getEnumerateWordpressPluginsConfig(targets, plugins, verifyTLS, timeout, threads)
 
 			// Generate report
 			report := enumeratecmswordpress.PerformAppEnumerateCMSWordpressPlugins(cmd.Context(), config)
@@ -238,7 +238,7 @@ func (a *WebScan) InitEnumerateCommand() {
 	// Config Flags
 	enumerateCMSWordpressPluginsCmd.Flags().StringSlice("plugins", []string{}, "Specific WordPress plugins to check for")
 	enumerateCMSWordpressPluginsCmd.Flags().StringSlice("plugins-file-paths", []string{"configs/enumerate/cms/wordpress/plugins_small.txt"}, "Paths to files containing WordPress plugin lists")
-	enumerateCMSWordpressPluginsCmd.Flags().Bool("insecure", false, "Allow insecure SSL/TLS connections")
+	enumerateCMSWordpressPluginsCmd.Flags().Bool("verify-tls", true, "Verify TLS certificates when making HTTPS requests")
 	enumerateCMSWordpressPluginsCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
 	enumerateCMSWordpressPluginsCmd.Flags().Int("threads", 0, "Number of concurrent threads for scanning")
 
@@ -275,7 +275,7 @@ func (a *WebScan) InitEnumerateCommand() {
 			}
 
 			// Config flags
-			insecure, err := cmd.Flags().GetBool("insecure")
+			verifyTLS, err := cmd.Flags().GetBool("verify-tls")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -292,7 +292,7 @@ func (a *WebScan) InitEnumerateCommand() {
 			}
 
 			// Generate config
-			config := getEnumerateWebserverIISConfig(targets, insecure, timeout, threads)
+			config := getEnumerateWebserverIISConfig(targets, verifyTLS, timeout, threads)
 
 			// Generate report
 			report := enumeratewebserver.PerformAppEnumerateWebserverIIS(cmd.Context(), config)
@@ -305,7 +305,7 @@ func (a *WebScan) InitEnumerateCommand() {
 	// Target Flags
 	enumerateWebserverIISCmd.Flags().StringSlice("targets", []string{}, "URL targets to perform IIS enumeration against")
 	// Config Flags
-	enumerateWebserverIISCmd.Flags().Bool("insecure", false, "Allow insecure SSL/TLS connections")
+	enumerateWebserverIISCmd.Flags().Bool("verify-tls", true, "Verify TLS certificates when making HTTPS requests")
 	enumerateWebserverIISCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
 	enumerateWebserverIISCmd.Flags().Int("threads", 0, "Number of concurrent threads for scanning")
 
@@ -348,7 +348,7 @@ func (a *WebScan) InitEnumerateCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			insecure, err := cmd.Flags().GetBool("insecure")
+			verifyTLS, err := cmd.Flags().GetBool("verify-tls")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -360,7 +360,7 @@ func (a *WebScan) InitEnumerateCommand() {
 			}
 
 			// Generate config
-			config := getEnumerateGeneralRateLimitConfig(targets, maxRequests, timespan, insecure, timeout)
+			config := getEnumerateGeneralRateLimitConfig(targets, maxRequests, timespan, verifyTLS, timeout)
 
 			// Generate report
 			report := enumerategeneral.PerformGeneralRatelimit(cmd.Context(), config)
@@ -375,7 +375,7 @@ func (a *WebScan) InitEnumerateCommand() {
 	// Config Flags
 	enumerateGeneralRatelimitCmd.Flags().Int("max-requests", 10, "Maximum number of requests to send")
 	enumerateGeneralRatelimitCmd.Flags().Int("timespan", 10, "Time window for rate limit testing in seconds")
-	enumerateGeneralRatelimitCmd.Flags().Bool("insecure", false, "Allow insecure SSL/TLS connections")
+	enumerateGeneralRatelimitCmd.Flags().Bool("verify-tls", true, "Verify TLS certificates when making HTTPS requests")
 	enumerateGeneralRatelimitCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
 
 	_ = enumerateGeneralRatelimitCmd.MarkFlagRequired("targets")
@@ -391,45 +391,45 @@ func (a *WebScan) InitEnumerateCommand() {
 }
 
 // getEnumerateWordpressPluginsConfig builds the config for WordPress plugin enumeration.
-func getEnumerateWordpressPluginsConfig(targets []string, plugins []string, insecure bool, timeout int, threads int) *enumeratecmswordpressfern.EnumerateWordpressPluginsConfig {
+func getEnumerateWordpressPluginsConfig(targets []string, plugins []string, verifyTLS bool, timeout int, threads int) *enumeratecmswordpressfern.EnumerateWordpressPluginsConfig {
 	config := &enumeratecmswordpressfern.EnumerateWordpressPluginsConfig{
-		Targets:  targets,
-		Plugins:  plugins,
-		Insecure: insecure,
-		Timeout:  max(timeout, 0),
-		Threads:  max(threads, 0),
+		Targets:   targets,
+		Plugins:   plugins,
+		VerifyTls: verifyTLS,
+		Timeout:   max(timeout, 0),
+		Threads:   max(threads, 0),
 	}
 	return config
 }
 
 // getEnumerateKubeConfig builds the config for Kubernetes enumeration.
-func getEnumerateKubeConfig(target string, insecure bool, timeout int) enumeratekubefern.EnumerateKubeConfig {
+func getEnumerateKubeConfig(target string, verifyTLS bool, timeout int) enumeratekubefern.EnumerateKubeConfig {
 	config := enumeratekubefern.EnumerateKubeConfig{
-		Target:   target,
-		Insecure: insecure,
-		Timeout:  max(timeout, 0),
+		Target:    target,
+		VerifyTls: verifyTLS,
+		Timeout:   max(timeout, 0),
 	}
 	return config
 }
 
 // getEnumerateWebserverIISConfig builds the config for IIS webserver enumeration.
-func getEnumerateWebserverIISConfig(targets []string, insecure bool, timeout int, threads int) enumeratewebserverfern.EnumerateWebserverIisConfig {
+func getEnumerateWebserverIISConfig(targets []string, verifyTLS bool, timeout int, threads int) enumeratewebserverfern.EnumerateWebserverIisConfig {
 	config := enumeratewebserverfern.EnumerateWebserverIisConfig{
-		Targets:  targets,
-		Insecure: insecure,
-		Timeout:  max(timeout, 0),
-		Threads:  max(threads, 0),
+		Targets:   targets,
+		VerifyTls: verifyTLS,
+		Timeout:   max(timeout, 0),
+		Threads:   max(threads, 0),
 	}
 	return config
 }
 
 // getEnumerateGeneralRateLimitConfig builds the config for general rate limit enumeration.
-func getEnumerateGeneralRateLimitConfig(targets []string, maxRequests int, timespan int, insecure bool, timeout int) enumerategeneralfern.EnumerateGeneralRateLimitConfig {
+func getEnumerateGeneralRateLimitConfig(targets []string, maxRequests int, timespan int, verifyTLS bool, timeout int) enumerategeneralfern.EnumerateGeneralRateLimitConfig {
 	config := enumerategeneralfern.EnumerateGeneralRateLimitConfig{
 		Targets:     targets,
 		MaxRequests: maxRequests,
 		Timespan:    max(timespan, 0),
-		Insecure:    insecure,
+		VerifyTls:   verifyTLS,
 		Timeout:     max(timeout, 0),
 	}
 	return config

@@ -44,26 +44,6 @@ func LaunchDiscoverSaasActive(ctx context.Context, config discoversaasfern.Disco
 	}
 	errors := []string{}
 
-	// Gather fingerprints
-	selectedSaasFingerprints, errs := discoversaasactivehelpers.SelectFingerprints(config.SaasFingerprints, config.SaasCompanies)
-	if len(errs) > 0 {
-		errors = append(errors, errs...)
-	}
-	selectedSsoFingerprints, errs := discoversaasactivehelpers.SelectFingerprints(config.SsoFingerprints, config.SsoCompanies)
-	if len(errs) > 0 {
-		errors = append(errors, errs...)
-	}
-	if len(selectedSaasFingerprints.Fingerprints) == 0 {
-		errors = append(errors, "no SaaS fingerprints found")
-		report.Errors = errors
-		return &report, nil
-	}
-	if len(selectedSsoFingerprints.Fingerprints) == 0 {
-		errors = append(errors, "no SSO fingerprints found")
-		report.Errors = errors
-		return &report, nil
-	}
-
 	// Process each organization
 	attempts := []*discoversaasfern.SaasActiveAttempt{}
 	for _, org := range config.Orgs {
@@ -71,7 +51,7 @@ func LaunchDiscoverSaasActive(ctx context.Context, config discoversaasfern.Disco
 		companies := []*discoversaasfern.SaasActiveCompany{}
 
 		// Process each company
-		for company, fingerprint := range selectedSaasFingerprints.Fingerprints {
+		for company, fingerprint := range config.SaasFingerprints.Fingerprints {
 			companyResult := &discoversaasfern.SaasActiveCompany{Company: company}
 			requests := []*discoversaasfern.SaasActiveRequest{}
 
@@ -110,7 +90,7 @@ func LaunchDiscoverSaasActive(ctx context.Context, config discoversaasfern.Disco
 
 					// Analyze the request
 					redirectedPage := len(httpRequestResponse.Response.RedirectChain) > 1
-					finding := discoversaasactivehelpers.AnalyzeSaasRequest(ctx, saasRequest, fingerprint, selectedSsoFingerprints, redirectedPage)
+					finding := discoversaasactivehelpers.AnalyzeSaasRequest(ctx, saasRequest, fingerprint, config.SsoFingerprints, redirectedPage)
 					saasRequest.Findings = finding
 
 					// Add request if it meets our criteria

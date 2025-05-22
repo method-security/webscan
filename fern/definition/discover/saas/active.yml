@@ -5,7 +5,7 @@ types:
   # File JSON Schema
   SaasFingerprintProfile:
     properties:
-      headers: optional<map<string, list<string>>>
+      headers: optional<map<string, optional<list<string>>>>
       body: optional<list<string>>
       pageNotFound: optional<list<string>>
   SaasFingerprintEntry:

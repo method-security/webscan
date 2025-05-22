@@ -8,25 +8,21 @@ import (
 	discoversaasfern "github.com/Method-Security/webscan/generated/go/discover/saas"
 )
 
-// SelectFingerprints enables the user to only look for specific SaaS companies or SSO login pages
-func SelectFingerprints(fingerprints *discoversaasfern.SaasFingerprintFile, companies []string) (*discoversaasfern.SaasFingerprintFile, []string) {
-	if fingerprints == nil {
-		return nil, []string{"no fingerprints provided"}
+// FilterFingerprints enables the user to only look for specific SaaS companies or SSO login pages
+func FilterFingerprints(companies []string, fingerprints discoversaasfern.SaasFingerprintFile) (*discoversaasfern.SaasFingerprintFile, error) {
+	if len(companies) == 0 {
+		return &fingerprints, nil
 	}
 
-	if len(companies) == 0 {
-		return fingerprints, nil
-	}
-	errs := []string{}
 	filteredFingerprints := make(map[string]*discoversaasfern.SaasFingerprintEntry)
 	for _, company := range companies {
 		if entry, exists := fingerprints.Fingerprints[company]; exists {
 			filteredFingerprints[company] = entry
 		} else {
-			errs = append(errs, fmt.Sprintf("company %s not found in fingerprints", company))
+			return nil, fmt.Errorf("company %s not found in fingerprints", company)
 		}
 	}
-	return &discoversaasfern.SaasFingerprintFile{Fingerprints: filteredFingerprints}, errs
+	return &discoversaasfern.SaasFingerprintFile{Fingerprints: filteredFingerprints}, nil
 }
 
 // UnmarshalFingerprints unmarshals the fingerprint files into a SaasFingerprintFile

@@ -14,7 +14,9 @@ nav:
   - Docs:
       - Overview: docs/index.md
       - Capabilities:
-        - App: docs/app.md
+        - Discover: docs/discover.md
+        - Enumerate: docs/enumerate.md
+        - Pentest: docs/pentest.md
   - Contributing:
       - How to contribute: community/community.md
       - Development:

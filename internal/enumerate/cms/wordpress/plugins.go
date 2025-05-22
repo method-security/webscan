@@ -39,7 +39,8 @@ func createSendHTTPRequestConfig(baseURL, path string, config *enumeratecmswordp
 	}
 }
 
-// PerformAppEnumerateCMSWordpressPlugins attempts to find plugins installed on WordPress sites
+// PerformAppEnumerateCMSWordpressPlugins attempts to find plugins installed on WordPress sites.
+// It returns a report containing the results for each target and any errors encountered.
 func PerformAppEnumerateCMSWordpressPlugins(ctx context.Context, config *enumeratecmswordpressfern.EnumerateWordpressPluginsConfig) enumeratecmswordpressfern.EnumerateWordpressPluginsReport {
 	report := enumeratecmswordpressfern.EnumerateWordpressPluginsReport{Config: config}
 

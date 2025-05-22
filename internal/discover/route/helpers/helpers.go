@@ -32,7 +32,7 @@ func AddListToSetString(set map[string]struct{}, list []string) map[string]struc
 	return set
 }
 
-// MergeStaticAssets merges StaticAssets, retaining only unique static assets
+// MergeStaticAssets merges static asset URLs, retaining only unique static assets.
 func MergeStaticAssets(staticAssets []string) []string {
 	staticAssetMap := make(map[string]struct{})
 
@@ -45,8 +45,7 @@ func MergeStaticAssets(staticAssets []string) []string {
 	return SetToListString(staticAssetMap)
 }
 
-// MergeWebRoutes merges WebRoutes, retaining only unique routes
-// unique routes are defined by the combination of method and URL
+// MergeWebRoutes merges WebRoutes, retaining only unique routes (by method and URL).
 func MergeWebRoutes(routes []*discover.RouteDetails) []*discover.RouteDetails {
 	routeMap := make(map[string]*discover.RouteDetails)
 
@@ -80,8 +79,7 @@ func MergeWebRoutes(routes []*discover.RouteDetails) []*discover.RouteDetails {
 	return mergedRoutes
 }
 
-// MergeQueryParams Helper function to merge QueryParams only retaining those that are unique
-// When the same param name is encountered, the example values are merged
+// MergeQueryParams merges two slices of RouteQueryParam, retaining unique params and merging example values.
 func MergeQueryParams(params1 []*discover.RouteQueryParam, params2 []*discover.RouteQueryParam) []*discover.RouteQueryParam {
 	// If either is nil return the other
 	if params1 == nil && params2 == nil {
@@ -117,8 +115,7 @@ func MergeQueryParams(params1 []*discover.RouteQueryParam, params2 []*discover.R
 	return mergedParams
 }
 
-// MergeBodyParams helper function to merge BodyParams only retaining those that are unique
-// When the same param name is encountered, the example values are merged
+// MergeBodyParams merges two slices of RouteBodyParam, retaining unique params and merging example values.
 func MergeBodyParams(params1 []*discover.RouteBodyParam, params2 []*discover.RouteBodyParam) []*discover.RouteBodyParam {
 	// If either is nil return the other
 	if params1 == nil && params2 == nil {
@@ -154,7 +151,7 @@ func MergeBodyParams(params1 []*discover.RouteBodyParam, params2 []*discover.Rou
 	return mergedParams
 }
 
-// ParseQueryParams helper function to parse query parameters from the URL
+// ParseQueryParams parses query parameters from a URL into RouteQueryParam structs.
 func ParseQueryParams(reqURL *url.URL) []*discover.RouteQueryParam {
 	var queryParams []*discover.RouteQueryParam
 	for key, values := range reqURL.Query() {
@@ -166,7 +163,7 @@ func ParseQueryParams(reqURL *url.URL) []*discover.RouteQueryParam {
 	return queryParams
 }
 
-// ParseBodyParams helper function to parse body parameters
+// ParseBodyParams parses body parameters from a JSON or form-urlencoded string into RouteBodyParam structs.
 func ParseBodyParams(postData string) ([]*discover.RouteBodyParam, error) {
 	var bodyParams []*discover.RouteBodyParam
 
@@ -208,7 +205,7 @@ func ParseBodyParams(postData string) ([]*discover.RouteBodyParam, error) {
 	return bodyParams, nil
 }
 
-// ResolveURL helper function to resolve relative URLs
+// ResolveURL resolves a reference URL relative to a base URL.
 func ResolveURL(base, ref string) string {
 	baseURL, err := url.Parse(base)
 	if err != nil {
@@ -222,7 +219,7 @@ func ResolveURL(base, ref string) string {
 	return strings.TrimRight(baseURL.ResolveReference(refURL).String(), "/")
 }
 
-// URLRemoveQueryParams helper function to remove query parameters from a URL
+// URLRemoveQueryParams removes query parameters from a URL string.
 func URLRemoveQueryParams(rawURL string) (string, error) {
 	parsedURL, err := url.Parse(rawURL)
 	if err != nil {
@@ -232,10 +229,7 @@ func URLRemoveQueryParams(rawURL string) (string, error) {
 	return parsedURL.String(), nil
 }
 
-// IsURLAllowed helper function to check if a URL is allowed based on baseUrlsOnly and base domain and captureStaticAssets
-// This only checks the first subdomain only of the baseURL as a condition for match
-// Web routes often get redirected to www.* or other subdomains, so we only check the base domain
-// baseURL should be the original URL sent to the CLI, targetURL is the URL discovered that needs checking
+// IsURLAllowed checks if a target URL is allowed based on base URL, static asset rules, and domain matching.
 func IsURLAllowed(baseURL string, targetURL string, requireBaseURLMatch bool, ignoreStaticAssets bool) bool {
 	// First check to see if the targetURL is a static asset type
 	if !ignoreStaticAssets {
@@ -255,10 +249,7 @@ func IsURLAllowed(baseURL string, targetURL string, requireBaseURLMatch bool, ig
 	return IsSubdomain(baseDomain, targetDomain)
 }
 
-// ExtractDomain helper function to extract the domain from a URL with an optional maxDomainLevel parameter
-// maxDomainLevel specifies the number of domain levels to include in the extracted domain
-// e.g. maxDomainLevel=2 would extract "example.com" from "www.sub.example.com"
-// maxDomainLevel=0 would extract the full domain
+// ExtractDomain extracts the domain from a URL up to a specified domain level.
 func ExtractDomain(rawURL string, maxDomainLevel int) string {
 	u, err := url.Parse(rawURL)
 	if err != nil {
@@ -276,7 +267,7 @@ func ExtractDomain(rawURL string, maxDomainLevel int) string {
 	return domain
 }
 
-// IsSubdomain helper function to check if sub is a subdomain of base
+// IsSubdomain checks if 'sub' is a subdomain of 'base'.
 func IsSubdomain(base string, sub string) bool {
 	if base == "" || sub == "" {
 		return false
@@ -284,7 +275,7 @@ func IsSubdomain(base string, sub string) bool {
 	return sub == base || strings.HasSuffix(sub, "."+base)
 }
 
-// IsAbsoluteURL helper function to check if a URL is absolute
+// IsAbsoluteURL returns true if the given URL is absolute.
 func IsAbsoluteURL(u string) bool {
 	return strings.HasPrefix(u, "http://") || strings.HasPrefix(u, "https://") || strings.HasPrefix(u, "//")
 }

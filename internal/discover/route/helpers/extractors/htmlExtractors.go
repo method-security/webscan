@@ -17,6 +17,8 @@ import (
 
 // ExtractFormRoutes extracts WebRoutes from form elements in the HTML document
 // It returns a slice of WebRoutes, a slice of URLs and a slice of errors
+// ExtractFormRoutes extracts WebRoutes from form elements in the HTML document
+// It returns a slice of WebRoutes, a slice of URLs and a slice of errors
 // WebRoutes are merged to only return unique routes
 func ExtractFormRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig discover.DiscoverRouteConfig) ([]*discover.RouteDetails, []string, []string) {
 	routes := []*discover.RouteDetails{}
@@ -97,6 +99,8 @@ func ExtractFormRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig
 	return discoverroutehelpers.MergeWebRoutes(routes), discoverroutehelpers.SetToListString(urls), []string{}
 }
 
+// ExtractAnchorRoutes extracts WebRoutes from anchor (<a>) elements in the HTML document.
+// Returns a slice of RouteDetails, a slice of URLs, and a slice of errors.
 func ExtractAnchorRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig discover.DiscoverRouteConfig) ([]*discover.RouteDetails, []string, []string) {
 	routes := []*discover.RouteDetails{}
 	urls := make(map[string]struct{})
@@ -140,6 +144,8 @@ func ExtractAnchorRoutes(doc *goquery.Document, baseURL string, routeCaptureConf
 	return discoverroutehelpers.MergeWebRoutes(routes), discoverroutehelpers.SetToListString(urls), errors
 }
 
+// ExtractLinkRoutes extracts WebRoutes from link (<link>) elements in the HTML document.
+// Returns a slice of RouteDetails, a slice of URLs, and a slice of errors.
 func ExtractLinkRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig discover.DiscoverRouteConfig) ([]*discover.RouteDetails, []string, []string) {
 	routes := []*discover.RouteDetails{}
 	urls := make(map[string]struct{})

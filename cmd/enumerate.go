@@ -22,6 +22,7 @@ import (
 	cobra "github.com/spf13/cobra"
 )
 
+// InitEnumerateCommand initializes the 'enumerate' command and its subcommands for the CLI.
 func (a *WebScan) InitEnumerateCommand() {
 	enumerateCmd := &cobra.Command{
 		Use:   "enumerate",
@@ -389,6 +390,7 @@ func (a *WebScan) InitEnumerateCommand() {
 	a.RootCmd.AddCommand(enumerateCmd)
 }
 
+// getEnumerateWordpressPluginsConfig builds the config for WordPress plugin enumeration.
 func getEnumerateWordpressPluginsConfig(targets []string, plugins []string, insecure bool, timeout int, threads int) *enumeratecmswordpressfern.EnumerateWordpressPluginsConfig {
 	config := &enumeratecmswordpressfern.EnumerateWordpressPluginsConfig{
 		Targets:  targets,
@@ -400,6 +402,7 @@ func getEnumerateWordpressPluginsConfig(targets []string, plugins []string, inse
 	return config
 }
 
+// getEnumerateKubeConfig builds the config for Kubernetes enumeration.
 func getEnumerateKubeConfig(target string, insecure bool, timeout int) enumeratekubefern.EnumerateKubeConfig {
 	config := enumeratekubefern.EnumerateKubeConfig{
 		Target:   target,
@@ -409,6 +412,7 @@ func getEnumerateKubeConfig(target string, insecure bool, timeout int) enumerate
 	return config
 }
 
+// getEnumerateWebserverIISConfig builds the config for IIS webserver enumeration.
 func getEnumerateWebserverIISConfig(targets []string, insecure bool, timeout int, threads int) enumeratewebserverfern.EnumerateWebserverIisConfig {
 	config := enumeratewebserverfern.EnumerateWebserverIisConfig{
 		Targets:  targets,
@@ -419,6 +423,7 @@ func getEnumerateWebserverIISConfig(targets []string, insecure bool, timeout int
 	return config
 }
 
+// getEnumerateGeneralRateLimitConfig builds the config for general rate limit enumeration.
 func getEnumerateGeneralRateLimitConfig(targets []string, maxRequests int, timespan int, insecure bool, timeout int) enumerategeneralfern.EnumerateGeneralRateLimitConfig {
 	config := enumerategeneralfern.EnumerateGeneralRateLimitConfig{
 		Targets:     targets,

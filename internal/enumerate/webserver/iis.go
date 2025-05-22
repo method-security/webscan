@@ -39,7 +39,7 @@ func createSendHTTPRequestConfig(baseURL, path string, config *enumeratewebserve
 	}
 }
 
-// PerformAppEnumerateWebserverIIS is the entry point exposed to the wider application
+// PerformAppEnumerateWebserverIIS performs enumeration of IIS webservers for the given config and returns a report.
 func PerformAppEnumerateWebserverIIS(ctx context.Context, config enumeratewebserverfern.EnumerateWebserverIisConfig) enumeratewebserverfern.EnumerateWebserverIisReport {
 	rpt := enumeratewebserverfern.EnumerateWebserverIisReport{Config: &config}
 

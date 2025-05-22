@@ -132,6 +132,7 @@ func extractRoutes(ctx context.Context, httpRequestResponse *common.HttpRequestR
 	return mergedRoutes, staticAssetsList, errors
 }
 
+// PerformRouteCapture performs route discovery and spidering for the given config, returning a DiscoverRouteReport.
 func PerformRouteCapture(ctx context.Context, config discover.DiscoverRouteConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) discover.DiscoverRouteReport {
 	log := svc1log.FromContext(ctx)
 

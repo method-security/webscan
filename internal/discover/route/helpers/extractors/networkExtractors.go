@@ -19,7 +19,8 @@ import (
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
-// ExtractNetworkRoutes fetches network requests, parses them, and populates []WebRoute.
+// ExtractNetworkRoutes uses a headless browser to capture network requests and extract route details from them.
+// Returns a slice of RouteDetails, a slice of URLs, and a slice of errors.
 func ExtractNetworkRoutes(ctx context.Context, b *headless.Requester, target string, baseURLsOnly bool, captureStaticAssets bool) ([]*discover.RouteDetails, []string, []string) {
 	routes := []*discover.RouteDetails{}
 	urls := make(map[string]struct{})

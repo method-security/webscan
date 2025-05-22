@@ -19,6 +19,8 @@ import (
 	parser "github.com/robertkrimen/otto/parser"
 )
 
+// ExtractScriptRoutes extracts WebRoutes from script elements in the HTML document
+// It returns a slice of RouteDetails, a slice of URLs and a slice of errors
 // extractScriptContentRoutes takes JavaScript code as a string, parses it using the Otto parser library to find all routes (including POST and GET methods with bodyParams and queryParams), and returns them.
 func extractScriptContentRoutes(scriptContent string, baseURL string, routeCaptureConfig discover.DiscoverRouteConfig) ([]*discover.RouteDetails, []string, []string) {
 	routes := []*discover.RouteDetails{}
@@ -143,7 +145,8 @@ func (v *visitor) addRoute(urlStr, method string, bodyParams []*discover.RouteBo
 	v.urls[urlStr] = struct{}{}
 }
 
-// ExtractScriptRoutes finds script elements with a src attribute, fetches the JavaScript data, converts it to a string, then calls extractScriptContentRoutes and returns the results. If onlybaseURLs is set, only request script src that are relative.
+// ExtractScriptRoutes finds script elements with a src attribute, fetches the JavaScript data, parses it, and extracts routes.
+// Returns a slice of RouteDetails, a slice of URLs, and a slice of errors.
 func ExtractScriptRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig discover.DiscoverRouteConfig) ([]*discover.RouteDetails, []string, []string) {
 	routes := []*discover.RouteDetails{}
 	urls := make(map[string]struct{})
@@ -209,7 +212,8 @@ func ExtractScriptRoutes(doc *goquery.Document, baseURL string, routeCaptureConf
 	return discoverroutehelpers.MergeWebRoutes(routes), discoverroutehelpers.SetToListString(urls), errors
 }
 
-// ExtractInlineScriptRoutes finds inline JavaScript code within script tags, and for each, passes the string contents to extractScriptContentRoutes and returns the results.
+// ExtractInlineScriptRoutes finds inline JavaScript code within script tags, parses it, and extracts routes.
+// Returns a slice of RouteDetails, a slice of URLs, and a slice of errors.
 func ExtractInlineScriptRoutes(doc *goquery.Document, url string, routeCaptureConfig discover.DiscoverRouteConfig) ([]*discover.RouteDetails, []string, []string) {
 	routes := []*discover.RouteDetails{}
 	urls := make(map[string]struct{})

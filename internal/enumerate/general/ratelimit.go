@@ -36,7 +36,7 @@ func createRateLimitRequestConfig(baseURL, path string, config enumerategeneralf
 	}
 }
 
-// PerformGeneralRatelimit performs rate limit detection on target URLs within a specified timespan
+// PerformGeneralRatelimit performs rate limit detection on target URLs within a specified timespan and returns a DetectRateLimitReport.
 func PerformGeneralRatelimit(ctx context.Context, config enumerategeneralfern.EnumerateGeneralRateLimitConfig) *enumerategeneralfern.DetectRateLimitReport {
 	// Initialize report
 	report := &enumerategeneralfern.DetectRateLimitReport{Config: &config}
@@ -101,8 +101,7 @@ func PerformGeneralRatelimit(ctx context.Context, config enumerategeneralfern.En
 	return report
 }
 
-// RateLimitDetected checks if a response explicitly indicates that a request was rate-limited
-// or if a 403 response is returned after a 200 response was previously seen.
+// RateLimitDetected checks if a response explicitly indicates that a request was rate-limited or if a 403 response is returned after a 200 response was previously seen.
 func RateLimitDetected(request *common.HttpRequestResponse, hasSeen200 bool) bool {
 	if request == nil || request.Response == nil {
 		return false

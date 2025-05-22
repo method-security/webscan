@@ -25,6 +25,7 @@ import (
 	cobra "github.com/spf13/cobra"
 )
 
+// InitDiscoverCommand initializes the 'discover' command and its subcommands for the CLI.
 func (a *WebScan) InitDiscoverCommand() {
 	discoverCmd := &cobra.Command{
 		Use:   "discover",
@@ -524,6 +525,7 @@ func (a *WebScan) InitDiscoverCommand() {
 	a.RootCmd.AddCommand(discoverCmd)
 }
 
+// getDiscoverApplicationFingerprintConfig builds the config for application fingerprinting discovery.
 func getDiscoverApplicationFingerprintConfig(targets []string, resource string, moduleEnums []string, fingerprints *discover.ApplicationFingerprintResource, successfulOnly bool, insecure bool, timeout int) (*discover.DiscoverApplicationFingerprintConfig, error) {
 	resourceEnum, err := discover.NewApplicationFingerprintResourceTypeFromString(resource)
 	if err != nil {
@@ -541,6 +543,7 @@ func getDiscoverApplicationFingerprintConfig(targets []string, resource string, 
 	return config, nil
 }
 
+// getDiscoverPageConfig builds the config for page capture and analysis.
 func getDiscoverPageConfig(target string, maxRedirects int, insecure bool, timeout int, takeScreenshot bool, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) discover.DiscoverPageConfig {
 	config := discover.DiscoverPageConfig{
 		Target:            target,
@@ -555,6 +558,7 @@ func getDiscoverPageConfig(target string, maxRedirects int, insecure bool, timeo
 	return config
 }
 
+// getDiscoverProbeConfig builds the config for probe discovery.
 func getDiscoverProbeConfig(targets []string, maxRedirects int, HTTPSOnly bool, insecure bool, timeout int, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) *discover.DiscoverProbeConfig {
 	config := &discover.DiscoverProbeConfig{
 		Targets:           targets,
@@ -570,6 +574,7 @@ func getDiscoverProbeConfig(targets []string, maxRedirects int, HTTPSOnly bool, 
 	return config
 }
 
+// getDiscoverRouteConfig builds the config for route discovery.
 func getDiscoverRouteConfig(target string, requiredBaseURLMatch bool, ignoreStaticAssets bool, spiderDepth int, maxRedirects int, insecure bool, timeout int, threads int, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) discover.DiscoverRouteConfig {
 	config := discover.DiscoverRouteConfig{
 		Target:              target,
@@ -587,6 +592,7 @@ func getDiscoverRouteConfig(target string, requiredBaseURLMatch bool, ignoreStat
 	return config
 }
 
+// getDiscoverSaasActiveConfig builds the config for SaaS active discovery.
 func getDiscoverSaasActiveConfig(orgs []string, saasFingerprints discoversaasfern.SaasFingerprintFile, ssoFingerprints discoversaasfern.SaasFingerprintFile, saasCompanies []string, ssoCompanies []string, maxRedirects int, successfulOnly bool, httpsOnly bool, insecure bool, timeout int, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) discoversaasfern.DiscoverSaasActiveConfig {
 	config := discoversaasfern.DiscoverSaasActiveConfig{
 		Orgs:              orgs,

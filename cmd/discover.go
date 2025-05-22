@@ -4,7 +4,6 @@ import (
 	// Standard
 	"errors"
 	"fmt"
-	"strings"
 
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
@@ -21,7 +20,6 @@ import (
 
 	// Utils
 	utils "github.com/Method-Security/webscan/utils"
-	browserbase "github.com/Method-Security/webscan/utils/request/helpers/headless/browserbase"
 
 	// External
 	cobra "github.com/spf13/cobra"
@@ -238,7 +236,7 @@ func (a *WebScan) InitDiscoverCommand() {
 				return
 			}
 
-			// Get Request Method flag
+			// Get Request Method flags
 			requestMethodConfig, err := utils.GetRequestMethodFlags(cmd)
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -329,7 +327,8 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			// Get Request Method flag
+
+			// Get Request Method flags
 			requestMethodConfig, err := utils.GetRequestMethodFlags(cmd)
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -410,7 +409,7 @@ func (a *WebScan) InitDiscoverCommand() {
 				return
 			}
 
-			// Config
+			// Filter SaaS and SSO fingerprints
 			saasCompanies, err := cmd.Flags().GetStringSlice("saas-companies")
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -421,6 +420,26 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			filteredSaasFingerprints, err := discoversaasactivehelpers.FilterFingerprints(saasCompanies, saasFingerprints)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			filteredSsoFingerprints, err := discoversaasactivehelpers.FilterFingerprints(ssoCompanies, ssoFingerprints)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			if len(filteredSaasFingerprints.Fingerprints) == 0 {
+				a.OutputSignal.AddError(errors.New("no SaaS fingerprints found"))
+				return
+			}
+			if len(filteredSsoFingerprints.Fingerprints) == 0 {
+				a.OutputSignal.AddError(errors.New("no SSO fingerprints found"))
+				return
+			}
+
+			// Config
 			successfulOnly, err := cmd.Flags().GetBool("successful-only")
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -447,83 +466,25 @@ func (a *WebScan) InitDiscoverCommand() {
 				return
 			}
 
-			// Get Request Method flag
-			requestMethod, err := cmd.Flags().GetString("request-method")
+			// Get Request Method flags
+			requestMethodConfig, err := utils.GetRequestMethodFlags(cmd)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			requestMethodEnum, err := common.NewRequestMethodFromString(strings.ToUpper(requestMethod))
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
+
+			// Validate Request Method (Only headless and browserbase are supported)
+			requestMethodEnum := requestMethodConfig.RequestMethodEnum
 			if requestMethodEnum != common.RequestMethodHeadless && requestMethodEnum != common.RequestMethodBrowserbase {
 				a.OutputSignal.AddError(errors.New("invalid request method, must be headless or browserbase"))
 				return
 			}
 
-			// Handle Headless Browser flags
-			var headlessConfig *common.HeadlessRequestConfig
-			if requestMethodEnum == common.RequestMethodHeadless {
-				bPath, err := cmd.Flags().GetString("headless-path")
-				if err != nil {
-					a.OutputSignal.AddError(err)
-					return
-				}
-				headlessConfig = &common.HeadlessRequestConfig{
-					PathToBrowserShell: &bPath,
-				}
-				domTime, err := cmd.Flags().GetInt("min-dom-stabalize-time")
-				if err != nil {
-					a.OutputSignal.AddError(err)
-					return
-				}
-				headlessConfig.MinDomStabalizeTime = domTime
-			}
-
-			// Handle Browserbase flags
-			var browserbaseConfig *common.BrowserbaseRequestConfig
-			var browserbaseSecrets *common.BrowserbaseRequestSecrets
-			if requestMethodEnum == common.RequestMethodBrowserbase {
-				// Config flags
-				proxy, err := cmd.Flags().GetBool("browserbase-proxy")
-				if err != nil {
-					a.OutputSignal.AddError(err)
-					return
-				}
-				countries, err := cmd.Flags().GetStringSlice("browserbase-countries")
-				if err != nil {
-					a.OutputSignal.AddError(err)
-					return
-				}
-				browserbaseConfig = &common.BrowserbaseRequestConfig{
-					Proxy:     &proxy,
-					Countries: countries,
-				}
-
-				// Environment variables
-				tokenStr, err := browserbase.GetFlagOrEnvironmentVariable(cmd, "browserbase-token", "BROWSERBASE_TOKEN")
-				if err != nil {
-					a.OutputSignal.AddError(err)
-					return
-				}
-				projectStr, err := browserbase.GetFlagOrEnvironmentVariable(cmd, "browserbase-project", "BROWSERBASE_PROJECT")
-				if err != nil {
-					a.OutputSignal.AddError(err)
-					return
-				}
-				browserbaseSecrets = &common.BrowserbaseRequestSecrets{
-					Token:   tokenStr,
-					Project: projectStr,
-				}
-			}
-
 			// Get the config
-			config := getDiscoverSaasActiveConfig(orgs, saasFingerprints, ssoFingerprints, saasCompanies, ssoCompanies, maxRedirects, successfulOnly, httpsOnly, insecure, timeout, requestMethodEnum, headlessConfig, browserbaseConfig)
+			config := getDiscoverSaasActiveConfig(orgs, *filteredSaasFingerprints, *filteredSsoFingerprints, saasCompanies, ssoCompanies, maxRedirects, successfulOnly, httpsOnly, insecure, timeout, requestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
 
 			// Generate the report
-			report, err := discoversaasactive.LaunchDiscoverSaasActive(cmd.Context(), config, browserbaseSecrets)
+			report, err := discoversaasactive.LaunchDiscoverSaasActive(cmd.Context(), config, requestMethodConfig.BrowserbaseSecrets)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return

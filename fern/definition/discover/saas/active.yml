@@ -11,7 +11,7 @@ types:
   SaasFingerprintEntry:
     properties:
       fingerprintProfile: SaasFingerprintProfile
-      domainSlugs: list<string>
+      domainSlugs: optional<list<string>>
   SaasFingerprintFile:
     properties:
       fingerprints: map<string, SaasFingerprintEntry>

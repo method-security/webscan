@@ -5,7 +5,7 @@ types:
   EnumerateKubeConfig:
     properties:
       target: string
-      verifyTLS: boolean
+      verifyTls: boolean
       timeout: integer
   # Report Struct
   EnumerateKubeReport:

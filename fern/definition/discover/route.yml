@@ -10,7 +10,7 @@ types:
       requireBaseUrlMatch: boolean
       spiderDepth: integer
       maxRedirects: integer
-      verifyTLS: boolean
+      verifyTls: boolean
       timeout: integer
       threads: integer
       requestMethod: method.RequestMethod

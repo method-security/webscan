@@ -7,7 +7,7 @@ types:
       targets: list<string>
       maxRequests: integer
       timespan: integer
-      verifyTLS: boolean
+      verifyTls: boolean
       timeout: integer
   # Report Struct
   RateLimitAttempt:

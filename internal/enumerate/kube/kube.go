@@ -16,7 +16,7 @@ import (
 
 var commonKubepaths = []string{"/api", "/livez", "/version"}
 
-func createSendHTTPRequestConfig(baseURL, path string, verifyTLS bool, timeout int) common.SendHttpRequestConfig {
+func createSendHTTPRequestConfig(baseURL, path string, verifyTls bool, timeout int) common.SendHttpRequestConfig {
 	request := common.HttpRequest{
 		BaseUrl: baseURL,
 		Path:    path,
@@ -26,7 +26,7 @@ func createSendHTTPRequestConfig(baseURL, path string, verifyTLS bool, timeout i
 	return common.SendHttpRequestConfig{
 		Request:            &request,
 		MaxRedirects:       0,
-		VerifyTls:          verifyTLS,
+		VerifyTls:          verifyTls,
 		Timeout:            timeout,
 		RequestMethod:      common.RequestMethodStandard,
 		HeadlessConfig:     nil,

@@ -5,7 +5,7 @@ types:
   EnumerateWebserverIisConfig:
     properties:
       targets: list<string>
-      verifyTLS: boolean
+      verifyTls: boolean
       timeout: integer
       threads: integer
   # Report Struct

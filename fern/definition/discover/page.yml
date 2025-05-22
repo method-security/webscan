@@ -8,7 +8,7 @@ types:
       target: string
       takeScreenshot: boolean
       maxRedirects: integer
-      verifyTLS: boolean
+      verifyTls: boolean
       timeout: integer
       requestMethod: method.RequestMethod
       headlessConfig: optional<method.HeadlessRequestConfig>

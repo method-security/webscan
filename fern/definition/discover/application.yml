@@ -35,7 +35,7 @@ types:
       modules: optional<list<string>>
       fingerprints: optional<ApplicationFingerprintResource>
       successfulOnly: boolean
-      verifyTLS: boolean
+      verifyTls: boolean
       timeout: integer
   # Report Struct
   ApplicationFingerprintAttempt:

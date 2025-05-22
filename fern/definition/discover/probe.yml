@@ -8,7 +8,7 @@ types:
       targets: list<string>
       maxRedirects: integer
       httpsOnly: boolean
-      verifyTLS: boolean
+      verifyTls: boolean
       timeout: integer
       requestMethod: method.RequestMethod
       headlessConfig: optional<method.HeadlessRequestConfig>

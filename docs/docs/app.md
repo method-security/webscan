@@ -1,49 +1,51 @@
-# App
+# Application Commands
 
-The `webscan app` command performs various application scans such as fingerprinting and enumeration.
+The `webscan discover` and `webscan enumerate` commands perform application related scans such as fingerprinting and enumeration.
 
 ## Usage
 
 ```bash
-webscan app [command]
+webscan discover application [flags]
 ```
 
 ## Commands
 
 ### Fingerprint
 
-The `webscan app fingerprint` command fingerprints a URL by identifying the web application type.
+The `webscan discover application` command fingerprints a URL by identifying the web application type.
 
-Fingerprint uses a randge of modules as the means for identifying an application type.
-For example, `--resourcetype API_APPLICATION  --modules SWAGGER` finds an active Swagger API. `--resourcetype API_APPLICATION  --modules AWSS3` finds AWS S3 buckets.
+Fingerprint uses a range of modules as the means for identifying an application type.
+For example, `--resource-type CLOUD_BUCKET --modules AWSS3` finds an AWS S3 bucket.
 
 #### Usage
 
 ```bash
-webscan app fingerprint --resourcetype API_APPLICATION  --modules GRAPHQL --targets https://example.com 
+webscan discover application --resource-type API_APPLICATION --modules GRAPHQL --targets https://example.com
 ```
 
 #### Help Text
 
 ```bash
-% method app fingerprint -h
-Perform a fingerprinting scan against a target using specified types.
-		
+% webscan discover application -h
+Perform application fingerprinting against targets.
+
 The fingerprint command identifies the type of web application running on the target URL.
-It supports fingerprinting different resource types including API applications (FastAPI, Swagger, gRPC, GraphQL, K8s), and 
-cloud buckets (AWSS3, AzureBlob). The command accepts a list of modules to run
-for the specified resource type.
+It supports fingerprinting different resource types including API applications, cloud buckets,
+content management systems, frameworks, Kubernetes services, remote access portals, and web servers.
+The command accepts a list of modules to run for the specified resource type.
 
 Usage:
-  webscan app fingerprint [flags]
+  webscan discover application [flags]
 
 Flags:
-  -h, --help                  help for fingerprint
-      --modules strings       Modules to run (APIApplication: FASTAPI, GRAPHQL, GRPC, SWAGGER, K8S, WORDPRESS; CloudBucket: AWSS3, AZUREBLOB; WebApplication: APACHE, NGINX, IIS)
-      --resourcetype string   Resource type to fingerprint (API_APPLICATION, CLOUD_BUCKET, WEBAPPLICATION)
-      --successfulonly        Only show successful attempts
-      --targets strings       URL target to perform fingerprint against
-      --timeout int           Timeout per request (seconds) (default 30)
+  -h, --help                     help for application
+      --fingerprint-file string  Path to the fingerprint definitions file (default "configs/discover/application/fingerprints.json")
+      --modules strings          Specific fingerprinting modules to run
+      --resource-type string     Type of resource to fingerprint (API_APPLICATION, CLOUD_BUCKET, CONTENT_MANAGEMENT_SYSTEM, FRAMEWORK, KUBE, REMOTE_ACCESS, WEB_SERVER)
+      --successful-only          Only show successful fingerprint matches
+      --targets strings          URL targets to perform fingerprinting against
+      --timeout int              Timeout per request in seconds (default 30)
+      --verify-tls               Verify TLS certificates when making HTTPS requests
 
 Global Flags:
   -o, --output string        Output format (signal, json, yaml). Default value is signal (default "signal")
@@ -55,35 +57,35 @@ Global Flags:
 
 ### Enumerate
 
-The `webscan app enumerate` command contains a suite of subcommands for enumerating API applications.
+The `webscan enumerate` command contains a suite of subcommands for enumerating targets.
 
 #### Usage
 ```bash
-webscan app enumerate [command]
+webscan enumerate [command]
 ```
 
 #### Commands
 
 ##### GraphQL
 
-The `webscan app enumerate graphql` command performs a GraphQL enumeration scan against a target.
+The `webscan enumerate api-application graphql` command performs a GraphQL enumeration scan against a target.
 
 ###### Usage
 
 ```bash
-webscan app enumerate graphql --target https://example.com
+webscan enumerate api-application graphql --target https://example.com
 ```
 
 ###### Help Text
-```bash 
-method app enumerate graphql  -h
+```bash
+webscan enumerate api-application graphql -h
 Perform a GraphQL enumeration scan against a target.
 		
 This involves querying the GraphQL schema to discover available types, queries, mutations, and subscriptions, 
 and extracting details about the fields and their types.
 
 Usage:
-  webscan app enumerate graphql [flags]
+  webscan enumerate api-application graphql [flags]
 
 Flags:
   -h, --help            help for graphql
@@ -96,46 +98,14 @@ Global Flags:
   -v, --verbose              Verbose output
 ```
 
-##### gRPC
-
-The `webscan app enumerate grpc` command performs a gRPC enumeration scan against a target.
-
-###### Usage
-
-```bash
-webscan app enumerate grpc --target grpc.example.com:443
-```
-
-###### Help Text
-```bash
-webscan app enumerate grpc -h
-Perform a gRPC enumeration scan against a target.
-		
-This involves connecting to the gRPC server, using reflection to discover available services and methods, 
-and extracting details about the methods, including their input and output types.
-
-Usage:
-  webscan app enumerate grpc [flags]
-
-Flags:
-  -h, --help            help for grpc
-      --target string   URL target to perform gRPC enumeration against
-
-Global Flags:
-  -o, --output string        Output format (signal, json, yaml). Default value is signal (default "signal")
-  -f, --output-file string   Path to output file. If blank, will output to STDOUT
-  -q, --quiet                Suppress output
-  -v, --verbose              Verbose output
-```
-
 ##### K8s
 
-The `webscan app enumerate k8s` command performs a Kubernetes enumeration scan against a target.
+The `webscan enumerate kube` command performs a Kubernetes enumeration scan against a target.
 
 ###### Usage
 
-```bash 
-webscan app enumerate k8s --target https://example.com --no-sandbox
+```bash
+webscan enumerate kube --target https://example.com --no-sandbox
 ```
 
 ###### Help Text
@@ -143,7 +113,7 @@ webscan app enumerate k8s --target https://example.com --no-sandbox
 Perform a K8s API enumeration against a target.
 
 Usage:
-  webscan app enumerate k8s [flags]
+  webscan enumerate kube [flags]
 
 Flags:
   -h, --help            help for k8s
@@ -159,12 +129,12 @@ Global Flags:
 
 ##### Swagger
 
-The `webscan app enumerate swagger` command performs a Swagger enumeration scan against a target.
+The `webscan enumerate api-application swagger` command performs a Swagger enumeration scan against a target.
 
 ###### Usage
 
-```bash 
-webscan app enumerate swagger --target https://example.com --no-sandbox
+```bash
+webscan enumerate api-application swagger --target https://example.com --no-sandbox
 ```
 
 ###### Help Text
@@ -175,7 +145,7 @@ This involves fetching and parsing the Swagger (OpenAPI) documentation to extrac
 HTTP methods, query parameters, and authentication mechanisms.
 
 Usage:
-  webscan app enumerate swagger [flags]
+  webscan enumerate api-application swagger [flags]
 
 Flags:
   -h, --help            help for swagger
@@ -189,14 +159,14 @@ Global Flags:
   -v, --verbose              Verbose output
 ```
 
-##### Wordpress
+##### WordPress
 
 Perform WordPress specific enumeration scans against a target
 
 ###### Usage
 
 ```bash
-webscan app enumerate wordpress [command]
+webscan enumerate cms wordpress [command]
 ```
 
 ###### Commands
@@ -209,7 +179,7 @@ Attempt to enumerate WordPress plugins on a target.
 ######## Usage
 
 ```bash
-webscan app enumerate wordpress plugins --target https://example.com
+webscan enumerate cms wordpress plugins --targets https://example.com
 ```
 
 ######### Help Text
@@ -219,7 +189,7 @@ webscan app enumerate wordpress plugins --target https://example.com
 Attempt to enumerate WordPress plugins on a target.
 
 Usage:
-  webscan app enumerate wordpress plugins [flags]
+  webscan enumerate cms wordpress plugins [flags]
 
 Flags:
       --plugins strings                     WordPress plugins to use for enumeration

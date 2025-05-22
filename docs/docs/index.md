@@ -2,7 +2,7 @@
 
 webscan offers a variety of scanning techniques to security teams working to gain a better handle on what web applications they have deployed across cloud providers and on-premise environments. Each of the below pages offers you an in depth look at a webscan capability related to a unique scanning technique.
 
-- [App](./app.md)
+- [Application Commands](./app.md)
 
 
 ## Top Level Flags

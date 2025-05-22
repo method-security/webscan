@@ -224,7 +224,7 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 		log.Info("Initializing browser")
 		// Create a new browser launcher
 		launch := launcher.New().Headless(true)
-		// Set the verifyTls flag if defined
+		// Set the verifyTLS flag if defined
 		if !config.VerifyTls {
 			launch = launch.Set("ignore-certificate-errors")
 		}

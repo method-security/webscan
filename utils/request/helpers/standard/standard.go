@@ -13,15 +13,10 @@ import (
 	// Utils
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
 	standardhelpers "github.com/Method-Security/webscan/utils/request/helpers/standard/helpers"
-
-	// External
-	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
 // SendStandardRequest performs an HTTP request using http/net and returns detailed information including response data
 func SendStandardRequest(ctx context.Context, config common.SendHttpRequestConfig) (common.HttpRequestResponse, error) {
-	// Initialize
-	log := svc1log.FromContext(ctx)
 	// Set the request
 	request := config.Request
 	if request == nil {
@@ -33,7 +28,7 @@ func SendStandardRequest(ctx context.Context, config common.SendHttpRequestConfi
 	if err != nil {
 		return common.HttpRequestResponse{Request: request}, fmt.Errorf("URL construction failed: %v", err)
 	}
-	constructedReqReader, err := standardhelpers.PrepareRequestBody(log, request)
+	constructedReqReader, err := standardhelpers.PrepareRequestBody(ctx, request)
 	if err != nil {
 		return common.HttpRequestResponse{Request: request}, fmt.Errorf("request body preparation failed: %v", err)
 	}
@@ -49,7 +44,7 @@ func SendStandardRequest(ctx context.Context, config common.SendHttpRequestConfi
 	// Send Request
 	sentAt := time.Now()
 	request.SentAt = &sentAt
-	resp, redirectChain, err := standardhelpers.SendHTTPRequest(log, *constructedURL, constructedHeaders, constructedReqReader, config)
+	resp, redirectChain, err := standardhelpers.SendHTTPRequest(ctx, *constructedURL, constructedHeaders, constructedReqReader, config)
 	if err != nil {
 		return common.HttpRequestResponse{Request: request}, fmt.Errorf("request failed: %v", err)
 	}

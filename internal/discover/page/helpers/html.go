@@ -9,6 +9,7 @@ import (
 	request "github.com/Method-Security/webscan/utils/request"
 )
 
+// PerformHTMLPageCapture sends an HTTP request using the provided config and returns the response.
 func PerformHTMLPageCapture(ctx context.Context, config *common.SendHttpRequestConfig) (*common.HttpRequestResponse, error) {
 	// Send request
 	httpRequestResponse, err := request.SendRequest(ctx, *config)

@@ -24,7 +24,7 @@ func createSendHTTPRequestConfig(baseURL, path string, config *discover.Discover
 	return common.SendHttpRequestConfig{
 		Request:            &request,
 		MaxRedirects:       config.MaxRedirects,
-		Insecure:           config.Insecure,
+		VerifyTls:          config.VerifyTls,
 		Timeout:            config.Timeout,
 		RequestMethod:      config.RequestMethod,
 		HeadlessConfig:     config.HeadlessConfig,
@@ -71,6 +71,7 @@ func sendRequests(ctx context.Context, target string, config *discover.DiscoverP
 	return httpRequestResponses, errors
 }
 
+// PerformWebProbe performs web probing for the given config and returns a DiscoverProbeReport.
 func PerformWebProbe(ctx context.Context, config *discover.DiscoverProbeConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) (*discover.DiscoverProbeReport, error) {
 	report := &discover.DiscoverProbeReport{Config: config}
 	errors := []string{}

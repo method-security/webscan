@@ -4,7 +4,7 @@ types:
     properties:
       targets: list<string>
       plugins: optional<list<string>>
-      insecure: boolean
+      verifyTls: boolean
       timeout: integer
       threads: integer
   # Fingerprint File Struct

@@ -16,7 +16,7 @@ import (
 
 var commonKubepaths = []string{"/api", "/livez", "/version"}
 
-func createSendHTTPRequestConfig(baseURL, path string, insecure bool, timeout int) common.SendHttpRequestConfig {
+func createSendHTTPRequestConfig(baseURL, path string, verifyTLS bool, timeout int) common.SendHttpRequestConfig {
 	request := common.HttpRequest{
 		BaseUrl: baseURL,
 		Path:    path,
@@ -26,7 +26,7 @@ func createSendHTTPRequestConfig(baseURL, path string, insecure bool, timeout in
 	return common.SendHttpRequestConfig{
 		Request:            &request,
 		MaxRedirects:       0,
-		Insecure:           insecure,
+		VerifyTls:          verifyTLS,
 		Timeout:            timeout,
 		RequestMethod:      common.RequestMethodStandard,
 		HeadlessConfig:     nil,
@@ -35,6 +35,7 @@ func createSendHTTPRequestConfig(baseURL, path string, insecure bool, timeout in
 	}
 }
 
+// PerformAppEnumerateKube performs enumeration of common Kubernetes endpoints and returns an EnumerateKubeReport.
 func PerformAppEnumerateKube(ctx context.Context, config enumeratekubefern.EnumerateKubeConfig) *enumeratekubefern.EnumerateKubeReport {
 	// Initialize report
 	report := &enumeratekubefern.EnumerateKubeReport{Target: config.Target, Config: &config}
@@ -52,7 +53,7 @@ func PerformAppEnumerateKube(ctx context.Context, config enumeratekubefern.Enume
 	requests := []*common.HttpRequestResponse{}
 	for _, path := range commonKubepaths {
 		// Create Request Config
-		requestConfig := createSendHTTPRequestConfig(baseURL, fmt.Sprintf("%s%s", parsedTargetPath, path), config.Insecure, config.Timeout)
+		requestConfig := createSendHTTPRequestConfig(baseURL, fmt.Sprintf("%s%s", parsedTargetPath, path), config.VerifyTls, config.Timeout)
 
 		// Send Request
 		request, err := request.SendRequest(ctx, requestConfig)

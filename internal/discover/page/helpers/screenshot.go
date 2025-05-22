@@ -15,6 +15,7 @@ import (
 	gson "github.com/ysmood/gson"
 )
 
+// CaptureScreenshot uses a headless browser to capture a screenshot of the given URL and returns the image bytes.
 func CaptureScreenshot(ctx context.Context, requester *headless.Requester, sendHTTPRequestConfig *common.SendHttpRequestConfig) ([]byte, error) {
 	log := svc1log.FromContext(ctx)
 

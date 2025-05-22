@@ -8,6 +8,7 @@ import (
 	cdp "github.com/go-rod/rod/lib/cdp"
 )
 
+// Requester manages a headless browser instance and configuration for making requests.
 type Requester struct {
 	Browser                    *rod.Browser
 	PathToBrowser              *string
@@ -15,6 +16,7 @@ type Requester struct {
 	MinDOMStabalizeTimeSeconds int
 }
 
+// NewRequester creates a new Requester with the given timeout and headless configuration.
 func NewRequester(timeout int, config *common.HeadlessRequestConfig) *Requester {
 	return &Requester{
 		Browser:                    nil,
@@ -24,6 +26,7 @@ func NewRequester(timeout int, config *common.HeadlessRequestConfig) *Requester 
 	}
 }
 
+// NewRequesterWithClient creates a new Requester using an existing rod cdp.Client.
 func NewRequesterWithClient(client *cdp.Client, timeout int, minDOMStabalizeTime int) *Requester {
 	return &Requester{
 		Browser:                    rod.New().Client(client).MustConnect(),

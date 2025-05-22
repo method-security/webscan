@@ -24,7 +24,7 @@ func createSendHTTPRequestConfig(baseURL, path string, method common.HttpMethod,
 	return common.SendHttpRequestConfig{
 		Request:            &request,
 		MaxRedirects:       0,
-		Insecure:           config.Insecure,
+		VerifyTls:          config.VerifyTls,
 		Timeout:            config.Timeout,
 		RequestMethod:      common.RequestMethodStandard,
 		HeadlessConfig:     nil,
@@ -33,6 +33,8 @@ func createSendHTTPRequestConfig(baseURL, path string, method common.HttpMethod,
 	}
 }
 
+// Run executes the fingerprinting process for a given target and configuration.
+// Returns a slice of ApplicationFingerprintAttempt and a slice of error messages.
 func Run(ctx context.Context, target string, config *discover.DiscoverApplicationFingerprintConfig) ([]*discover.ApplicationFingerprintAttempt, []string) {
 	if config == nil || config.Fingerprints == nil || len(config.Fingerprints.Modules) == 0 {
 		return []*discover.ApplicationFingerprintAttempt{}, []string{"invalid config: no resource types found"}
@@ -92,6 +94,8 @@ func Run(ctx context.Context, target string, config *discover.DiscoverApplicatio
 	return attempts, errors
 }
 
+// AnalyzeResponse checks if the HTTP response matches the fingerprint module's indicators.
+// Returns true if a match is found, false otherwise.
 func AnalyzeResponse(httpRequestResponse *common.HttpRequestResponse, module *discover.ApplicationFingerprintModule) bool {
 	// Check if response is nil
 	if httpRequestResponse == nil || httpRequestResponse.Response == nil || httpRequestResponse.Response.StatusCode == nil {
@@ -142,6 +146,7 @@ func AnalyzeResponse(httpRequestResponse *common.HttpRequestResponse, module *di
 	return false
 }
 
+// LaunchFingerprintEngine runs the fingerprinting engine for all targets in the config and returns a report.
 func LaunchFingerprintEngine(ctx context.Context, config *discover.DiscoverApplicationFingerprintConfig) (*discover.DiscoverApplicationFingerprintReport, error) {
 	report := discover.DiscoverApplicationFingerprintReport{Config: config}
 	errors := []string{}

@@ -28,7 +28,7 @@ func createSendHTTPRequestConfig(baseURL, path string, config discoversaasfern.D
 	return common.SendHttpRequestConfig{
 		Request:            &request,
 		MaxRedirects:       config.MaxRedirects,
-		Insecure:           config.Insecure,
+		VerifyTls:          config.VerifyTls,
 		Timeout:            config.Timeout,
 		RequestMethod:      config.RequestMethod,
 		HeadlessConfig:     config.HeadlessConfig,

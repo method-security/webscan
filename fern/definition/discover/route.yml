@@ -10,7 +10,7 @@ types:
       requireBaseUrlMatch: boolean
       spiderDepth: integer
       maxRedirects: integer
-      insecure: boolean
+      verifyTls: boolean
       timeout: integer
       threads: integer
       requestMethod: method.RequestMethod
@@ -27,7 +27,7 @@ types:
       exampleValues: optional<list<string>>
   RouteDetails:
     properties:
-      baseURL: string 
+      baseURL: string
       path: string
       method: optional<http.HttpMethod>
       queryParams: optional<list<RouteQueryParam>>

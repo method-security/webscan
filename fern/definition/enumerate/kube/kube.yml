@@ -1,11 +1,11 @@
-imports: 
+imports:
   http: ../../common/http.yml
 types:
   # Function Config Struct
   EnumerateKubeConfig:
     properties:
       target: string
-      insecure: boolean
+      verifyTls: boolean
       timeout: integer
   # Report Struct
   EnumerateKubeReport:

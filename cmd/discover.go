@@ -20,11 +20,11 @@ import (
 
 	// Utils
 	utils "github.com/Method-Security/webscan/utils"
-
 	// External
 	cobra "github.com/spf13/cobra"
 )
 
+// InitDiscoverCommand initializes the 'discover' command and its subcommands for the CLI.
 func (a *WebScan) InitDiscoverCommand() {
 	discoverCmd := &cobra.Command{
 		Use:   "discover",
@@ -77,7 +77,7 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			insecure, err := cmd.Flags().GetBool("insecure")
+			verifyTLS, err := cmd.Flags().GetBool("verify-tls")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -89,7 +89,7 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Create config
-			config, err := getDiscoverApplicationFingerprintConfig(targets, resourceType, modules, filteredFingerprints, successfulOnly, insecure, timeout)
+			config, err := getDiscoverApplicationFingerprintConfig(targets, resourceType, modules, filteredFingerprints, successfulOnly, verifyTLS, timeout)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -110,7 +110,7 @@ func (a *WebScan) InitDiscoverCommand() {
 	discoverApplicationCmd.Flags().String("resource-type", "", "Type of resource to fingerprint (e.g., web, api, cms)")
 	discoverApplicationCmd.Flags().StringSlice("modules", []string{}, "Specific fingerprinting modules to run")
 	discoverApplicationCmd.Flags().Bool("successful-only", false, "Only show successful fingerprint matches")
-	discoverApplicationCmd.Flags().Bool("insecure", false, "Allow insecure SSL/TLS connections")
+	discoverApplicationCmd.Flags().Bool("verify-tls", true, "Verify TLS certificates when making HTTPS requests")
 	discoverApplicationCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
 
 	// Mark Required Flags
@@ -140,7 +140,7 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			insecure, err := cmd.Flags().GetBool("insecure")
+			verifyTLS, err := cmd.Flags().GetBool("verify-tls")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -171,7 +171,7 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Set Config
-			config := getDiscoverPageConfig(target, maxRedirects, insecure, timeout, takeScreenshot, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
+			config := getDiscoverPageConfig(target, maxRedirects, verifyTLS, timeout, takeScreenshot, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
 
 			// Generate a report
 			report := discoverpage.PerformPageCapture(cmd.Context(), config, requestMethodConfig.BrowserbaseSecrets)
@@ -183,7 +183,7 @@ func (a *WebScan) InitDiscoverCommand() {
 	// Config Flags
 	discoverPageCmd.Flags().Bool("screenshot", false, "Capture a screenshot of the page")
 	discoverPageCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
-	discoverPageCmd.Flags().Bool("insecure", false, "Allow insecure SSL/TLS connections")
+	discoverPageCmd.Flags().Bool("verify-tls", true, "Verify TLS certificates when making HTTPS requests")
 	discoverPageCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
 	// Request Method Flags for all capture subcommands
 	discoverPageCmd.Flags().String("request-method", "STANDARD", "Request method to use (standard, headless, browserbase)")
@@ -225,7 +225,7 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			insecure, err := cmd.Flags().GetBool("insecure")
+			verifyTLS, err := cmd.Flags().GetBool("verify-tls")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -244,7 +244,7 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Set Config
-			config := getDiscoverProbeConfig(targets, maxRedirects, HTTPSOnly, insecure, timeout, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
+			config := getDiscoverProbeConfig(targets, maxRedirects, HTTPSOnly, verifyTLS, timeout, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
 
 			// Generate report
 			report, err := discoverprobe.PerformWebProbe(cmd.Context(), config, requestMethodConfig.BrowserbaseSecrets)
@@ -260,7 +260,7 @@ func (a *WebScan) InitDiscoverCommand() {
 	// Config Flags
 	discoverProbeCmd.Flags().Bool("https-only", true, "Only probe HTTPS URLs")
 	discoverProbeCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
-	discoverProbeCmd.Flags().Bool("insecure", false, "Allow insecure SSL/TLS connections")
+	discoverProbeCmd.Flags().Bool("verify-tls", true, "Verify TLS certificates when making HTTPS requests")
 	discoverProbeCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
 	// Request Method Flags
 	discoverProbeCmd.Flags().String("request-method", "STANDARD", "Request method to use (standard, headless, browserbase)")
@@ -312,7 +312,7 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			insecure, err := cmd.Flags().GetBool("insecure")
+			verifyTLS, err := cmd.Flags().GetBool("verify-tls")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -336,7 +336,7 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Set Config
-			config := getDiscoverRouteConfig(target, requireBaseURLMatch, ignoreStaticAssets, spiderDepth, maxRedirects, insecure, timeout, threads, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
+			config := getDiscoverRouteConfig(target, requireBaseURLMatch, ignoreStaticAssets, spiderDepth, maxRedirects, verifyTLS, timeout, threads, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
 
 			// Generate a report
 			report := discoverroute.PerformRouteCapture(cmd.Context(), config, requestMethodConfig.BrowserbaseSecrets)
@@ -350,7 +350,7 @@ func (a *WebScan) InitDiscoverCommand() {
 	discoverRouteCmd.Flags().Bool("ignore-static-assets", true, "Exclude static assets from route discovery")
 	discoverRouteCmd.Flags().Int("spider-depth", 1, "Maximum depth for route spidering")
 	discoverRouteCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
-	discoverRouteCmd.Flags().Bool("insecure", false, "Allow insecure SSL/TLS connections")
+	discoverRouteCmd.Flags().Bool("verify-tls", true, "Verify TLS certificates when making HTTPS requests")
 	discoverRouteCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
 	discoverRouteCmd.Flags().Int("threads", 0, "Number of concurrent threads for scanning")
 
@@ -455,7 +455,7 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			insecure, err := cmd.Flags().GetBool("insecure")
+			verifyTLS, err := cmd.Flags().GetBool("verify-tls")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -481,7 +481,7 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Get the config
-			config := getDiscoverSaasActiveConfig(orgs, *filteredSaasFingerprints, *filteredSsoFingerprints, saasCompanies, ssoCompanies, maxRedirects, successfulOnly, httpsOnly, insecure, timeout, requestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
+			config := getDiscoverSaasActiveConfig(orgs, *filteredSaasFingerprints, *filteredSsoFingerprints, saasCompanies, ssoCompanies, maxRedirects, successfulOnly, httpsOnly, verifyTLS, timeout, requestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
 
 			// Generate the report
 			report, err := discoversaasactive.LaunchDiscoverSaasActive(cmd.Context(), config, requestMethodConfig.BrowserbaseSecrets)
@@ -501,7 +501,7 @@ func (a *WebScan) InitDiscoverCommand() {
 	saasActiveCmd.Flags().Bool("successful-only", false, "Only show successful attempts")
 	saasActiveCmd.Flags().Bool("https-only", true, "Only show successful attempts over HTTPS")
 	saasActiveCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
-	saasActiveCmd.Flags().Bool("insecure", false, "Allow insecure connections")
+	saasActiveCmd.Flags().Bool("verify-tls", true, "Verify TLS certificates when making HTTPS requests")
 	saasActiveCmd.Flags().Int("timeout", 30, "Timeout in seconds for the capture")
 	// Request Method Flags for all capture subcommands
 	saasActiveCmd.Flags().String("request-method", "HEADLESS", "Request method (headless, browserbase)")
@@ -524,7 +524,8 @@ func (a *WebScan) InitDiscoverCommand() {
 	a.RootCmd.AddCommand(discoverCmd)
 }
 
-func getDiscoverApplicationFingerprintConfig(targets []string, resource string, moduleEnums []string, fingerprints *discover.ApplicationFingerprintResource, successfulOnly bool, insecure bool, timeout int) (*discover.DiscoverApplicationFingerprintConfig, error) {
+// getDiscoverApplicationFingerprintConfig builds the config for application fingerprinting discovery.
+func getDiscoverApplicationFingerprintConfig(targets []string, resource string, moduleEnums []string, fingerprints *discover.ApplicationFingerprintResource, successfulOnly bool, verifyTLS bool, timeout int) (*discover.DiscoverApplicationFingerprintConfig, error) {
 	resourceEnum, err := discover.NewApplicationFingerprintResourceTypeFromString(resource)
 	if err != nil {
 		return nil, fmt.Errorf("invalid resource type: %s", resource)
@@ -535,17 +536,18 @@ func getDiscoverApplicationFingerprintConfig(targets []string, resource string, 
 		Modules:        moduleEnums,
 		Fingerprints:   fingerprints,
 		SuccessfulOnly: successfulOnly,
-		Insecure:       insecure,
+		VerifyTls:      verifyTLS,
 		Timeout:        max(timeout, 0),
 	}
 	return config, nil
 }
 
-func getDiscoverPageConfig(target string, maxRedirects int, insecure bool, timeout int, takeScreenshot bool, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) discover.DiscoverPageConfig {
+// getDiscoverPageConfig builds the config for page capture and analysis.
+func getDiscoverPageConfig(target string, maxRedirects int, verifyTLS bool, timeout int, takeScreenshot bool, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) discover.DiscoverPageConfig {
 	config := discover.DiscoverPageConfig{
 		Target:            target,
 		MaxRedirects:      maxRedirects,
-		Insecure:          insecure,
+		VerifyTls:         verifyTLS,
 		Timeout:           max(timeout, 0),
 		TakeScreenshot:    takeScreenshot,
 		RequestMethod:     requestMethod,
@@ -555,12 +557,13 @@ func getDiscoverPageConfig(target string, maxRedirects int, insecure bool, timeo
 	return config
 }
 
-func getDiscoverProbeConfig(targets []string, maxRedirects int, HTTPSOnly bool, insecure bool, timeout int, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) *discover.DiscoverProbeConfig {
+// getDiscoverProbeConfig builds the config for probe discovery.
+func getDiscoverProbeConfig(targets []string, maxRedirects int, HTTPSOnly bool, verifyTLS bool, timeout int, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) *discover.DiscoverProbeConfig {
 	config := &discover.DiscoverProbeConfig{
 		Targets:           targets,
 		MaxRedirects:      maxRedirects,
 		HttpsOnly:         HTTPSOnly,
-		Insecure:          insecure,
+		VerifyTls:         verifyTLS,
 		Timeout:           max(timeout, 0),
 		RequestMethod:     requestMethod,
 		HeadlessConfig:    headlessConfig,
@@ -570,14 +573,15 @@ func getDiscoverProbeConfig(targets []string, maxRedirects int, HTTPSOnly bool, 
 	return config
 }
 
-func getDiscoverRouteConfig(target string, requiredBaseURLMatch bool, ignoreStaticAssets bool, spiderDepth int, maxRedirects int, insecure bool, timeout int, threads int, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) discover.DiscoverRouteConfig {
+// getDiscoverRouteConfig builds the config for route discovery.
+func getDiscoverRouteConfig(target string, requiredBaseURLMatch bool, ignoreStaticAssets bool, spiderDepth int, maxRedirects int, verifyTLS bool, timeout int, threads int, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) discover.DiscoverRouteConfig {
 	config := discover.DiscoverRouteConfig{
 		Target:              target,
 		IgnoreStaticAssets:  ignoreStaticAssets,
 		RequireBaseUrlMatch: requiredBaseURLMatch,
 		SpiderDepth:         spiderDepth,
 		MaxRedirects:        maxRedirects,
-		Insecure:            insecure,
+		VerifyTls:           verifyTLS,
 		Timeout:             max(timeout, 0),
 		Threads:             max(threads, 0),
 		RequestMethod:       requestMethod,
@@ -587,7 +591,8 @@ func getDiscoverRouteConfig(target string, requiredBaseURLMatch bool, ignoreStat
 	return config
 }
 
-func getDiscoverSaasActiveConfig(orgs []string, saasFingerprints discoversaasfern.SaasFingerprintFile, ssoFingerprints discoversaasfern.SaasFingerprintFile, saasCompanies []string, ssoCompanies []string, maxRedirects int, successfulOnly bool, httpsOnly bool, insecure bool, timeout int, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) discoversaasfern.DiscoverSaasActiveConfig {
+// getDiscoverSaasActiveConfig builds the config for SaaS active discovery.
+func getDiscoverSaasActiveConfig(orgs []string, saasFingerprints discoversaasfern.SaasFingerprintFile, ssoFingerprints discoversaasfern.SaasFingerprintFile, saasCompanies []string, ssoCompanies []string, maxRedirects int, successfulOnly bool, httpsOnly bool, verifyTLS bool, timeout int, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) discoversaasfern.DiscoverSaasActiveConfig {
 	config := discoversaasfern.DiscoverSaasActiveConfig{
 		Orgs:              orgs,
 		SaasFingerprints:  &saasFingerprints,
@@ -597,7 +602,7 @@ func getDiscoverSaasActiveConfig(orgs []string, saasFingerprints discoversaasfer
 		MaxRedirects:      maxRedirects,
 		SuccessfulOnly:    successfulOnly,
 		HttpsOnly:         httpsOnly,
-		Insecure:          insecure,
+		VerifyTls:         verifyTLS,
 		Timeout:           max(timeout, 0),
 		RequestMethod:     requestMethod,
 		HeadlessConfig:    headlessConfig,

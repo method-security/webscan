@@ -37,7 +37,7 @@ func createSendHTTPRequestConfig(baseURL, path string, config discover.DiscoverR
 	return common.SendHttpRequestConfig{
 		Request:            &request,
 		MaxRedirects:       config.MaxRedirects,
-		Insecure:           config.Insecure,
+		VerifyTls:          config.VerifyTls,
 		Timeout:            config.Timeout,
 		RequestMethod:      config.RequestMethod,
 		HeadlessConfig:     config.HeadlessConfig,
@@ -132,6 +132,7 @@ func extractRoutes(ctx context.Context, httpRequestResponse *common.HttpRequestR
 	return mergedRoutes, staticAssetsList, errors
 }
 
+// PerformRouteCapture performs route discovery and spidering for the given config, returning a DiscoverRouteReport.
 func PerformRouteCapture(ctx context.Context, config discover.DiscoverRouteConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) discover.DiscoverRouteReport {
 	log := svc1log.FromContext(ctx)
 

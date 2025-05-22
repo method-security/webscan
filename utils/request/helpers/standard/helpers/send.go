@@ -3,6 +3,7 @@ package standard
 import (
 	// Standard
 	"bytes"
+	"context"
 	"crypto/tls"
 	"fmt"
 	"io"
@@ -15,7 +16,8 @@ import (
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
-func SendHTTPRequest(log svc1log.Logger, url string, headers map[string]string, bodyReader io.Reader, config common.SendHttpRequestConfig) (*http.Response, []string, error) {
+func SendHTTPRequest(ctx context.Context, url string, headers map[string]string, bodyReader io.Reader, config common.SendHttpRequestConfig) (*http.Response, []string, error) {
+	log := svc1log.FromContext(ctx)
 	log.Info("Sending request", svc1log.SafeParam("url", url), svc1log.SafeParam("maxRedirects", config.MaxRedirects))
 
 	// Configure HTTP Client

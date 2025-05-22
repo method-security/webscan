@@ -48,7 +48,8 @@ func ConstructURL(ctx context.Context, request *common.HttpRequest) (*string, er
 	return &urlStr, nil
 }
 
-func PrepareRequestBody(log svc1log.Logger, request *common.HttpRequest) (io.Reader, error) {
+func PrepareRequestBody(ctx context.Context, request *common.HttpRequest) (io.Reader, error) {
+	log := svc1log.FromContext(ctx)
 	if request.Params == nil || request.Params.Body == nil {
 		return nil, nil
 	}

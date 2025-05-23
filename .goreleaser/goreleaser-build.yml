@@ -1,50 +1,35 @@
-# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
-# vim: set ts=2 sw=2 tw=0 fo=cnqoj
-
 version: 2
 
 project_name: webscan
-
-partial:
-  by: target
 
 builds:
   - id: build-linux
     main: .
     binary: webscan
-    ldflags:
-      - -s -w
-      - "-extldflags '-static -lm -ldl -lpthread'"
-      - -X github.com/method-security/webscan/main.version={{.Version}}
     env:
-      - CGO_ENABLED=1
+      - CGO_ENABLED=0
     goos:
       - linux
     goarch:
-      - arm64
       - amd64
-    goarm:
-      - "7"
-  - id: build-macos
-    main: .
-    binary: webscan
+      - arm64
     ldflags:
       - -s -w
       - -X github.com/method-security/webscan/main.version={{.Version}}
+
+  - id: build-macos
+    main: .
+    binary: webscan
     env:
       - CGO_ENABLED=1
     goos:
       - darwin
     goarch:
       - arm64
-    goarm:
-      - "7"
+
   - id: build-windows
     main: .
     binary: webscan
-    ldflags:
-      - -s -w
-      - -X github.com/method-security/webscan/main.version={{.Version}}
     env:
       - CGO_ENABLED=1
     goos:

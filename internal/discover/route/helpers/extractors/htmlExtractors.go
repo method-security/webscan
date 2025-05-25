@@ -11,6 +11,8 @@ import (
 
 	// Internal
 	discoverroutehelpers "github.com/Method-Security/webscan/internal/discover/route/helpers"
+	"github.com/Method-Security/webscan/utils"
+
 	// External
 	goquery "github.com/PuerkitoBio/goquery"
 )
@@ -155,6 +157,15 @@ func ExtractLinkRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig
 		href, exists := s.Attr("href")
 		if exists && href != "" {
 			fullURL := discoverroutehelpers.ResolveURL(baseURL, href)
+
+			// Skip if this is a static asset
+			if utils.IsStaticAsset(fullURL) {
+				// Only add to URLs if we're not ignoring static assets
+				if !routeCaptureConfig.IgnoreStaticAssets {
+					urls[fullURL] = struct{}{}
+				}
+				return
+			}
 
 			// The route URL should not have query params, those are stored in QueryParams
 			urlNoQuery, err := discoverroutehelpers.URLRemoveQueryParams(fullURL)

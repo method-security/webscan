@@ -380,7 +380,7 @@
             ]
         },
         {
-            "name": "REMOTEACCESS",
+            "name": "REMOTE_ACCESS",
             "modules": [
                 {
                     "name": "CISCOANYCONNECT",

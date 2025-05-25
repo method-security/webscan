@@ -2,10 +2,12 @@ package discoverroute
 
 import (
 	// Standard
+	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 
 	// Generated
@@ -15,27 +17,199 @@ import (
 
 	// External
 	goquery "github.com/PuerkitoBio/goquery"
+	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 	ast "github.com/robertkrimen/otto/ast"
 	parser "github.com/robertkrimen/otto/parser"
 )
 
-// ExtractScriptRoutes extracts WebRoutes from script elements in the HTML document
-// It returns a slice of RouteDetails, a slice of URLs and a slice of errors
-// extractScriptContentRoutes takes JavaScript code as a string, parses it using the Otto parser library to find all routes (including POST and GET methods with bodyParams and queryParams), and returns them.
-func extractScriptContentRoutes(scriptContent string, baseURL string, routeCaptureConfig discover.DiscoverRouteConfig) ([]*discover.RouteDetails, []string, []string) {
+// Common API call patterns in JavaScript
+var apiPatterns = []struct {
+	pattern *regexp.Regexp
+	method  string
+}{
+	// fetch() calls
+	{regexp.MustCompile(`fetch\(['"]([^'"]+)['"]\)`), "GET"},
+	{regexp.MustCompile(`fetch\(['"]([^'"]+)['"],\s*{\s*method:\s*['"]([^'"]+)['"]`), ""}, // Method will be in second capture group
+
+	// axios calls
+	{regexp.MustCompile(`axios\.(get|post|put|delete|patch)\(['"]([^'"]+)['"]`), ""},             // Method will be in first capture group
+	{regexp.MustCompile(`axios\({\s*method:\s*['"]([^'"]+)['"],\s*url:\s*['"]([^'"]+)['"]`), ""}, // Method and URL in capture groups
+
+	// jQuery ajax calls
+	{regexp.MustCompile(`\$\.(get|post|put|delete)\(['"]([^'"]+)['"]`), ""},                                  // Method and URL in capture groups
+	{regexp.MustCompile(`\$\.ajax\({\s*(?:method|type):\s*['"]([^'"]+)['"],\s*url:\s*['"]([^'"]+)['"]`), ""}, // Method and URL in capture groups
+
+	// XMLHttpRequest calls
+	{regexp.MustCompile(`\.open\(['"]([^'"]+)['"],\s*['"]([^'"]+)['"]`), ""}, // Method and URL in capture groups
+
+	// Generic URL patterns that might be API endpoints
+	{regexp.MustCompile(`['"](/api/[^'"]+)['"]`), "GET"},
+	{regexp.MustCompile(`['"](/v\d+/[^'"]+)['"]`), "GET"},
+	{regexp.MustCompile(`['"](/graphql[^'"]*)['"]`), "POST"},
+	{regexp.MustCompile(`['"](/rest/[^'"]+)['"]`), "GET"},
+}
+
+// extractRoutesFromPatterns uses regex patterns to find potential API routes in JavaScript content
+func extractRoutesFromPatterns(content string, baseURL string, routeCaptureConfig discover.DiscoverRouteConfig) ([]*discover.RouteDetails, []string, []string) {
 	routes := []*discover.RouteDetails{}
 	urls := make(map[string]struct{})
 	errors := []string{}
 
-	// Parse the JavaScript code into an AST
-	// TODO - this parsing method seems to not work well with js files on the internet - minified, obfuscated, etc.
-	program, err := parser.ParseFile(nil, "", scriptContent, parser.IgnoreRegExpErrors)
-	if err != nil {
-		errors = append(errors, err.Error())
+	for _, pattern := range apiPatterns {
+		matches := pattern.pattern.FindAllStringSubmatch(content, -1)
+		for _, match := range matches {
+			var urlStr string
+			var method string
+
+			// Handle different pattern formats
+			if len(match) == 2 {
+				// Pattern with single capture group (URL)
+				urlStr = match[1]
+				method = pattern.method
+			} else if len(match) == 3 {
+				// Pattern with two capture groups (method and URL)
+				method = strings.ToUpper(match[1])
+				urlStr = match[2]
+			}
+
+			// Skip if no URL found
+			if urlStr == "" {
+				continue
+			}
+
+			// Resolve relative URLs
+			fullURL := discoverroutehelpers.ResolveURL(baseURL, urlStr)
+
+			// Check if the URL is allowed
+			if !discoverroutehelpers.IsURLAllowed(baseURL, fullURL, routeCaptureConfig.RequireBaseUrlMatch, !routeCaptureConfig.IgnoreStaticAssets) {
+				continue
+			}
+
+			// The route URL should not have query params, those are stored in QueryParams
+			urlNoQuery, err := discoverroutehelpers.URLRemoveQueryParams(fullURL)
+			if err != nil {
+				errors = append(errors, err.Error())
+				continue
+			}
+
+			parsedURL, err := url.Parse(urlNoQuery)
+			if err != nil {
+				errors = append(errors, err.Error())
+				continue
+			}
+
+			// If no method was found in the pattern, default to GET
+			if method == "" {
+				method = "GET"
+			}
+
+			route := &discover.RouteDetails{
+				BaseUrl: baseURL,
+				Path:    parsedURL.Path,
+				Method:  common.HttpMethod(method).Ptr(),
+			}
+
+			routes = append(routes, route)
+			urls[fullURL] = struct{}{}
+		}
+	}
+
+	return routes, discoverroutehelpers.SetToListString(urls), errors
+}
+
+// shouldSkipScriptContent determines if a script should be skipped based on its content
+func shouldSkipScriptContent(content string) (bool, string) {
+	// Skip empty content
+	if len(strings.TrimSpace(content)) == 0 {
+		return true, "Empty script content"
+	}
+
+	// Skip JSON-LD content
+	if strings.Contains(content, `"@context"`) && strings.Contains(content, `"@type"`) {
+		// Get a preview of the JSON-LD content
+		preview := content
+		if len(content) > 200 {
+			preview = content[:200] + "..."
+		}
+		return true, fmt.Sprintf("JSON-LD structured data\nContent preview: %s", preview)
+	}
+
+	// Skip minified/compressed JavaScript patterns
+	minifiedPatterns := []struct {
+		pattern string
+		name    string
+	}{
+		{"window._stq=window._stq||[]", "WordPress"},
+		{"window.NREUM||(NREUM={})", "New Relic"},
+		{"window.ga=window.ga||function", "Google Analytics"},
+		{"window.fbq=window.fbq||function", "Facebook Pixel"},
+		{"window.dataLayer=window.dataLayer||[]", "Google Tag Manager"},
+	}
+
+	for _, p := range minifiedPatterns {
+		if strings.Contains(content, p.pattern) {
+			// Get a preview of the script content
+			preview := content
+			if len(content) > 200 {
+				preview = content[:200] + "..."
+			}
+			return true, fmt.Sprintf("Minified %s script\nContent preview: %s", p.name, preview)
+		}
+	}
+
+	// Skip if content is too short to be meaningful
+	if len(content) < 10 {
+		return true, "Script content too short"
+	}
+
+	return false, ""
+}
+
+// extractScriptContentRoutes takes JavaScript code as a string, parses it using the Otto parser library to find all routes (including POST and GET methods with bodyParams and queryParams), and returns them.
+func extractScriptContentRoutes(ctx context.Context, scriptContent string, baseURL string, routeCaptureConfig discover.DiscoverRouteConfig) ([]*discover.RouteDetails, []string, []string) {
+	routes := []*discover.RouteDetails{}
+	urls := make(map[string]struct{})
+	errors := []string{}
+
+	// Check if we should skip this script
+	if skip, reason := shouldSkipScriptContent(scriptContent); skip {
+		// Log the skip reason as debug information
+		svc1log.FromContext(ctx).Debug("Skipping script",
+			svc1log.SafeParam("url", baseURL),
+			svc1log.SafeParam("reason", reason))
 		return routes, discoverroutehelpers.SetToListString(urls), errors
 	}
 
-	// Traverse the AST to find relevant nodes
+	// First try to parse the JavaScript code into an AST
+	program, err := parser.ParseFile(nil, "", scriptContent, parser.IgnoreRegExpErrors)
+	if err != nil {
+		// If parsing fails, try regex pattern matching
+		patternRoutes, patternUrls, patternErrors := extractRoutesFromPatterns(scriptContent, baseURL, routeCaptureConfig)
+		routes = append(routes, patternRoutes...)
+		for _, u := range patternUrls {
+			urls[u] = struct{}{}
+		}
+		errors = append(errors, patternErrors...)
+
+		// Log the parsing error as debug information
+		errorMsg := err.Error()
+		lineInfo := ""
+		if strings.Contains(errorMsg, "Line") {
+			parts := strings.Split(errorMsg, "Line")
+			if len(parts) > 1 {
+				lineInfo = "Line" + parts[1]
+			}
+		}
+
+		svc1log.FromContext(ctx).Debug("JavaScript parsing failed, falling back to pattern matching",
+			svc1log.SafeParam("url", baseURL),
+			svc1log.SafeParam("error", errorMsg),
+			svc1log.SafeParam("line", lineInfo))
+
+		return routes, discoverroutehelpers.SetToListString(urls), errors
+	}
+
+	// If parsing succeeds, use AST traversal
 	ast.Walk(&visitor{routes: &routes, urls: urls, baseURL: baseURL, baseURLsOnly: routeCaptureConfig.RequireBaseUrlMatch, captureStaticAssets: !routeCaptureConfig.IgnoreStaticAssets, errors: &errors}, program)
 
 	return discoverroutehelpers.MergeWebRoutes(routes), discoverroutehelpers.SetToListString(urls), errors
@@ -147,7 +321,7 @@ func (v *visitor) addRoute(urlStr, method string, bodyParams []*discover.RouteBo
 
 // ExtractScriptRoutes finds script elements with a src attribute, fetches the JavaScript data, parses it, and extracts routes.
 // Returns a slice of RouteDetails, a slice of URLs, and a slice of errors.
-func ExtractScriptRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig discover.DiscoverRouteConfig) ([]*discover.RouteDetails, []string, []string) {
+func ExtractScriptRoutes(ctx context.Context, doc *goquery.Document, baseURL string, routeCaptureConfig discover.DiscoverRouteConfig) ([]*discover.RouteDetails, []string, []string) {
 	routes := []*discover.RouteDetails{}
 	urls := make(map[string]struct{})
 	errors := []string{}
@@ -200,7 +374,7 @@ func ExtractScriptRoutes(doc *goquery.Document, baseURL string, routeCaptureConf
 			scriptContent := string(bodyBytes)
 
 			// Extract routes from the JavaScript content
-			contentRoutes, contentUrls, contentErrors := extractScriptContentRoutes(scriptContent, baseURL, routeCaptureConfig)
+			contentRoutes, contentUrls, contentErrors := extractScriptContentRoutes(ctx, scriptContent, baseURL, routeCaptureConfig)
 			routes = append(routes, contentRoutes...)
 			for _, u := range contentUrls {
 				urls[u] = struct{}{}
@@ -214,14 +388,14 @@ func ExtractScriptRoutes(doc *goquery.Document, baseURL string, routeCaptureConf
 
 // ExtractInlineScriptRoutes finds inline JavaScript code within script tags, parses it, and extracts routes.
 // Returns a slice of RouteDetails, a slice of URLs, and a slice of errors.
-func ExtractInlineScriptRoutes(doc *goquery.Document, url string, routeCaptureConfig discover.DiscoverRouteConfig) ([]*discover.RouteDetails, []string, []string) {
+func ExtractInlineScriptRoutes(ctx context.Context, doc *goquery.Document, url string, routeCaptureConfig discover.DiscoverRouteConfig) ([]*discover.RouteDetails, []string, []string) {
 	routes := []*discover.RouteDetails{}
 	urls := make(map[string]struct{})
 	errors := []string{}
 
 	doc.Find("script:not([src])").Each(func(i int, s *goquery.Selection) {
 		scriptContent := s.Text()
-		contentRoutes, contentUrls, contentErrors := extractScriptContentRoutes(scriptContent, url, routeCaptureConfig)
+		contentRoutes, contentUrls, contentErrors := extractScriptContentRoutes(ctx, scriptContent, url, routeCaptureConfig)
 		routes = append(routes, contentRoutes...)
 		for _, u := range contentUrls {
 			urls[u] = struct{}{}

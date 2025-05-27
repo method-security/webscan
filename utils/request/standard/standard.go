@@ -12,7 +12,7 @@ import (
 	common "github.com/Method-Security/webscan/generated/go/common"
 	// Utils
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
-	standardhelpers "github.com/Method-Security/webscan/utils/request/helpers/standard/helpers"
+	standardhelpers "github.com/Method-Security/webscan/utils/request/standard/helpers"
 )
 
 // SendStandardRequest performs an HTTP request using http/net and returns detailed information including response data

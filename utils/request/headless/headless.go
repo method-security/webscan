@@ -12,7 +12,7 @@ import (
 
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
-	standardhelpers "github.com/Method-Security/webscan/utils/request/helpers/standard/helpers"
+	standardhelpers "github.com/Method-Security/webscan/utils/request/standard/helpers"
 
 	// Utils
 	utils "github.com/Method-Security/webscan/utils"

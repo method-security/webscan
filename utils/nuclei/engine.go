@@ -10,11 +10,11 @@ import (
 	"strings"
 
 	// Generated
-	nucleifern "github.com/Method-Security/webscan/generated/go/nuclei"
+	pentestgeneralfern "github.com/Method-Security/webscan/generated/go/pentest/general"
 	// Internal
-	report "github.com/Method-Security/webscan/internal/nuclei/report"
-	runner "github.com/Method-Security/webscan/internal/nuclei/runner"
-	templates "github.com/Method-Security/webscan/internal/nuclei/templates"
+	report "github.com/Method-Security/webscan/utils/nuclei/report"
+	runner "github.com/Method-Security/webscan/utils/nuclei/runner"
+	templates "github.com/Method-Security/webscan/utils/nuclei/templates"
 
 	// External
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
@@ -34,7 +34,7 @@ type proxifyRequest struct {
 }
 
 // RunScan for scan mode—unchanged.
-func RunScan(ctx context.Context, config nucleifern.Config) (*nucleifern.Report, error) {
+func RunScan(ctx context.Context, config pentestgeneralfern.Config) (*pentestgeneralfern.Report, error) {
 	log := svc1log.FromContext(ctx)
 	log.Info("Starting Nuclei Run of mode: Scan")
 
@@ -65,7 +65,7 @@ func RunScan(ctx context.Context, config nucleifern.Config) (*nucleifern.Report,
 }
 
 // RunDast builds JSONL entries and invokes runner.Run in dast mode.
-func RunDast(ctx context.Context, config nucleifern.Config) (*nucleifern.Report, error) {
+func RunDast(ctx context.Context, config pentestgeneralfern.Config) (*pentestgeneralfern.Report, error) {
 	srcFS, err := templates.DastFS(config.Dast.Categories)
 	if err != nil {
 		return nil, err
@@ -86,7 +86,7 @@ func RunDast(ctx context.Context, config nucleifern.Config) (*nucleifern.Report,
 	return runner.Run(ctx, rconfig, builder)
 }
 
-func buildJSONL(config nucleifern.Config) []string {
+func buildJSONL(config pentestgeneralfern.Config) []string {
 	var out []string
 
 	for _, method := range config.Dast.HttpMethods {
@@ -175,7 +175,7 @@ func buildJSONL(config nucleifern.Config) []string {
 	}
 	return out
 }
-func getProxy(config nucleifern.Config) string {
+func getProxy(config pentestgeneralfern.Config) string {
 	if config.Proxy != nil {
 		return *config.Proxy
 	}

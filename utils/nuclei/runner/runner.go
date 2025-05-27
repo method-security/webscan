@@ -9,9 +9,9 @@ import (
 	"path/filepath"
 
 	// Generated
-	nucleifern "github.com/Method-Security/webscan/generated/go/nuclei"
-	// Internal
-	report "github.com/Method-Security/webscan/internal/nuclei/report"
+	pentestgeneralfern "github.com/Method-Security/webscan/generated/go/pentest/general"
+	// Utils
+	report "github.com/Method-Security/webscan/utils/nuclei/report"
 	// External
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 	nuclei "github.com/projectdiscovery/nuclei/v3/lib"
@@ -23,12 +23,12 @@ type Config struct {
 	FS             []fs.FS  // template sources
 	Threads        int
 	Proxy          string
-	RunMode        nucleifern.RunMode
+	RunMode        pentestgeneralfern.RunMode
 	SuccessfulOnly *bool
 }
 
 func validateConfig(cfg Config) error {
-	if cfg.RunMode == nucleifern.RunModeDast {
+	if cfg.RunMode == pentestgeneralfern.RunModeDast {
 		if len(cfg.RawRequests) == 0 {
 			return fmt.Errorf("runner: no RawRequests provided for dast mode")
 		}
@@ -88,7 +88,7 @@ func buildNucleiOptions(cfg Config, tmpDir string) []nuclei.NucleiSDKOptions {
 		nuclei.WithVerbosity(nuclei.VerbosityOptions{Silent: true}),
 	}
 
-	if cfg.RunMode == nucleifern.RunModeDast {
+	if cfg.RunMode == pentestgeneralfern.RunModeDast {
 		opts = append(opts, nuclei.DASTMode())
 	}
 
@@ -101,7 +101,7 @@ func buildNucleiOptions(cfg Config, tmpDir string) []nuclei.NucleiSDKOptions {
 }
 
 func loadTargets(eng *nuclei.NucleiEngine, cfg Config) error {
-	if cfg.RunMode == nucleifern.RunModeDast {
+	if cfg.RunMode == pentestgeneralfern.RunModeDast {
 		// write JSONL to temp file
 		f, err := os.CreateTemp("", "requests-*.jsonl")
 		if err != nil {
@@ -128,7 +128,7 @@ func loadTargets(eng *nuclei.NucleiEngine, cfg Config) error {
 	return nil
 }
 
-func Run(ctx context.Context, cfg Config, reportBuilder *report.Builder) (*nucleifern.Report, error) {
+func Run(ctx context.Context, cfg Config, reportBuilder *report.Builder) (*pentestgeneralfern.Report, error) {
 	log := svc1log.FromContext(ctx)
 	log.Info("Validating config")
 	if err := validateConfig(cfg); err != nil {

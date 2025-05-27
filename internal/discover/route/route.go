@@ -15,8 +15,8 @@ import (
 
 	// Utils
 	request "github.com/Method-Security/webscan/utils/request"
+	headless "github.com/Method-Security/webscan/utils/request/headless"
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
-	headless "github.com/Method-Security/webscan/utils/request/helpers/headless"
 
 	// Internal
 	discoverroutehelpers "github.com/Method-Security/webscan/internal/discover/route/helpers"

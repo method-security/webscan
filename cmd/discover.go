@@ -19,7 +19,7 @@ import (
 	discoversaasactivehelpers "github.com/Method-Security/webscan/internal/discover/saas/active/helpers"
 
 	// Utils
-	utils "github.com/Method-Security/webscan/utils"
+	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
 	// External
 	cobra "github.com/spf13/cobra"
 )
@@ -158,7 +158,7 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Get Request Method flag
-			requestMethodConfig, err := utils.GetRequestMethodFlags(cmd)
+			requestMethodConfig, err := requesthelpers.GetRequestMethodFlags(cmd)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -244,7 +244,7 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Get Request Method flags
-			requestMethodConfig, err := utils.GetRequestMethodFlags(cmd)
+			requestMethodConfig, err := requesthelpers.GetRequestMethodFlags(cmd)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -337,7 +337,7 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Get Request Method flags
-			requestMethodConfig, err := utils.GetRequestMethodFlags(cmd)
+			requestMethodConfig, err := requesthelpers.GetRequestMethodFlags(cmd)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -477,7 +477,7 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Get Request Method flags
-			requestMethodConfig, err := utils.GetRequestMethodFlags(cmd)
+			requestMethodConfig, err := requesthelpers.GetRequestMethodFlags(cmd)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return

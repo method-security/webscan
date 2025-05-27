@@ -1,12 +1,16 @@
 package browserbase
 
 import (
+	// Standard
 	"context"
 	"fmt"
 	"os"
 
+	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
-	"github.com/Method-Security/webscan/utils/request/helpers/headless"
+	// Utils
+	headless "github.com/Method-Security/webscan/utils/request/headless"
+	// External
 	"github.com/go-rod/rod/lib/cdp"
 	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 	"github.com/spf13/cobra"

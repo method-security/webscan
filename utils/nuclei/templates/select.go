@@ -10,8 +10,7 @@ import (
 	"strings"
 
 	// Generated
-	nucleifern "github.com/Method-Security/webscan/generated/go/nuclei"
-
+	pentestgeneralfern "github.com/Method-Security/webscan/generated/go/pentest/general"
 	// External
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
@@ -21,9 +20,10 @@ import (
 //go:embed pentest
 var All embed.FS
 
-var resoure_type_to_file_map = map[nucleifern.ApplicationResourceType]string{
-	nucleifern.ApplicationResourceTypeContentManagementSystem: "cms",
-	nucleifern.ApplicationResourceTypeWebServer:               "webserver",
+// resourceTypeToFileMap maps the application resource type to the file name of the template.
+var resourceTypeToFileMap = map[pentestgeneralfern.ApplicationResourceType]string{
+	pentestgeneralfern.ApplicationResourceTypeContentManagementSystem: "cms",
+	pentestgeneralfern.ApplicationResourceTypeWebServer:               "webserver",
 }
 
 // subFS walks “pentest/<kind>/<subs…>” and returns each matching fs.FS or an error.
@@ -43,12 +43,12 @@ func subFS(kind string, subs []string) ([]fs.FS, error) {
 // ScanCategoryFS returns the FS views for the given scanCategory.
 // If scanCategory=="technologies", it delegates to ScanFS(resource, modules).
 // Otherwise it looks in pentest/scan/<scanCategory>.
-func ScanCategoryFS(ctx context.Context, scanCategory []nucleifern.ScanCategory, resourceTypes []nucleifern.ApplicationResourceType, modules []string) ([]fs.FS, error) {
+func ScanCategoryFS(ctx context.Context, scanCategory []pentestgeneralfern.ScanCategory, resourceTypes []pentestgeneralfern.ApplicationResourceType, modules []string) ([]fs.FS, error) {
 
 	var out []fs.FS
 	for _, st := range scanCategory {
 		switch st {
-		case nucleifern.ScanCategoryTechnologies:
+		case pentestgeneralfern.ScanCategoryTechnologies:
 			techFS, err := ScanFS(ctx, resourceTypes, modules)
 			if err != nil {
 				return nil, err
@@ -67,7 +67,7 @@ func ScanCategoryFS(ctx context.Context, scanCategory []nucleifern.ScanCategory,
 	return out, nil
 }
 
-func ScanFS(ctx context.Context, rTypes []nucleifern.ApplicationResourceType, modules []string) ([]fs.FS, error) {
+func ScanFS(ctx context.Context, rTypes []pentestgeneralfern.ApplicationResourceType, modules []string) ([]fs.FS, error) {
 	log := svc1log.FromContext(ctx)
 	// Validate & default
 	rTypes, err := wantResource(rTypes)
@@ -78,7 +78,7 @@ func ScanFS(ctx context.Context, rTypes []nucleifern.ApplicationResourceType, mo
 	// Build the “scan/<resource>/<module>” paths
 	var subs []string
 	for _, rt := range rTypes {
-		rtName := resoure_type_to_file_map[rt]
+		rtName := resourceTypeToFileMap[rt]
 		if len(modules) == 0 {
 			subs = append(subs, rtName)
 		} else {
@@ -96,7 +96,7 @@ func ScanFS(ctx context.Context, rTypes []nucleifern.ApplicationResourceType, mo
 	return subFS("scan/technologies", subs)
 }
 
-func DastFS(dCategories []nucleifern.DastCategory) ([]fs.FS, error) {
+func DastFS(dCategories []pentestgeneralfern.DastCategory) ([]fs.FS, error) {
 	// Validate & default
 	dCategories, err := wantDastCategory(dCategories)
 	if err != nil {
@@ -113,18 +113,18 @@ func DastFS(dCategories []nucleifern.DastCategory) ([]fs.FS, error) {
 }
 
 // wantResource validates the resource types and returns the valid resource types
-func wantResource(in []nucleifern.ApplicationResourceType) ([]nucleifern.ApplicationResourceType, error) {
-	all := []nucleifern.ApplicationResourceType{
-		nucleifern.ApplicationResourceTypeApiApplication,
-		nucleifern.ApplicationResourceTypeContentManagementSystem,
-		nucleifern.ApplicationResourceTypeWebServer,
+func wantResource(in []pentestgeneralfern.ApplicationResourceType) ([]pentestgeneralfern.ApplicationResourceType, error) {
+	all := []pentestgeneralfern.ApplicationResourceType{
+		pentestgeneralfern.ApplicationResourceTypeApiApplication,
+		pentestgeneralfern.ApplicationResourceTypeContentManagementSystem,
+		pentestgeneralfern.ApplicationResourceTypeWebServer,
 	}
 	if len(in) == 0 {
 		return all, nil
 	}
 	for _, rt := range in {
 		switch rt {
-		case nucleifern.ApplicationResourceTypeApiApplication, nucleifern.ApplicationResourceTypeContentManagementSystem, nucleifern.ApplicationResourceTypeWebServer:
+		case pentestgeneralfern.ApplicationResourceTypeApiApplication, pentestgeneralfern.ApplicationResourceTypeContentManagementSystem, pentestgeneralfern.ApplicationResourceTypeWebServer:
 		default:
 			return nil, fmt.Errorf("unknown resource type %q", rt)
 		}
@@ -133,25 +133,25 @@ func wantResource(in []nucleifern.ApplicationResourceType) ([]nucleifern.Applica
 }
 
 // wantDastCategory validates the DastCategory types and returns the valid categories
-func wantDastCategory(in []nucleifern.DastCategory) ([]nucleifern.DastCategory, error) {
+func wantDastCategory(in []pentestgeneralfern.DastCategory) ([]pentestgeneralfern.DastCategory, error) {
 	// exactly match the enum in your Fern spec
-	all := []nucleifern.DastCategory{
-		nucleifern.DastCategorySqli,
-		nucleifern.DastCategoryXss,
-		nucleifern.DastCategorySsti,
-		nucleifern.DastCategoryCommandInjection,
-		nucleifern.DastCategoryPathTraversal,
+	all := []pentestgeneralfern.DastCategory{
+		pentestgeneralfern.DastCategorySqli,
+		pentestgeneralfern.DastCategoryXss,
+		pentestgeneralfern.DastCategorySsti,
+		pentestgeneralfern.DastCategoryCommandInjection,
+		pentestgeneralfern.DastCategoryPathTraversal,
 	}
 	if len(in) == 0 {
 		return all, nil
 	}
 	// membership set
-	valid := map[nucleifern.DastCategory]struct{}{
-		nucleifern.DastCategorySqli:             {},
-		nucleifern.DastCategoryXss:              {},
-		nucleifern.DastCategorySsti:             {},
-		nucleifern.DastCategoryCommandInjection: {},
-		nucleifern.DastCategoryPathTraversal:    {},
+	valid := map[pentestgeneralfern.DastCategory]struct{}{
+		pentestgeneralfern.DastCategorySqli:             {},
+		pentestgeneralfern.DastCategoryXss:              {},
+		pentestgeneralfern.DastCategorySsti:             {},
+		pentestgeneralfern.DastCategoryCommandInjection: {},
+		pentestgeneralfern.DastCategoryPathTraversal:    {},
 	}
 	for _, vt := range in {
 		if _, ok := valid[vt]; !ok {

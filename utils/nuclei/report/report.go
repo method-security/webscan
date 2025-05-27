@@ -2,7 +2,7 @@ package nuclei
 
 import (
 	// Generated
-	nucleifern "github.com/Method-Security/webscan/generated/go/nuclei"
+	pentestgeneralfern "github.com/Method-Security/webscan/generated/go/pentest/general"
 	// External
 	nuclei "github.com/projectdiscovery/nuclei/v3/lib"
 	nout "github.com/projectdiscovery/nuclei/v3/pkg/output"
@@ -19,10 +19,10 @@ func (b *Builder) PopulateProbes(eng *nuclei.NucleiEngine) error {
 		if _, ok := b.probeIdx[id]; ok {
 			continue
 		}
-		pr := &nucleifern.Probe{
+		pr := &pentestgeneralfern.Probe{
 			Id:               id,
 			Payloads:         []string{},
-			ExpectedMatchers: []*nucleifern.ExpectedMatcher{},
+			ExpectedMatchers: []*pentestgeneralfern.ExpectedMatcher{},
 		}
 		for _, req := range tpl.RequestsHTTP {
 			// Extract payloads
@@ -41,7 +41,7 @@ func (b *Builder) PopulateProbes(eng *nuclei.NucleiEngine) error {
 			// Extract expected matchers
 			for _, ma := range req.Matchers {
 				vals := append(ma.Words, ma.Regex...)
-				pr.ExpectedMatchers = append(pr.ExpectedMatchers, &nucleifern.ExpectedMatcher{
+				pr.ExpectedMatchers = append(pr.ExpectedMatchers, &pentestgeneralfern.ExpectedMatcher{
 					Type:  ma.Type.String(),
 					Value: vals,
 				})
@@ -62,7 +62,7 @@ func (b *Builder) Consume(ev *nout.ResultEvent) {
 	// Get or create probe
 	pr, ok := b.probeIdx[ev.TemplateID]
 	if !ok {
-		pr = &nucleifern.Probe{Id: ev.TemplateID}
+		pr = &pentestgeneralfern.Probe{Id: ev.TemplateID}
 		b.probeIdx[ev.TemplateID] = pr
 		b.report.Probes = append(b.report.Probes, pr)
 	}
@@ -71,22 +71,22 @@ func (b *Builder) Consume(ev *nout.ResultEvent) {
 	host := hostKey(ev)
 	tg, ok := b.targetIdx[host]
 	if !ok {
-		tg = &nucleifern.TargetInfo{Target: host}
+		tg = &pentestgeneralfern.TargetInfo{Target: host}
 		b.targetIdx[host] = tg
 		b.report.Targets = append(b.report.Targets, tg)
 	}
 
 	// Build attempt information
-	reqResp, err := toReqResp(ev)
+	httpReqResp, err := getHTTPRequestResponse(ev)
 	if err != nil {
 		// Handle error or log it
 	}
-	at := &nucleifern.AttemptInfo{
+	at := &pentestgeneralfern.AttemptInfo{
 		ProbeId:             pr.Id,
-		HttpRequestResponse: reqResp,
+		HttpRequestResponse: httpReqResp,
 	}
 
-	at.Finding = &nucleifern.FindingInfo{
+	at.Finding = &pentestgeneralfern.FindingInfo{
 		Name:     strPtr(ev.MatcherName),
 		Finding:  ev.MatcherStatus,
 		Severity: strPtr(ev.Info.SeverityHolder.Severity.String()),
@@ -99,6 +99,6 @@ func (b *Builder) Consume(ev *nout.ResultEvent) {
 
 // Final returns the fully-populated Fern report.
 // It should be called after all ResultEvents have been consumed.
-func (b *Builder) Final() *nucleifern.Report {
+func (b *Builder) Final() *pentestgeneralfern.Report {
 	return b.report
 }

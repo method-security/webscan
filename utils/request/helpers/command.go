@@ -1,4 +1,4 @@
-package utils
+package request
 
 import (
 	// Standard
@@ -12,8 +12,8 @@ import (
 	cobra "github.com/spf13/cobra"
 )
 
-// RequestMethodFlagData holds all the configuration related to request methods
-type RequestMethodFlagData struct {
+// MethodFlagData holds all the configuration related to request methods
+type MethodFlagData struct {
 	RequestMethodEnum  common.RequestMethod
 	HeadlessConfig     *common.HeadlessRequestConfig
 	BrowserbaseConfig  *common.BrowserbaseRequestConfig
@@ -21,7 +21,7 @@ type RequestMethodFlagData struct {
 }
 
 // GetRequestMethodFlags extracts and validates all request method related configuration from a cobra command
-func GetRequestMethodFlags(cmd *cobra.Command) (*RequestMethodFlagData, error) {
+func GetRequestMethodFlags(cmd *cobra.Command) (*MethodFlagData, error) {
 	// Get Request Method flag
 	requestMethod, err := cmd.Flags().GetString("request-method")
 	if err != nil {
@@ -32,7 +32,7 @@ func GetRequestMethodFlags(cmd *cobra.Command) (*RequestMethodFlagData, error) {
 		return nil, fmt.Errorf("invalid request method: %w", err)
 	}
 
-	flags := &RequestMethodFlagData{
+	flags := &MethodFlagData{
 		RequestMethodEnum: requestMethodEnum,
 	}
 

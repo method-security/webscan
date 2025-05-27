@@ -22,9 +22,9 @@ func hostKey(ev *nout.ResultEvent) string {
 	return ev.Host
 }
 
-// toReqResp converts a Nuclei result event into an HttpRequestResponse structure.
+// getHTTPRequestResponse converts a Nuclei result event into an HttpRequestResponse structure.
 // It parses both request and response data, including headers, body, and parameters.
-func toReqResp(ev *nout.ResultEvent) (*common.HttpRequestResponse, error) {
+func getHTTPRequestResponse(ev *nout.ResultEvent) (*common.HttpRequestResponse, error) {
 	req := &common.HttpRequest{
 		BaseHeaders: map[string][]string{},
 		SentAt:      &ev.Timestamp,

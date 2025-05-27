@@ -1,0 +1,28 @@
+imports:
+  config: ./config.yml
+  http: ../common/http.yml
+  probe: ./probe.yml
+types:
+  FindingInfo:
+    properties:
+      name: optional<string>
+      finding: boolean
+      severity: optional<string>
+      tags: optional<list<string>>
+  AttemptInfo:
+    properties:
+      probeId: string
+      httpRequestResponse: http.HttpRequestResponse
+      finding: optional<FindingInfo>
+  TargetInfo:
+    properties:
+      target: string
+      baselineAttempt: optional<AttemptInfo>
+      attempts: optional<list<AttemptInfo>>
+      requestCount: integer
+  Report:
+    properties:
+      targets: optional<list<TargetInfo>>
+      probes: optional<list<probe.Probe>>
+      config: optional<config.Config>
+

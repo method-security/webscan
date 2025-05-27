@@ -1,0 +1,62 @@
+imports:
+  http: ../common/http.yml
+types:
+  # Parameter Structs
+  ParameterLocation:
+    enum:
+      - QUERY
+      - HEADER
+      - BODY
+      - COOKIE
+  RequestParameter:
+    properties:
+      location: ParameterLocation
+      name: string
+      value: optional<string>
+  # Scan Structs
+  ApplicationResourceType:
+    enum:
+      - API_APPLICATION
+      - CONTENT_MANAGEMENT_SYSTEM
+      - WEB_SERVER
+  ScanCategory:
+    enum:
+      - CVE
+      - MISCONFIGURATIONS
+      - TECHNOLOGIES
+  # Dast Structs
+  DastCategory:
+    enum:
+      - COMMAND_INJECTION
+      - PATH_TRAVERSAL
+      - SQLI
+      - SSTI
+      - XSS
+  # Run Mode Enum (used to toggle on Nuclei run types)
+  RunMode:
+    enum:
+      - DAST
+      - SCAN
+  # Run Mode Structs
+  DastConfig:
+    properties:
+      categories: optional<list<DastCategory>>
+      httpMethods: optional<list<http.HttpMethod>>
+      requestParameters: optional<list<RequestParameter>>
+  ScanConfig:
+    properties:
+      categories: optional<list<ScanCategory>>
+      applicationResourceTypes: optional<list<ApplicationResourceType>>
+      modules: optional<list<string>>
+  # Config Struct
+  Config:
+    properties:
+      targets: list<string>
+      runMode: RunMode
+      scan: optional<ScanConfig>
+      dast: optional<DastConfig>
+      successfulOnly: optional<boolean>
+      timeout: integer
+      threads: integer
+      proxy: optional<string>
+

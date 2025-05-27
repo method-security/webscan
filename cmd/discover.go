@@ -26,12 +26,16 @@ import (
 
 // InitDiscoverCommand initializes the 'discover' command and its subcommands for the CLI.
 func (a *WebScan) InitDiscoverCommand() {
+	// Discover Command
+	// Subcommands: application, page, probe, route, saas
 	discoverCmd := &cobra.Command{
 		Use:   "discover",
 		Short: "Perform various discovery scans",
 		Long:  `Perform various discovery scans to identify web applications, routes, and static assets.`,
 	}
 
+	// Application Command
+	// Subcommands: fingerprint
 	discoverApplicationCmd := &cobra.Command{
 		Use:   "application",
 		Short: "Perform application fingerprinting against targets",
@@ -120,6 +124,8 @@ func (a *WebScan) InitDiscoverCommand() {
 	// Add Command to 'Discover' Command
 	discoverCmd.AddCommand(discoverApplicationCmd)
 
+	// Page Command
+	// Subcommands: capture
 	discoverPageCmd := &cobra.Command{
 		Use:   "page",
 		Short: "Capture and analyze web pages",
@@ -200,6 +206,7 @@ func (a *WebScan) InitDiscoverCommand() {
 	// Add Command to 'Discover' Command
 	discoverCmd.AddCommand(discoverPageCmd)
 
+	// Probe Command
 	discoverProbeCmd := &cobra.Command{
 		Use:   "probe",
 		Short: "Probe targets for web application existence",
@@ -277,6 +284,7 @@ func (a *WebScan) InitDiscoverCommand() {
 	// Add Command to 'Discover' Command
 	discoverCmd.AddCommand(discoverProbeCmd)
 
+	// Route Command
 	discoverRouteCmd := &cobra.Command{
 		Use:   "route",
 		Short: "Discover and analyze web routes",
@@ -353,7 +361,6 @@ func (a *WebScan) InitDiscoverCommand() {
 	discoverRouteCmd.Flags().Bool("verify-tls", true, "Verify TLS certificates when making HTTPS requests")
 	discoverRouteCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
 	discoverRouteCmd.Flags().Int("threads", 0, "Number of concurrent threads for scanning")
-
 	// Request Method Flags
 	discoverRouteCmd.Flags().String("request-method", "STANDARD", "Request method to use (standard, headless, browserbase)")
 	discoverRouteCmd.Flags().String("headless-path", "", "Path to headless browser executable")
@@ -369,13 +376,16 @@ func (a *WebScan) InitDiscoverCommand() {
 	// Add Command to 'Discover' Command
 	discoverCmd.AddCommand(discoverRouteCmd)
 
-	saasCmd := &cobra.Command{
+	// SaaS Command
+	// Subcommands: active
+	discoverSaasCmd := &cobra.Command{
 		Use:   "saas",
 		Short: "Gather SaaS information given an organization name",
 		Long:  `Gather SaaS information given an organization name`,
 	}
 
-	saasActiveCmd := &cobra.Command{
+	// SaaS Active Command
+	discoverSaasActiveCmd := &cobra.Command{
 		Use:   "active",
 		Short: "Active detection of SaaS application instances and evalutation of login pages",
 		Long:  `Active detection of SaaS application instances and evalutation of login pages`,
@@ -492,33 +502,34 @@ func (a *WebScan) InitDiscoverCommand() {
 			a.OutputSignal.Content = report
 		},
 	}
-
-	saasActiveCmd.Flags().StringSlice("orgs", []string{}, "The organization names to use for discovery")
-	saasActiveCmd.Flags().StringSlice("saas-file-paths", []string{"configs/discover/saas/active/saas_fingerprints.json"}, "Files containing SaaS application fingerprints")
-	saasActiveCmd.Flags().StringSlice("sso-file-paths", []string{"configs/discover/saas/active/sso_fingerprints.json"}, "Files containing SSO application fingerprints")
-	saasActiveCmd.Flags().StringSlice("saas-companies", []string{}, "The specific SaaS companies to use for discovery (Must be present in the SaaS fingerprints file)")
-	saasActiveCmd.Flags().StringSlice("sso-companies", []string{}, "The specific SSO companies to use for discovery (Must be present in the SSO fingerprints file)")
-	saasActiveCmd.Flags().Bool("successful-only", false, "Only show successful attempts")
-	saasActiveCmd.Flags().Bool("https-only", true, "Only show successful attempts over HTTPS")
-	saasActiveCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
-	saasActiveCmd.Flags().Bool("verify-tls", true, "Verify TLS certificates when making HTTPS requests")
-	saasActiveCmd.Flags().Int("timeout", 30, "Timeout in seconds for the capture")
+	// Target Flags
+	discoverSaasActiveCmd.Flags().StringSlice("orgs", []string{}, "The organization names to use for discovery")
+	// Config Flags
+	discoverSaasActiveCmd.Flags().StringSlice("saas-file-paths", []string{"configs/discover/saas/active/saas_fingerprints.json"}, "Files containing SaaS application fingerprints")
+	discoverSaasActiveCmd.Flags().StringSlice("sso-file-paths", []string{"configs/discover/saas/active/sso_fingerprints.json"}, "Files containing SSO application fingerprints")
+	discoverSaasActiveCmd.Flags().StringSlice("saas-companies", []string{}, "The specific SaaS companies to use for discovery (Must be present in the SaaS fingerprints file)")
+	discoverSaasActiveCmd.Flags().StringSlice("sso-companies", []string{}, "The specific SSO companies to use for discovery (Must be present in the SSO fingerprints file)")
+	discoverSaasActiveCmd.Flags().Bool("successful-only", false, "Only show successful attempts")
+	discoverSaasActiveCmd.Flags().Bool("https-only", true, "Only show successful attempts over HTTPS")
+	discoverSaasActiveCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
+	discoverSaasActiveCmd.Flags().Bool("verify-tls", true, "Verify TLS certificates when making HTTPS requests")
+	discoverSaasActiveCmd.Flags().Int("timeout", 30, "Timeout in seconds for the capture")
 	// Request Method Flags for all capture subcommands
-	saasActiveCmd.Flags().String("request-method", "HEADLESS", "Request method (headless, browserbase)")
-	saasActiveCmd.Flags().String("headless-path", "", "Path to a headless browser executable")
-	saasActiveCmd.Flags().Int("min-dom-stabalize-time", 5, "Minimum time in seconds to wait for DOM to stabilize")
-	saasActiveCmd.Flags().String("browserbase-token", "", "Browserbase API token")
-	saasActiveCmd.Flags().String("browserbase-project", "", "Browserbase project ID")
-	saasActiveCmd.Flags().Bool("browserbase-proxy", false, "Instruct Browserbase to use a proxy")
-	saasActiveCmd.Flags().StringSlice("browserbase-countries", []string{}, "List of countries to use for the proxy")
+	discoverSaasActiveCmd.Flags().String("request-method", "HEADLESS", "Request method (headless, browserbase)")
+	discoverSaasActiveCmd.Flags().String("headless-path", "", "Path to a headless browser executable")
+	discoverSaasActiveCmd.Flags().Int("min-dom-stabalize-time", 5, "Minimum time in seconds to wait for DOM to stabilize")
+	discoverSaasActiveCmd.Flags().String("browserbase-token", "", "Browserbase API token")
+	discoverSaasActiveCmd.Flags().String("browserbase-project", "", "Browserbase project ID")
+	discoverSaasActiveCmd.Flags().Bool("browserbase-proxy", false, "Instruct Browserbase to use a proxy")
+	discoverSaasActiveCmd.Flags().StringSlice("browserbase-countries", []string{}, "List of countries to use for the proxy")
 
-	_ = saasActiveCmd.MarkFlagRequired("orgs")
+	_ = discoverSaasActiveCmd.MarkFlagRequired("orgs")
 
 	// Add Command to 'Saas' Command
-	saasCmd.AddCommand(saasActiveCmd)
+	discoverSaasCmd.AddCommand(discoverSaasActiveCmd)
 
 	// Add Command to 'Discover' Command
-	discoverCmd.AddCommand(saasCmd)
+	discoverCmd.AddCommand(discoverSaasCmd)
 
 	// Add Command to Root Command
 	a.RootCmd.AddCommand(discoverCmd)

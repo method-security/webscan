@@ -24,18 +24,24 @@ import (
 
 // InitEnumerateCommand initializes the 'enumerate' command and its subcommands for the CLI.
 func (a *WebScan) InitEnumerateCommand() {
+
+	// Enumerate Command
+	// Subcommands: api-application, cms, kube, webserver, general
 	enumerateCmd := &cobra.Command{
 		Use:   "enumerate",
 		Short: "Perform various enumeration scans",
 		Long:  `Perform various enumeration scans to identify and analyze web application components, APIs, and security controls.`,
 	}
 
+	// API Application Command
+	// Subcommands: graphql, swagger
 	enumerateAPIApplicationCmd := &cobra.Command{
 		Use:   "api-application",
 		Short: "Enumerate API applications",
 		Long:  `Discover and analyze API endpoints, documentation, and potential vulnerabilities in web APIs.`,
 	}
 
+	// GraphQL Command
 	enumerateAPIApplicationGraphqlCmd := &cobra.Command{
 		Use:   "graphql",
 		Short: "Enumerate GraphQL endpoints",
@@ -59,13 +65,16 @@ func (a *WebScan) InitEnumerateCommand() {
 		},
 	}
 
+	// Target Flags
 	enumerateAPIApplicationGraphqlCmd.Flags().String("target", "", "URL target to perform GraphQL enumeration against")
 
+	// Mark required flags
 	_ = enumerateAPIApplicationGraphqlCmd.MarkFlagRequired("target")
 
 	// Add Command to 'Enumerate API Application' Command
 	enumerateAPIApplicationCmd.AddCommand(enumerateAPIApplicationGraphqlCmd)
 
+	// Swagger Command
 	enumerateAPIApplicationSwaggerCmd := &cobra.Command{
 		Use:   "swagger",
 		Short: "Enumerate Swagger/OpenAPI documentation",
@@ -108,6 +117,7 @@ func (a *WebScan) InitEnumerateCommand() {
 	// Add Command to 'Enumerate' Command
 	enumerateCmd.AddCommand(enumerateAPIApplicationCmd)
 
+	// Kube Command
 	enumerateKubeCmd := &cobra.Command{
 		Use:   "kube",
 		Short: "Enumerate Kubernetes resources",
@@ -157,18 +167,23 @@ func (a *WebScan) InitEnumerateCommand() {
 	// Add Command to 'Enumerate' Command
 	enumerateCmd.AddCommand(enumerateKubeCmd)
 
+	// CMS Command
+	// Subcommands: wordpress
 	enumerateCMSCmd := &cobra.Command{
 		Use:   "cms",
 		Short: "Enumerate content management systems",
 		Long:  `Discover and analyze content management systems, their components, and potential security issues.`,
 	}
 
+	// WordPress Command
+	// Subcommands: plugins
 	enumerateCMSWordpressCmd := &cobra.Command{
 		Use:   "wordpress",
 		Short: "Enumerate WordPress installations",
 		Long:  `Discover and analyze WordPress installations, including themes, plugins, and potential vulnerabilities.`,
 	}
 
+	// WordPress Plugins Command
 	enumerateCMSWordpressPluginsCmd := &cobra.Command{
 		Use:   "plugins",
 		Short: "Enumerate WordPress plugins",
@@ -254,12 +269,15 @@ func (a *WebScan) InitEnumerateCommand() {
 	// Add Command to 'Enumerate' Command
 	enumerateCmd.AddCommand(enumerateCMSCmd)
 
+	// Webserver Command
+	// Subcommands: iis
 	enumerateWebserverCmd := &cobra.Command{
 		Use:   "webserver",
 		Short: "Enumerate web servers",
 		Long:  `Discover and analyze web server configurations, versions, and potential security misconfigurations.`,
 	}
 
+	// IIS Command
 	enumerateWebserverIISCmd := &cobra.Command{
 		Use:   "iis",
 		Short: "Enumerate IIS servers",
@@ -309,6 +327,7 @@ func (a *WebScan) InitEnumerateCommand() {
 	enumerateWebserverIISCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
 	enumerateWebserverIISCmd.Flags().Int("threads", 0, "Number of concurrent threads for scanning")
 
+	// Mark required flags
 	_ = enumerateWebserverIISCmd.MarkFlagRequired("targets")
 
 	// Add Command to 'Enumerate Webserver' Command
@@ -317,12 +336,15 @@ func (a *WebScan) InitEnumerateCommand() {
 	// Add Command to 'Enumerate' Command
 	enumerateCmd.AddCommand(enumerateWebserverCmd)
 
+	// General Command
+	// Subcommands: ratelimit
 	enumerateGeneralCmd := &cobra.Command{
 		Use:   "general",
 		Short: "Perform general enumeration",
 		Long:  `Perform general enumeration tasks to identify security controls and potential vulnerabilities.`,
 	}
 
+	// Rate Limit Command
 	enumerateGeneralRatelimitCmd := &cobra.Command{
 		Use:   "ratelimit",
 		Short: "Enumerate rate limiting controls",
@@ -378,6 +400,7 @@ func (a *WebScan) InitEnumerateCommand() {
 	enumerateGeneralRatelimitCmd.Flags().Bool("verify-tls", true, "Verify TLS certificates when making HTTPS requests")
 	enumerateGeneralRatelimitCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
 
+	// Mark required flags
 	_ = enumerateGeneralRatelimitCmd.MarkFlagRequired("targets")
 
 	// Add Command to 'Enumerate General' Command

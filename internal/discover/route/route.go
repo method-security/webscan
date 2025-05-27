@@ -56,8 +56,9 @@ func extractRoutes(ctx context.Context, httpRequestResponse *common.HttpRequestR
 	htmlContent := *requesthelpers.GetResponseBodyStringFromBodyStruct(httpRequestResponse.Response.ResponseBody)
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlContent))
 	if err != nil {
-		log.Error("Failed to parse HTML content", svc1log.SafeParam("error", err))
-		errors = append(errors, err.Error())
+		errorMsg := fmt.Sprintf("Failed to parse HTML content from %s: %s", httpRequestResponse.Response.RedirectChain[len(httpRequestResponse.Response.RedirectChain)-1], err)
+		log.Error(errorMsg)
+		errors = append(errors, errorMsg)
 		return routes, discoverroutehelpers.SetToListString(urls), errors
 	}
 
@@ -65,37 +66,45 @@ func extractRoutes(ctx context.Context, httpRequestResponse *common.HttpRequestR
 	log.Info("Redirected URL", svc1log.SafeParam("url", redirectedURL))
 	redirectedURLBase, redirectedURLPath, err := requesthelpers.SplitTargetURL(redirectedURL)
 	if err != nil {
-		log.Error("Failed to split redirected URL", svc1log.SafeParam("error", err))
-		errors = append(errors, err.Error())
+		errorMsg := fmt.Sprintf("Failed to split redirected URL %s: %s", redirectedURL, err)
+		log.Error(errorMsg)
+		errors = append(errors, errorMsg)
 		return routes, discoverroutehelpers.SetToListString(urls), errors
+	}
+
+	// Helper function to process errors with context
+	processErrors := func(source string, newErrors []string) {
+		for _, err := range newErrors {
+			errors = append(errors, fmt.Sprintf("[%s] %s", source, err))
+		}
 	}
 
 	log.Info("Extracting routes from form elements")
 	formRoutes, formUrls, formErrors := capturerouteextractors.ExtractFormRoutes(doc, redirectedURLBase, routeCaptureConfig)
 	routes = append(routes, formRoutes...)
 	urls = discoverroutehelpers.AddListToSetString(urls, formUrls)
-	errors = append(errors, formErrors...)
+	processErrors("Form Elements", formErrors)
 
 	log.Info("Extracting routes from anchor elements")
 	anchorRoutes, anchorUrls, anchorErrors := capturerouteextractors.ExtractAnchorRoutes(doc, redirectedURLBase, routeCaptureConfig)
 	routes = append(routes, anchorRoutes...)
 	urls = discoverroutehelpers.AddListToSetString(urls, anchorUrls)
-	errors = append(errors, anchorErrors...)
+	processErrors("Anchor Elements", anchorErrors)
 
 	log.Info("Extracting routes from link elements")
 	linkRoutes, linkUrls, linkErrors := capturerouteextractors.ExtractLinkRoutes(doc, redirectedURLBase, routeCaptureConfig)
 	routes = append(routes, linkRoutes...)
 	urls = discoverroutehelpers.AddListToSetString(urls, linkUrls)
-	errors = append(errors, linkErrors...)
+	processErrors("Link Elements", linkErrors)
 
 	log.Info("Extracting routes from script elements")
-	scriptRoutes, scriptUrls, scriptErrors := capturerouteextractors.ExtractScriptRoutes(doc, redirectedURLBase, routeCaptureConfig)
+	scriptRoutes, scriptUrls, scriptErrors := capturerouteextractors.ExtractScriptRoutes(ctx, doc, redirectedURLBase, routeCaptureConfig)
 	routes = append(routes, scriptRoutes...)
 	urls = discoverroutehelpers.AddListToSetString(urls, scriptUrls)
 	errors = append(errors, scriptErrors...)
 
 	log.Info("Extracting routes from inline script elements")
-	inlineScriptRoutes, inlineScriptUrls, inlineScriptErrors := capturerouteextractors.ExtractInlineScriptRoutes(doc, redirectedURLBase, routeCaptureConfig)
+	inlineScriptRoutes, inlineScriptUrls, inlineScriptErrors := capturerouteextractors.ExtractInlineScriptRoutes(ctx, doc, redirectedURLBase, routeCaptureConfig)
 	routes = append(routes, inlineScriptRoutes...)
 	urls = discoverroutehelpers.AddListToSetString(urls, inlineScriptUrls)
 	errors = append(errors, inlineScriptErrors...)

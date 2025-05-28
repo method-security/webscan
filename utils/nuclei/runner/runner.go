@@ -86,6 +86,11 @@ func buildNucleiOptions(cfg Config, tmpDir string) []nuclei.NucleiSDKOptions {
 			ProbeConcurrency:              cfg.Threads,
 		}),
 		nuclei.WithVerbosity(nuclei.VerbosityOptions{Silent: true}),
+		// Explicitly set StopAtFirstMatch to false to ensure we get all requests
+		func(e *nuclei.NucleiEngine) error {
+			e.Options().StopAtFirstMatch = false
+			return nil
+		},
 	}
 
 	if cfg.RunMode == pentestgeneralfern.RunModeDast {

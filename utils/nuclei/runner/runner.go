@@ -15,6 +15,7 @@ import (
 	// External
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 	nuclei "github.com/projectdiscovery/nuclei/v3/lib"
+	"github.com/projectdiscovery/useragent"
 )
 
 type Config struct {
@@ -85,13 +86,18 @@ func buildNucleiOptions(cfg Config, tmpDir string) []nuclei.NucleiSDKOptions {
 			JavascriptTemplateConcurrency: cfg.Threads,
 			ProbeConcurrency:              cfg.Threads,
 		}),
-		nuclei.WithVerbosity(nuclei.VerbosityOptions{Silent: true}),
+		nuclei.WithVerbosity(nuclei.VerbosityOptions{Silent: false, Debug: true}),
+
 		// Explicitly set StopAtFirstMatch to false to ensure we get all requests
 		func(e *nuclei.NucleiEngine) error {
 			e.Options().StopAtFirstMatch = false
 			return nil
 		},
 	}
+
+	// Add random user agent
+	randomUserAgent := useragent.PickRandom()
+	opts = append(opts, nuclei.WithHeaders([]string{fmt.Sprintf("User-Agent:%s", randomUserAgent.Raw)}))
 
 	if cfg.RunMode == pentestgeneralfern.RunModeDast {
 		opts = append(opts, nuclei.DASTMode())
@@ -133,7 +139,7 @@ func loadTargets(eng *nuclei.NucleiEngine, cfg Config) error {
 	return nil
 }
 
-func Run(ctx context.Context, cfg Config, reportBuilder *report.Builder) (*pentestgeneralfern.Report, error) {
+func Run(ctx context.Context, cfg Config, reportBuilder *report.Builder) (*pentestgeneralfern.PentestGeneralReport, error) {
 	log := svc1log.FromContext(ctx)
 	log.Info("Validating config")
 	if err := validateConfig(cfg); err != nil {
@@ -162,9 +168,9 @@ func Run(ctx context.Context, cfg Config, reportBuilder *report.Builder) (*pente
 	defer eng.Close()
 
 	if cfg.SuccessfulOnly != nil && *cfg.SuccessfulOnly {
-		eng.Options().MatcherStatus = true
-	} else {
 		eng.Options().MatcherStatus = false
+	} else {
+		eng.Options().MatcherStatus = true
 	}
 	log.Info("Set matcher status", svc1log.SafeParam("status", eng.Options().MatcherStatus), svc1log.SafeParam("successfulOnly", cfg.SuccessfulOnly))
 

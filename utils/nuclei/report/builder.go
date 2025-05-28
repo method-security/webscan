@@ -11,7 +11,7 @@ import (
 // It maintains indexes for probes and targets to efficiently process scan results.
 type Builder struct {
 	mu        sync.Mutex
-	report    *pentestgeneralfern.Report
+	report    *pentestgeneralfern.PentestGeneralReport
 	probeIdx  map[string]*pentestgeneralfern.Probe      // template-id → Probe
 	targetIdx map[string]*pentestgeneralfern.TargetInfo // host/baseURL → TargetInfo
 }
@@ -19,14 +19,14 @@ type Builder struct {
 // NewBuilder creates and returns a new Builder instance.
 func NewBuilder() *Builder {
 	return &Builder{
-		report:    &pentestgeneralfern.Report{},
+		report:    &pentestgeneralfern.PentestGeneralReport{},
 		probeIdx:  make(map[string]*pentestgeneralfern.Probe),
 		targetIdx: make(map[string]*pentestgeneralfern.TargetInfo),
 	}
 }
 
 // PopulateConfig sets the configuration for the report.
-func (b *Builder) PopulateConfig(config pentestgeneralfern.Config) error {
+func (b *Builder) PopulateConfig(config pentestgeneralfern.PentestGeneralConfig) error {
 	b.report.Config = &config
 	return nil
 }

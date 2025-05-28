@@ -98,6 +98,6 @@ func (b *Builder) Consume(ev *nout.ResultEvent) {
 
 // Final returns the fully-populated Fern report.
 // It should be called after all ResultEvents have been consumed.
-func (b *Builder) Final() *pentestgeneralfern.Report {
+func (b *Builder) Final() *pentestgeneralfern.PentestGeneralReport {
 	return b.report
 }

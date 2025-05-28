@@ -35,23 +35,19 @@ type proxifyRequest struct {
 }
 
 // RunScan for scan mode—unchanged.
-func RunScan(ctx context.Context, config pentestgeneralfern.Config) (*pentestgeneralfern.Report, error) {
+func RunScan(ctx context.Context, config pentestgeneralfern.PentestGeneralConfig) (*pentestgeneralfern.PentestGeneralReport, error) {
 	log := svc1log.FromContext(ctx)
 	log.Info("Starting Nuclei Run of mode: Scan")
 
-	var src []fs.FS
+	var fileSystems []fs.FS
 	var err error
-	if len(config.Scan.Categories) > 0 {
-		src, err = templates.ScanCategoryFS(ctx, config.Scan.Categories, config.Scan.ApplicationResourceTypes, config.Scan.Modules)
-	} else {
-		src, err = templates.ScanFS(ctx, config.Scan.ApplicationResourceTypes, config.Scan.Modules)
-	}
+	fileSystems, err = templates.GetScanFileSystem(ctx, *config.Scan)
 	if err != nil {
 		return nil, err
 	}
 	rconfig := runner.Config{
 		Targets:        config.Targets,
-		FS:             src,
+		FS:             fileSystems,
 		Threads:        config.Threads,
 		Proxy:          getProxy(config),
 		RunMode:        config.RunMode,
@@ -66,15 +62,15 @@ func RunScan(ctx context.Context, config pentestgeneralfern.Config) (*pentestgen
 }
 
 // RunDast builds JSONL entries and invokes runner.Run in dast mode.
-func RunDast(ctx context.Context, config pentestgeneralfern.Config) (*pentestgeneralfern.Report, error) {
-	srcFS, err := templates.DastFS(config.Dast.Categories)
+func RunDast(ctx context.Context, config pentestgeneralfern.PentestGeneralConfig) (*pentestgeneralfern.PentestGeneralReport, error) {
+	fileSystems, err := templates.GetDastFileSystem(config.Dast.Categories)
 	if err != nil {
 		return nil, err
 	}
 	jsonl := buildJSONL(config)
 	rconfig := runner.Config{
 		RawRequests:    jsonl,
-		FS:             srcFS,
+		FS:             fileSystems,
 		Threads:        config.Threads,
 		Proxy:          getProxy(config),
 		RunMode:        config.RunMode,
@@ -87,7 +83,7 @@ func RunDast(ctx context.Context, config pentestgeneralfern.Config) (*pentestgen
 	return runner.Run(ctx, rconfig, builder)
 }
 
-func buildJSONL(config pentestgeneralfern.Config) []string {
+func buildJSONL(config pentestgeneralfern.PentestGeneralConfig) []string {
 	var out []string
 
 	for _, method := range config.Dast.HttpMethods {
@@ -178,7 +174,7 @@ func buildJSONL(config pentestgeneralfern.Config) []string {
 }
 
 // getProxy returns the proxy URL from the config, or an empty string if no proxy is set.
-func getProxy(config pentestgeneralfern.Config) string {
+func getProxy(config pentestgeneralfern.PentestGeneralConfig) string {
 	if config.Proxy != nil {
 		return *config.Proxy
 	}

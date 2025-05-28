@@ -15,6 +15,7 @@ require (
 	github.com/palantir/witchcraft-go-logging v1.57.0
 	github.com/pb33f/libopenapi v0.16.11
 	github.com/projectdiscovery/nuclei/v3 v3.4.4
+	github.com/projectdiscovery/useragent v0.0.100
 	github.com/robertkrimen/otto v0.4.0
 	github.com/spf13/cobra v1.9.1
 	github.com/stretchr/testify v1.10.0
@@ -263,7 +264,6 @@ require (
 	github.com/projectdiscovery/sarif v0.0.1 // indirect
 	github.com/projectdiscovery/tlsx v1.1.9 // indirect
 	github.com/projectdiscovery/uncover v1.0.10 // indirect
-	github.com/projectdiscovery/useragent v0.0.100 // indirect
 	github.com/projectdiscovery/utils v0.4.19 // indirect
 	github.com/projectdiscovery/wappalyzergo v0.2.28 // indirect
 	github.com/projectdiscovery/yamldoc-go v1.0.6 // indirect

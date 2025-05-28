@@ -12,7 +12,6 @@ import (
 
 	// Generated code imports - auto-generated API types
 	pentestgeneralfern "github.com/Method-Security/webscan/generated/go/pentest/general"
-
 	// External library imports
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log" // Structured logging
 )
@@ -74,8 +73,8 @@ func (f *filteredFS) Open(name string) (fs.File, error) {
 
 	// Check if this file is one of the requested templates
 	baseName := strings.TrimSuffix(name, filepath.Ext(name))
-	for _, templateId := range f.templateIds {
-		if baseName == templateId {
+	for _, templateID := range f.templateIds {
+		if baseName == templateID {
 			return f.baseFS.Open(name)
 		}
 	}
@@ -107,7 +106,6 @@ func (f *filteredDir) ReadDir(n int) ([]fs.DirEntry, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer baseDir.Close()
 
 	readDirFile, ok := baseDir.(fs.ReadDirFile)
 	if !ok {
@@ -127,8 +125,8 @@ func (f *filteredDir) ReadDir(n int) ([]fs.DirEntry, error) {
 		}
 
 		baseName := strings.TrimSuffix(entry.Name(), filepath.Ext(entry.Name()))
-		for _, templateId := range f.fs.templateIds {
-			if baseName == templateId {
+		for _, templateID := range f.fs.templateIds {
+			if baseName == templateID {
 				filteredEntries = append(filteredEntries, entry)
 				break
 			}
@@ -141,6 +139,11 @@ func (f *filteredDir) ReadDir(n int) ([]fs.DirEntry, error) {
 
 	if n > len(filteredEntries) {
 		n = len(filteredEntries)
+	}
+
+	err = baseDir.Close()
+	if err != nil {
+		return nil, err
 	}
 
 	return filteredEntries[:n], nil

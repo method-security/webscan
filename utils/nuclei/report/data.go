@@ -2,7 +2,6 @@ package nuclei
 
 import (
 	// Standard
-
 	"fmt"
 	"net/url"
 	"strconv"
@@ -10,10 +9,8 @@ import (
 
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
-
 	// Utils
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
-
 	// External
 	nout "github.com/projectdiscovery/nuclei/v3/pkg/output"
 )

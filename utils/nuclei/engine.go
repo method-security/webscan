@@ -11,7 +11,6 @@ import (
 
 	// Generated
 	pentestgeneralfern "github.com/Method-Security/webscan/generated/go/pentest/general"
-
 	// Utils
 	report "github.com/Method-Security/webscan/utils/nuclei/report"
 	runner "github.com/Method-Security/webscan/utils/nuclei/runner"

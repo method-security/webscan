@@ -26,6 +26,7 @@ type Config struct {
 	Proxy          string
 	RunMode        pentestgeneralfern.RunMode
 	SuccessfulOnly *bool
+	VerboseLogs    bool
 }
 
 func validateConfig(cfg Config) error {
@@ -86,13 +87,17 @@ func buildNucleiOptions(cfg Config, tmpDir string) []nuclei.NucleiSDKOptions {
 			JavascriptTemplateConcurrency: cfg.Threads,
 			ProbeConcurrency:              cfg.Threads,
 		}),
-		nuclei.WithVerbosity(nuclei.VerbosityOptions{Silent: false, Debug: true}),
 
 		// Explicitly set StopAtFirstMatch to false to ensure we get all requests
 		func(e *nuclei.NucleiEngine) error {
 			e.Options().StopAtFirstMatch = false
 			return nil
 		},
+	}
+
+	// Add verbose logs if enabled
+	if cfg.VerboseLogs {
+		opts = append(opts, nuclei.WithVerbosity(nuclei.VerbosityOptions{Silent: false, Debug: true, Verbose: true}))
 	}
 
 	// Add random user agent

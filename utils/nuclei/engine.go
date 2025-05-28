@@ -52,6 +52,7 @@ func RunScan(ctx context.Context, config pentestgeneralfern.PentestGeneralConfig
 		Proxy:          getProxy(config),
 		RunMode:        config.RunMode,
 		SuccessfulOnly: config.SuccessfulOnly,
+		VerboseLogs:    config.VerboseLogs,
 	}
 	builder := report.NewBuilder()
 	log.Info("Populating config")

@@ -14,41 +14,41 @@ func (b *Builder) PopulateProbes(eng *nuclei.NucleiEngine) error {
 	if err := eng.LoadAllTemplates(); err != nil {
 		return err
 	}
-	for _, tpl := range eng.GetTemplates() {
-		id := tpl.ID
+	for _, template := range eng.GetTemplates() {
+		id := template.ID
 		if _, ok := b.probeIdx[id]; ok {
 			continue
 		}
-		pr := &pentestgeneralfern.Probe{
+		probe := &pentestgeneralfern.Probe{
 			Id:               id,
 			Payloads:         []string{},
 			ExpectedMatchers: []*pentestgeneralfern.ExpectedMatcher{},
 		}
-		for _, req := range tpl.RequestsHTTP {
+		for _, request := range template.RequestsHTTP {
 			// Extract payloads
-			for _, raw := range req.Payloads {
+			for _, raw := range request.Payloads {
 				switch v := raw.(type) {
 				case []string:
-					pr.Payloads = append(pr.Payloads, v...)
+					probe.Payloads = append(probe.Payloads, v...)
 				case []interface{}:
 					for _, iv := range v {
 						if s, ok := iv.(string); ok {
-							pr.Payloads = append(pr.Payloads, s)
+							probe.Payloads = append(probe.Payloads, s)
 						}
 					}
 				}
 			}
 			// Extract expected matchers
-			for _, ma := range req.Matchers {
-				vals := append(ma.Words, ma.Regex...)
-				pr.ExpectedMatchers = append(pr.ExpectedMatchers, &pentestgeneralfern.ExpectedMatcher{
-					Type:  ma.Type.String(),
+			for _, matcher := range request.Matchers {
+				vals := append(matcher.Words, matcher.Regex...)
+				probe.ExpectedMatchers = append(probe.ExpectedMatchers, &pentestgeneralfern.ExpectedMatcher{
+					Type:  matcher.Type.String(),
 					Value: vals,
 				})
 			}
 		}
-		b.probeIdx[id] = pr
-		b.report.Probes = append(b.report.Probes, pr)
+		b.probeIdx[id] = probe
+		b.report.Probes = append(b.report.Probes, probe)
 	}
 	return nil
 }
@@ -60,41 +60,40 @@ func (b *Builder) Consume(ev *nout.ResultEvent) {
 	defer b.mu.Unlock()
 
 	// Get or create probe
-	pr, ok := b.probeIdx[ev.TemplateID]
+	probe, ok := b.probeIdx[ev.TemplateID]
 	if !ok {
-		pr = &pentestgeneralfern.Probe{Id: ev.TemplateID}
-		b.probeIdx[ev.TemplateID] = pr
-		b.report.Probes = append(b.report.Probes, pr)
+		probe = &pentestgeneralfern.Probe{Id: ev.TemplateID}
+		b.probeIdx[ev.TemplateID] = probe
+		b.report.Probes = append(b.report.Probes, probe)
 	}
 
 	// Get or create target
 	host := hostKey(ev)
-	tg, ok := b.targetIdx[host]
+	targetInfo, ok := b.targetIdx[host]
 	if !ok {
-		tg = &pentestgeneralfern.TargetInfo{Target: host}
-		b.targetIdx[host] = tg
-		b.report.Targets = append(b.report.Targets, tg)
+		targetInfo = &pentestgeneralfern.TargetInfo{Target: host}
+		b.targetIdx[host] = targetInfo
+		b.report.Targets = append(b.report.Targets, targetInfo)
 	}
 
 	// Build attempt information
-	httpReqResp, err := getHTTPRequestResponse(ev)
-	if err != nil {
-		// Handle error or log it
-	}
-	at := &pentestgeneralfern.AttemptInfo{
-		ProbeId:             pr.Id,
+	httpReqResp, _ := getHTTPRequestResponse(ev)
+	attemptInfo := &pentestgeneralfern.AttemptInfo{
+		ProbeId:             probe.Id,
 		HttpRequestResponse: httpReqResp,
 	}
 
-	at.Finding = &pentestgeneralfern.FindingInfo{
-		Name:     strPtr(ev.MatcherName),
+	severity := ev.Info.SeverityHolder.Severity.String()
+	attemptInfo.Finding = &pentestgeneralfern.FindingInfo{
+		Name:     &ev.MatcherName,
 		Finding:  ev.MatcherStatus,
-		Severity: strPtr(ev.Info.SeverityHolder.Severity.String()),
+		Severity: &severity,
 		Tags:     ev.Info.Tags.ToSlice(),
 	}
 
-	tg.Attempts = append(tg.Attempts, at)
-	tg.RequestCount++
+	// Always add the attempt to the report, even if there was an error parsing the request/response
+	targetInfo.Attempts = append(targetInfo.Attempts, attemptInfo)
+	targetInfo.RequestCount++
 }
 
 // Final returns the fully-populated Fern report.

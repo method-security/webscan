@@ -99,8 +99,8 @@ func GetResponseBodyStringFromBodyStruct(body *common.Body) *string {
 	return nil
 }
 
-// createResponseBody creates a Body struct based on content type and response data
-func createResponseBody(contentType string, responseBody string) *common.Body {
+// CreateResponseBody creates a Body struct based on content type and response data
+func CreateResponseBody(contentType string, responseBody string) *common.Body {
 	// If no content type or empty content type, default to text
 	if contentType == "" {
 		return &common.Body{
@@ -157,8 +157,8 @@ func createResponseBody(contentType string, responseBody string) *common.Body {
 	}
 }
 
-// detectContentType attempts to detect the content type from the response body
-func detectContentType(body string) string {
+// DetectContentType attempts to detect the content type from the response body
+func DetectContentType(body string) string {
 	// Try to detect JSON
 	if strings.TrimSpace(body) != "" {
 		var jsonCheck interface{}
@@ -206,11 +206,11 @@ func CreateHTTPResponse(statusCode int, redirectChain []string, headers map[stri
 
 	// If no content type is provided, try to detect it
 	if contentType == "" {
-		contentType = detectContentType(responseBody)
+		contentType = DetectContentType(responseBody)
 	}
 
 	// Create the response body based on content type
-	bodyStruct := createResponseBody(contentType, responseBody)
+	bodyStruct := CreateResponseBody(contentType, responseBody)
 
 	// Get current time for received timestamp
 	receivedAt := time.Now()

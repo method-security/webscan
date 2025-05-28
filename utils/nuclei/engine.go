@@ -11,7 +11,8 @@ import (
 
 	// Generated
 	pentestgeneralfern "github.com/Method-Security/webscan/generated/go/pentest/general"
-	// Internal
+
+	// Utils
 	report "github.com/Method-Security/webscan/utils/nuclei/report"
 	runner "github.com/Method-Security/webscan/utils/nuclei/runner"
 	templates "github.com/Method-Security/webscan/utils/nuclei/templates"
@@ -90,10 +91,10 @@ func buildJSONL(config pentestgeneralfern.Config) []string {
 	var out []string
 
 	for _, method := range config.Dast.HttpMethods {
-		for _, tgt := range config.Targets {
+		for _, target := range config.Targets {
 			// 1) URL + query
-			uStr := strings.ReplaceAll(tgt, "%s", fuzzMarker)
-			u, err := url.Parse(uStr)
+			urlStr := strings.ReplaceAll(target, "%s", fuzzMarker)
+			u, err := url.Parse(urlStr)
 			if err != nil {
 				continue
 			}
@@ -107,7 +108,7 @@ func buildJSONL(config pentestgeneralfern.Config) []string {
 			u.RawQuery = q.Encode()
 
 			// 2) headers & cookies
-			hmap := map[string]string{}
+			headersMap := map[string]string{}
 			for _, p := range config.Dast.RequestParameters {
 				if p.Value == nil {
 					continue
@@ -115,12 +116,12 @@ func buildJSONL(config pentestgeneralfern.Config) []string {
 				v := strings.ReplaceAll(*p.Value, "%s", fuzzMarker)
 				switch strings.ToLower(string(p.Location)) {
 				case "header":
-					hmap[p.Name] = v
+					headersMap[p.Name] = v
 				case "cookie":
-					if prev, ok := hmap["Cookie"]; ok {
-						hmap["Cookie"] = prev + "; " + fmt.Sprintf("%s=%s", p.Name, v)
+					if prev, ok := headersMap["Cookie"]; ok {
+						headersMap["Cookie"] = prev + "; " + fmt.Sprintf("%s=%s", p.Name, v)
 					} else {
-						hmap["Cookie"] = fmt.Sprintf("%s=%s", p.Name, v)
+						headersMap["Cookie"] = fmt.Sprintf("%s=%s", p.Name, v)
 					}
 				}
 			}
@@ -129,10 +130,10 @@ func buildJSONL(config pentestgeneralfern.Config) []string {
 			bodyParams := url.Values{}
 			if !strings.EqualFold(string(method), "GET") &&
 				!strings.EqualFold(string(method), "HEAD") {
-				for _, p := range config.Dast.RequestParameters {
-					if strings.EqualFold(string(p.Location), "body") && p.Value != nil {
-						v := strings.ReplaceAll(*p.Value, "%s", fuzzMarker)
-						bodyParams.Add(p.Name, v)
+				for _, requestParameter := range config.Dast.RequestParameters {
+					if strings.EqualFold(string(requestParameter.Location), "body") && requestParameter.Value != nil {
+						v := strings.ReplaceAll(*requestParameter.Value, "%s", fuzzMarker)
+						bodyParams.Add(requestParameter.Name, v)
 					}
 				}
 			}
@@ -149,8 +150,8 @@ func buildJSONL(config pentestgeneralfern.Config) []string {
 				sb.WriteString("Content-Type: application/x-www-form-urlencoded\r\n")
 				sb.WriteString(fmt.Sprintf("Content-Length: %d\r\n", len(body)))
 			}
-			for k, v := range hmap {
-				sb.WriteString(fmt.Sprintf("%s: %s\r\n", k, v))
+			for headerName, headerValue := range headersMap {
+				sb.WriteString(fmt.Sprintf("%s: %s\r\n", headerName, headerValue))
 			}
 			sb.WriteString("\r\n")
 			if body != "" {
@@ -159,14 +160,14 @@ func buildJSONL(config pentestgeneralfern.Config) []string {
 			raw := sb.String()
 
 			// 5) marshal into proxifyRequest JSON
-			var pr proxifyRequest
-			pr.URL = u.String()
-			pr.Request.Header = hmap
-			pr.Request.Body = body
-			pr.Request.Endpoint = u.RequestURI()
-			pr.Request.Raw = raw
+			var proxifyRequest proxifyRequest
+			proxifyRequest.URL = u.String()
+			proxifyRequest.Request.Header = headersMap
+			proxifyRequest.Request.Body = body
+			proxifyRequest.Request.Endpoint = u.RequestURI()
+			proxifyRequest.Request.Raw = raw
 
-			j, err := json.Marshal(pr)
+			j, err := json.Marshal(proxifyRequest)
 			if err != nil {
 				continue
 			}
@@ -175,6 +176,8 @@ func buildJSONL(config pentestgeneralfern.Config) []string {
 	}
 	return out
 }
+
+// getProxy returns the proxy URL from the config, or an empty string if no proxy is set.
 func getProxy(config pentestgeneralfern.Config) string {
 	if config.Proxy != nil {
 		return *config.Proxy

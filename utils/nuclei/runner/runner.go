@@ -135,6 +135,8 @@ func Run(ctx context.Context, cfg Config, reportBuilder *report.Builder) (*pente
 		return nil, err
 	}
 
+	log.Info("SuccessfulOnly config value", svc1log.SafeParam("successfulOnly", cfg.SuccessfulOnly))
+
 	log.Info("Copying templates to tmp dir")
 	tmpDir, err := copyTemplatesToTmpDir(cfg)
 	if err != nil {
@@ -154,23 +156,28 @@ func Run(ctx context.Context, cfg Config, reportBuilder *report.Builder) (*pente
 	}
 	defer eng.Close()
 
-	log.Info("Setting matcher status")
 	if cfg.SuccessfulOnly != nil && *cfg.SuccessfulOnly {
 		eng.Options().MatcherStatus = true
+	} else {
+		eng.Options().MatcherStatus = false
 	}
+	log.Info("Set matcher status", svc1log.SafeParam("status", eng.Options().MatcherStatus), svc1log.SafeParam("successfulOnly", cfg.SuccessfulOnly))
 
 	log.Info("Loading targets")
 	if err := loadTargets(eng, cfg); err != nil {
 		return nil, err
 	}
+
 	log.Info("Populating probes")
 	if err := reportBuilder.PopulateProbes(eng); err != nil {
 		return nil, err
 	}
+
 	log.Info("Executing Nuclei engine")
 	if err := eng.ExecuteCallbackWithCtx(ctx, reportBuilder.Consume); err != nil {
 		return nil, err
 	}
+
 	log.Info("Returning report")
 	return reportBuilder.Final(), nil
 }

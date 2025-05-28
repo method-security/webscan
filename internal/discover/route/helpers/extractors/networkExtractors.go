@@ -12,7 +12,7 @@ import (
 	discoverroutehelpers "github.com/Method-Security/webscan/internal/discover/route/helpers"
 
 	// Utils
-	headless "github.com/Method-Security/webscan/utils/request/helpers/headless"
+	headless "github.com/Method-Security/webscan/utils/request/headless"
 	// External
 	rod "github.com/go-rod/rod"
 	proto "github.com/go-rod/rod/lib/proto"

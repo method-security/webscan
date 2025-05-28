@@ -8,9 +8,9 @@ import (
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
 	// Utils
-	headless "github.com/Method-Security/webscan/utils/request/helpers/headless"
-	browserbase "github.com/Method-Security/webscan/utils/request/helpers/headless/browserbase"
-	requeststandard "github.com/Method-Security/webscan/utils/request/helpers/standard"
+	headless "github.com/Method-Security/webscan/utils/request/headless"
+	browserbase "github.com/Method-Security/webscan/utils/request/headless/browserbase"
+	standard "github.com/Method-Security/webscan/utils/request/standard"
 
 	// External
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
@@ -24,7 +24,7 @@ func SendRequest(ctx context.Context, config common.SendHttpRequestConfig) (*com
 	// Standard capture
 	case common.RequestMethodStandard:
 		log.Info("Sending standard request")
-		httpRequestResponse, err := requeststandard.SendStandardRequest(ctx, config)
+		httpRequestResponse, err := standard.SendStandardRequest(ctx, config)
 		if err != nil {
 			return nil, fmt.Errorf("standard capture failed: %w", err)
 		}

@@ -172,6 +172,7 @@ func Run(ctx context.Context, cfg Config, reportBuilder *report.Builder) (*pente
 	}
 	defer eng.Close()
 
+	// To-Do: Write Customer Writer to enable this to work
 	if cfg.SuccessfulOnly != nil && *cfg.SuccessfulOnly {
 		eng.Options().MatcherStatus = false
 	} else {

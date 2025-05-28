@@ -21,6 +21,8 @@ RUN \
   mkdir -p /opt/method/${CLI_NAME}/var/conf/enumerate/cms && \
   mkdir -p /opt/method/${CLI_NAME}/var/conf/enumerate/cms/wordpress && \
   mkdir -p /opt/method/${CLI_NAME}/var/conf/pentest && \
+  mkdir -p /opt/method/${CLI_NAME}/var/conf/pentest/general && \
+  mkdir -p /opt/method/${CLI_NAME}/var/conf/pentest/general/path && \
   mkdir -p /opt/method/${CLI_NAME}/var/conf/pentest/route && \
   mkdir -p /opt/method/${CLI_NAME}/var/log && \
   mkdir -p /opt/method/${CLI_NAME}/service/bin && \
@@ -35,6 +37,8 @@ COPY configs/enumerate/*                          /opt/method/${CLI_NAME}/var/co
 COPY configs/enumerate/cms/*                      /opt/method/${CLI_NAME}/var/conf/enumerate/cms/
 COPY configs/enumerate/cms/wordpress/*            /opt/method/${CLI_NAME}/var/conf/enumerate/cms/wordpress/
 COPY configs/pentest/*                            /opt/method/${CLI_NAME}/var/conf/pentest/
+COPY configs/pentest/general/*                    /opt/method/${CLI_NAME}/var/conf/pentest/general/
+COPY configs/pentest/general/path/*                /opt/method/${CLI_NAME}/var/conf/pentest/general/path/
 COPY configs/pentest/route/*                      /opt/method/${CLI_NAME}/var/conf/pentest/route/
 
 COPY ${CLI_NAME} /opt/method/${CLI_NAME}/service/bin/${CLI_NAME}

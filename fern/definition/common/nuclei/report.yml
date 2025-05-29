@@ -3,26 +3,26 @@ imports:
   http: ../../common/http.yml
   probe: ./probe.yml
 types:
-  FindingInfo:
+  NucleiFindingInfo:
     properties:
       name: optional<string>
       finding: boolean
       severity: optional<string>
       tags: optional<list<string>>
-  AttemptInfo:
+  NucleiAttemptInfo:
     properties:
       probeId: string
       httpRequestResponse: http.HttpRequestResponse
-      finding: optional<FindingInfo>
-  TargetInfo:
+      finding: optional<NucleiFindingInfo>
+  NucleiTargetInfo:
     properties:
       target: string
-      baselineAttempt: optional<AttemptInfo>
-      attempts: optional<list<AttemptInfo>>
+      baselineAttempt: optional<NucleiAttemptInfo>
+      attempts: optional<list<NucleiAttemptInfo>>
       requestCount: integer
-  PentestGeneralReport:
+  NucleiReport:
     properties:
-      targets: optional<list<TargetInfo>>
-      probes: optional<list<probe.Probe>>
-      config: optional<config.PentestGeneralConfig>
+      targets: optional<list<NucleiTargetInfo>>
+      probes: optional<list<probe.NucleiProbe>>
+      config: optional<config.NucleiConfig>
 

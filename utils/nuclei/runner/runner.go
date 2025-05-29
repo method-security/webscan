@@ -9,13 +9,13 @@ import (
 	"path/filepath"
 
 	// Generated
-	pentestgeneralfern "github.com/Method-Security/webscan/generated/go/pentest/general"
+	nuclei "github.com/Method-Security/webscan/generated/go/common/nuclei"
 	// Utils
 	report "github.com/Method-Security/webscan/utils/nuclei/report"
 	// External
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
-	nuclei "github.com/projectdiscovery/nuclei/v3/lib"
-	"github.com/projectdiscovery/useragent"
+	nucleilib "github.com/projectdiscovery/nuclei/v3/lib"
+	useragent "github.com/projectdiscovery/useragent"
 )
 
 type Config struct {
@@ -24,13 +24,13 @@ type Config struct {
 	FS             []fs.FS  // template sources
 	Threads        int
 	Proxy          string
-	RunMode        pentestgeneralfern.RunMode
+	RunMode        nuclei.NucleiRunMode
 	SuccessfulOnly *bool
 	VerboseLogs    bool
 }
 
 func validateConfig(cfg Config) error {
-	if cfg.RunMode == pentestgeneralfern.RunModeDast {
+	if cfg.RunMode == nuclei.NucleiRunModeDast {
 		if len(cfg.RawRequests) == 0 {
 			return fmt.Errorf("runner: no RawRequests provided for dast mode")
 		}
@@ -73,12 +73,12 @@ func copyTemplatesToTmpDir(cfg Config) (string, error) {
 	return tmpDir, nil
 }
 
-func buildNucleiOptions(cfg Config, tmpDir string) []nuclei.NucleiSDKOptions {
-	opts := []nuclei.NucleiSDKOptions{
-		nuclei.WithTemplatesOrWorkflows(nuclei.TemplateSources{Templates: []string{tmpDir}}),
-		nuclei.EnableSelfContainedTemplates(),
-		nuclei.DisableUpdateCheck(),
-		nuclei.WithConcurrency(nuclei.Concurrency{
+func buildNucleiOptions(cfg Config, tmpDir string) []nucleilib.NucleiSDKOptions {
+	opts := []nucleilib.NucleiSDKOptions{
+		nucleilib.WithTemplatesOrWorkflows(nucleilib.TemplateSources{Templates: []string{tmpDir}}),
+		nucleilib.EnableSelfContainedTemplates(),
+		nucleilib.DisableUpdateCheck(),
+		nucleilib.WithConcurrency(nucleilib.Concurrency{
 			HeadlessHostConcurrency:       cfg.Threads,
 			HostConcurrency:               cfg.Threads,
 			TemplateConcurrency:           cfg.Threads,
@@ -89,7 +89,7 @@ func buildNucleiOptions(cfg Config, tmpDir string) []nuclei.NucleiSDKOptions {
 		}),
 
 		// Explicitly set StopAtFirstMatch to false to ensure we get all requests
-		func(e *nuclei.NucleiEngine) error {
+		func(e *nucleilib.NucleiEngine) error {
 			e.Options().StopAtFirstMatch = false
 			return nil
 		},
@@ -97,27 +97,27 @@ func buildNucleiOptions(cfg Config, tmpDir string) []nuclei.NucleiSDKOptions {
 
 	// Add verbose logs if enabled
 	if cfg.VerboseLogs {
-		opts = append(opts, nuclei.WithVerbosity(nuclei.VerbosityOptions{Silent: false, Debug: true, Verbose: true}))
+		opts = append(opts, nucleilib.WithVerbosity(nucleilib.VerbosityOptions{Silent: false, Debug: true, Verbose: true}))
 	}
 
 	// Add random user agent
 	randomUserAgent := useragent.PickRandom()
-	opts = append(opts, nuclei.WithHeaders([]string{fmt.Sprintf("User-Agent:%s", randomUserAgent.Raw)}))
+	opts = append(opts, nucleilib.WithHeaders([]string{fmt.Sprintf("User-Agent:%s", randomUserAgent.Raw)}))
 
-	if cfg.RunMode == pentestgeneralfern.RunModeDast {
-		opts = append(opts, nuclei.DASTMode())
+	if cfg.RunMode == nuclei.NucleiRunModeDast {
+		opts = append(opts, nucleilib.DASTMode())
 	}
 
 	// proxy
 	if cfg.Proxy != "" {
-		opts = append(opts, nuclei.WithProxy([]string{cfg.Proxy}, false))
+		opts = append(opts, nucleilib.WithProxy([]string{cfg.Proxy}, false))
 	}
 
 	return opts
 }
 
-func loadTargets(eng *nuclei.NucleiEngine, cfg Config) error {
-	if cfg.RunMode == pentestgeneralfern.RunModeDast {
+func loadTargets(eng *nucleilib.NucleiEngine, cfg Config) error {
+	if cfg.RunMode == nuclei.NucleiRunModeDast {
 		// write JSONL to temp file
 		f, err := os.CreateTemp("", "requests-*.jsonl")
 		if err != nil {
@@ -144,7 +144,7 @@ func loadTargets(eng *nuclei.NucleiEngine, cfg Config) error {
 	return nil
 }
 
-func Run(ctx context.Context, cfg Config, reportBuilder *report.Builder) (*pentestgeneralfern.PentestGeneralReport, error) {
+func Run(ctx context.Context, cfg Config, reportBuilder *report.Builder) (*nuclei.NucleiReport, error) {
 	log := svc1log.FromContext(ctx)
 	log.Info("Validating config")
 	if err := validateConfig(cfg); err != nil {
@@ -166,7 +166,7 @@ func Run(ctx context.Context, cfg Config, reportBuilder *report.Builder) (*pente
 	opts := buildNucleiOptions(cfg, tmpDir)
 
 	log.Info("Creating Nuclei engine")
-	eng, err := nuclei.NewNucleiEngineCtx(ctx, opts...)
+	eng, err := nucleilib.NewNucleiEngineCtx(ctx, opts...)
 	if err != nil {
 		return nil, err
 	}

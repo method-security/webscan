@@ -1,18 +1,18 @@
 package nuclei
 
 import (
-	// Standard library imports
-	"context"       // For context-aware operations and cancellation
-	"embed"         // For embedding static files into the binary
-	"fmt"           // For formatted string operations and error creation
-	"io/fs"         // For filesystem interface abstractions
-	"path/filepath" // For cross-platform file path manipulation
-	"strings"       // For string manipulation operations
-	"time"          // For time-related operations
+	// Standard
+	"context"
+	"embed"
+	"fmt"
+	"io/fs"
+	"path/filepath"
+	"strings"
+	"time"
 
-	// Generated code imports - auto-generated API types
-	pentestgeneralfern "github.com/Method-Security/webscan/generated/go/pentest/general"
-	// External library imports
+	// Generated
+	nuclei "github.com/Method-Security/webscan/generated/go/common/nuclei"
+	// External
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log" // Structured logging
 )
 
@@ -22,9 +22,9 @@ import (
 var All embed.FS
 
 // resourceTypeToFileMap maps the application resource type to the file name of the template.
-var resourceTypeToFileMap = map[pentestgeneralfern.ApplicationResourceType]string{
-	pentestgeneralfern.ApplicationResourceTypeContentManagementSystem: "cms",
-	pentestgeneralfern.ApplicationResourceTypeWebServer:               "webserver",
+var resourceTypeToFileMap = map[nuclei.ApplicationResourceType]string{
+	nuclei.ApplicationResourceTypeContentManagementSystem: "cms",
+	nuclei.ApplicationResourceTypeWebServer:               "webserver",
 }
 
 // getFullTemplatePaths walks "pentest/<kind>/<subs…>" and returns each matching fs.FS or an error.
@@ -42,7 +42,7 @@ func getFullTemplatePaths(kind string, subs []string) ([]fs.FS, error) {
 }
 
 // GetScanFileSystem returns filesystem views for scan templates based on the provided configuration.
-func GetScanFileSystem(ctx context.Context, config pentestgeneralfern.ScanConfig) ([]fs.FS, error) {
+func GetScanFileSystem(ctx context.Context, config nuclei.NucleiScanConfig) ([]fs.FS, error) {
 	log := svc1log.FromContext(ctx)
 
 	// If specific template paths are provided, use only those
@@ -165,7 +165,7 @@ func GetScanFileSystem(ctx context.Context, config pentestgeneralfern.ScanConfig
 }
 
 // GetDastFileSystem returns filesystem views for DAST templates organized by vulnerability categories.
-func GetDastFileSystem(dastCategories []pentestgeneralfern.DastCategory) ([]fs.FS, error) {
+func GetDastFileSystem(dastCategories []nuclei.DastCategory) ([]fs.FS, error) {
 	// Build the "dast/<vuln>" paths
 	var subs []string
 	for _, dastCategory := range dastCategories {
@@ -233,7 +233,10 @@ func (s *specificTemplateDir) ReadDir(n int) ([]fs.DirEntry, error) {
 				modTime: stat.ModTime(),
 			})
 		}
-		file.Close()
+		err = file.Close()
+		if err != nil {
+			continue
+		}
 	}
 
 	if n <= 0 {

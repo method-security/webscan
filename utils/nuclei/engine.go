@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	// Generated
-	pentestgeneralfern "github.com/Method-Security/webscan/generated/go/pentest/general"
+	nuclei "github.com/Method-Security/webscan/generated/go/common/nuclei"
 	// Utils
 	report "github.com/Method-Security/webscan/utils/nuclei/report"
 	runner "github.com/Method-Security/webscan/utils/nuclei/runner"
@@ -34,7 +34,7 @@ type proxifyRequest struct {
 }
 
 // RunScan for scan mode—unchanged.
-func RunScan(ctx context.Context, config pentestgeneralfern.PentestGeneralConfig) (*pentestgeneralfern.PentestGeneralReport, error) {
+func RunScan(ctx context.Context, config nuclei.NucleiConfig) (*nuclei.NucleiReport, error) {
 	log := svc1log.FromContext(ctx)
 	log.Info("Starting Nuclei Run of mode: Scan")
 
@@ -62,7 +62,7 @@ func RunScan(ctx context.Context, config pentestgeneralfern.PentestGeneralConfig
 }
 
 // RunDast builds JSONL entries and invokes runner.Run in dast mode.
-func RunDast(ctx context.Context, config pentestgeneralfern.PentestGeneralConfig) (*pentestgeneralfern.PentestGeneralReport, error) {
+func RunDast(ctx context.Context, config nuclei.NucleiConfig) (*nuclei.NucleiReport, error) {
 	fileSystems, err := templates.GetDastFileSystem(config.Dast.Categories)
 	if err != nil {
 		return nil, err
@@ -83,7 +83,7 @@ func RunDast(ctx context.Context, config pentestgeneralfern.PentestGeneralConfig
 	return runner.Run(ctx, rconfig, builder)
 }
 
-func buildJSONL(config pentestgeneralfern.PentestGeneralConfig) []string {
+func buildJSONL(config nuclei.NucleiConfig) []string {
 	var out []string
 
 	for _, method := range config.Dast.HttpMethods {
@@ -174,7 +174,7 @@ func buildJSONL(config pentestgeneralfern.PentestGeneralConfig) []string {
 }
 
 // getProxy returns the proxy URL from the config, or an empty string if no proxy is set.
-func getProxy(config pentestgeneralfern.PentestGeneralConfig) string {
+func getProxy(config nuclei.NucleiConfig) string {
 	if config.Proxy != nil {
 		return *config.Proxy
 	}

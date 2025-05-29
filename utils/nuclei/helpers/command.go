@@ -8,10 +8,10 @@ import (
 	"net/url"
 
 	// Generated
-	pentestgeneralfern "github.com/Method-Security/webscan/generated/go/pentest/general"
+	nuclei "github.com/Method-Security/webscan/generated/go/common/nuclei"
 )
 
-func ParseParameterString(b64 string) ([]*pentestgeneralfern.RequestParameter, error) {
+func ParseParameterString(b64 string) ([]*nuclei.RequestParameter, error) {
 	if b64 == "" {
 		return nil, nil
 	}
@@ -20,7 +20,7 @@ func ParseParameterString(b64 string) ([]*pentestgeneralfern.RequestParameter, e
 		return nil, fmt.Errorf("--dast-params must be base64 JSON: %w", err)
 	}
 	var wrapper struct {
-		Params []*pentestgeneralfern.RequestParameter `json:"params"`
+		Params []*nuclei.RequestParameter `json:"params"`
 	}
 	if err := json.Unmarshal(raw, &wrapper); err != nil {
 		return nil, err

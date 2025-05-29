@@ -2,7 +2,7 @@ imports:
   http: ../../common/http.yml
   parameter: ./parameter.yml
 types:
-  # Scan Structs
+  # General Enums and Structs
   ApplicationResourceType:
     enum:
       - API_APPLICATION
@@ -13,7 +13,6 @@ types:
       - CVE
       - MISCONFIGURATIONS
       - TECHNOLOGIES
-  # Dast Structs
   DastCategory:
     enum:
       - COMMAND_INJECTION
@@ -21,31 +20,29 @@ types:
       - SQLI
       - SSTI
       - XSS
-  # Run Mode Enum (used to toggle on Nuclei run types)
-  RunMode:
+  # Nuclei Enum and Structs
+  NucleiRunMode:
     enum:
       - DAST
       - SCAN
-  # Run Mode Structs
-  DastConfig:
+  NucleiDastConfig:
     properties:
       categories: optional<list<DastCategory>>
       httpMethods: optional<list<http.HttpMethod>>
       requestParameters: optional<list<parameter.RequestParameter>>
       templatePaths: optional<list<string>>
-  ScanConfig:
+  NucleiScanConfig:
     properties:
       category: optional<ScanCategory>
       applicationResourceType: optional<ApplicationResourceType>
       module: optional<string>
       templatePaths: optional<list<string>>
-  # Config Struct
-  PentestGeneralConfig:
+  NucleiConfig:
     properties:
       targets: list<string>
-      runMode: RunMode
-      scan: optional<ScanConfig>
-      dast: optional<DastConfig>
+      runMode: NucleiRunMode
+      scan: optional<NucleiScanConfig>
+      dast: optional<NucleiDastConfig>
       successfulOnly: optional<boolean>
       timeout: integer
       threads: integer

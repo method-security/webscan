@@ -10,10 +10,8 @@ import (
 	"strings"
 	"time"
 
-	// Generated
-	nuclei "github.com/Method-Security/webscan/generated/go/common/nuclei"
 	// External
-	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log" // Structured logging
+	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
 // All is the pentest templates
@@ -21,158 +19,123 @@ import (
 //go:embed pentest
 var All embed.FS
 
-// resourceTypeToFileMap maps the application resource type to the file name of the template.
-var resourceTypeToFileMap = map[nuclei.ApplicationResourceType]string{
-	nuclei.ApplicationResourceTypeContentManagementSystem: "cms",
-	nuclei.ApplicationResourceTypeWebServer:               "webserver",
-}
-
-// getFullTemplatePaths walks "pentest/<kind>/<subs…>" and returns each matching fs.FS or an error.
-func getFullTemplatePaths(kind string, subs []string) ([]fs.FS, error) {
-	var out []fs.FS
-	for _, sub := range subs {
-		path := filepath.Join("pentest", kind, sub)
-		subFS, err := fs.Sub(All, path)
-		if err != nil {
-			return nil, fmt.Errorf("no templates under %q: %w", path, err)
-		}
-		out = append(out, subFS)
-	}
-	return out, nil
-}
-
-// GetScanFileSystem returns filesystem views for scan templates based on the provided configuration.
-func GetScanFileSystem(ctx context.Context, config nuclei.NucleiScanConfig) ([]fs.FS, error) {
+// GetTemplateFileSystem returns filesystem views for templates based on the provided template paths.
+// templatePaths can contain either:
+// - Complete paths to template files (e.g., "pentest/scan/cve/2024/CVE-2024-13624.yaml")
+// - Folder paths (e.g., "pentest/scan/cve") - will collect all .yaml/.yml files recursively from that folder
+func GetTemplateFileSystem(ctx context.Context, templatePaths []string) ([]fs.FS, error) {
 	log := svc1log.FromContext(ctx)
 
-	// If specific template paths are provided, use only those
-	if len(config.TemplatePaths) > 0 {
-		log.Info("Using specific template paths", svc1log.SafeParam("templatePaths", config.TemplatePaths))
+	if len(templatePaths) == 0 {
+		return nil, fmt.Errorf("no template paths provided")
+	}
 
-		// Group template files by their directory to create minimal filesystems
-		dirToFiles := make(map[string][]string)
+	log.Info("Using template paths", svc1log.SafeParam("templatePaths", templatePaths))
 
-		for _, templatePath := range config.TemplatePaths {
-			// Clean the template path - remove utils/nuclei/templates/ prefix if present
-			cleanPath := templatePath
-			if strings.HasPrefix(cleanPath, "utils/nuclei/templates/") {
-				cleanPath = strings.TrimPrefix(cleanPath, "utils/nuclei/templates/")
-			}
-			// Also handle if it starts with just pentest/
-			if !strings.HasPrefix(cleanPath, "pentest/") {
-				cleanPath = filepath.Join("pentest", cleanPath)
-			}
+	// Collect all template files from the provided paths
+	var allTemplateFiles []string
 
-			// Get the directory and filename
-			templateDir := filepath.Dir(cleanPath)
-			templateFile := filepath.Base(cleanPath)
+	for _, templatePath := range templatePaths {
+		// Clean the template path - remove utils/nuclei/templates/ prefix if present
+		cleanPath := templatePath
+		cleanPath = strings.TrimPrefix(cleanPath, "utils/nuclei/templates/")
+		// Also handle if it starts with just pentest/
+		if !strings.HasPrefix(cleanPath, "pentest/") {
+			cleanPath = filepath.Join("pentest", cleanPath)
+		}
 
-			// Verify the template file exists
+		// Check if this is a file or directory
+		if isTemplateFile(cleanPath) {
+			// It's a template file - verify it exists and add it
 			if _, err := fs.Stat(All, cleanPath); err != nil {
 				log.Warn("Template file not found, skipping", svc1log.SafeParam("templatePath", templatePath), svc1log.SafeParam("cleanPath", cleanPath), svc1log.SafeParam("error", err.Error()))
 				continue
 			}
-
-			dirToFiles[templateDir] = append(dirToFiles[templateDir], templateFile)
-		}
-
-		if len(dirToFiles) == 0 {
-			return nil, fmt.Errorf("no valid template paths found")
-		}
-
-		var filesystems []fs.FS
-		for templateDir, templateFiles := range dirToFiles {
-			// Create a base filesystem for the directory
-			baseFS, err := fs.Sub(All, templateDir)
+			allTemplateFiles = append(allTemplateFiles, cleanPath)
+		} else {
+			// It's a directory - collect all template files recursively
+			templates, err := collectTemplatesFromDirectory(cleanPath)
 			if err != nil {
-				log.Warn("Template directory not found, skipping", svc1log.SafeParam("templateDir", templateDir), svc1log.SafeParam("error", err.Error()))
+				log.Warn("Failed to collect templates from directory, skipping", svc1log.SafeParam("templatePath", templatePath), svc1log.SafeParam("cleanPath", cleanPath), svc1log.SafeParam("error", err.Error()))
 				continue
 			}
-
-			// Create a filtered filesystem that only exposes the specific template files
-			filteredFS := &specificTemplateFS{
-				baseFS:        baseFS,
-				templateFiles: templateFiles,
-			}
-
-			filesystems = append(filesystems, filteredFS)
-		}
-
-		if len(filesystems) == 0 {
-			return nil, fmt.Errorf("no valid template directories found")
-		}
-
-		return filesystems, nil
-	}
-
-	// Build the hierarchical path: scan/<category>/<resource>/<module>
-	var pathParts []string
-
-	// Category is required
-	if config.Category != nil {
-		category := strings.ToLower(string(*config.Category))
-		pathParts = append(pathParts, category)
-	}
-
-	// Add resource type if specified
-	if config.ApplicationResourceType != nil {
-		resourceType := resourceTypeToFileMap[*config.ApplicationResourceType]
-		pathParts = append(pathParts, resourceType)
-		log.Info("Adding resource type", svc1log.SafeParam("resourceType", resourceType))
-	}
-
-	// Add module if specified (this becomes the lowest layer)
-	if config.Module != nil {
-		module := *config.Module
-		pathParts = append(pathParts, module)
-		log.Info("Adding module", svc1log.SafeParam("module", module))
-	}
-
-	// Build the final path
-	finalPath := strings.Join(pathParts, "/")
-	log.Info("Building template path", svc1log.SafeParam("path", finalPath))
-
-	// For any path, check if it contains subdirectories and collect all templates
-	fullPath := filepath.Join("pentest", "scan", finalPath)
-	entries, err := fs.ReadDir(All, fullPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read directory %q: %w", fullPath, err)
-	}
-
-	// Check if directory contains subdirectories
-	hasSubdirs := false
-	for _, entry := range entries {
-		if entry.IsDir() {
-			hasSubdirs = true
-			break
+			allTemplateFiles = append(allTemplateFiles, templates...)
 		}
 	}
 
-	if hasSubdirs {
-		// Collect all subdirectories
-		var subPaths []string
-		for _, entry := range entries {
-			if entry.IsDir() {
-				subPaths = append(subPaths, filepath.Join(finalPath, entry.Name()))
-			}
-		}
-		log.Info("Found subdirectories, collecting all", svc1log.SafeParam("subPaths", subPaths))
-		return getFullTemplatePaths("scan", subPaths)
+	if len(allTemplateFiles) == 0 {
+		return nil, fmt.Errorf("no valid template files found")
 	}
 
-	log.Info("Using final path for templates", svc1log.SafeParam("finalPath", finalPath))
-	return getFullTemplatePaths("scan", []string{finalPath})
+	log.Info("Found template files", svc1log.SafeParam("templateCount", len(allTemplateFiles)))
+
+	// Group template files by their directory to create minimal filesystems
+	dirToFiles := make(map[string][]string)
+
+	for _, templateFile := range allTemplateFiles {
+		templateDir := filepath.Dir(templateFile)
+		templateName := filepath.Base(templateFile)
+		dirToFiles[templateDir] = append(dirToFiles[templateDir], templateName)
+	}
+
+	var filesystems []fs.FS
+	for templateDir, templateFiles := range dirToFiles {
+		// Create a base filesystem for the directory
+		baseFS, err := fs.Sub(All, templateDir)
+		if err != nil {
+			log.Warn("Template directory not found, skipping", svc1log.SafeParam("templateDir", templateDir), svc1log.SafeParam("error", err.Error()))
+			continue
+		}
+
+		// Create a filtered filesystem that only exposes the specific template files
+		filteredFS := &specificTemplateFS{
+			baseFS:        baseFS,
+			templateFiles: templateFiles,
+		}
+
+		filesystems = append(filesystems, filteredFS)
+	}
+
+	if len(filesystems) == 0 {
+		return nil, fmt.Errorf("no valid template directories found")
+	}
+
+	return filesystems, nil
 }
 
-// GetDastFileSystem returns filesystem views for DAST templates organized by vulnerability categories.
-func GetDastFileSystem(dastCategories []nuclei.DastCategory) ([]fs.FS, error) {
-	// Build the "dast/<vuln>" paths
-	var subs []string
-	for _, dastCategory := range dastCategories {
-		subs = append(subs, strings.ToLower(string(dastCategory)))
+// isTemplateFile checks if the given path appears to be a template file based on extension
+func isTemplateFile(path string) bool {
+	ext := strings.ToLower(filepath.Ext(path))
+	return ext == ".yaml" || ext == ".yml"
+}
+
+// collectTemplatesFromDirectory recursively collects all .yaml and .yml files from the given directory
+func collectTemplatesFromDirectory(dirPath string) ([]string, error) {
+	var templates []string
+
+	err := fs.WalkDir(All, dirPath, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// Skip directories
+		if d.IsDir() {
+			return nil
+		}
+
+		// Check if this is a template file
+		if isTemplateFile(path) {
+			templates = append(templates, path)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to walk directory %s: %w", dirPath, err)
 	}
 
-	return getFullTemplatePaths("dast", subs)
+	return templates, nil
 }
 
 // specificTemplateFS wraps the base filesystem and only exposes specific template files

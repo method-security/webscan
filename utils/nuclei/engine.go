@@ -33,14 +33,14 @@ type proxifyRequest struct {
 	} `json:"request"`
 }
 
-// RunScan for scan mode—unchanged.
-func RunScan(ctx context.Context, config nuclei.NucleiConfig) (*nuclei.NucleiReport, error) {
+// RunNucleiEngine runs the Nuclei engine with the given config.
+func RunNucleiEngine(ctx context.Context, config nuclei.NucleiConfig) (*nuclei.NucleiReport, error) {
 	log := svc1log.FromContext(ctx)
 	log.Info("Starting Nuclei Run of mode: Scan")
 
 	var fileSystems []fs.FS
 	var err error
-	fileSystems, err = templates.GetScanFileSystem(ctx, *config.Scan)
+	fileSystems, err = templates.GetTemplateFileSystem(ctx, config.TemplatePaths)
 	if err != nil {
 		return nil, err
 	}
@@ -53,30 +53,13 @@ func RunScan(ctx context.Context, config nuclei.NucleiConfig) (*nuclei.NucleiRep
 		SuccessfulOnly: config.SuccessfulOnly,
 		VerboseLogs:    config.VerboseLogs,
 	}
+
+	if config.RunMode == nuclei.NucleiRunModeDast {
+		rconfig.RawRequests = buildJSONL(config)
+	}
+
 	builder := report.NewBuilder()
 	log.Info("Populating config")
-	if err := builder.PopulateConfig(config); err != nil {
-		return nil, err
-	}
-	return runner.Run(ctx, rconfig, builder)
-}
-
-// RunDast builds JSONL entries and invokes runner.Run in dast mode.
-func RunDast(ctx context.Context, config nuclei.NucleiConfig) (*nuclei.NucleiReport, error) {
-	fileSystems, err := templates.GetDastFileSystem(config.Dast.Categories)
-	if err != nil {
-		return nil, err
-	}
-	jsonl := buildJSONL(config)
-	rconfig := runner.Config{
-		RawRequests:    jsonl,
-		FS:             fileSystems,
-		Threads:        config.Threads,
-		Proxy:          getProxy(config),
-		RunMode:        config.RunMode,
-		SuccessfulOnly: config.SuccessfulOnly,
-	}
-	builder := report.NewBuilder()
 	if err := builder.PopulateConfig(config); err != nil {
 		return nil, err
 	}

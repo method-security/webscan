@@ -18,6 +18,7 @@ import (
 
 	// Utils
 	utils "github.com/Method-Security/webscan/utils"
+
 	// External
 	cobra "github.com/spf13/cobra"
 )

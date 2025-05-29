@@ -20,6 +20,7 @@ import (
 
 	// Utils
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
+
 	// External
 	cobra "github.com/spf13/cobra"
 )

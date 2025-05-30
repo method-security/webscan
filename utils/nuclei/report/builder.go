@@ -24,9 +24,3 @@ func NewBuilder() *Builder {
 		targetIdx: make(map[string]*nuclei.NucleiTargetInfo),
 	}
 }
-
-// PopulateConfig sets the configuration for the report.
-func (b *Builder) PopulateConfig(config nuclei.NucleiConfig) error {
-	b.report.Config = &config
-	return nil
-}

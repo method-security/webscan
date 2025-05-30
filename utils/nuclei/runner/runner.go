@@ -27,6 +27,7 @@ type Config struct {
 	RunMode        nuclei.NucleiRunMode
 	SuccessfulOnly *bool
 	VerboseLogs    bool
+	Timeout        int
 }
 
 func validateConfig(cfg Config) error {
@@ -78,6 +79,9 @@ func buildNucleiOptions(cfg Config, tmpDir string) []nucleilib.NucleiSDKOptions 
 		nucleilib.WithTemplatesOrWorkflows(nucleilib.TemplateSources{Templates: []string{tmpDir}}),
 		nucleilib.EnableSelfContainedTemplates(),
 		nucleilib.DisableUpdateCheck(),
+		nucleilib.WithNetworkConfig(nucleilib.NetworkConfig{
+			Timeout: cfg.Timeout,
+		}),
 		nucleilib.WithConcurrency(nucleilib.Concurrency{
 			HeadlessHostConcurrency:       cfg.Threads,
 			HostConcurrency:               cfg.Threads,
@@ -142,6 +146,29 @@ func loadTargets(eng *nucleilib.NucleiEngine, cfg Config) error {
 		eng.LoadTargets(cfg.Targets, false)
 	}
 	return nil
+}
+
+// getProxy returns the proxy URL from the config, or an empty string if no proxy is set.
+func getProxy(config nuclei.NucleiConfig) string {
+	if config.Proxy != nil {
+		return *config.Proxy
+	}
+	return ""
+}
+
+// GetRunnerConfig returns a runner config from a nuclei config.
+func GetRunnerConfig(fileSystems []fs.FS, config nuclei.NucleiConfig) Config {
+	rconfig := Config{
+		Targets:        config.Targets,
+		FS:             fileSystems,
+		Threads:        config.Threads,
+		Proxy:          getProxy(config),
+		RunMode:        config.RunMode,
+		SuccessfulOnly: config.SuccessfulOnly,
+		VerboseLogs:    config.VerboseLogs,
+		Timeout:        config.Timeout,
+	}
+	return rconfig
 }
 
 func Run(ctx context.Context, cfg Config, reportBuilder *report.Builder) (*nuclei.NucleiReport, error) {

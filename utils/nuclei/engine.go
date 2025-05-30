@@ -38,32 +38,25 @@ func RunNucleiEngine(ctx context.Context, config nuclei.NucleiConfig) (*nuclei.N
 	log := svc1log.FromContext(ctx)
 	log.Info("Starting Nuclei Run of mode: Scan")
 
+	// Get the template file system
 	var fileSystems []fs.FS
 	var err error
 	fileSystems, err = templates.GetTemplateFileSystem(ctx, config.TemplatePaths)
 	if err != nil {
 		return nil, err
 	}
-	rconfig := runner.Config{
-		Targets:        config.Targets,
-		FS:             fileSystems,
-		Threads:        config.Threads,
-		Proxy:          getProxy(config),
-		RunMode:        config.RunMode,
-		SuccessfulOnly: config.SuccessfulOnly,
-		VerboseLogs:    config.VerboseLogs,
-	}
 
+	// Get the runner config
+	runnerConfig := runner.GetRunnerConfig(fileSystems, config)
+
+	// Build the raw requests for dast mode
 	if config.RunMode == nuclei.NucleiRunModeDast {
-		rconfig.RawRequests = buildJSONL(config)
+		runnerConfig.RawRequests = buildJSONL(config)
 	}
 
+	// Build the report builder and run the nuclei engine
 	builder := report.NewBuilder()
-	log.Info("Populating config")
-	if err := builder.PopulateConfig(config); err != nil {
-		return nil, err
-	}
-	return runner.Run(ctx, rconfig, builder)
+	return runner.Run(ctx, runnerConfig, builder)
 }
 
 func buildJSONL(config nuclei.NucleiConfig) []string {
@@ -154,12 +147,4 @@ func buildJSONL(config nuclei.NucleiConfig) []string {
 		}
 	}
 	return out
-}
-
-// getProxy returns the proxy URL from the config, or an empty string if no proxy is set.
-func getProxy(config nuclei.NucleiConfig) string {
-	if config.Proxy != nil {
-		return *config.Proxy
-	}
-	return ""
 }

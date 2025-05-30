@@ -24,5 +24,4 @@ types:
     properties:
       targets: optional<list<NucleiTargetInfo>>
       probes: optional<list<probe.NucleiProbe>>
-      config: config.NucleiConfig
 

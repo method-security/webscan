@@ -1,0 +1,3 @@
+.git
+download
+api/auth/signin

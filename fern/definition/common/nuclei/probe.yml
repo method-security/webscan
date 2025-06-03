@@ -1,10 +1,10 @@
 types:
-  ExpectedMatcher:
+  NucleiExpectedMatcher:
     properties:
       type: string
       value: list<string>
-  Probe:
+  NucleiProbe:
     properties:
       id: string # Nuclei Template ID
       payloads: optional<list<string>>
-      expectedMatchers: optional<list<ExpectedMatcher>>
+      expectedMatchers: optional<list<NucleiExpectedMatcher>>

@@ -1,0 +1,25 @@
+imports:
+  http: ../../common/http.yml
+  parameter: ./parameter.yml
+types:
+  # Nuclei Enum and Structs
+  NucleiRunMode:
+    enum:
+      - DAST
+      - SCAN
+  NucleiDastConfig:
+    properties:
+      httpMethods: optional<list<http.HttpMethod>>
+      requestParameters: optional<list<parameter.RequestParameter>>
+  NucleiConfig:
+    properties:
+      targets: list<string>
+      runMode: NucleiRunMode
+      dast: optional<NucleiDastConfig>
+      templatePaths: optional<list<string>>
+      successfulOnly: optional<boolean>
+      timeout: integer
+      threads: integer
+      proxy: optional<string>
+      verboseLogs: boolean
+

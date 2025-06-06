@@ -40,9 +40,8 @@ func sendRequests(ctx context.Context, target string, config *discover.DiscoverP
 
 	// Probe both HTTP and HTTPS URLs
 	sanitizedTarget := requesthelpers.RemoveScheme(target)
-	httpURL := "http://" + sanitizedTarget
-	httpsURL := "https://" + sanitizedTarget
 
+	httpURL := "http://" + sanitizedTarget
 	baseURL, path, err := requesthelpers.SplitTargetURL(httpURL)
 	if err != nil {
 		errors = append(errors, fmt.Sprintf("invalid address %s: %v", httpURL, err))
@@ -56,20 +55,19 @@ func sendRequests(ctx context.Context, target string, config *discover.DiscoverP
 		httpRequestResponses = append(httpRequestResponses, httpRequestResponse)
 	}
 
-	if httpRequestResponse == nil {
-		// Send HTTPS Request
-		baseURL, path, err = requesthelpers.SplitTargetURL(httpsURL)
-		if err != nil {
-			errors = append(errors, fmt.Sprintf("invalid address %s: %v", httpsURL, err))
-			return nil, errors
-		}
-		httpsConfig := createSendHTTPRequestConfig(baseURL, path, config, browserbaseSecrets)
-		httpRequestResponse, httpsErr := request.SendRequest(ctx, httpsConfig)
-		if httpsErr != nil {
-			errors = append(errors, fmt.Sprintf("failed to probe %s - %s", httpsURL, httpsErr))
-		} else {
-			httpRequestResponses = append(httpRequestResponses, httpRequestResponse)
-		}
+	// Send HTTPS Request
+	httpsURL := "https://" + sanitizedTarget
+	baseURL, path, err = requesthelpers.SplitTargetURL(httpsURL)
+	if err != nil {
+		errors = append(errors, fmt.Sprintf("invalid address %s: %v", httpsURL, err))
+		return nil, errors
+	}
+	httpsConfig := createSendHTTPRequestConfig(baseURL, path, config, browserbaseSecrets)
+	httpRequestResponse, httpsErr := request.SendRequest(ctx, httpsConfig)
+	if httpsErr != nil {
+		errors = append(errors, fmt.Sprintf("failed to probe %s - %s", httpsURL, httpsErr))
+	} else {
+		httpRequestResponses = append(httpRequestResponses, httpRequestResponse)
 	}
 
 	return httpRequestResponses, errors
@@ -86,7 +84,6 @@ func PerformWebProbe(ctx context.Context, config *discover.DiscoverProbeConfig, 
 		responses, errs := sendRequests(ctx, target, config, browserbaseSecrets)
 		if len(errs) > 0 {
 			errors = append(errors, errs...)
-			continue
 		}
 		allResponses = append(allResponses, responses...)
 	}

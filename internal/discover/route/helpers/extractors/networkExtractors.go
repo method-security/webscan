@@ -31,7 +31,11 @@ func ExtractNetworkRoutes(ctx context.Context, browser *headless.Requester, targ
 	// Ensure the browser is initialized
 	if browser.Browser == nil {
 		log.Debug("Initializing browser for network capture")
-		browser.InitializeBrowser()
+		err := browser.InitializeBrowser()
+		if err != nil {
+			log.Error("Failed to initialize browser", svc1log.SafeParam("error", err))
+			return routes, discoverroutehelpers.SetToListString(urls), []string{err.Error()}
+		}
 	}
 
 	// Set up a page with timeout context

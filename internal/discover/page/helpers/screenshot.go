@@ -16,19 +16,19 @@ import (
 )
 
 // CaptureScreenshot uses a headless browser to capture a screenshot of the given URL and returns the image bytes.
-func CaptureScreenshot(ctx context.Context, requester *headless.Requester, sendHTTPRequestConfig *common.SendHttpRequestConfig) ([]byte, error) {
+func CaptureScreenshot(ctx context.Context, browser *headless.Requester, sendHTTPRequestConfig *common.SendHttpRequestConfig) ([]byte, error) {
 	log := svc1log.FromContext(ctx)
 
 	// Initialize browser if not already initialized
-	if requester.Browser == nil {
+	if browser == nil {
 		log.Info("Initializing browser")
-		requester.InitializeBrowser()
+		browser.InitializeBrowser()
 	}
 
 	// Get the page from the browser
 	fullURL := fmt.Sprintf("%s%s", sendHTTPRequestConfig.Request.BaseUrl, sendHTTPRequestConfig.Request.Path)
 	log.Info("Capturing screenshot", svc1log.SafeParam("url", fullURL))
-	page := requester.Browser.MustPage(fullURL)
+	page := browser.Browser.MustPage(fullURL)
 
 	// Capture the screenshot
 	log.Info("Capturing screenshot")

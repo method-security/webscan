@@ -158,7 +158,7 @@ func (a *WebScan) InitEnumerateCommand() {
 	// Target Flags
 	enumerateKubeCmd.Flags().String("target", "", "URL target to perform Kubernetes enumeration against")
 	// Config Flags
-	enumerateKubeCmd.Flags().Bool("verify-tls", true, "Verify TLS certificates when making HTTPS requests")
+	enumerateKubeCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
 	enumerateKubeCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
 
 	// Mark required flags
@@ -253,7 +253,7 @@ func (a *WebScan) InitEnumerateCommand() {
 	// Config Flags
 	enumerateCMSWordpressPluginsCmd.Flags().StringSlice("plugins", []string{}, "Specific WordPress plugins to check for")
 	enumerateCMSWordpressPluginsCmd.Flags().StringSlice("plugins-file-paths", []string{"configs/enumerate/cms/wordpress/plugins_small.txt"}, "Paths to files containing WordPress plugin lists")
-	enumerateCMSWordpressPluginsCmd.Flags().Bool("verify-tls", true, "Verify TLS certificates when making HTTPS requests")
+	enumerateCMSWordpressPluginsCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
 	enumerateCMSWordpressPluginsCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
 	enumerateCMSWordpressPluginsCmd.Flags().Int("threads", 0, "Number of concurrent threads for scanning")
 
@@ -323,7 +323,7 @@ func (a *WebScan) InitEnumerateCommand() {
 	// Target Flags
 	enumerateWebserverIISCmd.Flags().StringSlice("targets", []string{}, "URL targets to perform IIS enumeration against")
 	// Config Flags
-	enumerateWebserverIISCmd.Flags().Bool("verify-tls", true, "Verify TLS certificates when making HTTPS requests")
+	enumerateWebserverIISCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
 	enumerateWebserverIISCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
 	enumerateWebserverIISCmd.Flags().Int("threads", 0, "Number of concurrent threads for scanning")
 
@@ -397,7 +397,7 @@ func (a *WebScan) InitEnumerateCommand() {
 	// Config Flags
 	enumerateGeneralRatelimitCmd.Flags().Int("max-requests", 10, "Maximum number of requests to send")
 	enumerateGeneralRatelimitCmd.Flags().Int("timespan", 10, "Time window for rate limit testing in seconds")
-	enumerateGeneralRatelimitCmd.Flags().Bool("verify-tls", true, "Verify TLS certificates when making HTTPS requests")
+	enumerateGeneralRatelimitCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
 	enumerateGeneralRatelimitCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
 
 	// Mark required flags

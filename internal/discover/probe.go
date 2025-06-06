@@ -38,32 +38,36 @@ func sendRequests(ctx context.Context, target string, config *discover.DiscoverP
 	httpRequestResponses := []*common.HttpRequestResponse{}
 	errors := []string{}
 
-	// Send HTTPS Request
-	httpsURL := "https://" + target
-	baseURL, path, err := requesthelpers.SplitTargetURL(httpsURL)
+	// Probe both HTTP and HTTPS URLs
+	sanitizedTarget := requesthelpers.RemoveScheme(target)
+	httpURL := "http://" + sanitizedTarget
+	httpsURL := "https://" + sanitizedTarget
+
+	baseURL, path, err := requesthelpers.SplitTargetURL(httpURL)
 	if err != nil {
-		errors = append(errors, fmt.Sprintf("invalid address %s: %v", httpsURL, err))
+		errors = append(errors, fmt.Sprintf("invalid address %s: %v", httpURL, err))
 		return nil, errors
 	}
-	httpsConfig := createSendHTTPRequestConfig(baseURL, path, config, browserbaseSecrets)
-	httpRequestResponse, httpsErr := request.SendRequest(ctx, httpsConfig)
-	if httpsErr != nil {
-		errors = append(errors, fmt.Sprintf("failed to probe %s: %s", httpsURL, httpsErr))
+	httpConfig := createSendHTTPRequestConfig(baseURL, path, config, browserbaseSecrets)
+	httpRequestResponse, httpErr := request.SendRequest(ctx, httpConfig)
+	if httpErr != nil {
+		errors = append(errors, fmt.Sprintf("failed to probe %s - %s", httpURL, httpErr))
 	} else {
 		httpRequestResponses = append(httpRequestResponses, httpRequestResponse)
 	}
 
-	// Send HTTP Request
-	if !config.HttpsOnly {
-		httpURL := "http://" + target
-		baseURL, path, err = requesthelpers.SplitTargetURL(httpURL)
+	if httpRequestResponse == nil {
+		// Send HTTPS Request
+		baseURL, path, err = requesthelpers.SplitTargetURL(httpsURL)
 		if err != nil {
-			errors = append(errors, fmt.Sprintf("invalid address %s: %v", httpURL, err))
+			errors = append(errors, fmt.Sprintf("invalid address %s: %v", httpsURL, err))
 			return nil, errors
 		}
-		httpConfig := createSendHTTPRequestConfig(baseURL, path, config, browserbaseSecrets)
-		httpRequestResponse, err := request.SendRequest(ctx, httpConfig)
-		if err == nil {
+		httpsConfig := createSendHTTPRequestConfig(baseURL, path, config, browserbaseSecrets)
+		httpRequestResponse, httpsErr := request.SendRequest(ctx, httpsConfig)
+		if httpsErr != nil {
+			errors = append(errors, fmt.Sprintf("failed to probe %s - %s", httpsURL, httpsErr))
+		} else {
 			httpRequestResponses = append(httpRequestResponses, httpRequestResponse)
 		}
 	}

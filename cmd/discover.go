@@ -114,7 +114,7 @@ func (a *WebScan) InitDiscoverCommand() {
 	discoverApplicationCmd.Flags().String("resource-type", "", "Type of resource to fingerprint (e.g., web, api, cms)")
 	discoverApplicationCmd.Flags().StringSlice("modules", []string{}, "Specific fingerprinting modules to run")
 	discoverApplicationCmd.Flags().Bool("successful-only", false, "Only show successful fingerprint matches")
-	discoverApplicationCmd.Flags().Bool("verify-tls", true, "Verify TLS certificates when making HTTPS requests")
+	discoverApplicationCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
 	discoverApplicationCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
 
 	// Mark Required Flags
@@ -189,7 +189,7 @@ func (a *WebScan) InitDiscoverCommand() {
 	// Config Flags
 	discoverPageCmd.Flags().Bool("screenshot", false, "Capture a screenshot of the page")
 	discoverPageCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
-	discoverPageCmd.Flags().Bool("verify-tls", true, "Verify TLS certificates when making HTTPS requests")
+	discoverPageCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
 	discoverPageCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
 	// Request Method Flags for all capture subcommands
 	discoverPageCmd.Flags().String("request-method", "STANDARD", "Request method to use (standard, headless, browserbase)")
@@ -227,11 +227,6 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			HTTPSOnly, err := cmd.Flags().GetBool("https-only")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
 			verifyTLS, err := cmd.Flags().GetBool("verify-tls")
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -251,7 +246,7 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Set Config
-			config := getDiscoverProbeConfig(targets, maxRedirects, HTTPSOnly, verifyTLS, timeout, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
+			config := getDiscoverProbeConfig(targets, maxRedirects, verifyTLS, timeout, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
 
 			// Generate report
 			report, err := discoverprobe.PerformWebProbe(cmd.Context(), config, requestMethodConfig.BrowserbaseSecrets)
@@ -265,9 +260,8 @@ func (a *WebScan) InitDiscoverCommand() {
 	// Target Flags
 	discoverProbeCmd.Flags().StringSlice("targets", []string{}, "URL targets to probe for web applications")
 	// Config Flags
-	discoverProbeCmd.Flags().Bool("https-only", true, "Only probe HTTPS URLs")
 	discoverProbeCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
-	discoverProbeCmd.Flags().Bool("verify-tls", true, "Verify TLS certificates when making HTTPS requests")
+	discoverProbeCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
 	discoverProbeCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
 	// Request Method Flags
 	discoverProbeCmd.Flags().String("request-method", "STANDARD", "Request method to use (standard, headless, browserbase)")
@@ -358,7 +352,7 @@ func (a *WebScan) InitDiscoverCommand() {
 	discoverRouteCmd.Flags().Bool("ignore-static-assets", true, "Exclude static assets from route discovery")
 	discoverRouteCmd.Flags().Int("spider-depth", 1, "Maximum depth for route spidering")
 	discoverRouteCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
-	discoverRouteCmd.Flags().Bool("verify-tls", true, "Verify TLS certificates when making HTTPS requests")
+	discoverRouteCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
 	discoverRouteCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
 	discoverRouteCmd.Flags().Int("threads", 0, "Number of concurrent threads for scanning")
 	// Request Method Flags
@@ -512,7 +506,7 @@ func (a *WebScan) InitDiscoverCommand() {
 	discoverSaasActiveCmd.Flags().Bool("successful-only", false, "Only show successful attempts")
 	discoverSaasActiveCmd.Flags().Bool("https-only", true, "Only show successful attempts over HTTPS")
 	discoverSaasActiveCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
-	discoverSaasActiveCmd.Flags().Bool("verify-tls", true, "Verify TLS certificates when making HTTPS requests")
+	discoverSaasActiveCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
 	discoverSaasActiveCmd.Flags().Int("timeout", 30, "Timeout in seconds for the capture")
 	// Request Method Flags for all capture subcommands
 	discoverSaasActiveCmd.Flags().String("request-method", "HEADLESS", "Request method (headless, browserbase)")
@@ -569,11 +563,10 @@ func getDiscoverPageConfig(target string, maxRedirects int, verifyTLS bool, time
 }
 
 // getDiscoverProbeConfig builds the config for probe discovery.
-func getDiscoverProbeConfig(targets []string, maxRedirects int, HTTPSOnly bool, verifyTLS bool, timeout int, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) *discover.DiscoverProbeConfig {
+func getDiscoverProbeConfig(targets []string, maxRedirects int, verifyTLS bool, timeout int, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) *discover.DiscoverProbeConfig {
 	config := &discover.DiscoverProbeConfig{
 		Targets:           targets,
 		MaxRedirects:      maxRedirects,
-		HttpsOnly:         HTTPSOnly,
 		VerifyTls:         verifyTLS,
 		Timeout:           max(timeout, 0),
 		RequestMethod:     requestMethod,

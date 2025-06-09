@@ -68,7 +68,7 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 		resp, err := client.Do(req)
 		if err != nil {
 			log.Error("Failed to send request", svc1log.SafeParam("error", err))
-			return nil, redirectChain, fmt.Errorf("request failed: %v", err)
+			return nil, redirectChain, fmt.Errorf("redirect request failed: %v", err)
 		}
 
 		// Check if Response is not a redirect, return

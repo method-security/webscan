@@ -33,39 +33,67 @@ func createSendHTTPRequestConfig(baseURL, path string, config *discover.Discover
 	}
 }
 
+// sendHTTPRequest attempts to connect to a target using HTTP protocol
+func sendHTTPRequest(ctx context.Context, target string, config *discover.DiscoverProbeConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) (*common.HttpRequestResponse, error) {
+	sanitizedTarget := requesthelpers.RemoveScheme(target)
+	httpURL := "http://" + sanitizedTarget
+
+	baseURL, path, err := requesthelpers.SplitTargetURL(httpURL)
+	if err != nil {
+		return nil, fmt.Errorf("invalid address %s: %v", httpURL, err)
+	}
+
+	httpConfig := createSendHTTPRequestConfig(baseURL, path, config, browserbaseSecrets)
+	httpRequestResponse, err := request.SendRequest(ctx, httpConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to probe %s - %s", httpURL, err)
+	}
+
+	return httpRequestResponse, nil
+}
+
+// sendHTTPSRequest attempts to connect to a target using HTTPS protocol
+func sendHTTPSRequest(ctx context.Context, target string, config *discover.DiscoverProbeConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) (*common.HttpRequestResponse, error) {
+	sanitizedTarget := requesthelpers.RemoveScheme(target)
+	httpsURL := "https://" + sanitizedTarget
+
+	baseURL, path, err := requesthelpers.SplitTargetURL(httpsURL)
+	if err != nil {
+		return nil, fmt.Errorf("invalid address %s: %v", httpsURL, err)
+	}
+
+	httpsConfig := createSendHTTPRequestConfig(baseURL, path, config, browserbaseSecrets)
+	httpRequestResponse, err := request.SendRequest(ctx, httpsConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to probe %s - %s", httpsURL, err)
+	}
+
+	return httpRequestResponse, nil
+}
+
 // sendRequests attempts to connect to a target using both HTTPS and HTTP protocols
 func sendRequests(ctx context.Context, target string, config *discover.DiscoverProbeConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) ([]*common.HttpRequestResponse, []string) {
 	httpRequestResponses := []*common.HttpRequestResponse{}
-	errors := []string{}
+	var httpErr, httpsErr error
 
-	// Send HTTPS Request
-	httpsURL := "https://" + target
-	baseURL, path, err := requesthelpers.SplitTargetURL(httpsURL)
-	if err != nil {
-		errors = append(errors, fmt.Sprintf("invalid address %s: %v", httpsURL, err))
-		return nil, errors
-	}
-	httpsConfig := createSendHTTPRequestConfig(baseURL, path, config, browserbaseSecrets)
-	httpRequestResponse, httpsErr := request.SendRequest(ctx, httpsConfig)
-	if httpsErr != nil {
-		errors = append(errors, fmt.Sprintf("failed to probe %s: %s", httpsURL, httpsErr))
+	// Try HTTP request
+	if httpResponse, err := sendHTTPRequest(ctx, target, config, browserbaseSecrets); err != nil {
+		httpErr = err
 	} else {
-		httpRequestResponses = append(httpRequestResponses, httpRequestResponse)
+		httpRequestResponses = append(httpRequestResponses, httpResponse)
 	}
 
-	// Send HTTP Request
-	if !config.HttpsOnly {
-		httpURL := "http://" + target
-		baseURL, path, err = requesthelpers.SplitTargetURL(httpURL)
-		if err != nil {
-			errors = append(errors, fmt.Sprintf("invalid address %s: %v", httpURL, err))
-			return nil, errors
-		}
-		httpConfig := createSendHTTPRequestConfig(baseURL, path, config, browserbaseSecrets)
-		httpRequestResponse, err := request.SendRequest(ctx, httpConfig)
-		if err == nil {
-			httpRequestResponses = append(httpRequestResponses, httpRequestResponse)
-		}
+	// Try HTTPS request
+	if httpsResponse, err := sendHTTPSRequest(ctx, target, config, browserbaseSecrets); err != nil {
+		httpsErr = err
+	} else {
+		httpRequestResponses = append(httpRequestResponses, httpsResponse)
+	}
+
+	// Only return errors if both requests failed
+	var errors []string
+	if httpErr != nil && httpsErr != nil {
+		errors = append(errors, httpErr.Error(), httpsErr.Error())
 	}
 
 	return httpRequestResponses, errors
@@ -82,7 +110,6 @@ func PerformWebProbe(ctx context.Context, config *discover.DiscoverProbeConfig, 
 		responses, errs := sendRequests(ctx, target, config, browserbaseSecrets)
 		if len(errs) > 0 {
 			errors = append(errors, errs...)
-			continue
 		}
 		allResponses = append(allResponses, responses...)
 	}

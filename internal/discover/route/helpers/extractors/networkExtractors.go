@@ -21,7 +21,7 @@ import (
 
 // ExtractNetworkRoutes uses a headless browser to capture network requests and extract route details from them.
 // Returns a slice of RouteDetails, a slice of URLs, and a slice of errors.
-func ExtractNetworkRoutes(ctx context.Context, b *headless.Requester, target string, baseURLsOnly bool, captureStaticAssets bool) ([]*discover.RouteDetails, []string, []string) {
+func ExtractNetworkRoutes(ctx context.Context, browser *headless.Requester, target string, baseURLsOnly bool, captureStaticAssets bool) ([]*discover.RouteDetails, []string, []string) {
 	routes := []*discover.RouteDetails{}
 	urls := make(map[string]struct{})
 	errors := []string{}
@@ -29,18 +29,22 @@ func ExtractNetworkRoutes(ctx context.Context, b *headless.Requester, target str
 
 	log.Info("Initiating network events capture with Headless method", svc1log.SafeParam("target", target))
 	// Ensure the browser is initialized
-	if b.Browser == nil {
+	if browser.Browser == nil {
 		log.Debug("Initializing browser for network capture")
-		b.InitializeBrowser()
+		err := browser.InitializeBrowser()
+		if err != nil {
+			log.Error("Failed to initialize browser", svc1log.SafeParam("error", err))
+			return routes, discoverroutehelpers.SetToListString(urls), []string{err.Error()}
+		}
 	}
 
 	// Set up a page with timeout context
-	pageCtx, cancel := context.WithTimeout(ctx, time.Duration(b.TimeoutSeconds)*time.Second)
+	pageCtx, cancel := context.WithTimeout(ctx, time.Duration(browser.TimeoutSeconds)*time.Second)
 	defer cancel()
 
 	var page *rod.Page
 	pageErr := rod.Try(func() {
-		page = b.Browser.MustPage(target).Context(pageCtx)
+		page = browser.Browser.MustPage(target).Context(pageCtx)
 	})
 	if pageErr != nil {
 		log.Error("Failed to create page", svc1log.SafeParam("url", target), svc1log.SafeParam("error", pageErr))

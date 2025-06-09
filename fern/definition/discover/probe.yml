@@ -7,7 +7,6 @@ types:
     properties:
       targets: list<string>
       maxRedirects: integer
-      httpsOnly: boolean
       verifyTls: boolean
       timeout: integer
       requestMethod: method.RequestMethod

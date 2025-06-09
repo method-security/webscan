@@ -115,7 +115,12 @@ func extractRoutes(ctx context.Context, httpRequestResponse *common.HttpRequestR
 		browser := &headless.Requester{
 			TimeoutSeconds: requestConfig.Timeout,
 		}
-		browser.InitializeBrowser()
+		err := browser.InitializeBrowser()
+		if err != nil {
+			log.Error("Failed to initialize browser", svc1log.SafeParam("error", err))
+			errors = append(errors, err.Error())
+			return routes, discoverroutehelpers.SetToListString(urls), errors
+		}
 
 		fullRedirectedURL := fmt.Sprintf("%s%s", redirectedURLBase, redirectedURLPath)
 		networkRoutes, networkUrls, networkErrors := capturerouteextractors.ExtractNetworkRoutes(ctx, browser, fullRedirectedURL, routeCaptureConfig.RequireBaseUrlMatch, !routeCaptureConfig.IgnoreStaticAssets)

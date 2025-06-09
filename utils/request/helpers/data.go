@@ -13,6 +13,17 @@ import (
 	common "github.com/Method-Security/webscan/generated/go/common"
 )
 
+// RemoveScheme removes http:// or https:// from the beginning of a string
+func RemoveScheme(url string) string {
+	if strings.HasPrefix(url, "http://") {
+		return strings.TrimPrefix(url, "http://")
+	}
+	if strings.HasPrefix(url, "https://") {
+		return strings.TrimPrefix(url, "https://")
+	}
+	return url
+}
+
 // SplitTargetURL splits a target URL and standardizes it into its base URL and path components.
 func SplitTargetURL(target string) (string, string, error) {
 	parsedURL, err := url.Parse(target)

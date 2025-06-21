@@ -62,7 +62,7 @@ types:
       method: HttpMethod
       baseHeaders: optional<map<string, list<string>>>
       params: optional<HttpRequestParams>
-      sentAt: optional<datetime>
+      sentAt: datetime
   # Response Struct
   HttpResponse:
     properties:

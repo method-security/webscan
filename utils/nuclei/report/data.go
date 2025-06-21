@@ -94,7 +94,7 @@ func getHTTPRequestResponse(ev *nout.ResultEvent) (*common.HttpRequestResponse, 
 	request := common.HttpRequest{
 		Params:      &common.HttpRequestParams{},
 		BaseHeaders: map[string][]string{},
-		SentAt:      &ev.Timestamp,
+		SentAt:      ev.Timestamp,
 	}
 	response := common.HttpResponse{
 		ResponseHeaders: map[string][]string{},

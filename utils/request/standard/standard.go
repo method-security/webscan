@@ -43,7 +43,7 @@ func SendStandardRequest(ctx context.Context, config common.SendHttpRequestConfi
 
 	// Send Request
 	sentAt := time.Now()
-	request.SentAt = &sentAt
+	request.SentAt = sentAt
 	resp, redirectChain, err := standardhelpers.SendHTTPRequest(ctx, *constructedURL, constructedHeaders, constructedReqReader, config)
 	if err != nil {
 		return common.HttpRequestResponse{Request: request}, fmt.Errorf("request failed: %v", err)

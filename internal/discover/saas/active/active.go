@@ -12,7 +12,7 @@ import (
 	discover "github.com/Method-Security/webscan/generated/go/discover"
 
 	// Internal
-	discoversaasactivehelpers "github.com/Method-Security/webscan/internal/discover/saas/active/helpers"
+	discoversaashelpers "github.com/Method-Security/webscan/internal/discover/saas/active/helpers"
 	// Utils
 	request "github.com/Method-Security/webscan/utils/request"
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
@@ -37,7 +37,7 @@ func createSendHTTPRequestConfig(baseURL, path string, config discover.DiscoverS
 	}
 }
 
-func LaunchDiscoverSaasActive(ctx context.Context, config discover.DiscoverSaasConfig, saasFingerprints discover.SaasFingerprintFile, ssoFingerprints discover.SaasFingerprintFile, browserbaseSecrets *common.BrowserbaseRequestSecrets) (*discover.DiscoverSaasReport, error) {
+func LaunchDiscoverSaas(ctx context.Context, config discover.DiscoverSaasConfig, saasFingerprints discover.SaasFingerprintFile, ssoFingerprints discover.SaasFingerprintFile, browserbaseSecrets *common.BrowserbaseRequestSecrets) (*discover.DiscoverSaasReport, error) {
 	// Initialize report
 	report := discover.DiscoverSaasReport{
 		Config: &config,
@@ -88,11 +88,11 @@ func LaunchDiscoverSaasActive(ctx context.Context, config discover.DiscoverSaasC
 
 					// Analyze the request
 					redirectedPage := len(httpRequestResponse.Response.RedirectChain) > 1
-					finding := discoversaasactivehelpers.AnalyzeSaasRequest(ctx, saasRequest, fingerprint, &ssoFingerprints, redirectedPage)
+					finding := discoversaashelpers.AnalyzeSaasRequest(ctx, saasRequest, fingerprint, &ssoFingerprints, redirectedPage)
 					saasRequest.Findings = finding
 
 					// Add request if it meets our criteria
-					if discoversaasactivehelpers.ShouldAddRequest(saasRequest) {
+					if discoversaashelpers.ShouldAddRequest(saasRequest) {
 						requests = append(requests, saasRequest)
 					}
 				}

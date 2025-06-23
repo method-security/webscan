@@ -22,3 +22,6 @@ types:
     properties:
       type: string
       fields: optional<list<string>>
+  EnumerateGraphqlConfig:
+    properties:
+      target: string

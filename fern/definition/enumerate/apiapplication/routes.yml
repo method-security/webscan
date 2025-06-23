@@ -98,8 +98,8 @@ types:
       requestSchema: optional<RequestSchema>
   EnumerateApiApplicationRoutesReport:
     properties:
-      target: string  
-      appType: ApiType  
+      target: string
+      appType: ApiType
       baseEndpointUrl: string
       version: optional<string>
       schemaUrl: optional<string>

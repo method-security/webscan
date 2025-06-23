@@ -4,17 +4,16 @@ import (
 	// Standard
 	"errors"
 	// Generated
+	enumerateapiapplicationfern "github.com/Method-Security/webscan/generated/go/enumerate/apiapplication"
 	enumeratecmswordpressfern "github.com/Method-Security/webscan/generated/go/enumerate/cms/wordpress"
 	enumerategeneralfern "github.com/Method-Security/webscan/generated/go/enumerate/general"
 	enumeratekubefern "github.com/Method-Security/webscan/generated/go/enumerate/kube"
-	enumeratewebserverfern "github.com/Method-Security/webscan/generated/go/enumerate/webserver"
 
 	// Internal
 	enumerateapiapplication "github.com/Method-Security/webscan/internal/enumerate/apiapplication"
 	enumeratecmswordpress "github.com/Method-Security/webscan/internal/enumerate/cms/wordpress"
 	enumerategeneral "github.com/Method-Security/webscan/internal/enumerate/general"
 	enumeratekube "github.com/Method-Security/webscan/internal/enumerate/kube"
-	enumeratewebserver "github.com/Method-Security/webscan/internal/enumerate/webserver"
 
 	// Utils
 	utils "github.com/Method-Security/webscan/utils"
@@ -56,8 +55,12 @@ func (a *WebScan) InitEnumerateCommand() {
 				return
 			}
 
+			config := enumerateapiapplicationfern.EnumerateGraphqlConfig{
+				Target: target,
+			}
+
 			// Generate report
-			report := enumerateapiapplication.PerformAppEnumerateGraphQL(cmd.Context(), target)
+			report := enumerateapiapplication.PerformAppEnumerateGraphQL(cmd.Context(), config.Target)
 			if len(report.Errors) > 0 {
 				a.OutputSignal.Status = 1
 			}
@@ -96,8 +99,13 @@ func (a *WebScan) InitEnumerateCommand() {
 				return
 			}
 
+			config := enumerateapiapplicationfern.EnumerateSwaggerConfig{
+				Target:  target,
+				Timeout: timeout,
+			}
+
 			// Generate report
-			report := enumerateapiapplication.PerformAppEnumerateSwagger(cmd.Context(), target, timeout)
+			report := enumerateapiapplication.PerformAppEnumerateSwagger(cmd.Context(), config.Target, config.Timeout)
 			if len(report.Errors) > 0 {
 				a.OutputSignal.Status = 1
 			}
@@ -269,73 +277,6 @@ func (a *WebScan) InitEnumerateCommand() {
 	// Add Command to 'Enumerate' Command
 	enumerateCmd.AddCommand(enumerateCMSCmd)
 
-	// Webserver Command
-	// Subcommands: iis
-	enumerateWebserverCmd := &cobra.Command{
-		Use:   "webserver",
-		Short: "Enumerate web servers",
-		Long:  `Discover and analyze web server configurations, versions, and potential security misconfigurations.`,
-	}
-
-	// IIS Command
-	enumerateWebserverIISCmd := &cobra.Command{
-		Use:   "iis",
-		Short: "Enumerate IIS servers",
-		Long:  `Discover and analyze IIS server configurations, features, and potential security vulnerabilities.`,
-		Run: func(cmd *cobra.Command, args []string) {
-			defer a.OutputSignal.PanicHandler(cmd.Context())
-
-			// Target flag
-			targets, err := cmd.Flags().GetStringSlice("targets")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-
-			// Config flags
-			verifyTLS, err := cmd.Flags().GetBool("verify-tls")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			timeout, err := cmd.Flags().GetInt("timeout")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			threads, err := cmd.Flags().GetInt("threads")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-
-			// Generate config
-			config := getEnumerateWebserverIISConfig(targets, verifyTLS, timeout, threads)
-
-			// Generate report
-			report := enumeratewebserver.PerformAppEnumerateWebserverIIS(cmd.Context(), config)
-			if len(report.Errors) > 0 {
-				a.OutputSignal.Status = 1
-			}
-			a.OutputSignal.Content = report
-		},
-	}
-	// Target Flags
-	enumerateWebserverIISCmd.Flags().StringSlice("targets", []string{}, "URL targets to perform IIS enumeration against")
-	// Config Flags
-	enumerateWebserverIISCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
-	enumerateWebserverIISCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
-	enumerateWebserverIISCmd.Flags().Int("threads", 0, "Number of concurrent threads for scanning")
-
-	// Mark required flags
-	_ = enumerateWebserverIISCmd.MarkFlagRequired("targets")
-
-	// Add Command to 'Enumerate Webserver' Command
-	enumerateWebserverCmd.AddCommand(enumerateWebserverIISCmd)
-
-	// Add Command to 'Enumerate' Command
-	enumerateCmd.AddCommand(enumerateWebserverCmd)
-
 	// General Command
 	// Subcommands: ratelimit
 	enumerateGeneralCmd := &cobra.Command{
@@ -431,17 +372,6 @@ func getEnumerateKubeConfig(target string, verifyTLS bool, timeout int) enumerat
 		Target:    target,
 		VerifyTls: verifyTLS,
 		Timeout:   max(timeout, 0),
-	}
-	return config
-}
-
-// getEnumerateWebserverIISConfig builds the config for IIS webserver enumeration.
-func getEnumerateWebserverIISConfig(targets []string, verifyTLS bool, timeout int, threads int) enumeratewebserverfern.EnumerateWebserverIisConfig {
-	config := enumeratewebserverfern.EnumerateWebserverIisConfig{
-		Targets:   targets,
-		VerifyTls: verifyTLS,
-		Timeout:   max(timeout, 0),
-		Threads:   max(threads, 0),
 	}
 	return config
 }

@@ -1,0 +1,5 @@
+types:
+  EnumerateSwaggerConfig:
+    properties:
+      target: string
+      timeout: integer

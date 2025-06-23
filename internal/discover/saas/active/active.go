@@ -9,7 +9,7 @@ import (
 
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
-	discoversaasfern "github.com/Method-Security/webscan/generated/go/discover/saas"
+	discover "github.com/Method-Security/webscan/generated/go/discover"
 
 	// Internal
 	discoversaasactivehelpers "github.com/Method-Security/webscan/internal/discover/saas/active/helpers"
@@ -18,7 +18,7 @@ import (
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
 )
 
-func createSendHTTPRequestConfig(baseURL, path string, config discoversaasfern.DiscoverSaasActiveConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) common.SendHttpRequestConfig {
+func createSendHTTPRequestConfig(baseURL, path string, config discover.DiscoverSaasConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) common.SendHttpRequestConfig {
 	request := common.HttpRequest{
 		BaseUrl: baseURL,
 		Path:    path,
@@ -37,36 +37,34 @@ func createSendHTTPRequestConfig(baseURL, path string, config discoversaasfern.D
 	}
 }
 
-func LaunchDiscoverSaasActive(ctx context.Context, config discoversaasfern.DiscoverSaasActiveConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) (*discoversaasfern.DiscoverSaasActiveReport, error) {
+func LaunchDiscoverSaasActive(ctx context.Context, config discover.DiscoverSaasConfig, saasFingerprints discover.SaasFingerprintFile, ssoFingerprints discover.SaasFingerprintFile, browserbaseSecrets *common.BrowserbaseRequestSecrets) (*discover.DiscoverSaasReport, error) {
 	// Initialize report
-	report := discoversaasfern.DiscoverSaasActiveReport{
+	report := discover.DiscoverSaasReport{
 		Config: &config,
 	}
 	errors := []string{}
 
 	// Process each organization
-	attempts := []*discoversaasfern.SaasActiveAttempt{}
+	attempts := []*discover.SaasActiveAttempt{}
 	for _, org := range config.Orgs {
-		attempt := &discoversaasfern.SaasActiveAttempt{Org: org}
-		companies := []*discoversaasfern.SaasActiveCompany{}
+		attempt := &discover.SaasActiveAttempt{Org: org}
+		companies := []*discover.SaasActiveCompany{}
 
 		// Process each company
-		for company, fingerprint := range config.SaasFingerprints.Fingerprints {
-			companyResult := &discoversaasfern.SaasActiveCompany{Company: company}
-			requests := []*discoversaasfern.SaasActiveRequest{}
+		for company, fingerprint := range saasFingerprints.Fingerprints {
+			companyResult := &discover.SaasActiveCompany{Company: company}
+			requests := []*discover.SaasActiveRequest{}
 
 			// Process each domain slug
 			for _, domainSlug := range fingerprint.DomainSlugs {
 				// Determine the schemas to use for the request
 				schemas := []string{"https"}
-				if !config.HttpsOnly {
-					schemas = append(schemas, "http")
-				}
+				schemas = append(schemas, "http")
 
 				// Process each schema
 				for _, schema := range schemas {
 					log.Printf("Processing company: %s in org: %s with schema: %s", company, org, schema)
-					saasRequest := &discoversaasfern.SaasActiveRequest{}
+					saasRequest := &discover.SaasActiveRequest{}
 
 					// Construct the full URL
 					slug := strings.Replace(domainSlug, "INPUT_ORG", org, 1)
@@ -90,11 +88,11 @@ func LaunchDiscoverSaasActive(ctx context.Context, config discoversaasfern.Disco
 
 					// Analyze the request
 					redirectedPage := len(httpRequestResponse.Response.RedirectChain) > 1
-					finding := discoversaasactivehelpers.AnalyzeSaasRequest(ctx, saasRequest, fingerprint, config.SsoFingerprints, redirectedPage)
+					finding := discoversaasactivehelpers.AnalyzeSaasRequest(ctx, saasRequest, fingerprint, &ssoFingerprints, redirectedPage)
 					saasRequest.Findings = finding
 
 					// Add request if it meets our criteria
-					if discoversaasactivehelpers.ShouldAddRequest(saasRequest, config.SuccessfulOnly) {
+					if discoversaasactivehelpers.ShouldAddRequest(saasRequest) {
 						requests = append(requests, saasRequest)
 					}
 				}
@@ -108,7 +106,7 @@ func LaunchDiscoverSaasActive(ctx context.Context, config discoversaasfern.Disco
 		attempts = append(attempts, attempt)
 	}
 
-	report.Orgs = attempts
+	report.Result = &discover.DiscoverSaasResult{Orgs: attempts}
 	report.Errors = errors
 	return &report, nil
 }

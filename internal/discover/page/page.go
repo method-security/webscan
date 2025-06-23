@@ -56,7 +56,7 @@ func PerformPageCapture(
 	requestConfig := getHTTPRequestConfig(baseURL, path, config, browserbaseSecrets)
 
 	// Perform screenshot capture if enabled
-	if config.TakeScreenshot {
+	if config.Screenshot {
 		requester := headless.NewRequester(config.Timeout, config.HeadlessConfig)
 		img, err := pagehelpers.CaptureScreenshot(ctx, requester, &requestConfig)
 		if err != nil {

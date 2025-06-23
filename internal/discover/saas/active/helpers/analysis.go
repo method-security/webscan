@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	// Generated
-	discoversaasfern "github.com/Method-Security/webscan/generated/go/discover/saas"
+	discover "github.com/Method-Security/webscan/generated/go/discover"
 	// Utils
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
 	// External
@@ -15,7 +15,7 @@ import (
 )
 
 // AnalyzeSaasRequest analyzes a SaaS request and returns a finding
-func AnalyzeSaasRequest(ctx context.Context, request *discoversaasfern.SaasActiveRequest, saasFingerprint *discoversaasfern.SaasFingerprintEntry, selectedSsoFingerprints *discoversaasfern.SaasFingerprintFile, redirectedPage bool) *discoversaasfern.SaasActiveFinding {
+func AnalyzeSaasRequest(ctx context.Context, request *discover.SaasActiveRequest, saasFingerprint *discover.SaasFingerprintEntry, selectedSsoFingerprints *discover.SaasFingerprintFile, redirectedPage bool) *discover.SaasActiveFinding {
 	log := svc1log.FromContext(ctx)
 	// Initial validation
 	// Note: If no response body or headers, or status code is not 200, return false
@@ -33,7 +33,7 @@ func AnalyzeSaasRequest(ctx context.Context, request *discoversaasfern.SaasActiv
 
 	// Initialize values
 	companyPage := false
-	finding := &discoversaasfern.SaasActiveFinding{CompanyPage: &companyPage}
+	finding := &discover.SaasActiveFinding{CompanyPage: &companyPage}
 
 	// Check for indicators that the webpage is not actually a valid SaaS page
 	// Note: Sometimes it will appear as a SaaS page but strings such as 'Not found' or '404' will be present

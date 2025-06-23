@@ -4,6 +4,7 @@ types:
     properties:
       targets: list<string>
       plugins: optional<list<string>>
+      pluginFileSize: optional<PluginFileSize>
       verifyTls: boolean
       timeout: integer
       threads: integer
@@ -16,6 +17,10 @@ types:
       - REGISTERED_SCRIPT
       - REST_API_DIRECT
       - REST_API_NAMESPACE
+  PluginFileSize:
+    enum:
+      - SMALL
+      - LARGE
   # WordPress API Response Struct
   WordpressApiResponse:
     properties:

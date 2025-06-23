@@ -212,6 +212,12 @@ func (a *WebScan) InitEnumerateCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			var pluginFileSizeEnum *enumeratecmswordpressfern.PluginFileSize
+			pluginFileSize, err := cmd.Flags().GetString("plugins-file-size")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
 			pluginsFiles, err := cmd.Flags().GetStringSlice("plugins-file-paths")
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -219,6 +225,21 @@ func (a *WebScan) InitEnumerateCommand() {
 			}
 			if len(pluginsFiles) > 0 {
 				entries, err := utils.GetEntriesFromTXTFiles(pluginsFiles)
+				if err != nil {
+					a.OutputSignal.AddError(err)
+					return
+				}
+				plugins = append(plugins, entries...)
+			} else if pluginFileSize != "" {
+				pluginFileSizeEnumValue, err := enumeratecmswordpressfern.NewPluginFileSizeFromString(pluginFileSize)
+				if err != nil {
+					a.OutputSignal.AddError(err)
+					return
+				}
+				pluginFileSizeEnum = &pluginFileSizeEnumValue
+
+				pluginFile := utils.GetEnumerateWordpressPluginWordlistPath(pluginFileSize)
+				entries, err := utils.GetEntriesFromTXTFiles([]string{pluginFile})
 				if err != nil {
 					a.OutputSignal.AddError(err)
 					return
@@ -246,7 +267,7 @@ func (a *WebScan) InitEnumerateCommand() {
 			}
 
 			// Generate config
-			config := getEnumerateWordpressPluginsConfig(targets, plugins, verifyTLS, timeout, threads)
+			config := getEnumerateWordpressPluginsConfig(targets, plugins, pluginFileSizeEnum, verifyTLS, timeout, threads)
 
 			// Generate report
 			report := enumeratecmswordpress.PerformAppEnumerateCMSWordpressPlugins(cmd.Context(), config)
@@ -260,7 +281,8 @@ func (a *WebScan) InitEnumerateCommand() {
 	enumerateCMSWordpressPluginsCmd.Flags().StringSlice("targets", []string{}, "URL targets to perform WordPress plugin enumeration against")
 	// Config Flags
 	enumerateCMSWordpressPluginsCmd.Flags().StringSlice("plugins", []string{}, "Specific WordPress plugins to check for")
-	enumerateCMSWordpressPluginsCmd.Flags().StringSlice("plugins-file-paths", []string{"configs/enumerate/cms/wordpress/plugins_small.txt"}, "Paths to files containing WordPress plugin lists")
+	enumerateCMSWordpressPluginsCmd.Flags().StringSlice("plugins-file-paths", []string{}, "Paths to files containing WordPress plugin lists")
+	enumerateCMSWordpressPluginsCmd.Flags().String("plugins-file-size", "SMALL", "Size of the WordPress plugin list to use")
 	enumerateCMSWordpressPluginsCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
 	enumerateCMSWordpressPluginsCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
 	enumerateCMSWordpressPluginsCmd.Flags().Int("threads", 0, "Number of concurrent threads for scanning")
@@ -355,13 +377,14 @@ func (a *WebScan) InitEnumerateCommand() {
 }
 
 // getEnumerateWordpressPluginsConfig builds the config for WordPress plugin enumeration.
-func getEnumerateWordpressPluginsConfig(targets []string, plugins []string, verifyTLS bool, timeout int, threads int) *enumeratecmswordpressfern.EnumerateWordpressPluginsConfig {
+func getEnumerateWordpressPluginsConfig(targets []string, plugins []string, pluginFileSizeEnum *enumeratecmswordpressfern.PluginFileSize, verifyTLS bool, timeout int, threads int) *enumeratecmswordpressfern.EnumerateWordpressPluginsConfig {
 	config := &enumeratecmswordpressfern.EnumerateWordpressPluginsConfig{
-		Targets:   targets,
-		Plugins:   plugins,
-		VerifyTls: verifyTLS,
-		Timeout:   max(timeout, 0),
-		Threads:   max(threads, 0),
+		Targets:        targets,
+		Plugins:        plugins,
+		PluginFileSize: pluginFileSizeEnum,
+		VerifyTls:      verifyTLS,
+		Timeout:        max(timeout, 0),
+		Threads:        max(threads, 0),
 	}
 	return config
 }

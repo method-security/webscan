@@ -31,3 +31,11 @@ func GetEntriesFromTXTFiles(paths []string) ([]string, error) {
 	}
 	return entries, nil
 }
+
+func GetEnumerateWordpressPluginWordlistPath(pluginFileSize string) string {
+	wordlistPaths := map[string]string{
+		"SMALL": "/opt/method/webscan/var/conf/enumerate/cms/wordpress/plugins_small.txt",
+		"LARGE": "/opt/method/webscan/var/conf/enumerate/cms/wordpress/plugins_large.txt",
+	}
+	return wordlistPaths[pluginFileSize]
+}

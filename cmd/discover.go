@@ -507,9 +507,6 @@ func (a *WebScan) InitDiscoverCommand() {
 
 	_ = discoverSaasCmd.MarkFlagRequired("orgs")
 
-	// Add Command to 'Saas' Command
-	discoverSaasCmd.AddCommand(discoverSaasCmd)
-
 	// Add Command to 'Discover' Command
 	discoverCmd.AddCommand(discoverSaasCmd)
 

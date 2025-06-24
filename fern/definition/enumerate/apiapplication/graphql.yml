@@ -1,3 +1,5 @@
+imports:
+  common: ./common.yml
 types:
   # Specfic GraphQL Structs
   GraphQlField:
@@ -25,3 +27,19 @@ types:
   EnumerateGraphqlConfig:
     properties:
       target: string
+  EnumerateGraphqlResult:
+    properties:
+      apiType: common.ApiType
+      baseEndpointUrl: string
+      version: optional<string>
+      schemaUrl: optional<string>
+      routes: optional<list<common.ApiApplicationRouteDetails>>
+      securitySchemes: optional<map<string, common.SecurityScheme>>
+      security: optional<list<common.SecurityRequirement>>
+      queries: optional<list<GraphQlQuery>>
+      raw: string
+  EnumerateGraphqlReport:
+    properties:
+      config: EnumerateGraphqlConfig
+      result: EnumerateGraphqlResult
+      errors: optional<list<string>>

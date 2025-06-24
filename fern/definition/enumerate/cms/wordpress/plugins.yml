@@ -37,8 +37,11 @@ types:
     properties:
       target: string
       plugins: optional<list<WordpressPluginDetails>>
-  EnumerateWordpressPluginsReport:
+  EnumerateWordpressPluginsResult:
     properties:
       targets: optional<list<WordpressPluginsTarget>>
+  EnumerateWordpressPluginsReport:
+    properties:
       config: EnumerateWordpressPluginsConfig
+      result: EnumerateWordpressPluginsResult
       errors: optional<list<string>>

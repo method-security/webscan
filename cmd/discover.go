@@ -55,9 +55,6 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			if fingerprintFile == "" {
-				fingerprintFile = "/opt/method/webscan/var/conf/discover/application/fingerprints.json"
-			}
 			fingeprints, err := discoverapplication.LoadFingerprints(fingerprintFile)
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -73,7 +70,12 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			filteredFingerprints, err := discoverapplication.FilterFingerprints(fingeprints, resourceType, modules)
+			resourceConfigType, err := getDiscoverApplicationResourceConfigTypeFromString(resourceType)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			filteredFingerprints, err := discoverapplication.FilterFingerprints(fingeprints, &resourceConfigType, modules)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -100,7 +102,6 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-
 			// Generate report
 			report, err := discoverapplication.LaunchFingerprintEngine(cmd.Context(), config, filteredFingerprints)
 			if err != nil {
@@ -117,7 +118,7 @@ func (a *WebScan) InitDiscoverCommand() {
 	discoverApplicationCmd.Flags().Bool("successful-only", false, "Only show successful fingerprint matches")
 	discoverApplicationCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
 	discoverApplicationCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
-	discoverApplicationCmd.Flags().String("fingerprint-file", "", "Path to the fingerprint definitions file")
+	discoverApplicationCmd.Flags().String("fingerprint-file", "/opt/method/webscan/var/conf/discover/application/fingerprints.json", "Path to the fingerprint definitions file")
 
 	// Mark Required Flags
 	_ = discoverApplicationCmd.MarkFlagRequired("targets")
@@ -391,16 +392,10 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			if len(saasFilePaths) == 0 {
-				saasFilePaths = []string{"/opt/method/webscan/var/conf/discover/saas/active/saas_fingerprints.json", "configs/discover/saas/active/saas_fingerprints.json"}
-			}
 			ssoFilePaths, err := cmd.Flags().GetStringSlice("sso-file-paths")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
-			}
-			if len(ssoFilePaths) == 0 {
-				ssoFilePaths = []string{"/opt/method/webscan/var/conf/discover/saas/active/sso_fingerprints.json", "configs/discover/saas/active/sso_fingerprints.json"}
 			}
 			saasFingerprints := discoversaashelpers.UnmarshalFingerprints(saasFilePaths)
 			ssoFingerprints := discoversaashelpers.UnmarshalFingerprints(ssoFilePaths)
@@ -489,8 +484,8 @@ func (a *WebScan) InitDiscoverCommand() {
 	// Target Flags
 	discoverSaasCmd.Flags().StringSlice("orgs", []string{}, "The organization names to use for discovery")
 	// Config Flags
-	discoverSaasCmd.Flags().StringSlice("saas-file-paths", []string{""}, "Files containing SaaS application fingerprints")
-	discoverSaasCmd.Flags().StringSlice("sso-file-paths", []string{""}, "Files containing SSO application fingerprints")
+	discoverSaasCmd.Flags().StringSlice("saas-file-paths", []string{"/opt/method/webscan/var/conf/discover/saas/active/saas_fingerprints.json"}, "Files containing SaaS application fingerprints")
+	discoverSaasCmd.Flags().StringSlice("sso-file-paths", []string{"/opt/method/webscan/var/conf/discover/saas/active/sso_fingerprints.json"}, "Files containing SSO application fingerprints")
 	discoverSaasCmd.Flags().StringSlice("saas-companies", []string{}, "The specific SaaS companies to use for discovery (Must be present in the SaaS fingerprints file)")
 	discoverSaasCmd.Flags().StringSlice("sso-companies", []string{}, "The specific SSO companies to use for discovery (Must be present in the SSO fingerprints file)")
 	discoverSaasCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
@@ -516,13 +511,13 @@ func (a *WebScan) InitDiscoverCommand() {
 
 // getDiscoverApplicationConfig builds the config for application fingerprinting discovery.
 func getDiscoverApplicationConfig(targets []string, resource string, moduleEnums []string, fingerprints *discover.ApplicationResource, successfulOnly bool, verifyTLS bool, timeout int) (*discover.DiscoverApplicationConfig, error) {
-	resourceEnum, err := discover.NewApplicationResourceTypeFromString(resource)
+	resourceEnum, err := getDiscoverApplicationResourceConfigTypeFromString(resource)
 	if err != nil {
 		return nil, fmt.Errorf("invalid resource type: %s", resource)
 	}
 	config := &discover.DiscoverApplicationConfig{
 		Targets:      targets,
-		ResourceType: resourceEnum,
+		ResourceType: &resourceEnum,
 		Modules:      moduleEnums,
 		VerifyTls:    verifyTLS,
 		Timeout:      max(timeout, 0),
@@ -592,4 +587,19 @@ func getDiscoverSaasConfig(orgs []string, saasCompanies []string, ssoCompanies [
 		BrowserbaseConfig: browserbaseConfig,
 	}
 	return config
+}
+
+func getDiscoverApplicationResourceConfigTypeFromString(resource string) (discover.ApplicationResourceConfigType, error) {
+	if resource == "ALL" {
+		return discover.ApplicationResourceConfigType{
+			ApplicationResourceTypeAll: discover.ApplicationResourceTypeAllAll,
+		}, nil
+	}
+	resourceEnum, err := discover.NewApplicationResourceTypeFromString(resource)
+	if err != nil {
+		return discover.ApplicationResourceConfigType{}, fmt.Errorf("invalid resource type: %s", resource)
+	}
+	return discover.ApplicationResourceConfigType{
+		ApplicationResourceType: resourceEnum,
+	}, nil
 }

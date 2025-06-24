@@ -13,10 +13,13 @@ types:
       requestMethod: method.RequestMethod
       headlessConfig: optional<method.HeadlessRequestConfig>
       browserbaseConfig: optional<method.BrowserbaseRequestConfig>
-  # Report Struct
-  DiscoverPageReport:
+  DiscoverPageResult:
     properties:
       request: optional<http.HttpRequestResponse>
       screenshot: optional<base64>
+  # Report Struct
+  DiscoverPageReport:
+    properties:
       config: DiscoverPageConfig
+      result: DiscoverPageResult
       errors: optional<list<string>>

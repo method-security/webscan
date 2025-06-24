@@ -41,8 +41,9 @@ func PerformPageCapture(
 	browserbaseSecrets *common.BrowserbaseRequestSecrets,
 ) *discover.DiscoverPageReport {
 	// Initialize report
-	report := discover.DiscoverPageReport{Config: &config}
+	result := discover.DiscoverPageResult{}
 	errors := []string{}
+	report := discover.DiscoverPageReport{Config: &config, Result: &result}
 
 	// Split target
 	baseURL, path, err := requesthelpers.SplitTargetURL(config.Target)
@@ -64,7 +65,7 @@ func PerformPageCapture(
 			report.Errors = errors
 			return &report
 		}
-		report.Screenshot = &img
+		result.Screenshot = &img
 	}
 
 	// Perform HTML capture
@@ -74,6 +75,7 @@ func PerformPageCapture(
 		report.Errors = errors
 		return &report
 	}
-	report.Request = httpRequestResponse
+	result.Request = httpRequestResponse
+	report.Errors = errors
 	return &report
 }

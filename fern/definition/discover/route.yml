@@ -32,10 +32,13 @@ types:
       method: optional<http.HttpMethod>
       queryParams: optional<list<RouteQueryParam>>
       bodyParams: optional<list<RouteBodyParam>>
-  DiscoverRouteReport:
+  DiscoverRouteResult:
     properties:
       target: string
       routes: optional<list<RouteDetails>>
       staticAssets: optional<list<string>>
+  DiscoverRouteReport:
+    properties:
       config: DiscoverRouteConfig
+      result: DiscoverRouteResult
       errors: optional<list<string>>

@@ -2,7 +2,7 @@ imports:
   http: ../../common/http.yml
 types:
   # Config Struct
-  EnumerateGeneralRateLimitConfig:
+  EnumerateRateLimitConfig:
     properties:
       targets: list<string>
       maxRequests: integer
@@ -20,8 +20,11 @@ types:
       startTimestamp: datetime
       endTimestamp: datetime
       detectedRequest: optional<RateLimitAttempt>
-  DetectRateLimitReport:
+  EnumerateRateLimitResult:
     properties:
       targets: optional<list<RateLimitTarget>>
-      config: EnumerateGeneralRateLimitConfig
+  EnumerateRateLimitReport:
+    properties:
+      config: EnumerateRateLimitConfig
+      result: EnumerateRateLimitResult
       errors: optional<list<string>>

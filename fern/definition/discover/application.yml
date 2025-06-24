@@ -2,9 +2,11 @@ imports:
   http: ../common/http.yml
 types:
   # Application Enums
-  ApplicationResourceType:
+  ApplicationResourceTypeAll:
     enum:
       - ALL
+  ApplicationResourceType:
+    enum:
       - API_APPLICATION
       - CLOUD_BUCKET
       - CONTENT_MANAGEMENT_SYSTEM
@@ -12,6 +14,11 @@ types:
       - FRAMEWORK
       - REMOTE_ACCESS
       - WEB_SERVER
+  ApplicationResourceConfigType:
+    discriminated: false
+    union:
+      - ApplicationResourceType
+      - ApplicationResourceTypeAll
   # Application Fingerprints File Struct
   ApplicationFingerprintModule:
     properties:
@@ -23,7 +30,7 @@ types:
       bodyIndicators: optional<list<string>>
   ApplicationResource:
     properties:
-      name: ApplicationResourceType
+      name: ApplicationResourceConfigType
       modules: list<ApplicationFingerprintModule>
   ApplicationFingerprints:
     properties:
@@ -42,7 +49,7 @@ types:
   DiscoverApplicationConfig:
     properties:
       targets: list<string>
-      resourceType: ApplicationResourceType
+      resourceType: ApplicationResourceConfigType
       modules: optional<list<string>>
       verifyTls: boolean
       timeout: integer

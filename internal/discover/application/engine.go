@@ -95,6 +95,7 @@ func Run(ctx context.Context, target string, config *discover.DiscoverApplicatio
 						},
 					},
 				}
+				attempts = append(attempts, attempt)
 				break
 			}
 		}

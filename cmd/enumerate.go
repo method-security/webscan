@@ -11,7 +11,7 @@ import (
 
 	// Internal
 	enumerateapiapplication "github.com/Method-Security/webscan/internal/enumerate/apiapplication"
-	enumeratecmswordpress "github.com/Method-Security/webscan/internal/enumerate/cms/wordpress"
+	enumeratecms "github.com/Method-Security/webscan/internal/enumerate/cms"
 	enumerategeneral "github.com/Method-Security/webscan/internal/enumerate/general"
 	enumeratekube "github.com/Method-Security/webscan/internal/enumerate/kube"
 
@@ -156,7 +156,7 @@ func (a *WebScan) InitEnumerateCommand() {
 			config := getEnumerateKubeConfig(target, verifyTLS, timeout)
 
 			// Generate report
-			report := enumeratekube.PerformAppEnumerateKube(cmd.Context(), config)
+			report := enumeratekube.PerformAppEnumerateKube(cmd.Context(), &config)
 			if len(report.Errors) > 0 {
 				a.OutputSignal.Status = 1
 			}
@@ -238,7 +238,7 @@ func (a *WebScan) InitEnumerateCommand() {
 				}
 				pluginFileSizeEnum = &pluginFileSizeEnumValue
 
-				pluginFile := utils.GetEnumerateWordpressPluginWordlistPath(pluginFileSize)
+				pluginFile := GetEnumerateWordpressPluginWordlistPath(pluginFileSize)
 				entries, err := utils.GetEntriesFromTXTFiles([]string{pluginFile})
 				if err != nil {
 					a.OutputSignal.AddError(err)
@@ -270,7 +270,7 @@ func (a *WebScan) InitEnumerateCommand() {
 			config := getEnumerateWordpressPluginsConfig(targets, plugins, pluginFileSizeEnum, verifyTLS, timeout, threads)
 
 			// Generate report
-			report := enumeratecmswordpress.PerformAppEnumerateCMSWordpressPlugins(cmd.Context(), config)
+			report := enumeratecms.PerformAppEnumerateCMSWordpressPlugins(cmd.Context(), config)
 			if len(report.Errors) > 0 {
 				a.OutputSignal.Status = 1
 			}
@@ -348,7 +348,7 @@ func (a *WebScan) InitEnumerateCommand() {
 			config := getEnumerateGeneralRateLimitConfig(targets, maxRequests, timespan, verifyTLS, timeout)
 
 			// Generate report
-			report := enumerategeneral.PerformGeneralRatelimit(cmd.Context(), config)
+			report := enumerategeneral.PerformGeneralRatelimit(cmd.Context(), &config)
 			if len(report.Errors) > 0 {
 				a.OutputSignal.Status = 1
 			}
@@ -400,8 +400,8 @@ func getEnumerateKubeConfig(target string, verifyTLS bool, timeout int) enumerat
 }
 
 // getEnumerateGeneralRateLimitConfig builds the config for general rate limit enumeration.
-func getEnumerateGeneralRateLimitConfig(targets []string, maxRequests int, timespan int, verifyTLS bool, timeout int) enumerategeneralfern.EnumerateGeneralRateLimitConfig {
-	config := enumerategeneralfern.EnumerateGeneralRateLimitConfig{
+func getEnumerateGeneralRateLimitConfig(targets []string, maxRequests int, timespan int, verifyTLS bool, timeout int) enumerategeneralfern.EnumerateRateLimitConfig {
+	config := enumerategeneralfern.EnumerateRateLimitConfig{
 		Targets:     targets,
 		MaxRequests: maxRequests,
 		Timespan:    max(timespan, 0),
@@ -409,4 +409,12 @@ func getEnumerateGeneralRateLimitConfig(targets []string, maxRequests int, times
 		Timeout:     max(timeout, 0),
 	}
 	return config
+}
+
+func GetEnumerateWordpressPluginWordlistPath(pluginFileSize string) string {
+	wordlistPaths := map[string]string{
+		"SMALL": "/opt/method/webscan/var/conf/enumerate/cms/wordpress/plugins_small.txt",
+		"LARGE": "/opt/method/webscan/var/conf/enumerate/cms/wordpress/plugins_large.txt",
+	}
+	return wordlistPaths[pluginFileSize]
 }

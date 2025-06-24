@@ -29,24 +29,13 @@ func LoadFingerprints(filePath string) (*discover.ApplicationFingerprints, error
 // FilterFingerprints filters the fingerprints based on resource types and modules
 // Returns error if resource type or module doesn't exist
 // If resourceType is 'ALL', it returns all resource types combined into a single resource
-func FilterFingerprints(fingerprints *discover.ApplicationFingerprints, resourceType string, modules []string) (*discover.ApplicationResource, error) {
-	// Convert string to AppFingerprintResourceType
-	resourceTypeEnum, err := discover.NewApplicationResourceTypeFromString(resourceType)
-	if err != nil {
-		return nil, fmt.Errorf("invalid resource type: %s", resourceType)
-	}
-
+func FilterFingerprints(fingerprints *discover.ApplicationFingerprints, resourceConfigType *discover.ApplicationResourceConfigType, modules []string) (*discover.ApplicationResource, error) {
 	// Handle 'ALL' resource type - combine all resource types
-	if resourceTypeEnum == discover.ApplicationResourceTypeAll {
+	if resourceConfigType.GetApplicationResourceTypeAll() == discover.ApplicationResourceTypeAllAll {
 		allModules := []*discover.ApplicationFingerprintModule{}
 
 		// Collect all modules from all resource types
 		for _, rt := range fingerprints.Fingerprints {
-			// Skip the 'ALL' resource type itself if it exists in the data
-			if rt.Name == discover.ApplicationResourceTypeAll {
-				continue
-			}
-
 			// If specific modules are requested, filter them
 			if len(modules) > 0 {
 				for _, m := range rt.Modules {
@@ -69,21 +58,26 @@ func FilterFingerprints(fingerprints *discover.ApplicationFingerprints, resource
 
 		// Return a combined resource with all modules
 		return &discover.ApplicationResource{
-			Name:    discover.ApplicationResourceTypeAll,
+			Name:    resourceConfigType,
 			Modules: allModules,
 		}, nil
+	}
+
+	resourceTypeEnum, err := discover.NewApplicationResourceTypeFromString(string(resourceConfigType.GetApplicationResourceType()))
+	if err != nil {
+		return nil, fmt.Errorf("invalid resource type: %s", resourceConfigType)
 	}
 
 	// Handle specific resource type (existing logic)
 	var foundResourceType *discover.ApplicationResource
 	for _, rt := range fingerprints.Fingerprints {
-		if rt.Name == resourceTypeEnum {
+		if rt.Name.GetApplicationResourceType() == resourceTypeEnum {
 			foundResourceType = rt
 			break
 		}
 	}
 	if foundResourceType == nil {
-		return nil, fmt.Errorf("resource type %s not found", resourceType)
+		return nil, fmt.Errorf("resource type %s not found", resourceConfigType)
 	}
 
 	// If no module specified, return all modules for this type
@@ -99,7 +93,7 @@ func FilterFingerprints(fingerprints *discover.ApplicationFingerprints, resource
 		}
 	}
 	if len(foundModules) == 0 {
-		return nil, fmt.Errorf("modules %v not found for resource type %s", modules, resourceType)
+		return nil, fmt.Errorf("modules %v not found for resource type %s", modules, resourceConfigType)
 	}
 
 	// Return filtered config with just the requested modules
@@ -113,7 +107,7 @@ func FilterFingerprints(fingerprints *discover.ApplicationFingerprints, resource
 func GetModule(resourceType discover.ApplicationResourceType, module string, fingerprints *discover.ApplicationFingerprints) (*discover.ApplicationFingerprintModule, error) {
 	// Check if resource type exists
 	for _, rt := range fingerprints.Fingerprints {
-		if rt.Name == resourceType {
+		if rt.Name.GetApplicationResourceType() == resourceType {
 			// Check if module exists
 			for _, m := range rt.Modules {
 				if m.Name == module {

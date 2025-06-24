@@ -26,46 +26,6 @@ import (
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
-// marshalHeaders marshals the headers map to a JSON string to be used in the Headless browser
-func marshalHeaders(headers map[string][]string) string {
-	if headers == nil {
-		return "{}"
-	}
-	headerStr := "{"
-	for k, v := range headers {
-		// Convert the slice of values to a JavaScript array
-		values := make([]string, len(v))
-		for i, val := range v {
-			// Escape single quotes in values to prevent JS syntax errors
-			escapedVal := strings.ReplaceAll(val, "'", "\\'")
-			values[i] = fmt.Sprintf("'%s'", escapedVal)
-		}
-		headerStr += fmt.Sprintf("'%s': [%s],", k, strings.Join(values, ","))
-	}
-	// Remove trailing comma if present
-	if len(headers) > 0 {
-		headerStr = strings.TrimSuffix(headerStr, ",")
-	}
-	headerStr += "}"
-	return headerStr
-}
-
-// marshalBody marshals the body to a JSON string to be used in the Headless browser
-func marshalBody(body *common.Body) string {
-	if body == nil {
-		return "null"
-	}
-	bodyString := requesthelpers.GetResponseBodyStringFromBodyStruct(body)
-	if bodyString == nil {
-		return "null"
-	}
-	// Escape the body string for JavaScript
-	escapedBody := strings.ReplaceAll(*bodyString, "'", "\\'")
-	escapedBody = strings.ReplaceAll(escapedBody, "\n", "\\n")
-	escapedBody = strings.ReplaceAll(escapedBody, "\r", "\\r")
-	return fmt.Sprintf("'%s'", escapedBody)
-}
-
 // getHost returns the host of a URL
 func getHost(rawURL string) string {
 	u, err := url.Parse(rawURL)
@@ -124,9 +84,25 @@ func setupNavigationTracking(page *rod.Page, redirectChain *[]string, requestCom
 					}
 				}
 				if !exists {
+					// Check if this is just a trailing slash redirect
+					if len(*redirectChain) > 0 {
+						lastURL := (*redirectChain)[len(*redirectChain)-1]
+						if utils.IsTrailingSlashRedirect(lastURL, e.Frame.URL) {
+							log.Info("Detected trailing slash redirect, not counting as redirect",
+								svc1log.SafeParam("from", lastURL),
+								svc1log.SafeParam("to", e.Frame.URL))
+							// Update the last URL in the chain but don't add a new entry
+							(*redirectChain)[len(*redirectChain)-1] = e.Frame.URL
+							once.Do(func() { close(requestComplete) })
+							return
+						}
+					}
+
 					// Check if we've exceeded max redirects
-					if len(*redirectChain) > maxRedirects {
-						log.Info("Max redirects reached", svc1log.SafeParam("maxRedirects", strconv.Itoa(maxRedirects)))
+					// Count actual redirects (excluding initial URL)
+					actualRedirects := len(*redirectChain)
+					if actualRedirects > maxRedirects && maxRedirects >= 0 {
+						log.Info("Max redirects reached", svc1log.SafeParam("maxRedirects", strconv.Itoa(maxRedirects)), svc1log.SafeParam("actualRedirects", strconv.Itoa(actualRedirects)))
 						once.Do(func() {
 							redirectError <- fmt.Errorf("max redirects (%d) exceeded", maxRedirects)
 							close(requestComplete)
@@ -175,60 +151,28 @@ func filterRedirectChain(redirectChain []string, originalHost string) []string {
 
 // performNavigation handles the actual page navigation based on config
 func performNavigation(page *rod.Page, config common.SendHttpRequestConfig, constructedURL *string, request *common.HttpRequest, log svc1log.Logger) error {
-	if config.MaxRedirects > 0 {
-		log.Info("Following redirects with limit", svc1log.SafeParam("maxRedirects", strconv.Itoa(config.MaxRedirects)))
+	// Always use simple navigation - redirect handling is done by the event listeners
+	log.Info("Navigating to URL", svc1log.SafeParam("maxRedirects", strconv.Itoa(config.MaxRedirects)))
 
-		// Use Navigate instead of MustNavigate to handle errors
-		err := page.Navigate(*constructedURL)
-		if err != nil {
-			// Check for specific navigation errors
-			var navErr *rod.NavigationError
-			if errors.As(err, &navErr) {
-				return fmt.Errorf("navigation failed: %s", navErr.Reason)
-			}
-			return fmt.Errorf("navigation failed: %v", err)
+	// Use Navigate instead of MustNavigate to handle errors
+	err := page.Navigate(*constructedURL)
+	if err != nil {
+		// Check for specific navigation errors
+		var navErr *rod.NavigationError
+		if errors.As(err, &navErr) {
+			return fmt.Errorf("navigation failed: %s", navErr.Reason)
 		}
+		return fmt.Errorf("navigation failed: %v", err)
+	}
 
-		// Wait for the initial navigation to complete
-		err = page.WaitLoad()
-		if err != nil {
-			// Check if it's a timeout
-			if errors.Is(err, context.DeadlineExceeded) {
-				return fmt.Errorf("navigation timeout")
-			}
-			return fmt.Errorf("wait load failed: %v", err)
+	// Wait for the initial navigation to complete
+	err = page.WaitLoad()
+	if err != nil {
+		// Check if it's a timeout
+		if errors.Is(err, context.DeadlineExceeded) {
+			return fmt.Errorf("navigation timeout")
 		}
-	} else {
-		log.Info("Not following redirects", svc1log.SafeParam("maxRedirects", strconv.Itoa(config.MaxRedirects)))
-		script := fmt.Sprintf(`
-			() => {
-				return fetch("%s", {
-					method: "%s",
-					headers: %s,
-					body: %s,
-					credentials: "include",
-					redirect: "manual"
-				}).then(response => {
-					window.lastResponseStatus = response.status;
-					return response;
-				}).catch(e => {
-					window.navigationError = e.message;
-					throw e;
-				});
-			}
-		`, *constructedURL, request.Method,
-			marshalHeaders(request.Params.Headers),
-			marshalBody(request.Params.Body))
-
-		_, err := page.Eval(script)
-		if err != nil {
-			// Check for navigation error stored in window
-			navError, _ := page.Eval(`() => window.navigationError`)
-			if navError.Value.Str() != "" {
-				return fmt.Errorf("fetch failed: %s", navError.Value.Str())
-			}
-			return fmt.Errorf("fetch evaluation failed: %v", err)
-		}
+		return fmt.Errorf("wait load failed: %v", err)
 	}
 
 	return nil

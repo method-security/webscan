@@ -2,6 +2,7 @@ package utils
 
 import (
 	// Standard
+	"net/url"
 	"path"
 	"strings"
 )
@@ -31,4 +32,43 @@ func IsStaticAsset(url string) bool {
 		}
 	}
 	return false
+}
+
+// IsTrailingSlashRedirect checks if the redirect is just adding a trailing slash
+func IsTrailingSlashRedirect(from, to string) bool {
+	fromURL, err := url.Parse(from)
+	if err != nil {
+		return false
+	}
+	toURL, err := url.Parse(to)
+	if err != nil {
+		return false
+	}
+	// Must be same scheme and host
+	if fromURL.Scheme != toURL.Scheme || fromURL.Host != toURL.Host {
+		return false
+	}
+
+	// Check if query parameters are the same
+	if fromURL.RawQuery != toURL.RawQuery {
+		return false
+	}
+
+	// Check if fragment is the same
+	if fromURL.Fragment != toURL.Fragment {
+		return false
+	}
+
+	// Normalize paths for comparison
+	fromPath := fromURL.Path
+	toPath := toURL.Path
+
+	// Remove trailing slash from both for comparison
+	fromPathNormalized := strings.TrimSuffix(fromPath, "/")
+	toPathNormalized := strings.TrimSuffix(toPath, "/")
+
+	// They should be the same after normalization, and the redirect should be adding a slash
+	return fromPathNormalized == toPathNormalized &&
+		!strings.HasSuffix(fromPath, "/") &&
+		strings.HasSuffix(toPath, "/")
 }

@@ -207,22 +207,19 @@ func (a *WebScan) InitEnumerateCommand() {
 			}
 
 			// Get config flags
+			// Add manually provided plugins
 			plugins, err := cmd.Flags().GetStringSlice("plugins")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			var pluginFileSizeEnum *enumeratecmswordpressfern.PluginFileSize
-			pluginFileSize, err := cmd.Flags().GetString("plugins-file-size")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
+			// Default to using set wordlist path if no plugins-file-paths are provided
 			pluginsFiles, err := cmd.Flags().GetStringSlice("plugins-file-paths")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			var pluginFileSizeEnum *enumeratecmswordpressfern.PluginFileSize
 			if len(pluginsFiles) > 0 {
 				entries, err := utils.GetEntriesFromTXTFiles(pluginsFiles)
 				if err != nil {
@@ -230,15 +227,19 @@ func (a *WebScan) InitEnumerateCommand() {
 					return
 				}
 				plugins = append(plugins, entries...)
-			} else if pluginFileSize != "" {
+				// If no plugins-file-paths are provided, use the provided wordlist path (Toggled on size Default: Small)
+			} else {
+				pluginFileSize, err := cmd.Flags().GetString("plugins-file-size")
+				if err != nil {
+					a.OutputSignal.AddError(err)
+					return
+				}
 				pluginFileSizeEnumValue, err := enumeratecmswordpressfern.NewPluginFileSizeFromString(pluginFileSize)
 				if err != nil {
 					a.OutputSignal.AddError(err)
 					return
 				}
-				pluginFileSizeEnum = &pluginFileSizeEnumValue
-
-				pluginFile := enumeratecms.GetEnumerateWordpressPluginWordlistPath(*pluginFileSizeEnum)
+				pluginFile := enumeratecms.GetEnumerateWordpressPluginWordlistPath(pluginFileSizeEnumValue)
 				entries, err := utils.GetEntriesFromTXTFiles([]string{pluginFile})
 				if err != nil {
 					a.OutputSignal.AddError(err)
@@ -246,10 +247,12 @@ func (a *WebScan) InitEnumerateCommand() {
 				}
 				plugins = append(plugins, entries...)
 			}
+			// Check to ensure at least one plugin is provided
 			if len(plugins) == 0 {
 				a.OutputSignal.AddError(errors.New("no plugins provided"))
 				return
 			}
+			// Other config flags
 			verifyTLS, err := cmd.Flags().GetBool("verify-tls")
 			if err != nil {
 				a.OutputSignal.AddError(err)

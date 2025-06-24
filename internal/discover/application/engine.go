@@ -85,14 +85,10 @@ func Run(ctx context.Context, target string, config *discover.DiscoverApplicatio
 
 			if AnalyzeResponse(request, module) {
 				attempt.Finding = true
-				attempt.Fingerprints = []*discover.ApplicationFingerprints{
+				attempt.Fingerprints = []*discover.ApplicationResource{
 					{
-						Fingerprints: []*discover.ApplicationResource{
-							{
-								Name:    resourceType.Name,
-								Modules: []*discover.ApplicationFingerprintModule{module},
-							},
-						},
+						Name:    resourceType.Name,
+						Modules: []*discover.ApplicationFingerprintModule{module},
 					},
 				}
 				attempts = append(attempts, attempt)
@@ -101,6 +97,9 @@ func Run(ctx context.Context, target string, config *discover.DiscoverApplicatio
 		}
 
 		attempt.Requests = requests
+		if !attempt.Finding {
+			attempts = append(attempts, attempt)
+		}
 	}
 	return attempts, errors
 }
@@ -158,16 +157,20 @@ func AnalyzeResponse(httpRequestResponse *common.HttpRequestResponse, module *di
 }
 
 // LaunchFingerprintEngine runs the fingerprinting engine for all targets in the config and returns a report.
-func LaunchFingerprintEngine(ctx context.Context, config *discover.DiscoverApplicationConfig, filteredFingerprints *discover.ApplicationResource) (*discover.DiscoverApplicationReport, error) {
+func LaunchFingerprintEngine(ctx context.Context, config *discover.DiscoverApplicationConfig, filteredFingerprints *discover.ApplicationFingerprints) (*discover.DiscoverApplicationReport, error) {
 	report := discover.DiscoverApplicationReport{Config: config}
 	errors := []string{}
 
 	var targets []*discover.ApplicationFingerprintTarget
 	for _, target := range config.Targets {
 		var attempts []*discover.ApplicationFingerprintAttempt
-		attempt, errs := Run(ctx, target, config, filteredFingerprints)
-		attempts = append(attempts, attempt...)
-		errors = append(errors, errs...)
+
+		// Process each resource type separately
+		for _, resourceType := range filteredFingerprints.Fingerprints {
+			attempt, errs := Run(ctx, target, config, resourceType)
+			attempts = append(attempts, attempt...)
+			errors = append(errors, errs...)
+		}
 
 		filteredAttempts := []*discover.ApplicationFingerprintAttempt{}
 		for _, attempt := range attempts {

@@ -40,7 +40,7 @@ types:
       name: string
       requests: optional<list<http.HttpRequestResponse>>
       finding: boolean
-      fingerprints: optional<list<ApplicationFingerprints>>
+      fingerprints: optional<list<ApplicationResource>>
   ApplicationFingerprintTarget:
     properties:
       target: string

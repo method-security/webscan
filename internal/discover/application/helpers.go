@@ -28,38 +28,47 @@ func LoadFingerprints(filePath string) (*discover.ApplicationFingerprints, error
 
 // FilterFingerprints filters the fingerprints based on resource types and modules
 // Returns error if resource type or module doesn't exist
-// If resourceType is 'ALL', it returns all resource types combined into a single resource
-func FilterFingerprints(fingerprints *discover.ApplicationFingerprints, resourceConfigType *discover.ApplicationResourceConfigType, modules []string) (*discover.ApplicationResource, error) {
-	// Handle 'ALL' resource type - combine all resource types
+// If resourceType is 'ALL', it returns all resource types as separate resources
+func FilterFingerprints(fingerprints *discover.ApplicationFingerprints, resourceConfigType *discover.ApplicationResourceConfigType, modules []string) (*discover.ApplicationFingerprints, error) {
+	// Handle 'ALL' resource type - return all resource types with their modules
 	if resourceConfigType.GetApplicationResourceTypeAll() == discover.ApplicationResourceTypeAllAll {
-		allModules := []*discover.ApplicationFingerprintModule{}
+		var filteredResources []*discover.ApplicationResource
 
-		// Collect all modules from all resource types
+		// Collect all resource types with their modules
 		for _, rt := range fingerprints.Fingerprints {
+			var filteredModules []*discover.ApplicationFingerprintModule
+
 			// If specific modules are requested, filter them
 			if len(modules) > 0 {
 				for _, m := range rt.Modules {
 					if slices.Contains(modules, m.Name) {
-						allModules = append(allModules, m)
+						filteredModules = append(filteredModules, m)
 					}
 				}
 			} else {
 				// No specific modules requested, add all modules from this resource type
-				allModules = append(allModules, rt.Modules...)
+				filteredModules = append(filteredModules, rt.Modules...)
+			}
+
+			// Only add the resource type if it has matching modules
+			if len(filteredModules) > 0 {
+				filteredResources = append(filteredResources, &discover.ApplicationResource{
+					Name:    rt.Name,
+					Modules: filteredModules,
+				})
 			}
 		}
 
-		if len(allModules) == 0 {
+		if len(filteredResources) == 0 {
 			if len(modules) > 0 {
 				return nil, fmt.Errorf("none of the specified modules %v were found", modules)
 			}
 			return nil, fmt.Errorf("no modules found for resource type ALL")
 		}
 
-		// Return a combined resource with all modules
-		return &discover.ApplicationResource{
-			Name:    resourceConfigType,
-			Modules: allModules,
+		// Return all resource types as separate resources
+		return &discover.ApplicationFingerprints{
+			Fingerprints: filteredResources,
 		}, nil
 	}
 
@@ -82,7 +91,9 @@ func FilterFingerprints(fingerprints *discover.ApplicationFingerprints, resource
 
 	// If no module specified, return all modules for this type
 	if len(modules) == 0 {
-		return foundResourceType, nil
+		return &discover.ApplicationFingerprints{
+			Fingerprints: []*discover.ApplicationResource{foundResourceType},
+		}, nil
 	}
 
 	// Find the specific modules
@@ -97,9 +108,13 @@ func FilterFingerprints(fingerprints *discover.ApplicationFingerprints, resource
 	}
 
 	// Return filtered config with just the requested modules
-	return &discover.ApplicationResource{
-		Name:    foundResourceType.Name,
-		Modules: foundModules,
+	return &discover.ApplicationFingerprints{
+		Fingerprints: []*discover.ApplicationResource{
+			{
+				Name:    foundResourceType.Name,
+				Modules: foundModules,
+			},
+		},
 	}, nil
 }
 

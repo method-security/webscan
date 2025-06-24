@@ -238,7 +238,7 @@ func (a *WebScan) InitEnumerateCommand() {
 				}
 				pluginFileSizeEnum = &pluginFileSizeEnumValue
 
-				pluginFile := GetEnumerateWordpressPluginWordlistPath(pluginFileSize)
+				pluginFile := enumeratecms.GetEnumerateWordpressPluginWordlistPath(*pluginFileSizeEnum)
 				entries, err := utils.GetEntriesFromTXTFiles([]string{pluginFile})
 				if err != nil {
 					a.OutputSignal.AddError(err)
@@ -409,12 +409,4 @@ func getEnumerateGeneralRateLimitConfig(targets []string, maxRequests int, times
 		Timeout:     max(timeout, 0),
 	}
 	return config
-}
-
-func GetEnumerateWordpressPluginWordlistPath(pluginFileSize string) string {
-	wordlistPaths := map[string]string{
-		"SMALL": "/opt/method/webscan/var/conf/enumerate/cms/wordpress/plugins_small.txt",
-		"LARGE": "/opt/method/webscan/var/conf/enumerate/cms/wordpress/plugins_large.txt",
-	}
-	return wordlistPaths[pluginFileSize]
 }

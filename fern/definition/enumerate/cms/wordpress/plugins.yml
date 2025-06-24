@@ -1,5 +1,9 @@
 types:
   # Function Config Struct
+  PluginFileSize:
+    enum:
+      - SMALL
+      - LARGE
   EnumerateWordpressPluginsConfig:
     properties:
       targets: list<string>
@@ -17,10 +21,6 @@ types:
       - REGISTERED_SCRIPT
       - REST_API_DIRECT
       - REST_API_NAMESPACE
-  PluginFileSize:
-    enum:
-      - SMALL
-      - LARGE
   # WordPress API Response Struct
   WordpressApiResponse:
     properties:

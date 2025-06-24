@@ -50,8 +50,8 @@ func createSendHTTPRequestConfig(baseURL, path string, config *enumeratecmswordp
 
 // PerformAppEnumerateCMSWordpressPlugins attempts to find plugins installed on WordPress sites.
 // It returns a report containing the results for each target and any errors encountered.
-func PerformAppEnumerateCMSWordpressPlugins(ctx context.Context, config *enumeratecmswordpressfern.EnumerateWordpressPluginsConfig) enumeratecmswordpressfern.EnumerateWordpressPluginsReport {
-	report := enumeratecmswordpressfern.EnumerateWordpressPluginsReport{Config: config, Result: &enumeratecmswordpressfern.EnumerateWordpressPluginsResult{}}
+func PerformAppEnumerateCMSWordpressPlugins(ctx context.Context, config enumeratecmswordpressfern.EnumerateWordpressPluginsConfig) enumeratecmswordpressfern.EnumerateWordpressPluginsReport {
+	report := enumeratecmswordpressfern.EnumerateWordpressPluginsReport{Config: &config, Result: &enumeratecmswordpressfern.EnumerateWordpressPluginsResult{}}
 
 	// Create channels for collecting results and errors
 	resultsChan := make(chan *enumeratecmswordpressfern.WordpressPluginsTarget, len(config.Targets))
@@ -80,7 +80,7 @@ func PerformAppEnumerateCMSWordpressPlugins(ctx context.Context, config *enumera
 			defer wg.Done()
 			defer func() { <-semaphore }() // Release semaphore when done
 
-			result, errs := scanTarget(ctx, target, config)
+			result, errs := scanTarget(ctx, target, &config)
 			resultsChan <- &result
 			if len(errs) > 0 {
 				errorsChan <- errs

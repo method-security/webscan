@@ -219,7 +219,7 @@ func (a *WebScan) InitEnumerateCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			var pluginFileSizeEnum *enumeratecmswordpressfern.PluginFileSize
+			var pluginFileSizeEnum enumeratecmswordpressfern.PluginFileSize
 			if len(pluginsFiles) > 0 {
 				entries, err := utils.GetEntriesFromTXTFiles(pluginsFiles)
 				if err != nil {
@@ -234,12 +234,12 @@ func (a *WebScan) InitEnumerateCommand() {
 					a.OutputSignal.AddError(err)
 					return
 				}
-				pluginFileSizeEnumValue, err := enumeratecmswordpressfern.NewPluginFileSizeFromString(pluginFileSize)
+				pluginFileSizeEnum, err = enumeratecmswordpressfern.NewPluginFileSizeFromString(pluginFileSize)
 				if err != nil {
 					a.OutputSignal.AddError(err)
 					return
 				}
-				pluginFile := enumeratecms.GetEnumerateWordpressPluginWordlistPath(pluginFileSizeEnumValue)
+				pluginFile := enumeratecms.GetEnumerateWordpressPluginWordlistPath(pluginFileSizeEnum)
 				entries, err := utils.GetEntriesFromTXTFiles([]string{pluginFile})
 				if err != nil {
 					a.OutputSignal.AddError(err)
@@ -380,11 +380,11 @@ func (a *WebScan) InitEnumerateCommand() {
 }
 
 // getEnumerateWordpressPluginsConfig builds the config for WordPress plugin enumeration.
-func getEnumerateWordpressPluginsConfig(targets []string, plugins []string, pluginFileSizeEnum *enumeratecmswordpressfern.PluginFileSize, verifyTLS bool, timeout int, threads int) *enumeratecmswordpressfern.EnumerateWordpressPluginsConfig {
-	config := &enumeratecmswordpressfern.EnumerateWordpressPluginsConfig{
+func getEnumerateWordpressPluginsConfig(targets []string, plugins []string, pluginFileSizeEnum enumeratecmswordpressfern.PluginFileSize, verifyTLS bool, timeout int, threads int) enumeratecmswordpressfern.EnumerateWordpressPluginsConfig {
+	config := enumeratecmswordpressfern.EnumerateWordpressPluginsConfig{
 		Targets:        targets,
 		Plugins:        plugins,
-		PluginFileSize: pluginFileSizeEnum,
+		PluginFileSize: &pluginFileSizeEnum,
 		VerifyTls:      verifyTLS,
 		Timeout:        max(timeout, 0),
 		Threads:        max(threads, 0),

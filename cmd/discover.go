@@ -97,7 +97,7 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Create config
-			config, err := getDiscoverApplicationConfig(targets, resourceType, modules, filteredFingerprints, successfulOnly, verifyTLS, timeout)
+			config, err := getDiscoverApplicationConfig(targets, resourceType, modules, successfulOnly, verifyTLS, timeout)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -510,7 +510,7 @@ func (a *WebScan) InitDiscoverCommand() {
 }
 
 // getDiscoverApplicationConfig builds the config for application fingerprinting discovery.
-func getDiscoverApplicationConfig(targets []string, resource string, moduleEnums []string, fingerprints *discover.ApplicationResource, successfulOnly bool, verifyTLS bool, timeout int) (*discover.DiscoverApplicationConfig, error) {
+func getDiscoverApplicationConfig(targets []string, resource string, moduleEnums []string, successfulOnly bool, verifyTLS bool, timeout int) (*discover.DiscoverApplicationConfig, error) {
 	resourceEnum, err := getDiscoverApplicationResourceConfigTypeFromString(resource)
 	if err != nil {
 		return nil, fmt.Errorf("invalid resource type: %s", resource)

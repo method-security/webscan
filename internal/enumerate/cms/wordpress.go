@@ -20,6 +20,15 @@ import (
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
 )
 
+// GetEnumerateWordpressPluginWordlistPath returns the path to the wordlist for the given plugin file size
+func GetEnumerateWordpressPluginWordlistPath(pluginFileSize enumeratecmswordpressfern.PluginFileSize) string {
+	wordlistPaths := map[enumeratecmswordpressfern.PluginFileSize]string{
+		enumeratecmswordpressfern.PluginFileSizeSmall: "/opt/method/webscan/var/conf/enumerate/cms/wordpress/plugins_small.txt",
+		enumeratecmswordpressfern.PluginFileSizeLarge: "/opt/method/webscan/var/conf/enumerate/cms/wordpress/plugins_large.txt",
+	}
+	return wordlistPaths[pluginFileSize]
+}
+
 func createSendHTTPRequestConfig(baseURL, path string, config *enumeratecmswordpressfern.EnumerateWordpressPluginsConfig) common.SendHttpRequestConfig {
 	request := common.HttpRequest{
 		BaseUrl: baseURL,
@@ -41,8 +50,8 @@ func createSendHTTPRequestConfig(baseURL, path string, config *enumeratecmswordp
 
 // PerformAppEnumerateCMSWordpressPlugins attempts to find plugins installed on WordPress sites.
 // It returns a report containing the results for each target and any errors encountered.
-func PerformAppEnumerateCMSWordpressPlugins(ctx context.Context, config *enumeratecmswordpressfern.EnumerateWordpressPluginsConfig) enumeratecmswordpressfern.EnumerateWordpressPluginsReport {
-	report := enumeratecmswordpressfern.EnumerateWordpressPluginsReport{Config: config, Result: &enumeratecmswordpressfern.EnumerateWordpressPluginsResult{}}
+func PerformAppEnumerateCMSWordpressPlugins(ctx context.Context, config enumeratecmswordpressfern.EnumerateWordpressPluginsConfig) enumeratecmswordpressfern.EnumerateWordpressPluginsReport {
+	report := enumeratecmswordpressfern.EnumerateWordpressPluginsReport{Config: &config, Result: &enumeratecmswordpressfern.EnumerateWordpressPluginsResult{}}
 
 	// Create channels for collecting results and errors
 	resultsChan := make(chan *enumeratecmswordpressfern.WordpressPluginsTarget, len(config.Targets))
@@ -71,7 +80,7 @@ func PerformAppEnumerateCMSWordpressPlugins(ctx context.Context, config *enumera
 			defer wg.Done()
 			defer func() { <-semaphore }() // Release semaphore when done
 
-			result, errs := scanTarget(ctx, target, config)
+			result, errs := scanTarget(ctx, target, &config)
 			resultsChan <- &result
 			if len(errs) > 0 {
 				errorsChan <- errs

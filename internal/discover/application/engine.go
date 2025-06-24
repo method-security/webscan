@@ -14,7 +14,7 @@ import (
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
 )
 
-func createSendHTTPRequestConfig(baseURL, path string, method common.HttpMethod, requestParams common.HttpRequestParams, config *discover.DiscoverApplicationFingerprintConfig) common.SendHttpRequestConfig {
+func createSendHTTPRequestConfig(baseURL, path string, method common.HttpMethod, requestParams common.HttpRequestParams, config *discover.DiscoverApplicationConfig) common.SendHttpRequestConfig {
 	request := common.HttpRequest{
 		BaseUrl: baseURL,
 		Path:    path,
@@ -35,13 +35,13 @@ func createSendHTTPRequestConfig(baseURL, path string, method common.HttpMethod,
 
 // Run executes the fingerprinting process for a given target and configuration.
 // Returns a slice of ApplicationFingerprintAttempt and a slice of error messages.
-func Run(ctx context.Context, target string, config *discover.DiscoverApplicationFingerprintConfig) ([]*discover.ApplicationFingerprintAttempt, []string) {
-	if config == nil || config.Fingerprints == nil || len(config.Fingerprints.Modules) == 0 {
+func Run(ctx context.Context, target string, config *discover.DiscoverApplicationConfig, filteredFingerprints *discover.ApplicationResource) ([]*discover.ApplicationFingerprintAttempt, []string) {
+	if config == nil || filteredFingerprints == nil || len(filteredFingerprints.Modules) == 0 {
 		return []*discover.ApplicationFingerprintAttempt{}, []string{"invalid config: no resource types found"}
 	}
 
-	// Get the first (and should be only) resource type from the filtered config
-	resourceType := config.Fingerprints
+	// Get the resource type from the filtered config (could be a specific type or 'ALL')
+	resourceType := filteredFingerprints
 	if len(resourceType.Modules) == 0 {
 		return []*discover.ApplicationFingerprintAttempt{}, []string{"invalid config: no modules found for resource type"}
 	}
@@ -85,11 +85,22 @@ func Run(ctx context.Context, target string, config *discover.DiscoverApplicatio
 
 			if AnalyzeResponse(request, module) {
 				attempt.Finding = true
+				attempt.Fingerprints = []*discover.ApplicationFingerprints{
+					{
+						Fingerprints: []*discover.ApplicationResource{
+							{
+								Name:    resourceType.Name,
+								Modules: []*discover.ApplicationFingerprintModule{module},
+							},
+						},
+					},
+				}
+				attempts = append(attempts, attempt)
 				break
 			}
 		}
+
 		attempt.Requests = requests
-		attempts = append(attempts, attempt)
 	}
 	return attempts, errors
 }
@@ -147,20 +158,20 @@ func AnalyzeResponse(httpRequestResponse *common.HttpRequestResponse, module *di
 }
 
 // LaunchFingerprintEngine runs the fingerprinting engine for all targets in the config and returns a report.
-func LaunchFingerprintEngine(ctx context.Context, config *discover.DiscoverApplicationFingerprintConfig) (*discover.DiscoverApplicationFingerprintReport, error) {
-	report := discover.DiscoverApplicationFingerprintReport{Config: config}
+func LaunchFingerprintEngine(ctx context.Context, config *discover.DiscoverApplicationConfig, filteredFingerprints *discover.ApplicationResource) (*discover.DiscoverApplicationReport, error) {
+	report := discover.DiscoverApplicationReport{Config: config}
 	errors := []string{}
 
 	var targets []*discover.ApplicationFingerprintTarget
 	for _, target := range config.Targets {
 		var attempts []*discover.ApplicationFingerprintAttempt
-		attempt, errs := Run(ctx, target, config)
+		attempt, errs := Run(ctx, target, config, filteredFingerprints)
 		attempts = append(attempts, attempt...)
 		errors = append(errors, errs...)
 
 		filteredAttempts := []*discover.ApplicationFingerprintAttempt{}
 		for _, attempt := range attempts {
-			if !config.SuccessfulOnly || attempt.Finding {
+			if attempt.Finding {
 				filteredAttempts = append(filteredAttempts, attempt)
 			}
 		}
@@ -171,7 +182,7 @@ func LaunchFingerprintEngine(ctx context.Context, config *discover.DiscoverAppli
 	}
 
 	// Marshal Report
-	report.Targets = targets
+	report.Result = &discover.DiscoverApplicationResult{Targets: targets}
 	report.Errors = errors
 	return &report, nil
 }

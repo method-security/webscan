@@ -8,15 +8,14 @@ import (
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
 	discover "github.com/Method-Security/webscan/generated/go/discover"
-	discoversaasfern "github.com/Method-Security/webscan/generated/go/discover/saas"
 
 	// Internal
 	discoverprobe "github.com/Method-Security/webscan/internal/discover"
 	discoverapplication "github.com/Method-Security/webscan/internal/discover/application"
 	discoverpage "github.com/Method-Security/webscan/internal/discover/page"
 	discoverroute "github.com/Method-Security/webscan/internal/discover/route"
-	discoversaasactive "github.com/Method-Security/webscan/internal/discover/saas/active"
-	discoversaasactivehelpers "github.com/Method-Security/webscan/internal/discover/saas/active/helpers"
+	discoversaas "github.com/Method-Security/webscan/internal/discover/saas/active"
+	discoversaashelpers "github.com/Method-Security/webscan/internal/discover/saas/active/helpers"
 
 	// Utils
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
@@ -71,7 +70,12 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			filteredFingerprints, err := discoverapplication.FilterFingerprints(fingeprints, resourceType, modules)
+			resourceConfigType, err := getDiscoverApplicationResourceConfigTypeFromString(resourceType)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			filteredFingerprints, err := discoverapplication.FilterFingerprints(fingeprints, &resourceConfigType, modules)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -93,14 +97,13 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Create config
-			config, err := getDiscoverApplicationFingerprintConfig(targets, resourceType, modules, filteredFingerprints, successfulOnly, verifyTLS, timeout)
+			config, err := getDiscoverApplicationConfig(targets, resourceType, modules, filteredFingerprints, successfulOnly, verifyTLS, timeout)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
-
 			// Generate report
-			report, err := discoverapplication.LaunchFingerprintEngine(cmd.Context(), config)
+			report, err := discoverapplication.LaunchFingerprintEngine(cmd.Context(), config, filteredFingerprints)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 			}
@@ -110,16 +113,15 @@ func (a *WebScan) InitDiscoverCommand() {
 	// Target Flags
 	discoverApplicationCmd.Flags().StringSlice("targets", []string{}, "URL targets to perform fingerprinting against")
 	// Config Flags
-	discoverApplicationCmd.Flags().String("fingerprint-file", "configs/discover/application/fingerprints.json", "Path to the fingerprint definitions file")
-	discoverApplicationCmd.Flags().String("resource-type", "", "Type of resource to fingerprint (e.g., web, api, cms)")
+	discoverApplicationCmd.Flags().String("resource-type", "ALL", "Type of resource to fingerprint (e.g., web, api, cms)")
 	discoverApplicationCmd.Flags().StringSlice("modules", []string{}, "Specific fingerprinting modules to run")
 	discoverApplicationCmd.Flags().Bool("successful-only", false, "Only show successful fingerprint matches")
 	discoverApplicationCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
 	discoverApplicationCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
+	discoverApplicationCmd.Flags().String("fingerprint-file", "/opt/method/webscan/var/conf/discover/application/fingerprints.json", "Path to the fingerprint definitions file")
 
 	// Mark Required Flags
 	_ = discoverApplicationCmd.MarkFlagRequired("targets")
-	_ = discoverApplicationCmd.MarkFlagRequired("resource-type")
 
 	// Add Command to 'Discover' Command
 	discoverCmd.AddCommand(discoverApplicationCmd)
@@ -376,13 +378,6 @@ func (a *WebScan) InitDiscoverCommand() {
 		Use:   "saas",
 		Short: "Gather SaaS information given an organization name",
 		Long:  `Gather SaaS information given an organization name`,
-	}
-
-	// SaaS Active Command
-	discoverSaasActiveCmd := &cobra.Command{
-		Use:   "active",
-		Short: "Active detection of SaaS application instances and evalutation of login pages",
-		Long:  `Active detection of SaaS application instances and evalutation of login pages`,
 		Run: func(cmd *cobra.Command, args []string) {
 			// Get the Orgs
 			orgs, err := cmd.Flags().GetStringSlice("orgs")
@@ -402,8 +397,8 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			saasFingerprints := discoversaasactivehelpers.UnmarshalFingerprints(saasFilePaths)
-			ssoFingerprints := discoversaasactivehelpers.UnmarshalFingerprints(ssoFilePaths)
+			saasFingerprints := discoversaashelpers.UnmarshalFingerprints(saasFilePaths)
+			ssoFingerprints := discoversaashelpers.UnmarshalFingerprints(ssoFilePaths)
 			if len(saasFingerprints.Fingerprints) == 0 {
 				a.OutputSignal.AddError(errors.New("no SaaS fingerprints found"))
 				return
@@ -424,12 +419,12 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			filteredSaasFingerprints, err := discoversaasactivehelpers.FilterFingerprints(saasCompanies, saasFingerprints)
+			filteredSaasFingerprints, err := discoversaashelpers.FilterFingerprints(saasCompanies, saasFingerprints)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			filteredSsoFingerprints, err := discoversaasactivehelpers.FilterFingerprints(ssoCompanies, ssoFingerprints)
+			filteredSsoFingerprints, err := discoversaashelpers.FilterFingerprints(ssoCompanies, ssoFingerprints)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -444,11 +439,6 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Config
-			successfulOnly, err := cmd.Flags().GetBool("successful-only")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
 			maxRedirects, err := cmd.Flags().GetInt("max-redirects")
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -480,10 +470,10 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Get the config
-			config := getDiscoverSaasActiveConfig(orgs, *filteredSaasFingerprints, *filteredSsoFingerprints, saasCompanies, ssoCompanies, maxRedirects, successfulOnly, verifyTLS, timeout, requestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
+			config := getDiscoverSaasConfig(orgs, saasCompanies, ssoCompanies, maxRedirects, verifyTLS, timeout, requestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
 
 			// Generate the report
-			report, err := discoversaasactive.LaunchDiscoverSaasActive(cmd.Context(), config, requestMethodConfig.BrowserbaseSecrets)
+			report, err := discoversaas.LaunchDiscoverSaas(cmd.Context(), config, *filteredSaasFingerprints, *filteredSsoFingerprints, requestMethodConfig.BrowserbaseSecrets)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -492,30 +482,25 @@ func (a *WebScan) InitDiscoverCommand() {
 		},
 	}
 	// Target Flags
-	discoverSaasActiveCmd.Flags().StringSlice("orgs", []string{}, "The organization names to use for discovery")
+	discoverSaasCmd.Flags().StringSlice("orgs", []string{}, "The organization names to use for discovery")
 	// Config Flags
-	discoverSaasActiveCmd.Flags().StringSlice("saas-file-paths", []string{"configs/discover/saas/active/saas_fingerprints.json"}, "Files containing SaaS application fingerprints")
-	discoverSaasActiveCmd.Flags().StringSlice("sso-file-paths", []string{"configs/discover/saas/active/sso_fingerprints.json"}, "Files containing SSO application fingerprints")
-	discoverSaasActiveCmd.Flags().StringSlice("saas-companies", []string{}, "The specific SaaS companies to use for discovery (Must be present in the SaaS fingerprints file)")
-	discoverSaasActiveCmd.Flags().StringSlice("sso-companies", []string{}, "The specific SSO companies to use for discovery (Must be present in the SSO fingerprints file)")
-	discoverSaasActiveCmd.Flags().Bool("successful-only", false, "Only show successful attempts")
-	discoverSaasActiveCmd.Flags().Bool("https-only", true, "Only show successful attempts over HTTPS")
-	discoverSaasActiveCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
-	discoverSaasActiveCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
-	discoverSaasActiveCmd.Flags().Int("timeout", 30, "Timeout in seconds for the capture")
+	discoverSaasCmd.Flags().StringSlice("saas-file-paths", []string{"/opt/method/webscan/var/conf/discover/saas/active/saas_fingerprints.json"}, "Files containing SaaS application fingerprints")
+	discoverSaasCmd.Flags().StringSlice("sso-file-paths", []string{"/opt/method/webscan/var/conf/discover/saas/active/sso_fingerprints.json"}, "Files containing SSO application fingerprints")
+	discoverSaasCmd.Flags().StringSlice("saas-companies", []string{}, "The specific SaaS companies to use for discovery (Must be present in the SaaS fingerprints file)")
+	discoverSaasCmd.Flags().StringSlice("sso-companies", []string{}, "The specific SSO companies to use for discovery (Must be present in the SSO fingerprints file)")
+	discoverSaasCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
+	discoverSaasCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
+	discoverSaasCmd.Flags().Int("timeout", 30, "Timeout in seconds for the capture")
 	// Request Method Flags for all capture subcommands
-	discoverSaasActiveCmd.Flags().String("request-method", "HEADLESS", "Request method (headless, browserbase)")
-	discoverSaasActiveCmd.Flags().String("headless-path", "", "Path to a headless browser executable")
-	discoverSaasActiveCmd.Flags().Int("min-dom-stabalize-time", 5, "Minimum time in seconds to wait for DOM to stabilize")
-	discoverSaasActiveCmd.Flags().String("browserbase-token", "", "Browserbase API token")
-	discoverSaasActiveCmd.Flags().String("browserbase-project", "", "Browserbase project ID")
-	discoverSaasActiveCmd.Flags().Bool("browserbase-proxy", false, "Instruct Browserbase to use a proxy")
-	discoverSaasActiveCmd.Flags().StringSlice("browserbase-countries", []string{}, "List of countries to use for the proxy")
+	discoverSaasCmd.Flags().String("request-method", "HEADLESS", "Request method (headless, browserbase)")
+	discoverSaasCmd.Flags().String("headless-path", "", "Path to a headless browser executable")
+	discoverSaasCmd.Flags().Int("min-dom-stabalize-time", 5, "Minimum time in seconds to wait for DOM to stabilize")
+	discoverSaasCmd.Flags().String("browserbase-token", "", "Browserbase API token")
+	discoverSaasCmd.Flags().String("browserbase-project", "", "Browserbase project ID")
+	discoverSaasCmd.Flags().Bool("browserbase-proxy", false, "Instruct Browserbase to use a proxy")
+	discoverSaasCmd.Flags().StringSlice("browserbase-countries", []string{}, "List of countries to use for the proxy")
 
-	_ = discoverSaasActiveCmd.MarkFlagRequired("orgs")
-
-	// Add Command to 'Saas' Command
-	discoverSaasCmd.AddCommand(discoverSaasActiveCmd)
+	_ = discoverSaasCmd.MarkFlagRequired("orgs")
 
 	// Add Command to 'Discover' Command
 	discoverCmd.AddCommand(discoverSaasCmd)
@@ -524,20 +509,18 @@ func (a *WebScan) InitDiscoverCommand() {
 	a.RootCmd.AddCommand(discoverCmd)
 }
 
-// getDiscoverApplicationFingerprintConfig builds the config for application fingerprinting discovery.
-func getDiscoverApplicationFingerprintConfig(targets []string, resource string, moduleEnums []string, fingerprints *discover.ApplicationFingerprintResource, successfulOnly bool, verifyTLS bool, timeout int) (*discover.DiscoverApplicationFingerprintConfig, error) {
-	resourceEnum, err := discover.NewApplicationFingerprintResourceTypeFromString(resource)
+// getDiscoverApplicationConfig builds the config for application fingerprinting discovery.
+func getDiscoverApplicationConfig(targets []string, resource string, moduleEnums []string, fingerprints *discover.ApplicationResource, successfulOnly bool, verifyTLS bool, timeout int) (*discover.DiscoverApplicationConfig, error) {
+	resourceEnum, err := getDiscoverApplicationResourceConfigTypeFromString(resource)
 	if err != nil {
 		return nil, fmt.Errorf("invalid resource type: %s", resource)
 	}
-	config := &discover.DiscoverApplicationFingerprintConfig{
-		Targets:        targets,
-		ResourceType:   resourceEnum,
-		Modules:        moduleEnums,
-		Fingerprints:   fingerprints,
-		SuccessfulOnly: successfulOnly,
-		VerifyTls:      verifyTLS,
-		Timeout:        max(timeout, 0),
+	config := &discover.DiscoverApplicationConfig{
+		Targets:      targets,
+		ResourceType: &resourceEnum,
+		Modules:      moduleEnums,
+		VerifyTls:    verifyTLS,
+		Timeout:      max(timeout, 0),
 	}
 	return config, nil
 }
@@ -549,7 +532,7 @@ func getDiscoverPageConfig(target string, maxRedirects int, verifyTLS bool, time
 		MaxRedirects:      maxRedirects,
 		VerifyTls:         verifyTLS,
 		Timeout:           max(timeout, 0),
-		TakeScreenshot:    takeScreenshot,
+		Screenshot:        takeScreenshot,
 		RequestMethod:     requestMethod,
 		HeadlessConfig:    headlessConfig,
 		BrowserbaseConfig: browserbaseConfig,
@@ -590,16 +573,13 @@ func getDiscoverRouteConfig(target string, requiredBaseURLMatch bool, ignoreStat
 	return config
 }
 
-// getDiscoverSaasActiveConfig builds the config for SaaS active discovery.
-func getDiscoverSaasActiveConfig(orgs []string, saasFingerprints discoversaasfern.SaasFingerprintFile, ssoFingerprints discoversaasfern.SaasFingerprintFile, saasCompanies []string, ssoCompanies []string, maxRedirects int, successfulOnly bool, verifyTLS bool, timeout int, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) discoversaasfern.DiscoverSaasActiveConfig {
-	config := discoversaasfern.DiscoverSaasActiveConfig{
+// getDiscoverSaasConfig builds the config for SaaS active discovery.
+func getDiscoverSaasConfig(orgs []string, saasCompanies []string, ssoCompanies []string, maxRedirects int, verifyTLS bool, timeout int, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) discover.DiscoverSaasConfig {
+	config := discover.DiscoverSaasConfig{
 		Orgs:              orgs,
-		SaasFingerprints:  &saasFingerprints,
-		SsoFingerprints:   &ssoFingerprints,
 		SaasCompanies:     saasCompanies,
 		SsoCompanies:      ssoCompanies,
 		MaxRedirects:      maxRedirects,
-		SuccessfulOnly:    successfulOnly,
 		VerifyTls:         verifyTLS,
 		Timeout:           max(timeout, 0),
 		RequestMethod:     requestMethod,
@@ -607,4 +587,19 @@ func getDiscoverSaasActiveConfig(orgs []string, saasFingerprints discoversaasfer
 		BrowserbaseConfig: browserbaseConfig,
 	}
 	return config
+}
+
+func getDiscoverApplicationResourceConfigTypeFromString(resource string) (discover.ApplicationResourceConfigType, error) {
+	if resource == "ALL" {
+		return discover.ApplicationResourceConfigType{
+			ApplicationResourceTypeAll: discover.ApplicationResourceTypeAllAll,
+		}, nil
+	}
+	resourceEnum, err := discover.NewApplicationResourceTypeFromString(resource)
+	if err != nil {
+		return discover.ApplicationResourceConfigType{}, fmt.Errorf("invalid resource type: %s", resource)
+	}
+	return discover.ApplicationResourceConfigType{
+		ApplicationResourceType: resourceEnum,
+	}, nil
 }

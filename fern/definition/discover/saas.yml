@@ -1,6 +1,6 @@
 imports:
-  http: ../../common/http.yml
-  method: ../../common/method.yml
+  http: ../common/http.yml
+  method: ../common/method.yml
 types:
   # File JSON Schema
   SaasFingerprintProfile:
@@ -16,15 +16,11 @@ types:
     properties:
       fingerprints: map<string, SaasFingerprintEntry>
   # CLI Config
-  DiscoverSaasActiveConfig:
+  DiscoverSaasConfig:
     properties:
       orgs: list<string>
-      saasFingerprints: SaasFingerprintFile
-      ssoFingerprints: SaasFingerprintFile
       saasCompanies: optional<list<string>>
       ssoCompanies: optional<list<string>>
-      successfulOnly: boolean
-      httpsOnly: boolean
       maxRedirects: integer
       verifyTls: boolean
       timeout: integer
@@ -48,8 +44,11 @@ types:
     properties:
       org: string
       companies: list<SaasActiveCompany>
-  DiscoverSaasActiveReport:
+  DiscoverSaasResult:
     properties:
       orgs: optional<list<SaasActiveAttempt>>
-      config: DiscoverSaasActiveConfig
+  DiscoverSaasReport:
+    properties:
+      config: DiscoverSaasConfig
+      result: DiscoverSaasResult
       errors: optional<list<string>>

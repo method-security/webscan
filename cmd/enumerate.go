@@ -4,17 +4,16 @@ import (
 	// Standard
 	"errors"
 	// Generated
+	enumerateapiapplicationfern "github.com/Method-Security/webscan/generated/go/enumerate/apiapplication"
 	enumeratecmswordpressfern "github.com/Method-Security/webscan/generated/go/enumerate/cms/wordpress"
 	enumerategeneralfern "github.com/Method-Security/webscan/generated/go/enumerate/general"
 	enumeratekubefern "github.com/Method-Security/webscan/generated/go/enumerate/kube"
-	enumeratewebserverfern "github.com/Method-Security/webscan/generated/go/enumerate/webserver"
 
 	// Internal
 	enumerateapiapplication "github.com/Method-Security/webscan/internal/enumerate/apiapplication"
-	enumeratecmswordpress "github.com/Method-Security/webscan/internal/enumerate/cms/wordpress"
+	enumeratecms "github.com/Method-Security/webscan/internal/enumerate/cms"
 	enumerategeneral "github.com/Method-Security/webscan/internal/enumerate/general"
 	enumeratekube "github.com/Method-Security/webscan/internal/enumerate/kube"
-	enumeratewebserver "github.com/Method-Security/webscan/internal/enumerate/webserver"
 
 	// Utils
 	utils "github.com/Method-Security/webscan/utils"
@@ -56,8 +55,12 @@ func (a *WebScan) InitEnumerateCommand() {
 				return
 			}
 
+			config := enumerateapiapplicationfern.EnumerateGraphqlConfig{
+				Target: target,
+			}
+
 			// Generate report
-			report := enumerateapiapplication.PerformAppEnumerateGraphQL(cmd.Context(), target)
+			report := enumerateapiapplication.PerformAppEnumerateGraphQL(cmd.Context(), config.Target)
 			if len(report.Errors) > 0 {
 				a.OutputSignal.Status = 1
 			}
@@ -96,8 +99,13 @@ func (a *WebScan) InitEnumerateCommand() {
 				return
 			}
 
+			config := enumerateapiapplicationfern.EnumerateSwaggerConfig{
+				Target:  target,
+				Timeout: timeout,
+			}
+
 			// Generate report
-			report := enumerateapiapplication.PerformAppEnumerateSwagger(cmd.Context(), target, timeout)
+			report := enumerateapiapplication.PerformAppEnumerateSwagger(cmd.Context(), config.Target, config.Timeout)
 			if len(report.Errors) > 0 {
 				a.OutputSignal.Status = 1
 			}
@@ -148,7 +156,7 @@ func (a *WebScan) InitEnumerateCommand() {
 			config := getEnumerateKubeConfig(target, verifyTLS, timeout)
 
 			// Generate report
-			report := enumeratekube.PerformAppEnumerateKube(cmd.Context(), config)
+			report := enumeratekube.PerformAppEnumerateKube(cmd.Context(), &config)
 			if len(report.Errors) > 0 {
 				a.OutputSignal.Status = 1
 			}
@@ -204,6 +212,12 @@ func (a *WebScan) InitEnumerateCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			var pluginFileSizeEnum *enumeratecmswordpressfern.PluginFileSize
+			pluginFileSize, err := cmd.Flags().GetString("plugins-file-size")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
 			pluginsFiles, err := cmd.Flags().GetStringSlice("plugins-file-paths")
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -211,6 +225,21 @@ func (a *WebScan) InitEnumerateCommand() {
 			}
 			if len(pluginsFiles) > 0 {
 				entries, err := utils.GetEntriesFromTXTFiles(pluginsFiles)
+				if err != nil {
+					a.OutputSignal.AddError(err)
+					return
+				}
+				plugins = append(plugins, entries...)
+			} else if pluginFileSize != "" {
+				pluginFileSizeEnumValue, err := enumeratecmswordpressfern.NewPluginFileSizeFromString(pluginFileSize)
+				if err != nil {
+					a.OutputSignal.AddError(err)
+					return
+				}
+				pluginFileSizeEnum = &pluginFileSizeEnumValue
+
+				pluginFile := GetEnumerateWordpressPluginWordlistPath(pluginFileSize)
+				entries, err := utils.GetEntriesFromTXTFiles([]string{pluginFile})
 				if err != nil {
 					a.OutputSignal.AddError(err)
 					return
@@ -238,10 +267,10 @@ func (a *WebScan) InitEnumerateCommand() {
 			}
 
 			// Generate config
-			config := getEnumerateWordpressPluginsConfig(targets, plugins, verifyTLS, timeout, threads)
+			config := getEnumerateWordpressPluginsConfig(targets, plugins, pluginFileSizeEnum, verifyTLS, timeout, threads)
 
 			// Generate report
-			report := enumeratecmswordpress.PerformAppEnumerateCMSWordpressPlugins(cmd.Context(), config)
+			report := enumeratecms.PerformAppEnumerateCMSWordpressPlugins(cmd.Context(), config)
 			if len(report.Errors) > 0 {
 				a.OutputSignal.Status = 1
 			}
@@ -252,7 +281,8 @@ func (a *WebScan) InitEnumerateCommand() {
 	enumerateCMSWordpressPluginsCmd.Flags().StringSlice("targets", []string{}, "URL targets to perform WordPress plugin enumeration against")
 	// Config Flags
 	enumerateCMSWordpressPluginsCmd.Flags().StringSlice("plugins", []string{}, "Specific WordPress plugins to check for")
-	enumerateCMSWordpressPluginsCmd.Flags().StringSlice("plugins-file-paths", []string{"configs/enumerate/cms/wordpress/plugins_small.txt"}, "Paths to files containing WordPress plugin lists")
+	enumerateCMSWordpressPluginsCmd.Flags().StringSlice("plugins-file-paths", []string{}, "Paths to files containing WordPress plugin lists")
+	enumerateCMSWordpressPluginsCmd.Flags().String("plugins-file-size", "SMALL", "Size of the WordPress plugin list to use")
 	enumerateCMSWordpressPluginsCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
 	enumerateCMSWordpressPluginsCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
 	enumerateCMSWordpressPluginsCmd.Flags().Int("threads", 0, "Number of concurrent threads for scanning")
@@ -268,73 +298,6 @@ func (a *WebScan) InitEnumerateCommand() {
 
 	// Add Command to 'Enumerate' Command
 	enumerateCmd.AddCommand(enumerateCMSCmd)
-
-	// Webserver Command
-	// Subcommands: iis
-	enumerateWebserverCmd := &cobra.Command{
-		Use:   "webserver",
-		Short: "Enumerate web servers",
-		Long:  `Discover and analyze web server configurations, versions, and potential security misconfigurations.`,
-	}
-
-	// IIS Command
-	enumerateWebserverIISCmd := &cobra.Command{
-		Use:   "iis",
-		Short: "Enumerate IIS servers",
-		Long:  `Discover and analyze IIS server configurations, features, and potential security vulnerabilities.`,
-		Run: func(cmd *cobra.Command, args []string) {
-			defer a.OutputSignal.PanicHandler(cmd.Context())
-
-			// Target flag
-			targets, err := cmd.Flags().GetStringSlice("targets")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-
-			// Config flags
-			verifyTLS, err := cmd.Flags().GetBool("verify-tls")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			timeout, err := cmd.Flags().GetInt("timeout")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			threads, err := cmd.Flags().GetInt("threads")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-
-			// Generate config
-			config := getEnumerateWebserverIISConfig(targets, verifyTLS, timeout, threads)
-
-			// Generate report
-			report := enumeratewebserver.PerformAppEnumerateWebserverIIS(cmd.Context(), config)
-			if len(report.Errors) > 0 {
-				a.OutputSignal.Status = 1
-			}
-			a.OutputSignal.Content = report
-		},
-	}
-	// Target Flags
-	enumerateWebserverIISCmd.Flags().StringSlice("targets", []string{}, "URL targets to perform IIS enumeration against")
-	// Config Flags
-	enumerateWebserverIISCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
-	enumerateWebserverIISCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
-	enumerateWebserverIISCmd.Flags().Int("threads", 0, "Number of concurrent threads for scanning")
-
-	// Mark required flags
-	_ = enumerateWebserverIISCmd.MarkFlagRequired("targets")
-
-	// Add Command to 'Enumerate Webserver' Command
-	enumerateWebserverCmd.AddCommand(enumerateWebserverIISCmd)
-
-	// Add Command to 'Enumerate' Command
-	enumerateCmd.AddCommand(enumerateWebserverCmd)
 
 	// General Command
 	// Subcommands: ratelimit
@@ -385,7 +348,7 @@ func (a *WebScan) InitEnumerateCommand() {
 			config := getEnumerateGeneralRateLimitConfig(targets, maxRequests, timespan, verifyTLS, timeout)
 
 			// Generate report
-			report := enumerategeneral.PerformGeneralRatelimit(cmd.Context(), config)
+			report := enumerategeneral.PerformGeneralRatelimit(cmd.Context(), &config)
 			if len(report.Errors) > 0 {
 				a.OutputSignal.Status = 1
 			}
@@ -414,13 +377,14 @@ func (a *WebScan) InitEnumerateCommand() {
 }
 
 // getEnumerateWordpressPluginsConfig builds the config for WordPress plugin enumeration.
-func getEnumerateWordpressPluginsConfig(targets []string, plugins []string, verifyTLS bool, timeout int, threads int) *enumeratecmswordpressfern.EnumerateWordpressPluginsConfig {
+func getEnumerateWordpressPluginsConfig(targets []string, plugins []string, pluginFileSizeEnum *enumeratecmswordpressfern.PluginFileSize, verifyTLS bool, timeout int, threads int) *enumeratecmswordpressfern.EnumerateWordpressPluginsConfig {
 	config := &enumeratecmswordpressfern.EnumerateWordpressPluginsConfig{
-		Targets:   targets,
-		Plugins:   plugins,
-		VerifyTls: verifyTLS,
-		Timeout:   max(timeout, 0),
-		Threads:   max(threads, 0),
+		Targets:        targets,
+		Plugins:        plugins,
+		PluginFileSize: pluginFileSizeEnum,
+		VerifyTls:      verifyTLS,
+		Timeout:        max(timeout, 0),
+		Threads:        max(threads, 0),
 	}
 	return config
 }
@@ -435,20 +399,9 @@ func getEnumerateKubeConfig(target string, verifyTLS bool, timeout int) enumerat
 	return config
 }
 
-// getEnumerateWebserverIISConfig builds the config for IIS webserver enumeration.
-func getEnumerateWebserverIISConfig(targets []string, verifyTLS bool, timeout int, threads int) enumeratewebserverfern.EnumerateWebserverIisConfig {
-	config := enumeratewebserverfern.EnumerateWebserverIisConfig{
-		Targets:   targets,
-		VerifyTls: verifyTLS,
-		Timeout:   max(timeout, 0),
-		Threads:   max(threads, 0),
-	}
-	return config
-}
-
 // getEnumerateGeneralRateLimitConfig builds the config for general rate limit enumeration.
-func getEnumerateGeneralRateLimitConfig(targets []string, maxRequests int, timespan int, verifyTLS bool, timeout int) enumerategeneralfern.EnumerateGeneralRateLimitConfig {
-	config := enumerategeneralfern.EnumerateGeneralRateLimitConfig{
+func getEnumerateGeneralRateLimitConfig(targets []string, maxRequests int, timespan int, verifyTLS bool, timeout int) enumerategeneralfern.EnumerateRateLimitConfig {
+	config := enumerategeneralfern.EnumerateRateLimitConfig{
 		Targets:     targets,
 		MaxRequests: maxRequests,
 		Timespan:    max(timespan, 0),
@@ -456,4 +409,12 @@ func getEnumerateGeneralRateLimitConfig(targets []string, maxRequests int, times
 		Timeout:     max(timeout, 0),
 	}
 	return config
+}
+
+func GetEnumerateWordpressPluginWordlistPath(pluginFileSize string) string {
+	wordlistPaths := map[string]string{
+		"SMALL": "/opt/method/webscan/var/conf/enumerate/cms/wordpress/plugins_small.txt",
+		"LARGE": "/opt/method/webscan/var/conf/enumerate/cms/wordpress/plugins_large.txt",
+	}
+	return wordlistPaths[pluginFileSize]
 }

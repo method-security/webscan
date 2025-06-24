@@ -12,9 +12,12 @@ types:
       requestMethod: method.RequestMethod
       headlessConfig: optional<method.HeadlessRequestConfig>
       browserbaseConfig: optional<method.BrowserbaseRequestConfig>
+  DiscoverProbeResult:
+    properties:
+      targets: optional<list<http.HttpRequestResponse>>
   # Report Struct
   DiscoverProbeReport:
     properties:
-      targets: optional<list<http.HttpRequestResponse>>
       config: DiscoverProbeConfig
+      result: DiscoverProbeResult
       errors: optional<list<string>>

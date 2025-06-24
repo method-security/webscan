@@ -152,8 +152,10 @@ func PerformRouteCapture(ctx context.Context, config discover.DiscoverRouteConfi
 
 	// Initialize Report
 	report := discover.DiscoverRouteReport{
-		Target: config.Target,
 		Config: &config,
+		Result: &discover.DiscoverRouteResult{
+			Target: config.Target,
+		},
 	}
 	errors := []string{}
 
@@ -272,8 +274,8 @@ func PerformRouteCapture(ctx context.Context, config discover.DiscoverRouteConfi
 	}
 
 	// Remove duplicate Routes and Static Assets
-	report.Routes = discoverroutehelpers.MergeWebRoutes(allRoutes)
-	report.StaticAssets = discoverroutehelpers.MergeStaticAssets(allStaticAssets)
+	report.Result.Routes = discoverroutehelpers.MergeWebRoutes(allRoutes)
+	report.Result.StaticAssets = discoverroutehelpers.MergeStaticAssets(allStaticAssets)
 	report.Errors = errors
 	return report
 }

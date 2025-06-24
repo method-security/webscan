@@ -1,8 +1,11 @@
 imports:
   http: ../common/http.yml
 types:
-  # Application Fingerprint Enums
-  ApplicationFingerprintResourceType:
+  # Application Enums
+  ApplicationResourceTypeAll:
+    enum:
+      - ALL
+  ApplicationResourceType:
     enum:
       - API_APPLICATION
       - CLOUD_BUCKET
@@ -11,7 +14,12 @@ types:
       - FRAMEWORK
       - REMOTE_ACCESS
       - WEB_SERVER
-  # Application Fingerprint File Struct
+  ApplicationResourceConfigType:
+    discriminated: false
+    union:
+      - ApplicationResourceType
+      - ApplicationResourceTypeAll
+  # Application Fingerprints File Struct
   ApplicationFingerprintModule:
     properties:
       name: string
@@ -20,35 +28,37 @@ types:
       requestParams: optional<http.HttpRequestParams>
       headerIndicators: optional<map<string, optional<list<string>>>>
       bodyIndicators: optional<list<string>>
-  ApplicationFingerprintResource:
+  ApplicationResource:
     properties:
-      name: ApplicationFingerprintResourceType
+      name: ApplicationResourceConfigType
       modules: list<ApplicationFingerprintModule>
   ApplicationFingerprints:
     properties:
-      fingerprints: list<ApplicationFingerprintResource>
-  # Config Struct
-  DiscoverApplicationFingerprintConfig:
-    properties:
-      targets: list<string>
-      resourceType: ApplicationFingerprintResourceType
-      modules: optional<list<string>>
-      fingerprints: optional<ApplicationFingerprintResource>
-      successfulOnly: boolean
-      verifyTls: boolean
-      timeout: integer
-  # Report Struct
+      fingerprints: list<ApplicationResource>
   ApplicationFingerprintAttempt:
     properties:
       name: string
       requests: optional<list<http.HttpRequestResponse>>
       finding: boolean
+      fingerprints: optional<list<ApplicationFingerprints>>
   ApplicationFingerprintTarget:
     properties:
       target: string
       attempts: list<ApplicationFingerprintAttempt>
-  DiscoverApplicationFingerprintReport:
+  # Config Struct
+  DiscoverApplicationConfig:
+    properties:
+      targets: list<string>
+      resourceType: ApplicationResourceConfigType
+      modules: optional<list<string>>
+      verifyTls: boolean
+      timeout: integer
+  # Report Struct
+  DiscoverApplicationResult:
     properties:
       targets: optional<list<ApplicationFingerprintTarget>>
-      config: DiscoverApplicationFingerprintConfig
+  DiscoverApplicationReport:
+    properties:
+      config: DiscoverApplicationConfig
+      result: DiscoverApplicationResult
       errors: optional<list<string>>

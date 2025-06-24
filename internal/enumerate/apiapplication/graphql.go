@@ -18,13 +18,17 @@ import (
 )
 
 // PerformAppEnumerateGraphQL performs a GraphQL scan against a target URL and returns the report.
-func PerformAppEnumerateGraphQL(ctx context.Context, target string) enumerateapiapplicationfern.EnumerateApiApplicationRoutesReport {
-	report := enumerateapiapplicationfern.EnumerateApiApplicationRoutesReport{Target: target, AppType: enumerateapiapplicationfern.ApiTypeGraphQl}
+func PerformAppEnumerateGraphQL(ctx context.Context, target string) enumerateapiapplicationfern.EnumerateGraphqlReport {
+	result := enumerateapiapplicationfern.EnumerateGraphqlResult{
+		BaseEndpointUrl: target,
+		ApiType:         enumerateapiapplicationfern.ApiTypeGraphQl,
+	}
+	report := enumerateapiapplicationfern.EnumerateGraphqlReport{Config: &enumerateapiapplicationfern.EnumerateGraphqlConfig{Target: target}, Result: &result}
 
 	basePath, baseEndpointURL := extractBasePathAndEndpoint(target)
-	report.BaseEndpointUrl = baseEndpointURL
+	result.BaseEndpointUrl = baseEndpointURL
 
-	addTopLevelRoute(&report, basePath)
+	addTopLevelRoute(&result, basePath)
 
 	body, err := fetchGraphQLSchema(target)
 	if err != nil {
@@ -32,7 +36,7 @@ func PerformAppEnumerateGraphQL(ctx context.Context, target string) enumerateapi
 		return report
 	}
 
-	report.Raw = base64.StdEncoding.EncodeToString(body)
+	result.Raw = base64.StdEncoding.EncodeToString(body)
 
 	var schema enumerateapiapplicationfern.GraphQlSchema
 	if err := json.Unmarshal(body, &schema); err != nil {
@@ -43,7 +47,7 @@ func PerformAppEnumerateGraphQL(ctx context.Context, target string) enumerateapi
 
 	typeFields := extractTypeFields(schema)
 
-	populateReportWithQueries(&report, schema, typeFields)
+	populateReportWithQueries(&result, schema, typeFields)
 
 	return report
 }
@@ -61,7 +65,7 @@ func extractBasePathAndEndpoint(target string) (string, string) {
 	return basePath, baseEndpoint
 }
 
-func addTopLevelRoute(report *enumerateapiapplicationfern.EnumerateApiApplicationRoutesReport, basePath string) {
+func addTopLevelRoute(report *enumerateapiapplicationfern.EnumerateGraphqlResult, basePath string) {
 	baseRoute := enumerateapiapplicationfern.ApiApplicationRouteDetails{
 		Path:        basePath,
 		QueryParams: nil,
@@ -104,7 +108,7 @@ func extractTypeFields(schema enumerateapiapplicationfern.GraphQlSchema) map[str
 	return typeFields
 }
 
-func populateReportWithQueries(report *enumerateapiapplicationfern.EnumerateApiApplicationRoutesReport, schema enumerateapiapplicationfern.GraphQlSchema, typeFields map[string][]string) {
+func populateReportWithQueries(report *enumerateapiapplicationfern.EnumerateGraphqlResult, schema enumerateapiapplicationfern.GraphQlSchema, typeFields map[string][]string) {
 	for _, t := range schema.Data.Schema.Types {
 		if t.Kind == "OBJECT" && (t.Name == "Query" || t.Name == "Mutation" || t.Name == "Subscription") {
 			for _, field := range t.Fields {

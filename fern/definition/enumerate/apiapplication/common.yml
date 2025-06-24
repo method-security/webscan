@@ -1,5 +1,3 @@
-imports:
-  graphql: ./graphql.yml
 types:
   # Enums
   ApiType:
@@ -96,16 +94,3 @@ types:
       description: string
       responseProperties: optional<map<string, list<string>>>
       requestSchema: optional<RequestSchema>
-  EnumerateApiApplicationRoutesReport:
-    properties:
-      target: string  
-      appType: ApiType  
-      baseEndpointUrl: string
-      version: optional<string>
-      schemaUrl: optional<string>
-      routes: optional<list<ApiApplicationRouteDetails>>
-      securitySchemes: optional<map<string, SecurityScheme>>
-      security: optional<list<SecurityRequirement>>
-      queries: optional<list<graphql.GraphQlQuery>>
-      raw: string
-      errors: optional<list<string>>

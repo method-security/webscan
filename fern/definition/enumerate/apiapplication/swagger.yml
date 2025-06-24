@@ -1,0 +1,22 @@
+imports:
+  common: ./common.yml
+types:
+  EnumerateSwaggerConfig:
+    properties:
+      target: string
+      timeout: integer
+  EnumerateSwaggerResult:
+    properties:
+      apiType: common.ApiType
+      baseEndpointUrl: string
+      version: optional<string>
+      schemaUrl: optional<string>
+      routes: optional<list<common.ApiApplicationRouteDetails>>
+      securitySchemes: optional<map<string, common.SecurityScheme>>
+      security: optional<list<common.SecurityRequirement>>
+      raw: string
+  EnumerateSwaggerReport:
+    properties:
+      config: EnumerateSwaggerConfig
+      result: EnumerateSwaggerResult
+      errors: optional<list<string>>

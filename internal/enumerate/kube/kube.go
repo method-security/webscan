@@ -36,9 +36,9 @@ func createSendHTTPRequestConfig(baseURL, path string, verifyTLS bool, timeout i
 }
 
 // PerformAppEnumerateKube performs enumeration of common Kubernetes endpoints and returns an EnumerateKubeReport.
-func PerformAppEnumerateKube(ctx context.Context, config enumeratekubefern.EnumerateKubeConfig) *enumeratekubefern.EnumerateKubeReport {
+func PerformAppEnumerateKube(ctx context.Context, config *enumeratekubefern.EnumerateKubeConfig) *enumeratekubefern.EnumerateKubeReport {
 	// Initialize report
-	report := &enumeratekubefern.EnumerateKubeReport{Target: config.Target, Config: &config}
+	report := &enumeratekubefern.EnumerateKubeReport{Config: config, Result: &enumeratekubefern.EnumerateKubeResult{}}
 	var errors []string
 
 	// Split target URL into base URL and path
@@ -68,7 +68,7 @@ func PerformAppEnumerateKube(ctx context.Context, config enumeratekubefern.Enume
 	}
 
 	// Populate and return Report
-	report.Requests = requests
+	report.Result.Requests = requests
 	report.Errors = errors
 	return report
 }

@@ -5,16 +5,16 @@ import (
 	"fmt"
 	"os"
 
-	discoversaasfern "github.com/Method-Security/webscan/generated/go/discover/saas"
+	discover "github.com/Method-Security/webscan/generated/go/discover"
 )
 
 // FilterFingerprints enables the user to only look for specific SaaS companies or SSO login pages
-func FilterFingerprints(companies []string, fingerprints discoversaasfern.SaasFingerprintFile) (*discoversaasfern.SaasFingerprintFile, error) {
+func FilterFingerprints(companies []string, fingerprints discover.SaasFingerprintFile) (*discover.SaasFingerprintFile, error) {
 	if len(companies) == 0 {
 		return &fingerprints, nil
 	}
 
-	filteredFingerprints := make(map[string]*discoversaasfern.SaasFingerprintEntry)
+	filteredFingerprints := make(map[string]*discover.SaasFingerprintEntry)
 	for _, company := range companies {
 		if entry, exists := fingerprints.Fingerprints[company]; exists {
 			filteredFingerprints[company] = entry
@@ -22,13 +22,13 @@ func FilterFingerprints(companies []string, fingerprints discoversaasfern.SaasFi
 			return nil, fmt.Errorf("company %s not found in fingerprints", company)
 		}
 	}
-	return &discoversaasfern.SaasFingerprintFile{Fingerprints: filteredFingerprints}, nil
+	return &discover.SaasFingerprintFile{Fingerprints: filteredFingerprints}, nil
 }
 
 // UnmarshalFingerprints unmarshals the fingerprint files into a SaasFingerprintFile
-func UnmarshalFingerprints(fingerprintFiles []string) discoversaasfern.SaasFingerprintFile {
-	result := discoversaasfern.SaasFingerprintFile{
-		Fingerprints: make(map[string]*discoversaasfern.SaasFingerprintEntry),
+func UnmarshalFingerprints(fingerprintFiles []string) discover.SaasFingerprintFile {
+	result := discover.SaasFingerprintFile{
+		Fingerprints: make(map[string]*discover.SaasFingerprintEntry),
 	}
 	// Read and unmarshal each fingerprint file
 	for _, file := range fingerprintFiles {
@@ -36,7 +36,7 @@ func UnmarshalFingerprints(fingerprintFiles []string) discoversaasfern.SaasFinge
 		if err != nil {
 			continue
 		}
-		var fingerprints discoversaasfern.SaasFingerprintFile
+		var fingerprints discover.SaasFingerprintFile
 		if err := json.Unmarshal(data, &fingerprints); err != nil {
 			continue
 		}
@@ -50,17 +50,17 @@ func UnmarshalFingerprints(fingerprintFiles []string) discoversaasfern.SaasFinge
 }
 
 // ShouldAddRequest determines if a request should be included in results based on its findings and the successfulOnly flag
-func ShouldAddRequest(request *discoversaasfern.SaasActiveRequest, successfulOnly bool) bool {
+func ShouldAddRequest(request *discover.SaasActiveRequest) bool {
 	if request == nil {
 		return false
 	}
 
 	if request.Findings == nil {
-		return !successfulOnly
+		return false
 	}
 
 	hasCompanyPage := request.Findings.CompanyPage != nil && *request.Findings.CompanyPage
 	hasSsoPage := request.Findings.SsoPage != nil
 
-	return hasCompanyPage || hasSsoPage || !successfulOnly
+	return hasCompanyPage || hasSsoPage
 }

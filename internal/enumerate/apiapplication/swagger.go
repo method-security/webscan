@@ -74,8 +74,9 @@ func createSendHTTPRequestConfig(baseURL, path string, timeout int) common.SendH
 }
 
 // PerformAppEnumerateSwagger performs a Swagger scan against a target URL and returns the report.
-func PerformAppEnumerateSwagger(ctx context.Context, target string, timeout int) enumerateapiapplicationfern.EnumerateApiApplicationRoutesReport {
-	report := enumerateapiapplicationfern.EnumerateApiApplicationRoutesReport{Target: target}
+func PerformAppEnumerateSwagger(ctx context.Context, target string, timeout int) enumerateapiapplicationfern.EnumerateSwaggerReport {
+	result := enumerateapiapplicationfern.EnumerateSwaggerResult{}
+	report := enumerateapiapplicationfern.EnumerateSwaggerReport{Config: &enumerateapiapplicationfern.EnumerateSwaggerConfig{Target: target}, Result: &result}
 
 	// Normalize target URL
 	if !strings.HasPrefix(target, "http://") && !strings.HasPrefix(target, "https://") {
@@ -136,10 +137,10 @@ func PerformAppEnumerateSwagger(ctx context.Context, target string, timeout int)
 		return report
 	}
 
-	report.SchemaUrl = &swaggerURL
+	result.SchemaUrl = &swaggerURL
 
 	// Encode the raw body in base64 and add to the report
-	report.Raw = base64.StdEncoding.EncodeToString(bodyBytes)
+	result.Raw = base64.StdEncoding.EncodeToString(bodyBytes)
 
 	// Create a new document from specification bytes
 	document, err := libopenapi.NewDocument(bodyBytes)
@@ -157,11 +158,11 @@ func PerformAppEnumerateSwagger(ctx context.Context, target string, timeout int)
 
 	if version, ok := docType["swagger"]; ok && strings.HasPrefix(version.(string), "2") {
 		versionStr := version.(string)
-		report.Version = &versionStr
+		result.Version = &versionStr
 		err = handleSwaggerV2(document, &report)
 	} else if version, ok := docType["openapi"]; ok && strings.HasPrefix(version.(string), "3") {
 		versionStr := version.(string)
-		report.Version = &versionStr
+		result.Version = &versionStr
 		err = handleOpenAPIV3(document, &report, target)
 	} else {
 		report.Errors = append(report.Errors, "unsupported OpenAPI version")
@@ -176,8 +177,8 @@ func PerformAppEnumerateSwagger(ctx context.Context, target string, timeout int)
 	return report
 }
 
-func handleSwaggerV2(document libopenapi.Document, report *enumerateapiapplicationfern.EnumerateApiApplicationRoutesReport) error {
-	report.AppType = enumerateapiapplicationfern.ApiTypeSwaggerV2
+func handleSwaggerV2(document libopenapi.Document, report *enumerateapiapplicationfern.EnumerateSwaggerReport) error {
+	report.Result.ApiType = enumerateapiapplicationfern.ApiTypeSwaggerV2
 	var errors []error
 	var v2Model *libopenapi.DocumentModel[v2.Swagger]
 
@@ -194,7 +195,7 @@ func handleSwaggerV2(document libopenapi.Document, report *enumerateapiapplicati
 
 	// Construct the base endpoint URL from the host and basePath fields
 	baseEndpointURL := fmt.Sprintf("https://%s%s", model.Host, model.BasePath)
-	report.BaseEndpointUrl = baseEndpointURL
+	report.Result.BaseEndpointUrl = baseEndpointURL
 
 	// Extract security definitions
 	securityDefinitions := make(map[string]*v2.SecurityScheme)
@@ -205,12 +206,12 @@ func handleSwaggerV2(document libopenapi.Document, report *enumerateapiapplicati
 	}
 
 	// Add security schemes to the report
-	report.SecuritySchemes = convertSecurityDefinitionsV2(securityDefinitions)
+	report.Result.SecuritySchemes = convertSecurityDefinitionsV2(securityDefinitions)
 
 	// Add app-level security requirements to the report
 	securityRequirements := convertSecurityRequirementsV2(model.Security)
 	if securityRequirements != nil {
-		report.Security = []*enumerateapiapplicationfern.SecurityRequirement{securityRequirements}
+		report.Result.Security = []*enumerateapiapplicationfern.SecurityRequirement{securityRequirements}
 	}
 
 	// Iterate over paths and methods to populate the report
@@ -244,15 +245,15 @@ func handleSwaggerV2(document libopenapi.Document, report *enumerateapiapplicati
 				ResponseProperties: responseProperties,
 			}
 
-			report.Routes = append(report.Routes, &route)
+			report.Result.Routes = append(report.Result.Routes, &route)
 		}
 	}
 
 	return nil
 }
 
-func handleOpenAPIV3(document libopenapi.Document, report *enumerateapiapplicationfern.EnumerateApiApplicationRoutesReport, target string) error {
-	report.AppType = enumerateapiapplicationfern.ApiTypeSwaggerV3
+func handleOpenAPIV3(document libopenapi.Document, report *enumerateapiapplicationfern.EnumerateSwaggerReport, target string) error {
+	report.Result.ApiType = enumerateapiapplicationfern.ApiTypeSwaggerV3
 	var errors []error
 	var v3Model *libopenapi.DocumentModel[v3.Document]
 
@@ -280,7 +281,7 @@ func handleOpenAPIV3(document libopenapi.Document, report *enumerateapiapplicati
 	}
 	baseURL := fmt.Sprintf("%s://%s", parsedURL.Scheme, parsedURL.Host)
 	baseURL = strings.TrimSuffix(baseURL, "/")
-	report.BaseEndpointUrl = baseURL + serverPath
+	report.Result.BaseEndpointUrl = baseURL + serverPath
 
 	// Extract security definitions
 	securityDefinitions := make(map[string]*v3.SecurityScheme)
@@ -289,12 +290,12 @@ func handleOpenAPIV3(document libopenapi.Document, report *enumerateapiapplicati
 	}
 
 	// Add security schemes to the report
-	report.SecuritySchemes = convertSecurityDefinitionsV3(securityDefinitions)
+	report.Result.SecuritySchemes = convertSecurityDefinitionsV3(securityDefinitions)
 
 	// Add app-level security requirements to the report
 	securityRequirements := convertSecurityRequirementsV3(model.Security)
 	if securityRequirements != nil {
-		report.Security = []*enumerateapiapplicationfern.SecurityRequirement{securityRequirements}
+		report.Result.Security = []*enumerateapiapplicationfern.SecurityRequirement{securityRequirements}
 	}
 
 	// Iterate over paths and methods to populate the report
@@ -328,7 +329,7 @@ func handleOpenAPIV3(document libopenapi.Document, report *enumerateapiapplicati
 				ResponseProperties: responseProperties,
 			}
 
-			report.Routes = append(report.Routes, &route)
+			report.Result.Routes = append(report.Result.Routes, &route)
 		}
 	}
 
@@ -582,7 +583,7 @@ func extractResponsePropertiesV3(operation *v3.Operation) (map[string][]string, 
 	return responseProperties, nil
 }
 
-func convertSchemaToRequestSchema(s *base.Schema, seenSchemas map[*base.Schema]bool, report *enumerateapiapplicationfern.EnumerateApiApplicationRoutesReport) *enumerateapiapplicationfern.RequestSchema {
+func convertSchemaToRequestSchema(s *base.Schema, seenSchemas map[*base.Schema]bool, report *enumerateapiapplicationfern.EnumerateSwaggerReport) *enumerateapiapplicationfern.RequestSchema {
 	if s == nil {
 		report.Errors = append(report.Errors, "Encountered nil schema")
 		return nil
@@ -767,7 +768,7 @@ func contains(slice []string, item string) bool {
 	return false
 }
 
-func extractRequestSchemaV2(operation *v2.Operation, doc libopenapi.Document, report *enumerateapiapplicationfern.EnumerateApiApplicationRoutesReport) *enumerateapiapplicationfern.RequestSchema {
+func extractRequestSchemaV2(operation *v2.Operation, doc libopenapi.Document, report *enumerateapiapplicationfern.EnumerateSwaggerReport) *enumerateapiapplicationfern.RequestSchema {
 	if operation.Parameters == nil {
 		report.Errors = append(report.Errors, "No parameters found in operation")
 		return nil
@@ -784,7 +785,7 @@ func extractRequestSchemaV2(operation *v2.Operation, doc libopenapi.Document, re
 	return nil
 }
 
-func extractRequestSchemaV3(operation *v3.Operation, doc libopenapi.Document, report *enumerateapiapplicationfern.EnumerateApiApplicationRoutesReport) *enumerateapiapplicationfern.RequestSchema {
+func extractRequestSchemaV3(operation *v3.Operation, doc libopenapi.Document, report *enumerateapiapplicationfern.EnumerateSwaggerReport) *enumerateapiapplicationfern.RequestSchema {
 	if operation.RequestBody == nil || operation.RequestBody.Content == nil {
 		report.Errors = append(report.Errors, "No request body or content found in operation")
 		return nil
@@ -802,7 +803,7 @@ func extractRequestSchemaV3(operation *v3.Operation, doc libopenapi.Document, re
 	return nil
 }
 
-func convertEnumValues(s *base.Schema, rs *enumerateapiapplicationfern.RequestSchema, report *enumerateapiapplicationfern.EnumerateApiApplicationRoutesReport) {
+func convertEnumValues(s *base.Schema, rs *enumerateapiapplicationfern.RequestSchema, report *enumerateapiapplicationfern.EnumerateSwaggerReport) {
 	if len(s.Enum) > 0 {
 		rs.Enum = make([]interface{}, len(s.Enum))
 		for i, v := range s.Enum {
@@ -811,7 +812,7 @@ func convertEnumValues(s *base.Schema, rs *enumerateapiapplicationfern.RequestSc
 	}
 }
 
-func convertEnumValue(v *yaml.Node, report *enumerateapiapplicationfern.EnumerateApiApplicationRoutesReport) interface{} {
+func convertEnumValue(v *yaml.Node, report *enumerateapiapplicationfern.EnumerateSwaggerReport) interface{} {
 	switch v.Kind {
 	case yaml.ScalarNode:
 		switch v.Tag {

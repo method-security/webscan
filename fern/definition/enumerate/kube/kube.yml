@@ -7,10 +7,13 @@ types:
       target: string
       verifyTls: boolean
       timeout: integer
-  # Report Struct
-  EnumerateKubeReport:
+  EnumerateKubeResult:
     properties:
       target: string
       requests: optional<list<http.HttpRequestResponse>>
+  # Report Struct
+  EnumerateKubeReport:
+    properties:
       config: EnumerateKubeConfig
+      result: EnumerateKubeResult
       errors: optional<list<string>>

@@ -12,6 +12,8 @@ import (
 
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
+	// Utils
+	utils "github.com/Method-Security/webscan/utils"
 	// External
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
@@ -88,6 +90,21 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 		if err != nil {
 			log.Error("Failed to parse redirect location", svc1log.SafeParam("error", err))
 			return nil, redirectChain, fmt.Errorf("failed to parse redirect location: %v", err)
+		}
+
+		// Check if this is just a trailing slash redirect (should not count as a redirect)
+		if utils.IsTrailingSlashRedirect(currentURL, nextURL.String()) {
+			log.Info("Detected trailing slash redirect, not counting as redirect", svc1log.SafeParam("from", currentURL), svc1log.SafeParam("to", nextURL.String()))
+			// Close Response Body
+			err = resp.Body.Close()
+			if err != nil {
+				log.Error("Failed to close response body", svc1log.SafeParam("error", err))
+				return nil, redirectChain, fmt.Errorf("failed to close response body: %v", err)
+			}
+			// Update current URL but don't increment redirect count
+			currentURL = nextURL.String()
+			redirects-- // Decrement to offset the loop increment
+			continue
 		}
 
 		// Close Response Body

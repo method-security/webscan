@@ -85,13 +85,21 @@ func Run(ctx context.Context, target string, config *discover.DiscoverApplicatio
 
 			if AnalyzeResponse(request, module) {
 				attempt.Finding = true
-				attempt.Fingerprints = []*discover.ApplicationResource{resourceType}
+				attempt.Fingerprints = []*discover.ApplicationResource{
+					{
+						Name:    resourceType.Name,
+						Modules: []*discover.ApplicationFingerprintModule{module},
+					},
+				}
 				attempts = append(attempts, attempt)
 				break
 			}
 		}
 
 		attempt.Requests = requests
+		if !attempt.Finding {
+			attempts = append(attempts, attempt)
+		}
 	}
 	return attempts, errors
 }

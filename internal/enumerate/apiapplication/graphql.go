@@ -10,7 +10,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"net/url"
 	"strings"
 
 	// Generated
@@ -25,10 +24,7 @@ func PerformAppEnumerateGraphQL(ctx context.Context, target string) enumerateapi
 	}
 	report := enumerateapiapplicationfern.EnumerateGraphqlReport{Config: &enumerateapiapplicationfern.EnumerateGraphqlConfig{Target: target}, Result: &result}
 
-	basePath, baseEndpointURL := extractBasePathAndEndpoint(target)
-	result.BaseEndpointUrl = baseEndpointURL
-
-	addTopLevelRoute(&result, basePath)
+	result.BaseEndpointUrl = target
 
 	body, err := fetchGraphQLSchema(target)
 	if err != nil {
@@ -50,31 +46,6 @@ func PerformAppEnumerateGraphQL(ctx context.Context, target string) enumerateapi
 	populateReportWithQueries(&result, schema, typeFields)
 
 	return report
-}
-
-func extractBasePathAndEndpoint(target string) (string, string) {
-	u, err := url.Parse(target)
-	if err != nil {
-		return "/", target // fallback if parsing fails
-	}
-	baseEndpoint := u.Scheme + "://" + u.Host
-	basePath := u.Path
-	if basePath == "" {
-		basePath = "/"
-	}
-	return basePath, baseEndpoint
-}
-
-func addTopLevelRoute(report *enumerateapiapplicationfern.EnumerateGraphqlResult, basePath string) {
-	baseRoute := enumerateapiapplicationfern.ApiApplicationRouteDetails{
-		Path:        basePath,
-		QueryParams: nil,
-		Security:    nil,
-		Method:      "POST",
-		Type:        enumerateapiapplicationfern.ApiTypeGraphQl,
-		Description: "Top-level GraphQL route",
-	}
-	report.Routes = append(report.Routes, &baseRoute)
 }
 
 func fetchGraphQLSchema(target string) ([]byte, error) {

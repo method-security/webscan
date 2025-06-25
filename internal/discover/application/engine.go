@@ -61,7 +61,7 @@ func Run(ctx context.Context, target string, config *discover.DiscoverApplicatio
 			Finding: false,
 		}
 
-		var requests []*common.HttpRequestResponse
+		var allRequests []*common.HttpRequestResponse
 		for _, path := range module.Paths {
 			// Request Configuration
 			fullPath := parsedTargetPath + path
@@ -81,7 +81,7 @@ func Run(ctx context.Context, target string, config *discover.DiscoverApplicatio
 				errors = append(errors, err.Error())
 				continue
 			}
-			requests = append(requests, request)
+			allRequests = append(allRequests, request)
 
 			if AnalyzeResponse(request, module) {
 				attempt.Finding = true
@@ -91,13 +91,16 @@ func Run(ctx context.Context, target string, config *discover.DiscoverApplicatio
 						Modules: []*discover.ApplicationFingerprintModule{module},
 					},
 				}
+				// Only include the successful request in the results
+				attempt.Requests = []*common.HttpRequestResponse{request}
 				attempts = append(attempts, attempt)
 				break
 			}
 		}
 
-		attempt.Requests = requests
+		// For unsuccessful attempts, include all requests made
 		if !attempt.Finding {
+			attempt.Requests = allRequests
 			attempts = append(attempts, attempt)
 		}
 	}

@@ -37,7 +37,10 @@ func SplitTargetURL(target string) (string, string, error) {
 
 	// Standardize the path
 	// If the path is empty or '/', set it to "", else trim the trailing slash (ie. "/foo/" -> "/foo")
-	path := strings.TrimRight(parsedURL.Path, "/")
+	path := strings.Trim(parsedURL.Path, "/")
+	if path != "" {
+		path = fmt.Sprintf("/%s", path)
+	}
 
 	return baseURL, path, nil
 }

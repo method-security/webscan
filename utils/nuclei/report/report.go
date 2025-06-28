@@ -4,6 +4,8 @@ import (
 	// Generated
 	nuclei "github.com/Method-Security/webscan/generated/go/common/nuclei"
 	// External
+	"fmt"
+
 	nucleilib "github.com/projectdiscovery/nuclei/v3/lib"
 	nout "github.com/projectdiscovery/nuclei/v3/pkg/output"
 )
@@ -40,7 +42,32 @@ func (b *Builder) PopulateProbes(eng *nucleilib.NucleiEngine) error {
 			}
 			// Extract expected matchers
 			for _, matcher := range request.Matchers {
-				vals := append(matcher.Words, matcher.Regex...)
+				var vals []string
+
+				// Handle different matcher types
+				switch matcher.Type.String() {
+				case "word":
+					vals = append(vals, matcher.Words...)
+				case "regex":
+					vals = append(vals, matcher.Regex...)
+				case "status":
+					for _, status := range matcher.Status {
+						vals = append(vals, fmt.Sprintf("%d", status))
+					}
+				case "size":
+					for _, size := range matcher.Size {
+						vals = append(vals, fmt.Sprintf("%d", size))
+					}
+				case "dsl":
+					vals = append(vals, matcher.DSL...)
+				case "binary":
+					vals = append(vals, matcher.Binary...)
+				default:
+					// Fallback for unknown types - try to extract from common fields
+					vals = append(vals, matcher.Words...)
+					vals = append(vals, matcher.Regex...)
+				}
+
 				probe.ExpectedMatchers = append(probe.ExpectedMatchers, &nuclei.NucleiExpectedMatcher{
 					Type:  matcher.Type.String(),
 					Value: vals,

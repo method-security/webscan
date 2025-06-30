@@ -310,6 +310,7 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 
 	if b.Browser == nil {
 		log.Info("Initializing browser")
+
 		// Create a new browser launcher
 		launch := launcher.New().Headless(true)
 		// Set the verifyTLS flag if defined
@@ -320,24 +321,20 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 			launch = launch.Bin(*b.PathToBrowser)
 		}
 
-		// Use non-panicking launch
-		browserURL, err := launch.Launch()
+		// Use non-panicking launch with context
+		browserURL, err := launch.Context(ctx).Launch()
 		if err != nil {
 			return common.HttpRequestResponse{Request: request}, fmt.Errorf("browser launch failed: %v", err)
 		}
 
-		// Connect to browser
-		b.Browser = rod.New().ControlURL(browserURL)
+		// Connect to browser with context
+		b.Browser = rod.New().ControlURL(browserURL).Context(ctx)
 		err = b.Browser.Connect()
 		if err != nil {
 			return common.HttpRequestResponse{Request: request}, fmt.Errorf("browser connection failed: %v", err)
 		}
 		log.Info("Connected to browser")
 	}
-
-	// Create a context with a timeout
-	pageCtx, cancel := context.WithTimeout(ctx, time.Duration(b.TimeoutSeconds)*time.Second)
-	defer cancel()
 
 	redirectChain := []string{*constructedURL}
 	headers := make(map[string][]string)
@@ -356,7 +353,7 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 			navigationErr = fmt.Errorf("failed to create page: %v", err)
 			return
 		}
-		page = page.Context(pageCtx)
+		page = page.Context(ctx)
 
 		// Ensure page is closed on completion
 		defer func() {
@@ -378,7 +375,7 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 			return
 		}
 
-		// Wait for navigation to complete or error
+		// Wait for navigation to complete or error with timeout
 		select {
 		case err := <-redirectError:
 			log.Error("Redirect error occurred", svc1log.SafeParam("error", err))
@@ -386,12 +383,23 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 			return
 		case <-requestComplete:
 			log.Info("Request complete, redirect chain", svc1log.SafeParam("chain", strings.Join(redirectChain, " -> ")))
-		case <-pageCtx.Done():
-			navigationErr = fmt.Errorf("request timeout after %d seconds", b.TimeoutSeconds)
+		case <-ctx.Done():
+			if ctx.Err() == context.DeadlineExceeded {
+				log.Warn("Request timed out",
+					svc1log.SafeParam("url", *constructedURL),
+					svc1log.SafeParam("timeout", config.Timeout),
+					svc1log.SafeParam("redirectChain", strings.Join(redirectChain, " -> ")))
+				navigationErr = fmt.Errorf("request timeout after %d seconds", config.Timeout)
+			} else {
+				log.Warn("Request cancelled",
+					svc1log.SafeParam("url", *constructedURL),
+					svc1log.SafeParam("error", ctx.Err()))
+				navigationErr = fmt.Errorf("request cancelled: %v", ctx.Err())
+			}
 			return
 		}
 
-		// Get final URL
+		// Get final URL with timeout context
 		finalURL, err := safeEval(page, `() => window.location.href`)
 		if err != nil {
 			log.Warn("Failed to get final URL", svc1log.SafeParam("error", err))
@@ -440,7 +448,7 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 
 		var responseBody string
 		if statusCode >= 200 && statusCode < 300 {
-			// Get the response body
+			// Get the response body with timeout context
 			htmlContent, err := page.HTML()
 			if err != nil {
 				log.Error("Failed to get HTML content", svc1log.SafeParam("error", err))
@@ -532,20 +540,20 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 	return result, nil
 }
 
-func (b *Requester) InitializeBrowser() error {
+func (b *Requester) InitializeBrowser(ctx context.Context) error {
 	launch := launcher.New().Headless(true)
 	if b.PathToBrowser != nil && *b.PathToBrowser != "" {
 		launch = launch.Bin(*b.PathToBrowser)
 	}
 
-	// Use non-panicking launch
-	browserURL, err := launch.Launch()
+	// Use non-panicking launch with context
+	browserURL, err := launch.Context(ctx).Launch()
 	if err != nil {
 		return fmt.Errorf("browser launch failed: %v", err)
 	}
 
-	// Connect to browser
-	b.Browser = rod.New().ControlURL(browserURL)
+	// Connect to browser with context
+	b.Browser = rod.New().ControlURL(browserURL).Context(ctx)
 	err = b.Browser.Connect()
 	if err != nil {
 		return fmt.Errorf("browser connection failed: %v", err)

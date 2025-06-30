@@ -4,6 +4,7 @@ import (
 	// Standard
 	"context"
 	"fmt"
+	"time"
 
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
@@ -17,12 +18,17 @@ import (
 
 // CaptureScreenshot uses a headless browser to capture a screenshot of the given URL and returns the image bytes.
 func CaptureScreenshot(ctx context.Context, browser *headless.Requester, sendHTTPRequestConfig *common.SendHttpRequestConfig) ([]byte, error) {
+	// Set timeout for the context
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(sendHTTPRequestConfig.Timeout)*time.Second)
+	defer cancel()
+
+	// Get the logger from the context
 	log := svc1log.FromContext(ctx)
 
 	// Initialize browser if not already initialized
 	if browser == nil {
 		log.Info("Initializing browser")
-		err := browser.InitializeBrowser()
+		err := browser.InitializeBrowser(ctx)
 		if err != nil {
 			log.Error("Failed to initialize browser", svc1log.SafeParam("error", err))
 			return nil, err

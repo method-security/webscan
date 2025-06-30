@@ -21,17 +21,19 @@ import (
 
 // ExtractNetworkRoutes uses a headless browser to capture network requests and extract route details from them.
 // Returns a slice of RouteDetails, a slice of URLs, and a slice of errors.
-func ExtractNetworkRoutes(ctx context.Context, browser *headless.Requester, target string, baseURLsOnly bool, captureStaticAssets bool) ([]*discover.RouteDetails, []string, []string) {
+func ExtractNetworkRoutes(ctx context.Context, browser *headless.Requester, target string, baseURLsOnly bool, captureStaticAssets bool, timeout int) ([]*discover.RouteDetails, []string, []string) {
+	// Get the logger from the context
+	log := svc1log.FromContext(ctx)
+
 	routes := []*discover.RouteDetails{}
 	urls := make(map[string]struct{})
 	errors := []string{}
-	log := svc1log.FromContext(ctx)
 
 	log.Info("Initiating network events capture with Headless method", svc1log.SafeParam("target", target))
 	// Ensure the browser is initialized
 	if browser.Browser == nil {
 		log.Debug("Initializing browser for network capture")
-		err := browser.InitializeBrowser()
+		err := browser.InitializeBrowser(ctx)
 		if err != nil {
 			log.Error("Failed to initialize browser", svc1log.SafeParam("error", err))
 			return routes, discoverroutehelpers.SetToListString(urls), []string{err.Error()}

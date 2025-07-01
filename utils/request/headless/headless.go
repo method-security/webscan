@@ -157,30 +157,31 @@ func performNavigation(page *rod.Page, config common.SendHttpRequestConfig, cons
 	// Use Navigate instead of MustNavigate to handle errors
 	err := page.Navigate(*constructedURL)
 	if err != nil {
-		// Check for specific navigation errors
+		// Check for specific navigation errors - but don't fail immediately
 		var navErr *rod.NavigationError
 		if errors.As(err, &navErr) {
-			return fmt.Errorf("navigation failed: %s", navErr.Reason)
+			log.Warn("Navigation encountered error but continuing", svc1log.SafeParam("error", navErr.Reason))
+			return nil // Don't fail - page might still be partially loaded
 		}
-		return fmt.Errorf("navigation failed: %v", err)
+		log.Warn("Navigation encountered error but continuing", svc1log.SafeParam("error", err.Error()))
+		return nil // Don't fail - page might still be partially loaded
 	}
 
-	// Wait for the initial navigation to complete
+	// Try to wait for the initial navigation to complete, but don't fail if it times out
 	err = page.WaitLoad()
 	if err != nil {
-		// Check if it's a timeout
-		if errors.Is(err, context.DeadlineExceeded) {
-			return fmt.Errorf("navigation timeout")
-		}
-
-		// Check if it's an execution context destroyed error (common during redirects)
+		// Log all errors but don't treat any as fatal - page might still have useful content
 		errStr := err.Error()
-		if strings.Contains(errStr, "Execution context was destroyed") || strings.Contains(errStr, "-32000") {
+		if errors.Is(err, context.DeadlineExceeded) {
+			log.Info("Navigation load timeout - this is normal for slow pages, continuing anyway")
+		} else if strings.Contains(errStr, "Execution context was destroyed") || strings.Contains(errStr, "-32000") {
 			log.Info("Execution context destroyed during navigation (likely due to redirect), continuing")
-			return nil // Don't treat this as an error since redirects are handled by event listeners
+		} else if strings.Contains(errStr, "timeout") {
+			log.Info("Navigation timeout encountered, continuing anyway - page might still have useful content")
+		} else {
+			log.Info("Wait load encountered error, continuing anyway - page might still have useful content", svc1log.SafeParam("error", err.Error()))
 		}
-
-		return fmt.Errorf("wait load failed: %v", err)
+		// Never return an error - always continue to try to extract data
 	}
 
 	return nil
@@ -189,31 +190,41 @@ func performNavigation(page *rod.Page, config common.SendHttpRequestConfig, cons
 // waitForPageLoad waits for the page to stabilize and load
 func waitForPageLoad(page *rod.Page, minDOMStabalizeTimeSeconds int, log svc1log.Logger) error {
 	log.Info("Waiting for DOM stabilization", svc1log.SafeParam("seconds", strconv.Itoa(minDOMStabalizeTimeSeconds)))
-	time.Sleep(time.Duration(minDOMStabalizeTimeSeconds) * time.Second)
 
-	// Use non-panicking versions
-	err := page.WaitLoad()
-	if err != nil && !errors.Is(err, context.DeadlineExceeded) {
-		// Check if it's an execution context destroyed error (common during redirects)
-		errStr := err.Error()
-		if strings.Contains(errStr, "Execution context was destroyed") || strings.Contains(errStr, "-32000") {
-			log.Info("Execution context destroyed during page load wait (likely due to redirect)")
-			// Don't return an error - this is expected during redirects
-		} else {
-			return fmt.Errorf("wait load failed: %v", err)
-		}
+	// Use context-aware sleep that can be cancelled if page context times out
+	select {
+	case <-time.After(time.Duration(minDOMStabalizeTimeSeconds) * time.Second):
+		// Normal case - sleep completed
+	case <-page.GetContext().Done():
+		// Context cancelled/timed out during sleep
+		log.Warn("DOM stabilization interrupted by context timeout")
+		return page.GetContext().Err()
 	}
 
-	err = page.WaitStable(300 * time.Millisecond)
-	if err != nil && !errors.Is(err, context.DeadlineExceeded) {
-		// Check if it's an execution context destroyed error
+	// Use non-panicking versions - treat timeouts as warnings, not errors
+	err := page.WaitLoad()
+	if err != nil {
 		errStr := err.Error()
-		if strings.Contains(errStr, "Execution context was destroyed") || strings.Contains(errStr, "-32000") {
-			log.Info("Execution context destroyed during page stable wait (likely due to redirect)")
-			// Don't return an error - this is expected during redirects
+		if errors.Is(err, context.DeadlineExceeded) {
+			log.Info("Page load wait timed out during DOM stabilization (this is normal)")
+		} else if strings.Contains(errStr, "Execution context was destroyed") || strings.Contains(errStr, "-32000") {
+			log.Info("Execution context destroyed during page load wait (likely due to redirect)")
 		} else {
-			return fmt.Errorf("wait stable failed: %v", err)
+			log.Warn("Page load wait encountered error during DOM stabilization", svc1log.SafeParam("error", err.Error()))
 		}
+		// Don't return error for any of these cases - they're expected during DOM stabilization
+	}
+
+	if err != nil {
+		errStr := err.Error()
+		if errors.Is(err, context.DeadlineExceeded) {
+			log.Info("Page stable wait timed out during DOM stabilization (this is normal)")
+		} else if strings.Contains(errStr, "Execution context was destroyed") || strings.Contains(errStr, "-32000") {
+			log.Info("Execution context destroyed during page stable wait (likely due to redirect)")
+		} else {
+			log.Warn("Page stable wait encountered error during DOM stabilization", svc1log.SafeParam("error", err.Error()))
+		}
+		// Don't return error for any of these cases - they're expected during DOM stabilization
 	}
 
 	return nil
@@ -231,7 +242,13 @@ func getResponseHeaders(page *rod.Page, log svc1log.Logger) map[string][]string 
 		return headers;
 	}`)
 	if err != nil {
-		log.Error("Failed to get response headers", svc1log.SafeParam("error", err))
+		// Check if it's an execution context destroyed error (common during redirects)
+		errStr := err.Error()
+		if strings.Contains(errStr, "Execution context was destroyed") || strings.Contains(errStr, "-32000") {
+			log.Info("Execution context destroyed while getting response headers (likely due to redirect)")
+		} else {
+			log.Error("Failed to get response headers", svc1log.SafeParam("error", err.Error()))
+		}
 		return make(map[string][]string)
 	}
 
@@ -358,7 +375,7 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 		if !config.VerifyTls {
 			err = b.Browser.IgnoreCertErrors(true)
 			if err != nil {
-				log.Warn("Failed to disable certificate error checking", svc1log.SafeParam("error", err))
+				log.Warn("Failed to disable certificate error checking", svc1log.SafeParam("error", err.Error()))
 			} else {
 				log.Info("Certificate error checking disabled")
 			}
@@ -378,13 +395,20 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 	var navigationErr error
 
 	err = rod.Try(func() {
-		// Create page with context
+		// Create page with context and appropriate timeout
 		page, err := b.Browser.Page(proto.TargetCreateTarget{})
 		if err != nil {
 			navigationErr = fmt.Errorf("failed to create page: %v", err)
 			return
 		}
-		page = page.Context(ctx)
+		// Set page context and timeout - Rod has internal timeouts that need to be extended
+		// Add DOM stabilization time to page timeout to ensure enough time for final data extraction
+		pageTimeout := time.Duration(config.Timeout+b.MinDOMStabalizeTimeSeconds) * time.Second
+		page = page.Context(ctx).Timeout(pageTimeout)
+		log.Info("Set page timeout",
+			svc1log.SafeParam("configTimeout", config.Timeout),
+			svc1log.SafeParam("domStabilizeTime", b.MinDOMStabalizeTimeSeconds),
+			svc1log.SafeParam("totalPageTimeout", int(pageTimeout.Seconds())))
 
 		// Ensure page is closed on completion
 		defer func() {
@@ -398,12 +422,11 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 
 		setupNavigationTracking(page, &redirectChain, requestComplete, &once, log, config.MaxRedirects, redirectError)
 
-		// Perform the navigation
+		// Perform the navigation - this should never fail now, but just in case
 		navErr := performNavigation(page, config, constructedURL, request, log)
 		if navErr != nil {
-			navigationErr = navErr
-			log.Error("Navigation failed", svc1log.SafeParam("error", extractNavigationError(navErr)))
-			return
+			// This should not happen anymore since performNavigation never returns errors
+			log.Info("Unexpected navigation error, but continuing to extract data anyway", svc1log.SafeParam("error", extractNavigationError(navErr)))
 		}
 
 		// Wait for navigation to complete or error with timeout
@@ -438,7 +461,7 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 		// Get final URL with timeout context
 		finalURL, err := safeEval(page, `() => window.location.href`)
 		if err != nil {
-			log.Warn("Failed to get final URL", svc1log.SafeParam("error", err))
+			log.Warn("Failed to get final URL", svc1log.SafeParam("error", err.Error()))
 			finalURL = ""
 		}
 
@@ -461,7 +484,7 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 		// Wait for page to stabilize
 		err = waitForPageLoad(page, b.MinDOMStabalizeTimeSeconds, log)
 		if err != nil {
-			log.Warn("Page stabilization warning", svc1log.SafeParam("error", err))
+			log.Warn("Page stabilization warning", svc1log.SafeParam("error", err.Error()))
 		}
 
 		log.Info("Final URL", svc1log.SafeParam("url", finalURL))
@@ -487,7 +510,13 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 			// Get the response body with timeout context
 			htmlContent, err := page.HTML()
 			if err != nil {
-				log.Error("Failed to get HTML content", svc1log.SafeParam("error", err))
+				// Check if it's an execution context destroyed error (common during redirects)
+				errStr := err.Error()
+				if strings.Contains(errStr, "Execution context was destroyed") || strings.Contains(errStr, "-32000") {
+					log.Info("Execution context destroyed while getting HTML content (likely due to redirect)")
+				} else {
+					log.Error("Failed to get HTML content", svc1log.SafeParam("error", err.Error()))
+				}
 				responseBody = ""
 			} else {
 				responseBody = htmlContent
@@ -497,7 +526,7 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 		// Parse the constructed URL to get the host
 		parsedURL, err := url.Parse(*constructedURL)
 		if err != nil {
-			log.Error("Failed to parse URL", svc1log.SafeParam("error", err))
+			log.Error("Failed to parse URL", svc1log.SafeParam("error", err.Error()))
 			return
 		}
 		originalHost := getHost(parsedURL.Host)

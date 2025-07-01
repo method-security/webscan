@@ -57,6 +57,7 @@ func ExtractNetworkRoutes(ctx context.Context, browser *headless.Requester, targ
 		return routes, discoverroutehelpers.SetToListString(urls), errors
 	}
 
+	log.Info("Capturing network events")
 	// Capture network requests of type 'fetch' which are typical of API calls
 	networkEvents := []*proto.NetworkRequestWillBeSent{}
 	waitForNetworkEvents := page.EachEvent(func(e *proto.NetworkRequestWillBeSent) {
@@ -90,6 +91,7 @@ func ExtractNetworkRoutes(ctx context.Context, browser *headless.Requester, targ
 	// Wait for network events to be captured
 	waitForNetworkEvents()
 
+	log.Info("Processing network events")
 	// Process network events and populate the WebRoute structure
 	for _, event := range networkEvents {
 		request := event.Request
@@ -122,6 +124,7 @@ func ExtractNetworkRoutes(ctx context.Context, browser *headless.Requester, targ
 		}
 
 		// Build WebRoute object
+		log.Info("Building WebRoute object", svc1log.SafeParam("url", urlNoQuery), svc1log.SafeParam("path", parsedURL.Path), svc1log.SafeParam("method", request.Method))
 		webRoute := &discover.RouteDetails{
 			BaseUrl: urlNoQuery,
 			Path:    parsedURL.Path,

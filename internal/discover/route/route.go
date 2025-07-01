@@ -119,6 +119,7 @@ func extractRoutes(ctx context.Context, httpRequestResponse *common.HttpRequestR
 		log.Info("Extracting routes from inspecting network calls")
 		browser := &headless.Requester{
 			TimeoutSeconds: requestConfig.Timeout,
+			PathToBrowser:  requestConfig.HeadlessConfig.PathToBrowserShell,
 		}
 		err := browser.InitializeBrowser(networkRouteCtx)
 		if err != nil {

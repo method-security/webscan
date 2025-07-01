@@ -31,7 +31,6 @@ func ExtractNetworkRoutes(ctx context.Context, browser *headless.Requester, targ
 	log.Info("Initiating network events capture with Headless method", svc1log.SafeParam("target", target))
 	// Ensure the browser is initialized
 	if browser.Browser == nil {
-		log.Debug("Initializing browser for network capture")
 		err := browser.InitializeBrowser(ctx)
 		if err != nil {
 			log.Error("Failed to initialize browser", svc1log.SafeParam("error", err))

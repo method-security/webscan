@@ -3,7 +3,6 @@ package discoverpage
 import (
 	// Standard
 	"context"
-	"time"
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
 	"github.com/Method-Security/webscan/generated/go/discover"
@@ -41,10 +40,6 @@ func PerformPageCapture(
 	config discover.DiscoverPageConfig,
 	browserbaseSecrets *common.BrowserbaseRequestSecrets,
 ) *discover.DiscoverPageReport {
-	// Set timeout for the context
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(config.Timeout)*time.Second)
-	defer cancel()
-
 	// Initialize report
 	result := discover.DiscoverPageResult{}
 	errors := []string{}

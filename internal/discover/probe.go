@@ -4,7 +4,6 @@ import (
 	// Standard
 	"context"
 	"fmt"
-	"time"
 
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
@@ -102,10 +101,6 @@ func sendRequests(ctx context.Context, target string, config *discover.DiscoverP
 
 // PerformWebProbe performs web probing for the given config and returns a DiscoverProbeReport.
 func PerformWebProbe(ctx context.Context, config *discover.DiscoverProbeConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) (*discover.DiscoverProbeReport, error) {
-	// Set timeout for the context
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(config.Timeout)*time.Second)
-	defer cancel()
-
 	// Initialize report
 	result := discover.DiscoverProbeResult{}
 	report := &discover.DiscoverProbeReport{Config: config, Result: &result}

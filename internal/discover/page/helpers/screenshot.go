@@ -21,7 +21,7 @@ func CaptureScreenshot(ctx context.Context, browser *headless.Requester, sendHTT
 	log := svc1log.FromContext(ctx)
 
 	// Initialize browser if not already initialized
-	if browser == nil {
+	if browser.Browser == nil {
 		log.Info("Initializing browser")
 		err := browser.InitializeBrowser(ctx)
 		if err != nil {

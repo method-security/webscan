@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
@@ -41,10 +40,6 @@ func createSendHTTPRequestConfig(baseURL, path string, config discover.DiscoverS
 }
 
 func LaunchDiscoverSaas(ctx context.Context, config discover.DiscoverSaasConfig, saasFingerprints discover.SaasFingerprintFile, ssoFingerprints discover.SaasFingerprintFile, browserbaseSecrets *common.BrowserbaseRequestSecrets) (*discover.DiscoverSaasReport, error) {
-	// Set timeout for the context
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(config.Timeout)*time.Second)
-	defer cancel()
-
 	// Get the logger from the context
 	log := svc1log.FromContext(ctx)
 
@@ -101,10 +96,8 @@ func LaunchDiscoverSaas(ctx context.Context, config discover.DiscoverSaasConfig,
 					finding := discoversaashelpers.AnalyzeSaasRequest(ctx, saasRequest, fingerprint, &ssoFingerprints, redirectedPage)
 					saasRequest.Findings = finding
 
-					// Add request if it meets our criteria
-					if discoversaashelpers.ShouldAddRequest(saasRequest) {
-						requests = append(requests, saasRequest)
-					}
+					requests = append(requests, saasRequest)
+
 				}
 			}
 

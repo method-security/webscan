@@ -112,11 +112,15 @@ func extractRoutes(ctx context.Context, httpRequestResponse *common.HttpRequestR
 
 	// Only to be performed if requestMethod is of type Headless or Browserbase
 	if requestConfig.RequestMethod == common.RequestMethodHeadless || requestConfig.RequestMethod == common.RequestMethodBrowserbase {
+		// Set a timeout for the network route extraction
+		networkRouteCtx, networkCancel := context.WithTimeout(ctx, time.Duration(requestConfig.Timeout)*time.Second)
+		defer networkCancel()
+
 		log.Info("Extracting routes from inspecting network calls")
 		browser := &headless.Requester{
 			TimeoutSeconds: requestConfig.Timeout,
 		}
-		err := browser.InitializeBrowser(ctx)
+		err := browser.InitializeBrowser(networkRouteCtx)
 		if err != nil {
 			log.Error("Failed to initialize browser", svc1log.SafeParam("error", err))
 			errors = append(errors, err.Error())
@@ -124,7 +128,7 @@ func extractRoutes(ctx context.Context, httpRequestResponse *common.HttpRequestR
 		}
 
 		fullRedirectedURL := fmt.Sprintf("%s%s", redirectedURLBase, redirectedURLPath)
-		networkRoutes, networkUrls, networkErrors := capturerouteextractors.ExtractNetworkRoutes(ctx, browser, fullRedirectedURL, routeCaptureConfig.RequireBaseUrlMatch, !routeCaptureConfig.IgnoreStaticAssets)
+		networkRoutes, networkUrls, networkErrors := capturerouteextractors.ExtractNetworkRoutes(networkRouteCtx, browser, fullRedirectedURL, routeCaptureConfig.RequireBaseUrlMatch, !routeCaptureConfig.IgnoreStaticAssets)
 		routes = append(routes, networkRoutes...)
 		urls = discoverroutehelpers.AddListToSetString(urls, networkUrls)
 		errors = append(errors, networkErrors...)
@@ -149,10 +153,6 @@ func extractRoutes(ctx context.Context, httpRequestResponse *common.HttpRequestR
 
 // PerformRouteCapture performs route discovery and spidering for the given config, returning a DiscoverRouteReport.
 func PerformRouteCapture(ctx context.Context, config discover.DiscoverRouteConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) discover.DiscoverRouteReport {
-	// Set timeout for the context
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(config.Timeout)*time.Second)
-	defer cancel()
-
 	// Get the logger from the context
 	log := svc1log.FromContext(ctx)
 

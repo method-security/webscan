@@ -248,6 +248,7 @@
                 ]
             },
             "domainSlugs": [
+                "impl.workday.com/INPUT_ORG",
                 "INPUT_ORG.workday.com",
                 "www.INPUT_ORG.workday.com",
                 "impl.INPUT_ORG.workday.com",
@@ -256,9 +257,7 @@
                 "wd5.myworkday.com/INPUT_ORG",
                 "wd5-impl.myworkday.com/INPUT_ORG",
                 "wd2-impl.myworkday.com/INPUT_ORG",
-                "wd3-impl.myworkday.com/INPUT_ORG",
-                "impl.workday.com/INPUT_ORG",
-                "wd3.services.workday.com/ccx/service/custom/INPUT_ORG"
+                "wd3-impl.myworkday.com/INPUT_ORG"
             ]
         },
         "zendesk": {

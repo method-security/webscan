@@ -93,8 +93,7 @@ func LaunchDiscoverSaas(ctx context.Context, config discover.DiscoverSaasConfig,
 
 					// Analyze the request
 					redirectedPage := len(httpRequestResponse.Response.RedirectChain) > 1
-					finding := discoversaashelpers.AnalyzeSaasRequest(ctx, saasRequest, fingerprint, &ssoFingerprints, redirectedPage)
-					saasRequest.Findings = finding
+					saasRequest.Findings = discoversaashelpers.AnalyzeSaasRequest(ctx, saasRequest, fingerprint, &ssoFingerprints, redirectedPage)
 
 					// Add request if it meets our criteria
 					if discoversaashelpers.ShouldAddRequest(saasRequest) {

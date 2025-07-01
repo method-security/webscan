@@ -313,10 +313,6 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 
 		// Create a new browser launcher
 		launch := launcher.New().Headless(true)
-		// Set the verifyTLS flag if defined
-		if !config.VerifyTls {
-			launch = launch.Set("ignore-certificate-errors")
-		}
 		if b.PathToBrowser != nil && *b.PathToBrowser != "" {
 			launch = launch.Bin(*b.PathToBrowser)
 		}
@@ -333,6 +329,17 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 		if err != nil {
 			return common.HttpRequestResponse{Request: request}, fmt.Errorf("browser connection failed: %v", err)
 		}
+
+		// Set certificate error handling after browser connection
+		if !config.VerifyTls {
+			err = b.Browser.IgnoreCertErrors(true)
+			if err != nil {
+				log.Warn("Failed to disable certificate error checking", svc1log.SafeParam("error", err))
+			} else {
+				log.Info("Certificate error checking disabled")
+			}
+		}
+
 		log.Info("Connected to browser")
 	}
 

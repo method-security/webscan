@@ -4,7 +4,6 @@ import (
 	// Standard
 	"context"
 	"net/url"
-	"time"
 
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
@@ -21,7 +20,7 @@ import (
 
 // ExtractNetworkRoutes uses a headless browser to capture network requests and extract route details from them.
 // Returns a slice of RouteDetails, a slice of URLs, and a slice of errors.
-func ExtractNetworkRoutes(ctx context.Context, browser *headless.Requester, target string, baseURLsOnly bool, captureStaticAssets bool, timeout int) ([]*discover.RouteDetails, []string, []string) {
+func ExtractNetworkRoutes(ctx context.Context, browser *headless.Requester, target string, baseURLsOnly bool, captureStaticAssets bool) ([]*discover.RouteDetails, []string, []string) {
 	// Get the logger from the context
 	log := svc1log.FromContext(ctx)
 
@@ -40,13 +39,9 @@ func ExtractNetworkRoutes(ctx context.Context, browser *headless.Requester, targ
 		}
 	}
 
-	// Set up a page with timeout context
-	pageCtx, cancel := context.WithTimeout(ctx, time.Duration(browser.TimeoutSeconds)*time.Second)
-	defer cancel()
-
 	var page *rod.Page
 	pageErr := rod.Try(func() {
-		page = browser.Browser.MustPage(target).Context(pageCtx)
+		page = browser.Browser.MustPage(target).Context(ctx)
 	})
 	if pageErr != nil {
 		log.Error("Failed to create page", svc1log.SafeParam("url", target), svc1log.SafeParam("error", pageErr))

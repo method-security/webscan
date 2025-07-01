@@ -96,7 +96,10 @@ func LaunchDiscoverSaas(ctx context.Context, config discover.DiscoverSaasConfig,
 					finding := discoversaashelpers.AnalyzeSaasRequest(ctx, saasRequest, fingerprint, &ssoFingerprints, redirectedPage)
 					saasRequest.Findings = finding
 
-					requests = append(requests, saasRequest)
+					// Add request if it meets our criteria
+					if discoversaashelpers.ShouldAddRequest(saasRequest) {
+						requests = append(requests, saasRequest)
+					}
 
 				}
 			}

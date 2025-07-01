@@ -30,11 +30,11 @@ For the full list of available installation options, please see the [Installatio
 ### Examples
 
 ```bash
-webscan general probe --targets https://example.com --targets https://example.dev
+webscan discover probe --targets method.security --request-method HEADLESS -o json --headless-path /headless-shell/run.sh
 ```
 
 ```bash
-webscan general ratelimit --max-requests 100 --targets example.com
+webscan webscan-cli discover page --target https://method.security
 ```
 
 ### Building a Statically Compiled Container for Local Testing
@@ -50,7 +50,7 @@ webscan general ratelimit --max-requests 100 --targets example.com
 
 5. Open shell: `docker run -it --rm --entrypoint /bin/bash webscan:local`
 
-6. OR run command without shell example: `docker run webscan:local general probe --targets example.com -o json`
+6. OR run command without shell example: `docker run webscan:local discover probe --targets method.security --request-method HEADLESS -o json --headless-path /headless-shell/run.sh`
 
 ### Fern
 If updating the fern yaml configuration you need to [install](https://buildwithfern.com/learn/cli-reference/overview) Fern CLI. After installation you can execute `fern generate` to generate the updates.

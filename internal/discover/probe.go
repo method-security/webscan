@@ -101,6 +101,7 @@ func sendRequests(ctx context.Context, target string, config *discover.DiscoverP
 
 // PerformWebProbe performs web probing for the given config and returns a DiscoverProbeReport.
 func PerformWebProbe(ctx context.Context, config *discover.DiscoverProbeConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) (*discover.DiscoverProbeReport, error) {
+	// Initialize report
 	result := discover.DiscoverProbeResult{}
 	report := &discover.DiscoverProbeReport{Config: config, Result: &result}
 	errors := []string{}

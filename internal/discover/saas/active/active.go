@@ -4,7 +4,6 @@ import (
 	// Standard
 	"context"
 	"fmt"
-	"log"
 	"strings"
 
 	// Generated
@@ -16,6 +15,9 @@ import (
 	// Utils
 	request "github.com/Method-Security/webscan/utils/request"
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
+
+	// External
+	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
 func createSendHTTPRequestConfig(baseURL, path string, config discover.DiscoverSaasConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) common.SendHttpRequestConfig {
@@ -38,6 +40,9 @@ func createSendHTTPRequestConfig(baseURL, path string, config discover.DiscoverS
 }
 
 func LaunchDiscoverSaas(ctx context.Context, config discover.DiscoverSaasConfig, saasFingerprints discover.SaasFingerprintFile, ssoFingerprints discover.SaasFingerprintFile, browserbaseSecrets *common.BrowserbaseRequestSecrets) (*discover.DiscoverSaasReport, error) {
+	// Get the logger from the context
+	log := svc1log.FromContext(ctx)
+
 	// Initialize report
 	report := discover.DiscoverSaasReport{
 		Config: &config,
@@ -63,7 +68,7 @@ func LaunchDiscoverSaas(ctx context.Context, config discover.DiscoverSaasConfig,
 
 				// Process each schema
 				for _, schema := range schemas {
-					log.Printf("Processing company: %s in org: %s with schema: %s", company, org, schema)
+					log.Info("Processing company", svc1log.SafeParam("company", company), svc1log.SafeParam("org", org), svc1log.SafeParam("schema", schema))
 					saasRequest := &discover.SaasActiveRequest{}
 
 					// Construct the full URL
@@ -95,6 +100,7 @@ func LaunchDiscoverSaas(ctx context.Context, config discover.DiscoverSaasConfig,
 					if discoversaashelpers.ShouldAddRequest(saasRequest) {
 						requests = append(requests, saasRequest)
 					}
+
 				}
 			}
 

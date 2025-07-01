@@ -17,6 +17,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+            node-version: "23.10.0"
+
       - name: Install Fern CLI
         run: npm install -g fern-api
 

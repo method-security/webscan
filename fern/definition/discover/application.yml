@@ -44,7 +44,7 @@ types:
   ApplicationFingerprintTarget:
     properties:
       target: string
-      attempts: list<ApplicationFingerprintAttempt>
+      attempts: optional<list<ApplicationFingerprintAttempt>>
   # Config Struct
   DiscoverApplicationConfig:
     properties:

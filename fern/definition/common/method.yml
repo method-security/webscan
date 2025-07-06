@@ -10,6 +10,7 @@ types:
     properties:
       pathToBrowserShell: optional<string>
       minDOMStabalizeTime: integer
+      browser: optional<unknown>
   BrowserbaseRequestConfig:
     properties:
       proxy: optional<boolean>

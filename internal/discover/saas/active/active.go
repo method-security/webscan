@@ -16,9 +16,11 @@ import (
 	discoversaashelpers "github.com/Method-Security/webscan/internal/discover/saas/active/helpers"
 	// Utils
 	request "github.com/Method-Security/webscan/utils/request"
+	"github.com/Method-Security/webscan/utils/request/headless"
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
 
 	// External
+	rod "github.com/go-rod/rod"
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
@@ -29,6 +31,7 @@ func createSendHTTPRequestConfig(baseURL, path string, config discover.DiscoverS
 		Method:  common.HttpMethodGet,
 		Params:  &common.HttpRequestParams{},
 	}
+
 	return common.SendHttpRequestConfig{
 		Request:            &request,
 		MaxRedirects:       config.MaxRedirects,
@@ -39,6 +42,21 @@ func createSendHTTPRequestConfig(baseURL, path string, config discover.DiscoverS
 		BrowserbaseConfig:  config.BrowserbaseConfig,
 		BrowserbaseSecrets: browserbaseSecrets,
 	}
+}
+
+// createSharedBrowser creates and configures a shared browser instance for reuse across requests
+func createSharedBrowser(ctx context.Context, config discover.DiscoverSaasConfig) (*rod.Browser, error) {
+	log := svc1log.FromContext(ctx)
+
+	// Create a headless requester to use its initialization logic
+	requester := headless.NewRequester(config.Timeout, config.HeadlessConfig)
+	err := requester.InitializeBrowser(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize browser: %v", err)
+	}
+
+	log.Info("Shared browser instance created and configured")
+	return requester.Browser, nil
 }
 
 func LaunchDiscoverSaas(ctx context.Context, config discover.DiscoverSaasConfig, saasFingerprints discover.SaasFingerprintFile, ssoFingerprints discover.SaasFingerprintFile, browserbaseSecrets *common.BrowserbaseRequestSecrets) (*discover.DiscoverSaasReport, error) {
@@ -53,6 +71,31 @@ func LaunchDiscoverSaas(ctx context.Context, config discover.DiscoverSaasConfig,
 	// Use mutexes to protect shared data
 	var errorsMutex sync.Mutex
 	errors := []string{}
+
+	// Create a single browser instance for reuse if using headless method
+	var sharedBrowser *rod.Browser
+	if config.RequestMethod == common.RequestMethodHeadless {
+		log.Info("Creating shared browser instance for headless requests")
+
+		var err error
+		sharedBrowser, err = createSharedBrowser(ctx, config)
+		if err != nil {
+			return nil, err
+		}
+
+		// Store browser in config for reuse
+		config.HeadlessConfig.Browser = sharedBrowser
+	}
+
+	// Ensure browser cleanup
+	defer func() {
+		if sharedBrowser != nil {
+			log.Info("Closing shared browser instance")
+			if err := sharedBrowser.Close(); err != nil {
+				log.Warn("Failed to close shared browser", svc1log.SafeParam("error", err.Error()))
+			}
+		}
+	}()
 
 	// Determine number of concurrent goroutines
 	maxGoroutines := runtime.GOMAXPROCS(0) // Default to number of CPUs
@@ -82,7 +125,7 @@ func LaunchDiscoverSaas(ctx context.Context, config discover.DiscoverSaasConfig,
 			// Process each domain slug
 			for _, domainSlug := range fingerprint.DomainSlugs {
 				// Determine the schemas to use for the request
-				schemas := []string{"https"}
+				schemas := []string{"https", "http"}
 
 				// Process each schema with controlled concurrency
 				for _, schema := range schemas {
@@ -111,7 +154,7 @@ func LaunchDiscoverSaas(ctx context.Context, config discover.DiscoverSaasConfig,
 							return
 						}
 
-						// Send the request
+						// Send the request using the shared browser
 						httpConfig := createSendHTTPRequestConfig(baseURL, path, config, browserbaseSecrets)
 						httpRequestResponse, err := request.SendRequest(ctx, httpConfig)
 						if err != nil {

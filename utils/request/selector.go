@@ -39,8 +39,15 @@ func SendRequest(ctx context.Context, config common.SendHttpRequestConfig) (*com
 	// Headless capture
 	case common.RequestMethodHeadless:
 		log.Info("Sending headless request")
-		headless := headless.NewRequester(config.Timeout, config.HeadlessConfig)
-		httpRequestResponse, err := headless.SendRequest(requestCtx, config)
+		var headlessRequester *headless.Requester
+
+		// If the browser is already initialized, use the existing browser
+		if config.HeadlessConfig.Browser != nil {
+			headlessRequester = headless.NewRequesterwithBrowser(config.Timeout, config.HeadlessConfig)
+		} else {
+			headlessRequester = headless.NewRequester(config.Timeout, config.HeadlessConfig)
+		}
+		httpRequestResponse, err := headlessRequester.SendRequest(requestCtx, config)
 		if err != nil {
 			return nil, fmt.Errorf("browser capture failed: %w", err)
 		}

@@ -26,6 +26,20 @@ func NewRequester(timeout int, config *common.HeadlessRequestConfig) *Requester 
 	}
 }
 
+// NewRequester creates a new Requester with the given timeout and headless configuration.
+func NewRequesterwithBrowser(timeout int, config *common.HeadlessRequestConfig) *Requester {
+	var browser *rod.Browser
+	if config.Browser != nil {
+		browser, _ = config.Browser.(*rod.Browser)
+	}
+	return &Requester{
+		Browser:                    browser,
+		PathToBrowser:              config.PathToBrowserShell,
+		TimeoutSeconds:             timeout,
+		MinDOMStabalizeTimeSeconds: config.MinDomStabalizeTime,
+	}
+}
+
 // NewRequesterWithClient creates a new Requester using an existing rod cdp.Client.
 func NewRequesterWithClient(client *cdp.Client, timeout int, minDOMStabalizeTime int) *Requester {
 	return &Requester{

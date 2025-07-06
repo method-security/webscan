@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	// Generated
@@ -56,15 +57,28 @@ func setupHeaderInterception(page *rod.Page) {
 
 // handleNavigation sets up tracking for top-level frame navigations
 func handleNavigation(page *rod.Page, redirectChain *[]string, requestComplete chan struct{}, once *sync.Once, log svc1log.Logger, maxRedirects int, redirectError chan error) {
-	// Set up event listeners for navigation errors
+	// Use a simple completion flag to prevent further event processing
+	var completed int32 // Use atomic operations for thread safety
+
+	// Set up event listeners for navigation events
 	go page.EachEvent(
 		func(e *proto.PageFrameNavigated) {
+			// Check if request is already complete
+			if atomic.LoadInt32(&completed) == 1 {
+				return
+			}
+
 			if e.Frame.ParentID == "" && e.Frame.URL != "" && !utils.IsStaticAsset(e.Frame.URL) {
 				// Check for Chrome error pages
 				if strings.HasPrefix(e.Frame.URL, "chrome-error://") {
 					log.Warn("Navigation resulted in Chrome error page, indicating network/connection failure",
 						svc1log.SafeParam("errorURL", e.Frame.URL),
 						svc1log.SafeParam("originalURL", (*redirectChain)[0]))
+					// Still complete the request even on error pages
+					once.Do(func() {
+						atomic.StoreInt32(&completed, 1)
+						close(requestComplete)
+					})
 					return
 				}
 
@@ -86,7 +100,10 @@ func handleNavigation(page *rod.Page, redirectChain *[]string, requestComplete c
 								svc1log.SafeParam("to", e.Frame.URL))
 							// Update the last URL in the chain but don't add a new entry
 							(*redirectChain)[len(*redirectChain)-1] = e.Frame.URL
-							once.Do(func() { close(requestComplete) })
+							once.Do(func() {
+								atomic.StoreInt32(&completed, 1)
+								close(requestComplete)
+							})
 							return
 						}
 					}
@@ -97,6 +114,7 @@ func handleNavigation(page *rod.Page, redirectChain *[]string, requestComplete c
 					if actualRedirects > maxRedirects && maxRedirects >= 0 {
 						log.Info("Max redirects reached", svc1log.SafeParam("maxRedirects", strconv.Itoa(maxRedirects)), svc1log.SafeParam("actualRedirects", strconv.Itoa(actualRedirects)))
 						once.Do(func() {
+							atomic.StoreInt32(&completed, 1)
 							redirectError <- fmt.Errorf("max redirects (%d) exceeded", maxRedirects)
 							close(requestComplete)
 						})
@@ -104,13 +122,55 @@ func handleNavigation(page *rod.Page, redirectChain *[]string, requestComplete c
 					}
 					*redirectChain = append(*redirectChain, e.Frame.URL)
 					log.Info("Top-level frame navigated", svc1log.SafeParam("url", e.Frame.URL))
-					once.Do(func() { close(requestComplete) })
+					once.Do(func() {
+						atomic.StoreInt32(&completed, 1)
+						close(requestComplete)
+					})
 				}
 			}
 		},
 		func(e *proto.PageLoadEventFired) {
+			// Check if request is already complete
+			if atomic.LoadInt32(&completed) == 1 {
+				return
+			}
+
 			// Page load completed successfully
-			once.Do(func() { close(requestComplete) })
+			log.Info("Page load event fired")
+			once.Do(func() {
+				atomic.StoreInt32(&completed, 1)
+				close(requestComplete)
+			})
+		},
+		func(e *proto.PageLifecycleEvent) {
+			// Check if request is already complete
+			if atomic.LoadInt32(&completed) == 1 {
+				return
+			}
+
+			// Additional lifecycle events that might indicate completion
+			if e.Name == "load" || e.Name == "DOMContentLoaded" {
+				log.Info("Page lifecycle event fired", svc1log.SafeParam("event", e.Name))
+				once.Do(func() {
+					atomic.StoreInt32(&completed, 1)
+					close(requestComplete)
+				})
+			}
+		},
+		func(e *proto.PageFrameStoppedLoading) {
+			// Check if request is already complete
+			if atomic.LoadInt32(&completed) == 1 {
+				return
+			}
+
+			// Frame finished loading
+			if e.FrameID != "" {
+				log.Info("Frame stopped loading", svc1log.SafeParam("frameID", string(e.FrameID)))
+				once.Do(func() {
+					atomic.StoreInt32(&completed, 1)
+					close(requestComplete)
+				})
+			}
 		},
 	)()
 }
@@ -195,22 +255,6 @@ func isChromeErrorPage(page *rod.Page) bool {
 	finalURL, err := safeEval(page, `() => window.location.href`)
 	if err == nil && strings.HasPrefix(finalURL, "chrome-error://") {
 		return true
-	}
-
-	// Check for specific Chrome error page indicators in the HTML
-	htmlContent, err := page.HTML()
-	if err != nil {
-		return false
-	}
-
-	// Look for Chrome error page specific CSS classes and content
-	errorIndicators := []string{
-		"chrome://theme/IDR_ERROR_NETWORK_GENERIC",
-	}
-	for _, indicator := range errorIndicators {
-		if strings.Contains(htmlContent, indicator) {
-			return true
-		}
 	}
 
 	return false

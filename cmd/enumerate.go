@@ -331,7 +331,7 @@ func (a *WebScan) InitEnumerateCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			timespan, err := cmd.Flags().GetInt("timespan")
+			sleep, err := cmd.Flags().GetInt("sleep")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -346,9 +346,14 @@ func (a *WebScan) InitEnumerateCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			threads, err := cmd.Flags().GetInt("threads")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
 
 			// Generate config
-			config := getEnumerateGeneralRateLimitConfig(targets, maxRequests, timespan, verifyTLS, timeout)
+			config := getEnumerateGeneralRateLimitConfig(targets, maxRequests, sleep, verifyTLS, timeout, threads)
 
 			// Generate report
 			report := enumerategeneral.PerformGeneralRatelimit(cmd.Context(), &config)
@@ -362,9 +367,10 @@ func (a *WebScan) InitEnumerateCommand() {
 	enumerateGeneralRatelimitCmd.Flags().StringSlice("targets", []string{}, "URL targets to perform rate limit enumeration against")
 	// Config Flags
 	enumerateGeneralRatelimitCmd.Flags().Int("max-requests", 10, "Maximum number of requests to send")
-	enumerateGeneralRatelimitCmd.Flags().Int("timespan", 10, "Time window for rate limit testing in seconds")
+	enumerateGeneralRatelimitCmd.Flags().Int("sleep", 0, "Time window between requests in seconds")
 	enumerateGeneralRatelimitCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
 	enumerateGeneralRatelimitCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
+	enumerateGeneralRatelimitCmd.Flags().Int("threads", 0, "Number of concurrent threads for scanning")
 
 	// Mark required flags
 	_ = enumerateGeneralRatelimitCmd.MarkFlagRequired("targets")
@@ -382,12 +388,12 @@ func (a *WebScan) InitEnumerateCommand() {
 // getEnumerateWordpressPluginsConfig builds the config for WordPress plugin enumeration.
 func getEnumerateWordpressPluginsConfig(targets []string, plugins []string, PluginsFileSizeEnum enumeratecmswordpressfern.PluginsFileSize, verifyTLS bool, timeout int, threads int) enumeratecmswordpressfern.EnumerateWordpressPluginsConfig {
 	config := enumeratecmswordpressfern.EnumerateWordpressPluginsConfig{
-		Targets:        targets,
-		Plugins:        plugins,
+		Targets:         targets,
+		Plugins:         plugins,
 		PluginsFileSize: &PluginsFileSizeEnum,
-		VerifyTls:      verifyTLS,
-		Timeout:        max(timeout, 0),
-		Threads:        max(threads, 0),
+		VerifyTls:       verifyTLS,
+		Timeout:         max(timeout, 0),
+		Threads:         max(threads, 0),
 	}
 	return config
 }
@@ -403,13 +409,14 @@ func getEnumerateKubeConfig(target string, verifyTLS bool, timeout int) enumerat
 }
 
 // getEnumerateGeneralRateLimitConfig builds the config for general rate limit enumeration.
-func getEnumerateGeneralRateLimitConfig(targets []string, maxRequests int, timespan int, verifyTLS bool, timeout int) enumerategeneralfern.EnumerateRateLimitConfig {
+func getEnumerateGeneralRateLimitConfig(targets []string, maxRequests int, sleep int, verifyTLS bool, timeout int, threads int) enumerategeneralfern.EnumerateRateLimitConfig {
 	config := enumerategeneralfern.EnumerateRateLimitConfig{
 		Targets:     targets,
 		MaxRequests: maxRequests,
-		Timespan:    max(timespan, 0),
+		Sleep:       max(sleep, 0),
 		VerifyTls:   verifyTLS,
 		Timeout:     max(timeout, 0),
+		Threads:     max(threads, 0),
 	}
 	return config
 }

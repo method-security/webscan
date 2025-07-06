@@ -6,9 +6,10 @@ types:
     properties:
       targets: list<string>
       maxRequests: integer
-      timespan: integer
+      sleep: integer
       verifyTls: boolean
       timeout: integer
+      threads: integer
   # Report Struct
   RateLimitAttempt:
     properties:

@@ -8,7 +8,7 @@ types:
     properties:
       targets: list<string>
       plugins: optional<list<string>>
-      pluginFileSize: optional<PluginFileSize>
+      pluginsFileSize: optional<PluginFileSize>
       verifyTls: boolean
       timeout: integer
       threads: integer

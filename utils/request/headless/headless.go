@@ -168,7 +168,7 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 
 		batchResult, err := page.Eval(batchJS)
 		var finalURL string
-		var responseHeaders = make(map[string][]string)
+		var responseHeaders map[string][]string
 		var isErrorPage bool
 
 		if err != nil {

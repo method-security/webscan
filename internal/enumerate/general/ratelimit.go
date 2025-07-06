@@ -4,8 +4,10 @@ import (
 	// Standard
 	"context"
 	"net/http"
+	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	// Generated
@@ -13,8 +15,11 @@ import (
 	enumerategeneralfern "github.com/Method-Security/webscan/generated/go/enumerate/general"
 
 	// Utils
-	request "github.com/Method-Security/webscan/utils/request"
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
+	standard "github.com/Method-Security/webscan/utils/request/standard"
+
+	// External
+	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
 func createRateLimitRequestConfig(baseURL, path string, config *enumerategeneralfern.EnumerateRateLimitConfig) common.SendHttpRequestConfig {
@@ -36,63 +41,165 @@ func createRateLimitRequestConfig(baseURL, path string, config *enumerategeneral
 	}
 }
 
+// processTarget handles rate limit detection for a single target
+func processTarget(ctx context.Context, target string, config *enumerategeneralfern.EnumerateRateLimitConfig, wg *sync.WaitGroup, results chan<- *enumerategeneralfern.RateLimitTarget, errors chan<- string) {
+	defer wg.Done()
+
+	// Get logger from context
+	log := svc1log.FromContext(ctx)
+
+	// Initialize target info
+	targetInfo := &enumerategeneralfern.RateLimitTarget{Target: target, StartTimestamp: time.Now()}
+
+	// Split target URL into base URL and path
+	baseURL, parsedTargetPath, err := requesthelpers.SplitTargetURL(target)
+	if err != nil {
+		errors <- err.Error()
+		return
+	}
+
+	// Determine number of concurrent goroutines - use 1 for sequential timing
+	maxGoroutines := runtime.GOMAXPROCS(0) // Default to number of CPUs
+	if config.Threads > 0 {
+		maxGoroutines = config.Threads
+	}
+
+	// Create a semaphore to limit concurrent requests
+	semaphore := make(chan struct{}, maxGoroutines)
+
+	// Create channels for request results
+	requestResults := make(chan *enumerategeneralfern.RateLimitAttempt, config.MaxRequests)
+	requestErrors := make(chan error, config.MaxRequests)
+
+	// Create wait group for request goroutines
+	var requestWg sync.WaitGroup
+
+	// Track if a 200 OK response was previously detected for this target
+	var hasSeen200 bool
+	var mu sync.Mutex // Protect hasSeen200
+
+	// Channel to signal when rate limit is detected
+	rateLimitDetected := make(chan bool, 1)
+
+	// Send requests (concurrent or sequential based on maxGoroutines)
+requestLoop:
+	for requestNumber := 1; requestNumber <= config.MaxRequests; requestNumber++ {
+		// Check if rate limit has been detected before sending more requests
+		select {
+		case <-rateLimitDetected:
+			log.Error("Rate limit detected, stopping further requests", svc1log.SafeParam("target", target))
+			break requestLoop
+		default:
+			// Continue with request
+		}
+
+		requestWg.Add(1)
+
+		// Acquire semaphore (blocks if maxGoroutines are running)
+		semaphore <- struct{}{}
+
+		go func(reqNum int) {
+			defer requestWg.Done()
+			defer func() { <-semaphore }() // Release semaphore when done
+
+			// Print request number to console
+			log.Warn("Sending ratelimit request", svc1log.SafeParam("requestNumber", reqNum), svc1log.SafeParam("target", target))
+
+			// Create Request Config
+			requestConfig := createRateLimitRequestConfig(baseURL, parsedTargetPath, config)
+
+			// Send lightweight request directly
+			httpRequestResponse, err := standard.SendStandardRequest(ctx, requestConfig)
+			if err != nil {
+				requestErrors <- err
+				return
+			}
+
+			// Check if rate limit was detected
+			mu.Lock()
+			currentHasSeen200 := hasSeen200
+			if httpRequestResponse.Response != nil && httpRequestResponse.Response.StatusCode != nil && *httpRequestResponse.Response.StatusCode == http.StatusOK {
+				hasSeen200 = true
+			}
+			mu.Unlock()
+
+			if RateLimitDetected(&httpRequestResponse, currentHasSeen200) {
+				requestResults <- &enumerategeneralfern.RateLimitAttempt{
+					RequestNumber: reqNum,
+					Request:       &httpRequestResponse,
+				}
+
+				// Signal that rate limit was detected
+				select {
+				case rateLimitDetected <- true:
+				default:
+					// Channel already has signal, continue
+				}
+			}
+		}(requestNumber)
+
+		// Enforce the calculated request interval for sequential timing
+		time.Sleep(time.Duration(config.Sleep) * time.Second)
+	}
+
+	// Wait for all request goroutines to complete
+	go func() {
+		requestWg.Wait()
+		close(requestResults)
+		close(requestErrors)
+	}()
+
+	// Collect the first rate limit detection (if any)
+	select {
+	case result := <-requestResults:
+		targetInfo.DetectedRequest = result
+	case <-time.After(time.Duration(config.Timeout) * time.Second):
+		// Timeout waiting for results
+	}
+
+	// Collect any errors
+	for err := range requestErrors {
+		errors <- err.Error()
+	}
+
+	// Set end timestamp and send result
+	targetInfo.EndTimestamp = time.Now()
+	results <- targetInfo
+}
+
 // PerformGeneralRatelimit performs rate limit detection on target URLs within a specified timespan and returns a DetectRateLimitReport.
 func PerformGeneralRatelimit(ctx context.Context, config *enumerategeneralfern.EnumerateRateLimitConfig) *enumerategeneralfern.EnumerateRateLimitReport {
 	// Initialize report
 	report := &enumerategeneralfern.EnumerateRateLimitReport{Config: config, Result: &enumerategeneralfern.EnumerateRateLimitResult{}}
-	errors := []string{}
 
-	// Calculate the interval between requests based on the timespan
-	requestInterval := time.Duration(config.Timespan) * time.Second / time.Duration(config.MaxRequests)
+	// Create channels for results and errors
+	results := make(chan *enumerategeneralfern.RateLimitTarget, len(config.Targets))
+	errorsChan := make(chan string, len(config.Targets)*config.MaxRequests)
 
-	targets := []*enumerategeneralfern.RateLimitTarget{}
+	// Create wait group for goroutines
+	var wg sync.WaitGroup
+
+	// Process each target concurrently
 	for _, target := range config.Targets {
-		// Initialize target info
-		targetInfo := &enumerategeneralfern.RateLimitTarget{Target: target, StartTimestamp: time.Now()}
+		wg.Add(1)
+		go processTarget(ctx, target, config, &wg, results, errorsChan)
+	}
 
-		// Split target URL into base URL and path
-		baseURL, parsedTargetPath, err := requesthelpers.SplitTargetURL(target)
-		if err != nil {
-			errors = append(errors, err.Error())
-			continue
-		}
+	// Wait for all goroutines to complete
+	wg.Wait()
+	close(results)
+	close(errorsChan)
 
-		// Track if a 200 OK response was previously detected for this target
-		var hasSeen200 bool
-		for requestNumber := 1; requestNumber <= config.MaxRequests; requestNumber++ {
-			// Create Request Config
-			requestConfig := createRateLimitRequestConfig(baseURL, parsedTargetPath, config)
+	// Collect results
+	targets := make([]*enumerategeneralfern.RateLimitTarget, 0, len(config.Targets))
+	for target := range results {
+		targets = append(targets, target)
+	}
 
-			// Send Request
-			request, err := request.SendRequest(ctx, requestConfig)
-			if err != nil {
-				errors = append(errors, err.Error())
-				continue
-			}
-
-			// Check if rate limit was detected
-			if RateLimitDetected(request, hasSeen200) {
-				targetInfo.DetectedRequest = &enumerategeneralfern.RateLimitAttempt{
-					RequestNumber: requestNumber,
-					Request:       request,
-				}
-				break
-			}
-
-			// Mark if a 200 OK response was seen
-			if request.Response != nil && request.Response.StatusCode != nil && *request.Response.StatusCode == http.StatusOK {
-				hasSeen200 = true
-			}
-
-			// Enforce the calculated request interval
-			if requestInterval > 0 {
-				time.Sleep(requestInterval)
-			}
-		}
-
-		// Append target info to list
-		targetInfo.EndTimestamp = time.Now()
-		targets = append(targets, targetInfo)
+	// Collect errors
+	errors := make([]string, 0)
+	for err := range errorsChan {
+		errors = append(errors, err)
 	}
 
 	// Populate and return Report

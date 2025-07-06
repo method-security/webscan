@@ -68,6 +68,7 @@ func PerformAppEnumerateKube(ctx context.Context, config *enumeratekubefern.Enum
 	}
 
 	// Populate and return Report
+	report.Result.Target = config.Target
 	report.Result.Requests = requests
 	report.Errors = errors
 	return report

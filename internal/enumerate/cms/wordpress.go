@@ -21,12 +21,12 @@ import (
 )
 
 // GetEnumerateWordpressPluginWordlistPath returns the path to the wordlist for the given plugin file size
-func GetEnumerateWordpressPluginWordlistPath(pluginFileSize enumeratecmswordpressfern.PluginFileSize) string {
-	wordlistPaths := map[enumeratecmswordpressfern.PluginFileSize]string{
-		enumeratecmswordpressfern.PluginFileSizeSmall: "/opt/method/webscan/var/conf/enumerate/cms/wordpress/plugins_small.txt",
-		enumeratecmswordpressfern.PluginFileSizeLarge: "/opt/method/webscan/var/conf/enumerate/cms/wordpress/plugins_large.txt",
+func GetEnumerateWordpressPluginWordlistPath(PluginsFileSize enumeratecmswordpressfern.PluginsFileSize) string {
+	wordlistPaths := map[enumeratecmswordpressfern.PluginsFileSize]string{
+		enumeratecmswordpressfern.PluginsFileSizeSmall: "/opt/method/webscan/var/conf/enumerate/cms/wordpress/plugins_small.txt",
+		enumeratecmswordpressfern.PluginsFileSizeLarge: "/opt/method/webscan/var/conf/enumerate/cms/wordpress/plugins_large.txt",
 	}
-	return wordlistPaths[pluginFileSize]
+	return wordlistPaths[PluginsFileSize]
 }
 
 func createSendHTTPRequestConfig(baseURL, path string, config *enumeratecmswordpressfern.EnumerateWordpressPluginsConfig) common.SendHttpRequestConfig {

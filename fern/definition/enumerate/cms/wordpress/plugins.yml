@@ -1,47 +1,47 @@
 types:
-  # Function Config Struct
-  PluginFileSize:
-    enum:
-      - SMALL
-      - LARGE
-  EnumerateWordpressPluginsConfig:
-    properties:
-      targets: list<string>
-      plugins: optional<list<string>>
-      pluginsFileSize: optional<PluginFileSize>
-      verifyTls: boolean
-      timeout: integer
-      threads: integer
-  # Fingerprint File Struct
-  DetectionSource:
-    enum:
-      - CSS_REFERENCE
-      - HTML
-      - README_TXT
-      - REGISTERED_SCRIPT
-      - REST_API_DIRECT
-      - REST_API_NAMESPACE
-  # WordPress API Response Struct
-  WordpressApiResponse:
-    properties:
-      namespaces: list<string>
-      routes: map<string, unknown>
-  # Report Struct
-  WordpressPluginDetails:
-    properties:
-      name: string
-      version: optional<string>
-      description: optional<string>
-      source: list<DetectionSource>
-  WordpressPluginsTarget:
-    properties:
-      target: string
-      plugins: optional<list<WordpressPluginDetails>>
-  EnumerateWordpressPluginsResult:
-    properties:
-      targets: optional<list<WordpressPluginsTarget>>
-  EnumerateWordpressPluginsReport:
-    properties:
-      config: EnumerateWordpressPluginsConfig
-      result: EnumerateWordpressPluginsResult
-      errors: optional<list<string>>
+    # Function Config Struct
+    PluginsFileSize:
+        enum:
+            - SMALL
+            - LARGE
+    EnumerateWordpressPluginsConfig:
+        properties:
+            targets: list<string>
+            plugins: optional<list<string>>
+            pluginsFileSize: optional<PluginsFileSize>
+            verifyTls: boolean
+            timeout: integer
+            threads: integer
+    # Fingerprint File Struct
+    DetectionSource:
+        enum:
+            - CSS_REFERENCE
+            - HTML
+            - README_TXT
+            - REGISTERED_SCRIPT
+            - REST_API_DIRECT
+            - REST_API_NAMESPACE
+    # WordPress API Response Struct
+    WordpressApiResponse:
+        properties:
+            namespaces: list<string>
+            routes: map<string, unknown>
+    # Report Struct
+    WordpressPluginDetails:
+        properties:
+            name: string
+            version: optional<string>
+            description: optional<string>
+            source: list<DetectionSource>
+    WordpressPluginsTarget:
+        properties:
+            target: string
+            plugins: optional<list<WordpressPluginDetails>>
+    EnumerateWordpressPluginsResult:
+        properties:
+            targets: optional<list<WordpressPluginsTarget>>
+    EnumerateWordpressPluginsReport:
+        properties:
+            config: EnumerateWordpressPluginsConfig
+            result: EnumerateWordpressPluginsResult
+            errors: optional<list<string>>

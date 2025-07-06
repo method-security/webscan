@@ -145,12 +145,18 @@ func LaunchDiscoverSaas(ctx context.Context, config discover.DiscoverSaasConfig,
 				requests = append(requests, req)
 			}
 
-			companyResult.Requests = requests
-			companies = append(companies, companyResult)
+			// Dont add if no data
+			if len(requests) > 0 {
+				companyResult.Requests = requests
+				companies = append(companies, companyResult)
+			}
 		}
 
-		attempt.Companies = companies
-		attempts = append(attempts, attempt)
+		// Dont add if no data
+		if len(companies) > 0 {
+			attempt.Companies = companies
+			attempts = append(attempts, attempt)
+		}
 	}
 
 	report.Result = &discover.DiscoverSaasResult{Orgs: attempts}

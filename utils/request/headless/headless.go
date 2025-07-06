@@ -70,9 +70,8 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 			if err != nil {
 				log.Warn("Failed to disable certificate error checking", svc1log.SafeParam("error", err.Error()))
 				return report, fmt.Errorf("failed to disable certificate error checking: %v", err)
-			} else {
-				log.Info("Certificate error checking disabled")
 			}
+			log.Info("Certificate error checking disabled")
 		}
 		log.Info("Connected to browser")
 	}
@@ -89,7 +88,7 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 		statusCode      int
 	)
 
-	rod.Try(func() {
+	if err := rod.Try(func() {
 		// Create new page
 		page, err := b.Browser.Page(proto.TargetCreateTarget{})
 		if err != nil {
@@ -153,11 +152,78 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 		// RESPONSE PROCESSING
 		// =========================================================================================
 
-		// Final Url
-		finalURL, err := safeEval(page, `() => window.location.href`)
+		// Batch JavaScript evaluations for better performance
+		batchJS := `() => {
+			return {
+				finalURL: window.location.href,
+				readyState: document.readyState,
+				isErrorPage: window.location.href.startsWith('chrome-error://'),
+				statusCode: window.lastResponseStatus || 0,
+				performanceStatus: (() => {
+					const entries = performance.getEntriesByType('navigation');
+					return entries.length > 0 && entries[0].responseStatus ? entries[0].responseStatus : 0;
+				})(),
+				headers: (() => {
+					const headers = {};
+					if (window.responseHeaders) {
+						window.responseHeaders.forEach((value, key) => {
+							Object.assign(headers, value);
+						});
+					}
+					return headers;
+				})()
+			};
+		}`
+
+		batchResult, err := page.Eval(batchJS)
+		var finalURL string
+		var responseHeaders map[string][]string = make(map[string][]string)
+		var isErrorPage bool
+
 		if err != nil {
-			log.Warn("Failed to get final URL", svc1log.SafeParam("error", err.Error()))
-			finalURL = ""
+			log.Warn("Failed to execute batch JavaScript, falling back to individual calls", svc1log.SafeParam("error", err.Error()))
+			// Fallback to individual calls
+			finalURL, _ = safeEval(page, `() => window.location.href`)
+			readyState, err := safeEval(page, `() => document.readyState`)
+			if err == nil && readyState == "complete" {
+				statusCode = 200
+			} else {
+				statusCode = getStatusCodeFromPage(page)
+				if statusCode == 0 && browserErr == nil {
+					statusCode = 200
+				}
+			}
+			responseHeaders = getResponseHeaders(page, log)
+			isErrorPage = isChromeErrorPage(page)
+		} else {
+			// Parse batch results
+			resultMap := batchResult.Value.Map()
+			if resultMap != nil {
+				if val, ok := resultMap["finalURL"]; ok {
+					finalURL = val.Str()
+				}
+				if val, ok := resultMap["readyState"]; ok && val.Str() == "complete" {
+					statusCode = 200
+				}
+				if val, ok := resultMap["isErrorPage"]; ok {
+					isErrorPage = val.Bool()
+				}
+				if val, ok := resultMap["statusCode"]; ok && val.Int() > 0 {
+					statusCode = val.Int()
+				} else if val, ok := resultMap["performanceStatus"]; ok && val.Int() > 0 {
+					statusCode = val.Int()
+				}
+				if statusCode == 0 && browserErr == nil {
+					statusCode = 200 // Default for successful navigation
+				}
+
+				// Parse headers
+				if val, ok := resultMap["headers"]; ok && val.Map() != nil {
+					for k, v := range val.Map() {
+						responseHeaders[k] = []string{v.Str()}
+					}
+				}
+			}
 		}
 
 		// Redirect Chain
@@ -177,7 +243,7 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 		}
 		redirectChain = filterRedirectChain(redirectChain)
 
-		// Wait for page to fully load
+		// Wait for page to fully load (optimized)
 		err = waitForPageLoad(page, b.MinDOMStabalizeTimeSeconds, log)
 		if err != nil {
 			log.Warn("Page stabilization warning", svc1log.SafeParam("error", err.Error()))
@@ -185,26 +251,13 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 
 		log.Info("Final URL", svc1log.SafeParam("url", finalURL))
 
-		// Check if Chrome error page - treat as navigation failure
-		if isChromeErrorPage(page) {
+		// Check if Chrome error page using batch result
+		if isErrorPage {
 			log.Warn("Detected Chrome error page, treating as navigation failure")
 			browserErr = fmt.Errorf("navigation failed: Chrome error page detected")
-			return
 		}
 
-		// Status Code
-		readyState, err := safeEval(page, `() => document.readyState`)
-		if err == nil && readyState == "complete" {
-			statusCode = 200
-		} else {
-			statusCode = getStatusCodeFromPage(page)
-			if statusCode == 0 && browserErr == nil {
-				statusCode = 200 // Default for successful navigation
-			}
-		}
-
-		// Extract response headers and body
-		responseHeaders := getResponseHeaders(page, log)
+		// Extract response body
 		var responseBody string
 		if statusCode >= 200 && statusCode < 300 {
 			htmlContent, err := page.HTML()
@@ -229,7 +282,12 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 			responseBody,
 		)
 		report.Response = &response
-	})
+	}); err != nil {
+		log.Error("Browser operation failed with panic", svc1log.SafeParam("error", err.Error()))
+		if browserErr == nil {
+			browserErr = fmt.Errorf("browser operation panicked: %v", err)
+		}
+	}
 
 	// Handle navigation errors
 	var finalErr error

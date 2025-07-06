@@ -12,10 +12,8 @@ import (
 
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
-
 	// Utils
 	utils "github.com/Method-Security/webscan/utils"
-
 	// External
 	rod "github.com/go-rod/rod"
 	proto "github.com/go-rod/rod/lib/proto"
@@ -138,28 +136,21 @@ func performNavigation(ctx context.Context, page *rod.Page, constructedURL *stri
 		return nil // Don't fail - page might still be partially loaded
 	}
 
-	// Try to wait for the initial navigation to complete, but don't fail if it times out
-	err = page.WaitLoad()
-	if err != nil {
-		// Log all errors but don't treat any as fatal - page might still have useful content
-		errStr := err.Error()
-		if errors.Is(err, context.DeadlineExceeded) {
-			log.Info("Navigation load timeout - this is normal for slow pages, continuing anyway")
-		} else if strings.Contains(errStr, "Execution context was destroyed") || strings.Contains(errStr, "-32000") {
-			log.Info("Execution context destroyed during navigation (likely due to redirect), continuing")
-		} else if strings.Contains(errStr, "timeout") {
-			log.Info("Navigation timeout encountered, continuing anyway - page might still have useful content")
-		} else {
-			log.Info("Wait load encountered error, continuing anyway - page might still have useful content", svc1log.SafeParam("error", err.Error()))
-		}
-		// Never return an error - always continue to try to extract data
-	}
+	// Skip the WaitLoad here - waitForPageLoad will handle this more efficiently
+	// This eliminates a duplicate wait operation that was slowing down requests
 
 	return nil
 }
 
 // waitForPageLoad waits for the page to stabilize and load
 func waitForPageLoad(page *rod.Page, minDOMStabalizeTimeSeconds int, log svc1log.Logger) error {
+	// Quick check if document is already ready - this can save significant time
+	readyState, err := safeEval(page, `() => document.readyState`)
+	if err == nil && readyState == "complete" {
+		log.Info("DOM already in complete state, skipping stabilization wait")
+		return nil
+	}
+
 	log.Info("Waiting for DOM stabilization", svc1log.SafeParam("seconds", strconv.Itoa(minDOMStabalizeTimeSeconds)))
 
 	// Use context-aware sleep that can be cancelled if page context times out
@@ -172,8 +163,8 @@ func waitForPageLoad(page *rod.Page, minDOMStabalizeTimeSeconds int, log svc1log
 		return page.GetContext().Err()
 	}
 
-	// Use non-panicking versions - treat timeouts as warnings, not errors
-	err := page.WaitLoad()
+	// Single WaitLoad call is sufficient - remove duplicate
+	err = page.WaitLoad()
 	if err != nil {
 		errStr := err.Error()
 		if errors.Is(err, context.DeadlineExceeded) {
@@ -182,18 +173,6 @@ func waitForPageLoad(page *rod.Page, minDOMStabalizeTimeSeconds int, log svc1log
 			log.Info("Execution context destroyed during page load wait (likely due to redirect)")
 		} else {
 			log.Warn("Page load wait encountered error during DOM stabilization", svc1log.SafeParam("error", err.Error()))
-		}
-		// Don't return error for any of these cases - they're expected during DOM stabilization
-	}
-
-	if err != nil {
-		errStr := err.Error()
-		if errors.Is(err, context.DeadlineExceeded) {
-			log.Info("Page stable wait timed out during DOM stabilization (this is normal)")
-		} else if strings.Contains(errStr, "Execution context was destroyed") || strings.Contains(errStr, "-32000") {
-			log.Info("Execution context destroyed during page stable wait (likely due to redirect)")
-		} else {
-			log.Warn("Page stable wait encountered error during DOM stabilization", svc1log.SafeParam("error", err.Error()))
 		}
 		// Don't return error for any of these cases - they're expected during DOM stabilization
 	}

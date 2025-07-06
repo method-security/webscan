@@ -125,7 +125,7 @@ func LaunchDiscoverSaas(ctx context.Context, config discover.DiscoverSaasConfig,
 			// Process each domain slug
 			for _, domainSlug := range fingerprint.DomainSlugs {
 				// Determine the schemas to use for the request
-				schemas := []string{"https", "http"}
+				schemas := []string{"https"}
 
 				// Process each schema with controlled concurrency
 				for _, schema := range schemas {

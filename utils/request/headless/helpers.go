@@ -21,42 +21,72 @@ import (
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
-// setupHeaderInterception sets up the header interception for the page
-func setupHeaderInterception(page *rod.Page) {
-	page.MustEvalOnNewDocument(`
-		window.responseHeaders = new Map();
-		const originalFetch = window.fetch;
-		window.fetch = async function(url, options) {
-			const response = await originalFetch(url, options);
-			// Store headers for this URL
-			window.responseHeaders.set(url, Object.fromEntries(response.headers.entries()));
-			
-			// If this is a redirect, follow it and capture those headers too
-			if (response.redirected) {
-				const redirectResponse = await fetch(response.url, options);
-				window.responseHeaders.set(response.url, Object.fromEntries(redirectResponse.headers.entries()));
-				return redirectResponse;
-			}
-			return response;
-		};
+// NetworkHeaderCapture stores captured response headers
+type NetworkHeaderCapture struct {
+	Headers map[string][]string
+	mutex   sync.RWMutex
+}
 
-		// Also intercept XMLHttpRequest
-		const originalXHR = window.XMLHttpRequest.prototype.open;
-		window.XMLHttpRequest.prototype.open = function(method, url) {
-			this.addEventListener('load', function() {
-				window.responseHeaders.set(url, Object.fromEntries(this.getAllResponseHeaders().split('\r\n').reduce((acc, line) => {
-					const [key, value] = line.split(': ');
-					if (key && value) acc[key] = value;
-					return acc;
-				}, {})));
-			});
-			return originalXHR.apply(this, arguments);
-		};
-	`)
+// NewNetworkHeaderCapture creates a new header capture instance
+func NewNetworkHeaderCapture() *NetworkHeaderCapture {
+	return &NetworkHeaderCapture{
+		Headers: make(map[string][]string),
+	}
+}
+
+// SetHeaders safely sets headers
+func (n *NetworkHeaderCapture) SetHeaders(headers map[string][]string) {
+	n.mutex.Lock()
+	defer n.mutex.Unlock()
+	n.Headers = headers
+}
+
+// GetHeaders safely gets headers
+func (n *NetworkHeaderCapture) GetHeaders() map[string][]string {
+	n.mutex.RLock()
+	defer n.mutex.RUnlock()
+	result := make(map[string][]string)
+	for k, v := range n.Headers {
+		result[k] = v
+	}
+	return result
+}
+
+// setupHeaderInterception sets up network event monitoring to capture response headers
+func setupHeaderInterception(page *rod.Page) *NetworkHeaderCapture {
+	headerCapture := NewNetworkHeaderCapture()
+
+	// Enable network domain to capture network events
+	page.MustEval(`() => {
+		// Store for backward compatibility, but we'll use network events for actual capture
+		window.responseHeaders = new Map();
+	}`)
+
+	// Enable network domain
+	page.EnableDomain(proto.NetworkEnable{})
+
+	// Set up network event listeners
+	go page.EachEvent(
+		func(e *proto.NetworkResponseReceived) {
+			// Only capture headers for main document responses
+			if e.Type == proto.NetworkResourceTypeDocument {
+				headers := make(map[string][]string)
+				for key, value := range e.Response.Headers {
+					// Convert gson.JSON to string
+					headers[key] = []string{value.Str()}
+				}
+				headerCapture.SetHeaders(headers)
+			}
+		},
+	)()
+
+	return headerCapture
 }
 
 // handleNavigation sets up tracking for top-level frame navigations
-func handleNavigation(page *rod.Page, redirectChain *[]string, requestComplete chan struct{}, once *sync.Once, log svc1log.Logger, maxRedirects int, redirectError chan error) {
+func handleNavigation(ctx context.Context, page *rod.Page, redirectChain *[]string, requestComplete chan struct{}, once *sync.Once, maxRedirects int, redirectError chan error) {
+	log := svc1log.FromContext(ctx)
+
 	// Use a simple completion flag to prevent further event processing
 	var completed int32 // Use atomic operations for thread safety
 
@@ -281,7 +311,19 @@ func filterRedirectChain(redirectChain []string) []string {
 }
 
 // getResponseHeaders retrieves the captured response headers
-func getResponseHeaders(page *rod.Page, log svc1log.Logger) map[string][]string {
+func getResponseHeaders(ctx context.Context, page *rod.Page, headerCapture *NetworkHeaderCapture) map[string][]string {
+	log := svc1log.FromContext(ctx)
+
+	// First try to get headers from network capture
+	if headerCapture != nil {
+		headers := headerCapture.GetHeaders()
+		if len(headers) > 0 {
+			log.Info("Retrieved headers from network capture", svc1log.SafeParam("headerCount", len(headers)))
+			return headers
+		}
+	}
+
+	// Fallback to JavaScript extraction (for backward compatibility)
 	responseHeaders, err := page.Eval(`() => {
 		const headers = {};
 		if (window.responseHeaders) {

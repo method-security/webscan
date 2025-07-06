@@ -26,7 +26,7 @@ func NewRequester(timeout int, config *common.HeadlessRequestConfig) *Requester 
 	}
 }
 
-// NewRequester creates a new Requester with the given timeout and headless configuration.
+// NewRequesterwithBrowser creates a new Requester with the given timeout and headless configuration.
 func NewRequesterwithBrowser(timeout int, config *common.HeadlessRequestConfig) *Requester {
 	var browser *rod.Browser
 	if config.Browser != nil {

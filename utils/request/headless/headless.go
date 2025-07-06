@@ -111,8 +111,8 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 			svc1log.SafeParam("totalPageTimeout", int(pageTimeout.Seconds())))
 
 		// Setup request monitoring and navigate
-		setupHeaderInterception(page)
-		handleNavigation(page, &redirectChain, requestComplete, &once, log, config.MaxRedirects, browsersErr)
+		headerCapture := setupHeaderInterception(page)
+		handleNavigation(ctx, page, &redirectChain, requestComplete, &once, config.MaxRedirects, browsersErr)
 
 		navErr := performNavigation(ctx, page, constructedURL, config)
 		if navErr != nil {
@@ -162,15 +162,6 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 				performanceStatus: (() => {
 					const entries = performance.getEntriesByType('navigation');
 					return entries.length > 0 && entries[0].responseStatus ? entries[0].responseStatus : 0;
-				})(),
-				headers: (() => {
-					const headers = {};
-					if (window.responseHeaders) {
-						window.responseHeaders.forEach((value, key) => {
-							Object.assign(headers, value);
-						});
-					}
-					return headers;
 				})()
 			};
 		}`
@@ -193,7 +184,6 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 					statusCode = 200
 				}
 			}
-			responseHeaders = getResponseHeaders(page, log)
 			isErrorPage = isChromeErrorPage(page)
 		} else {
 			// Parse batch results
@@ -216,15 +206,11 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 				if statusCode == 0 && browserErr == nil {
 					statusCode = 200 // Default for successful navigation
 				}
-
-				// Parse headers
-				if val, ok := resultMap["headers"]; ok && val.Map() != nil {
-					for k, v := range val.Map() {
-						responseHeaders[k] = []string{v.Str()}
-					}
-				}
 			}
 		}
+
+		// Always use the reliable headers extraction method
+		responseHeaders = getResponseHeaders(ctx, page, headerCapture)
 
 		// Redirect Chain
 		if finalURL != "" && !utils.IsStaticAsset(finalURL) {

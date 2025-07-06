@@ -117,7 +117,7 @@ func checkHeaders(ctx context.Context, headers map[string][]string, fingerprintH
 				for _, fingerprintValue := range fingerprintValue {
 					for _, headerValue := range headerValue {
 						if strings.EqualFold(fingerprintValue, headerValue) {
-							log.Debug("Header match found", svc1log.SafeParam("header", fingerprintHeader), svc1log.SafeParam("value", headerValue))
+							log.Info("Header match found", svc1log.SafeParam("header", fingerprintHeader), svc1log.SafeParam("value", headerValue))
 							return true
 						}
 					}
@@ -138,7 +138,7 @@ func checkBody(ctx context.Context, responseBody *string, fingerprintBody []stri
 	bodyLower := strings.ToLower(*responseBody)
 	for _, bodyEntry := range fingerprintBody {
 		if strings.Contains(bodyLower, strings.ToLower(bodyEntry)) {
-			log.Debug("Body match found", svc1log.SafeParam("pattern", bodyEntry))
+			log.Info("Body match found", svc1log.SafeParam("pattern", bodyEntry))
 			return true
 		}
 	}

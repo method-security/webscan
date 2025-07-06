@@ -15,7 +15,7 @@ import (
 )
 
 // AnalyzeSaasRequest analyzes a SaaS request and returns a finding
-func AnalyzeSaasRequest(ctx context.Context, request *discover.SaasActiveRequest, saasFingerprint *discover.SaasFingerprintEntry, selectedSsoFingerprints *discover.SaasFingerprintFile, redirectedPage bool) *discover.SaasActiveFinding {
+func AnalyzeSaasRequest(ctx context.Context, request *discover.SaasActiveRequest, saasFingerprint *discover.SaasFingerprintEntry, selectedSsoFingerprints *discover.SaasFingerprintFile) *discover.SaasActiveFinding {
 	log := svc1log.FromContext(ctx)
 	// Initial validation
 	// Note: If no response body or headers, or status code is not 200, return false
@@ -34,6 +34,7 @@ func AnalyzeSaasRequest(ctx context.Context, request *discover.SaasActiveRequest
 	// Initialize values
 	companyPage := false
 	finding := &discover.SaasActiveFinding{CompanyPage: &companyPage}
+	redirectedPage := len(request.Request.Response.RedirectChain) > 1
 
 	// Check for indicators that the webpage is not actually a valid SaaS page
 	// Note: Sometimes it will appear as a SaaS page but strings such as 'Not found' or '404' will be present

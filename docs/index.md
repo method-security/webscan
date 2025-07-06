@@ -28,11 +28,11 @@ For the full list of available installation options, please see the [Installatio
 ### Examples
 
 ```bash
-webscan general probe --targets https://example.com --targets https://example.dev
+webscan discover probe --targets https://example.com --targets https://example.dev
 ```
 
 ```bash
-webscan general ratelimit --max-requests 100 --targets example.com
+webscan discover page --target https://example.com
 ```
 
 ## Contributing

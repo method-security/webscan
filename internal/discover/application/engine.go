@@ -33,9 +33,9 @@ func createSendHTTPRequestConfig(baseURL, path string, method common.HttpMethod,
 	}
 }
 
-// Run executes the fingerprinting process for a given target and configuration.
+// run executes the fingerprinting process for a given target and configuration.
 // Returns a slice of ApplicationFingerprintAttempt and a slice of error messages.
-func Run(ctx context.Context, target string, config *discover.DiscoverApplicationConfig, filteredFingerprints *discover.ApplicationResource) ([]*discover.ApplicationFingerprintAttempt, []string) {
+func run(ctx context.Context, target string, config *discover.DiscoverApplicationConfig, filteredFingerprints *discover.ApplicationResource) ([]*discover.ApplicationFingerprintAttempt, []string) {
 	if config == nil || filteredFingerprints == nil || len(filteredFingerprints.Modules) == 0 {
 		return []*discover.ApplicationFingerprintAttempt{}, []string{"invalid config: no resource types found"}
 	}
@@ -170,7 +170,7 @@ func LaunchFingerprintEngine(ctx context.Context, config *discover.DiscoverAppli
 
 		// Process each resource type separately
 		for _, resourceType := range filteredFingerprints.Fingerprints {
-			attempt, errs := Run(ctx, target, config, resourceType)
+			attempt, errs := run(ctx, target, config, resourceType)
 			attempts = append(attempts, attempt...)
 			errors = append(errors, errs...)
 		}
@@ -183,8 +183,11 @@ func LaunchFingerprintEngine(ctx context.Context, config *discover.DiscoverAppli
 		}
 		attempts = filteredAttempts
 
-		target := discover.ApplicationFingerprintTarget{Target: target, Attempts: attempts}
-		targets = append(targets, &target)
+		// Only include targets that have positive findings (non-empty attempts list)
+		if len(attempts) > 0 {
+			target := discover.ApplicationFingerprintTarget{Target: target, Attempts: attempts}
+			targets = append(targets, &target)
+		}
 	}
 
 	// Marshal Report

@@ -4,7 +4,9 @@ import (
 	// Standard
 	"context"
 	"fmt"
+	"runtime"
 	"strings"
+	"sync"
 
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
@@ -47,7 +49,21 @@ func LaunchDiscoverSaas(ctx context.Context, config discover.DiscoverSaasConfig,
 	report := discover.DiscoverSaasReport{
 		Config: &config,
 	}
+
+	// Use mutexes to protect shared data
+	var errorsMutex sync.Mutex
 	errors := []string{}
+
+	// Determine number of concurrent goroutines
+	maxGoroutines := runtime.GOMAXPROCS(0) // Default to number of CPUs
+	if config.Threads > 0 {
+		maxGoroutines = config.Threads
+	}
+
+	// Create a semaphore to limit concurrent goroutines
+	semaphore := make(chan struct{}, maxGoroutines)
+
+	log.Info("Starting SaaS discovery", svc1log.SafeParam("maxConcurrency", maxGoroutines))
 
 	// Process each organization
 	attempts := []*discover.SaasActiveAttempt{}
@@ -58,49 +74,75 @@ func LaunchDiscoverSaas(ctx context.Context, config discover.DiscoverSaasConfig,
 		// Process each company
 		for company, fingerprint := range saasFingerprints.Fingerprints {
 			companyResult := &discover.SaasActiveCompany{Company: company}
-			requests := []*discover.SaasActiveRequest{}
+
+			// Use channel to collect requests and WaitGroup for synchronization
+			requestsChan := make(chan *discover.SaasActiveRequest, len(fingerprint.DomainSlugs)*2) // *2 for http/https
+			var wg sync.WaitGroup
 
 			// Process each domain slug
 			for _, domainSlug := range fingerprint.DomainSlugs {
 				// Determine the schemas to use for the request
-				schemas := []string{"https"}
-				schemas = append(schemas, "http")
+				schemas := []string{"https", "http"}
 
-				// Process each schema
+				// Process each schema with controlled concurrency
 				for _, schema := range schemas {
-					log.Info("Processing company", svc1log.SafeParam("company", company), svc1log.SafeParam("org", org), svc1log.SafeParam("schema", schema))
-					saasRequest := &discover.SaasActiveRequest{}
+					wg.Add(1)
 
-					// Construct the full URL
-					slug := strings.Replace(domainSlug, "INPUT_ORG", org, 1)
-					fullURL := fmt.Sprintf("%s://%s", schema, slug)
+					// Acquire semaphore (blocks if maxGoroutines are running)
+					semaphore <- struct{}{}
 
-					// Construct the full URL
-					baseURL, path, err := requesthelpers.SplitTargetURL(fullURL)
-					if err != nil {
-						errors = append(errors, fmt.Sprintf("invalid address %s: %v", fullURL, err))
-						continue
-					}
+					go func(domainSlug, schema string) {
+						defer wg.Done()
+						defer func() { <-semaphore }() // Release semaphore when done
 
-					// Send the request
-					httpConfig := createSendHTTPRequestConfig(baseURL, path, config, browserbaseSecrets)
-					httpRequestResponse, err := request.SendRequest(ctx, httpConfig)
-					if err != nil {
-						errors = append(errors, fmt.Sprintf("failed to probe %s: %s", fullURL, err))
-						continue
-					}
-					saasRequest.Request = httpRequestResponse
+						log.Info("Processing company", svc1log.SafeParam("company", company), svc1log.SafeParam("org", org), svc1log.SafeParam("schema", schema))
+						saasRequest := &discover.SaasActiveRequest{}
 
-					// Analyze the request
-					redirectedPage := len(httpRequestResponse.Response.RedirectChain) > 1
-					saasRequest.Findings = discoversaashelpers.AnalyzeSaasRequest(ctx, saasRequest, fingerprint, &ssoFingerprints, redirectedPage)
+						// Construct the full URL
+						slug := strings.Replace(domainSlug, "INPUT_ORG", org, 1)
+						fullURL := fmt.Sprintf("%s://%s", schema, slug)
 
-					// Add request if it meets our criteria
-					if discoversaashelpers.ShouldAddRequest(saasRequest) {
-						requests = append(requests, saasRequest)
-					}
+						// Construct the full URL
+						baseURL, path, err := requesthelpers.SplitTargetURL(fullURL)
+						if err != nil {
+							errorsMutex.Lock()
+							errors = append(errors, fmt.Sprintf("invalid address %s: %v", fullURL, err))
+							errorsMutex.Unlock()
+							return
+						}
 
+						// Send the request
+						httpConfig := createSendHTTPRequestConfig(baseURL, path, config, browserbaseSecrets)
+						httpRequestResponse, err := request.SendRequest(ctx, httpConfig)
+						if err != nil {
+							errorsMutex.Lock()
+							errors = append(errors, fmt.Sprintf("failed to probe %s: %s", fullURL, err))
+							errorsMutex.Unlock()
+							return
+						}
+						saasRequest.Request = httpRequestResponse
+
+						// Analyze the request
+						saasRequest.Findings = discoversaashelpers.AnalyzeSaasRequest(ctx, saasRequest, fingerprint, &ssoFingerprints)
+
+						// Add request if company or sso page is found (Positive hit)
+						if discoversaashelpers.ShouldAddRequest(saasRequest) {
+							requestsChan <- saasRequest
+						}
+					}(domainSlug, schema)
 				}
+			}
+
+			// Wait for all goroutines to complete and close the channel
+			go func() {
+				wg.Wait()
+				close(requestsChan)
+			}()
+
+			// Collect all requests from the channel
+			requests := []*discover.SaasActiveRequest{}
+			for req := range requestsChan {
+				requests = append(requests, req)
 			}
 
 			companyResult.Requests = requests

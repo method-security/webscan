@@ -24,6 +24,7 @@ types:
       maxRedirects: integer
       verifyTls: boolean
       timeout: integer
+      threads: integer
       requestMethod: method.RequestMethod
       headlessConfig: optional<method.HeadlessRequestConfig>
       browserbaseConfig: optional<method.BrowserbaseRequestConfig>

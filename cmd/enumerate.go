@@ -219,7 +219,7 @@ func (a *WebScan) InitEnumerateCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			var pluginFileSizeEnum enumeratecmswordpressfern.PluginFileSize
+			var PluginsFileSizeEnum enumeratecmswordpressfern.PluginsFileSize
 			if len(pluginsFiles) > 0 {
 				entries, err := utils.GetEntriesFromTXTFiles(pluginsFiles)
 				if err != nil {
@@ -229,17 +229,17 @@ func (a *WebScan) InitEnumerateCommand() {
 				plugins = append(plugins, entries...)
 				// If no plugins-file-paths are provided, use the provided wordlist path (Toggled on size Default: Small)
 			} else {
-				pluginFileSize, err := cmd.Flags().GetString("plugins-file-size")
+				PluginsFileSize, err := cmd.Flags().GetString("plugins-file-size")
 				if err != nil {
 					a.OutputSignal.AddError(err)
 					return
 				}
-				pluginFileSizeEnum, err = enumeratecmswordpressfern.NewPluginFileSizeFromString(pluginFileSize)
+				PluginsFileSizeEnum, err = enumeratecmswordpressfern.NewPluginsFileSizeFromString(PluginsFileSize)
 				if err != nil {
 					a.OutputSignal.AddError(err)
 					return
 				}
-				pluginFile := enumeratecms.GetEnumerateWordpressPluginWordlistPath(pluginFileSizeEnum)
+				pluginFile := enumeratecms.GetEnumerateWordpressPluginWordlistPath(PluginsFileSizeEnum)
 				entries, err := utils.GetEntriesFromTXTFiles([]string{pluginFile})
 				if err != nil {
 					a.OutputSignal.AddError(err)
@@ -270,7 +270,7 @@ func (a *WebScan) InitEnumerateCommand() {
 			}
 
 			// Generate config
-			config := getEnumerateWordpressPluginsConfig(targets, plugins, pluginFileSizeEnum, verifyTLS, timeout, threads)
+			config := getEnumerateWordpressPluginsConfig(targets, plugins, PluginsFileSizeEnum, verifyTLS, timeout, threads)
 
 			// Generate report
 			report := enumeratecms.PerformAppEnumerateCMSWordpressPlugins(cmd.Context(), config)
@@ -380,11 +380,11 @@ func (a *WebScan) InitEnumerateCommand() {
 }
 
 // getEnumerateWordpressPluginsConfig builds the config for WordPress plugin enumeration.
-func getEnumerateWordpressPluginsConfig(targets []string, plugins []string, pluginFileSizeEnum enumeratecmswordpressfern.PluginFileSize, verifyTLS bool, timeout int, threads int) enumeratecmswordpressfern.EnumerateWordpressPluginsConfig {
+func getEnumerateWordpressPluginsConfig(targets []string, plugins []string, PluginsFileSizeEnum enumeratecmswordpressfern.PluginsFileSize, verifyTLS bool, timeout int, threads int) enumeratecmswordpressfern.EnumerateWordpressPluginsConfig {
 	config := enumeratecmswordpressfern.EnumerateWordpressPluginsConfig{
 		Targets:        targets,
 		Plugins:        plugins,
-		PluginFileSize: &pluginFileSizeEnum,
+		PluginsFileSize: &PluginsFileSizeEnum,
 		VerifyTls:      verifyTLS,
 		Timeout:        max(timeout, 0),
 		Threads:        max(threads, 0),

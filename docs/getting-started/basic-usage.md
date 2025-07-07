@@ -7,7 +7,7 @@ Running as a binary allows you to skip dealing with any container related networ
 You can validate that the binary is working by scanning the publicly available `scanme.sh`.
 
 ```bash
-webscan webserver probe --targets scanme.sh
+webscan discover page --target https://example.com
 ```
 
 ## Docker
@@ -17,7 +17,5 @@ Running webscan within a Docker container should typically work similarly to run
 If you're running on a Docker container on a MacOS machine and you are trying to scan a locally running service, you can leverage the `host.docker.internal` address as mentioned in the Docker documentation [here](https://docs.docker.com/desktop/networking/#i-want-to-connect-from-a-container-to-a-service-on-the-host).
 
 ```bash
-docker run ghcr.io/method-security/webscan \
-  webserver probe \
-  --targets scanme.sh
+docker run ghcr.io/method-security/webscan discover page --target https://example.com
 ```

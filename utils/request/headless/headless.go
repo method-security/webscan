@@ -3,10 +3,7 @@ package headless
 import (
 	// Standard
 	"context"
-	"errors"
 	"fmt"
-	"net/url"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -26,383 +23,86 @@ import (
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
-// getHost returns the host of a URL
-func getHost(rawURL string) string {
-	u, err := url.Parse(rawURL)
+// InitializeBrowser starts a headless browser instance and establishes connection
+func (b *Requester) InitializeBrowser(ctx context.Context) error {
+	launch := launcher.New().Headless(true)
+	if b.PathToBrowser != nil && *b.PathToBrowser != "" {
+		launch = launch.Bin(*b.PathToBrowser)
+	}
+
+	browserURL, err := launch.Context(ctx).Launch()
 	if err != nil {
-		return ""
-	}
-	return strings.ToLower(u.Hostname())
-}
-
-// setupHeaderInterception sets up the header interception for the page
-func setupHeaderInterception(page *rod.Page) {
-	page.MustEvalOnNewDocument(`
-		window.responseHeaders = new Map();
-		const originalFetch = window.fetch;
-		window.fetch = async function(url, options) {
-			const response = await originalFetch(url, options);
-			// Store headers for this URL
-			window.responseHeaders.set(url, Object.fromEntries(response.headers.entries()));
-			
-			// If this is a redirect, follow it and capture those headers too
-			if (response.redirected) {
-				const redirectResponse = await fetch(response.url, options);
-				window.responseHeaders.set(response.url, Object.fromEntries(redirectResponse.headers.entries()));
-				return redirectResponse;
-			}
-			return response;
-		};
-
-		// Also intercept XMLHttpRequest
-		const originalXHR = window.XMLHttpRequest.prototype.open;
-		window.XMLHttpRequest.prototype.open = function(method, url) {
-			this.addEventListener('load', function() {
-				window.responseHeaders.set(url, Object.fromEntries(this.getAllResponseHeaders().split('\r\n').reduce((acc, line) => {
-					const [key, value] = line.split(': ');
-					if (key && value) acc[key] = value;
-					return acc;
-				}, {})));
-			});
-			return originalXHR.apply(this, arguments);
-		};
-	`)
-}
-
-// setupNavigationTracking sets up tracking for top-level frame navigations
-func setupNavigationTracking(page *rod.Page, redirectChain *[]string, requestComplete chan struct{}, once *sync.Once, log svc1log.Logger, maxRedirects int, redirectError chan error) {
-	// Set up event listeners for navigation errors
-	go page.EachEvent(
-		func(e *proto.PageFrameNavigated) {
-			if e.Frame.ParentID == "" && e.Frame.URL != "" && !utils.IsStaticAsset(e.Frame.URL) {
-				// Check if URL is already in chain
-				exists := false
-				for _, url := range *redirectChain {
-					if url == e.Frame.URL {
-						exists = true
-						break
-					}
-				}
-				if !exists {
-					// Check if this is just a trailing slash redirect
-					if len(*redirectChain) > 0 {
-						lastURL := (*redirectChain)[len(*redirectChain)-1]
-						if utils.IsTrailingSlashRedirect(lastURL, e.Frame.URL) {
-							log.Info("Detected trailing slash redirect, not counting as redirect",
-								svc1log.SafeParam("from", lastURL),
-								svc1log.SafeParam("to", e.Frame.URL))
-							// Update the last URL in the chain but don't add a new entry
-							(*redirectChain)[len(*redirectChain)-1] = e.Frame.URL
-							once.Do(func() { close(requestComplete) })
-							return
-						}
-					}
-
-					// Check if we've exceeded max redirects
-					// Count actual redirects (excluding initial URL)
-					actualRedirects := len(*redirectChain)
-					if actualRedirects > maxRedirects && maxRedirects >= 0 {
-						log.Info("Max redirects reached", svc1log.SafeParam("maxRedirects", strconv.Itoa(maxRedirects)), svc1log.SafeParam("actualRedirects", strconv.Itoa(actualRedirects)))
-						once.Do(func() {
-							redirectError <- fmt.Errorf("max redirects (%d) exceeded", maxRedirects)
-							close(requestComplete)
-						})
-						return
-					}
-					*redirectChain = append(*redirectChain, e.Frame.URL)
-					log.Info("Top-level frame navigated", svc1log.SafeParam("url", e.Frame.URL))
-					once.Do(func() { close(requestComplete) })
-				}
-			}
-		},
-		func(e *proto.PageLoadEventFired) {
-			// Page load completed successfully
-			once.Do(func() { close(requestComplete) })
-		},
-	)()
-}
-
-// filterRedirectChain filters the redirect chain based on the original host
-func filterRedirectChain(redirectChain []string, originalHost string) []string {
-	// If the chain is empty, return it as is
-	if len(redirectChain) == 0 {
-		return redirectChain
+		return fmt.Errorf("browser launch failed: %v", err)
 	}
 
-	filteredChain := make([]string, 0, len(redirectChain))
-	for _, url := range redirectChain {
-		if url == "about:blank" {
-			continue
-		}
-		host := getHost(url)
-		if host != originalHost && !strings.HasSuffix(host, "."+originalHost) {
-			continue
-		}
-		filteredChain = append(filteredChain, url)
-	}
-
-	// If after filtering we have no URLs, return the original chain
-	if len(filteredChain) == 0 {
-		return redirectChain
-	}
-
-	return filteredChain
-}
-
-// performNavigation handles the actual page navigation based on config
-func performNavigation(page *rod.Page, config common.SendHttpRequestConfig, constructedURL *string, request *common.HttpRequest, log svc1log.Logger) error {
-	// Always use simple navigation - redirect handling is done by the event listeners
-	log.Info("Navigating to URL", svc1log.SafeParam("maxRedirects", strconv.Itoa(config.MaxRedirects)))
-
-	// Use Navigate instead of MustNavigate to handle errors
-	err := page.Navigate(*constructedURL)
+	b.Browser = rod.New().ControlURL(browserURL).Context(ctx)
+	err = b.Browser.Connect()
 	if err != nil {
-		// Check for specific navigation errors - but don't fail immediately
-		var navErr *rod.NavigationError
-		if errors.As(err, &navErr) {
-			log.Warn("Navigation encountered error but continuing", svc1log.SafeParam("error", navErr.Reason))
-			return nil // Don't fail - page might still be partially loaded
-		}
-		log.Warn("Navigation encountered error but continuing", svc1log.SafeParam("error", err.Error()))
-		return nil // Don't fail - page might still be partially loaded
-	}
-
-	// Try to wait for the initial navigation to complete, but don't fail if it times out
-	err = page.WaitLoad()
-	if err != nil {
-		// Log all errors but don't treat any as fatal - page might still have useful content
-		errStr := err.Error()
-		if errors.Is(err, context.DeadlineExceeded) {
-			log.Info("Navigation load timeout - this is normal for slow pages, continuing anyway")
-		} else if strings.Contains(errStr, "Execution context was destroyed") || strings.Contains(errStr, "-32000") {
-			log.Info("Execution context destroyed during navigation (likely due to redirect), continuing")
-		} else if strings.Contains(errStr, "timeout") {
-			log.Info("Navigation timeout encountered, continuing anyway - page might still have useful content")
-		} else {
-			log.Info("Wait load encountered error, continuing anyway - page might still have useful content", svc1log.SafeParam("error", err.Error()))
-		}
-		// Never return an error - always continue to try to extract data
+		return fmt.Errorf("browser connection failed: %v", err)
 	}
 
 	return nil
 }
 
-// waitForPageLoad waits for the page to stabilize and load
-func waitForPageLoad(page *rod.Page, minDOMStabalizeTimeSeconds int, log svc1log.Logger) error {
-	log.Info("Waiting for DOM stabilization", svc1log.SafeParam("seconds", strconv.Itoa(minDOMStabalizeTimeSeconds)))
-
-	// Use context-aware sleep that can be cancelled if page context times out
-	select {
-	case <-time.After(time.Duration(minDOMStabalizeTimeSeconds) * time.Second):
-		// Normal case - sleep completed
-	case <-page.GetContext().Done():
-		// Context cancelled/timed out during sleep
-		log.Warn("DOM stabilization interrupted by context timeout")
-		return page.GetContext().Err()
-	}
-
-	// Use non-panicking versions - treat timeouts as warnings, not errors
-	err := page.WaitLoad()
-	if err != nil {
-		errStr := err.Error()
-		if errors.Is(err, context.DeadlineExceeded) {
-			log.Info("Page load wait timed out during DOM stabilization (this is normal)")
-		} else if strings.Contains(errStr, "Execution context was destroyed") || strings.Contains(errStr, "-32000") {
-			log.Info("Execution context destroyed during page load wait (likely due to redirect)")
-		} else {
-			log.Warn("Page load wait encountered error during DOM stabilization", svc1log.SafeParam("error", err.Error()))
-		}
-		// Don't return error for any of these cases - they're expected during DOM stabilization
-	}
-
-	if err != nil {
-		errStr := err.Error()
-		if errors.Is(err, context.DeadlineExceeded) {
-			log.Info("Page stable wait timed out during DOM stabilization (this is normal)")
-		} else if strings.Contains(errStr, "Execution context was destroyed") || strings.Contains(errStr, "-32000") {
-			log.Info("Execution context destroyed during page stable wait (likely due to redirect)")
-		} else {
-			log.Warn("Page stable wait encountered error during DOM stabilization", svc1log.SafeParam("error", err.Error()))
-		}
-		// Don't return error for any of these cases - they're expected during DOM stabilization
-	}
-
-	return nil
-}
-
-// getResponseHeaders retrieves the captured response headers
-func getResponseHeaders(page *rod.Page, log svc1log.Logger) map[string][]string {
-	responseHeaders, err := page.Eval(`() => {
-		const headers = {};
-		if (window.responseHeaders) {
-			window.responseHeaders.forEach((value, key) => {
-				Object.assign(headers, value);
-			});
-		}
-		return headers;
-	}`)
-	if err != nil {
-		// Check if it's an execution context destroyed error (common during redirects)
-		errStr := err.Error()
-		if strings.Contains(errStr, "Execution context was destroyed") || strings.Contains(errStr, "-32000") {
-			log.Info("Execution context destroyed while getting response headers (likely due to redirect)")
-		} else {
-			log.Error("Failed to get response headers", svc1log.SafeParam("error", err.Error()))
-		}
-		return make(map[string][]string)
-	}
-
-	headerMap := make(map[string][]string)
-	if responseHeaders.Value.Map() != nil {
-		for k, v := range responseHeaders.Value.Map() {
-			headerMap[k] = []string{v.Str()}
-		}
-	}
-	return headerMap
-}
-
-// safeEval safely evaluates JavaScript on the page
-func safeEval(page *rod.Page, js string) (string, error) {
-	result, err := page.Eval(js)
-	if err != nil {
-		return "", err
-	}
-	return result.Value.Str(), nil
-}
-
-// getStatusCodeFromPage attempts to get the actual HTTP status code
-func getStatusCodeFromPage(page *rod.Page, log svc1log.Logger) int {
-	// First, try to get status from stored response
-	statusStr, err := safeEval(page, `() => window.lastResponseStatus || 0`)
-	if err == nil && statusStr != "" && statusStr != "0" {
-		if status, err := strconv.Atoi(statusStr); err == nil && status > 0 {
-			return status
-		}
-	}
-
-	// Try to get status from performance timing API
-	statusStr, err = safeEval(page, `() => {
-		const entries = performance.getEntriesByType('navigation');
-		if (entries.length > 0 && entries[0].responseStatus) {
-			return entries[0].responseStatus;
-		}
-		return 0;
-	}`)
-
-	if err == nil && statusStr != "" && statusStr != "0" {
-		if status, err := strconv.Atoi(statusStr); err == nil && status > 0 {
-			return status
-		}
-	}
-
-	// Default to 0 if we can't determine status
-	return 0
-}
-
-// extractNavigationError extracts meaningful error message from navigation errors
-func extractNavigationError(err error) string {
-	if err == nil {
-		return "unknown error"
-	}
-
-	// Check for rod.NavigationError
-	var navErr *rod.NavigationError
-	if errors.As(err, &navErr) {
-		return navErr.Reason
-	}
-
-	// Check for common network errors
-	errStr := err.Error()
-	switch {
-	case strings.Contains(errStr, "ERR_CONNECTION_REFUSED"):
-		return "connection refused"
-	case strings.Contains(errStr, "ERR_NAME_NOT_RESOLVED"):
-		return "DNS resolution failed"
-	case strings.Contains(errStr, "ERR_CONNECTION_TIMED_OUT"):
-		return "connection timeout"
-	case strings.Contains(errStr, "ERR_SSL_PROTOCOL_ERROR"):
-		return "SSL protocol error"
-	case strings.Contains(errStr, "ERR_CERT_"):
-		return "certificate error"
-	case strings.Contains(errStr, "ERR_INTERNET_DISCONNECTED"):
-		return "no internet connection"
-	case strings.Contains(errStr, "ERR_ADDRESS_UNREACHABLE"):
-		return "address unreachable"
-	case strings.Contains(errStr, "Execution context was destroyed") || strings.Contains(errStr, "-32000"):
-		return "execution context destroyed during navigation (likely redirect)"
-	case strings.Contains(errStr, "timeout"):
-		return "request timeout"
-	default:
-		return errStr
-	}
-}
-
-// SendRequest sends a request using the headless browser
+// SendRequest navigates to a URL using the headless browser and captures the response
 func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpRequestConfig) (common.HttpRequestResponse, error) {
+	// =========================================================================================
+	// SETUP
+	// =========================================================================================
 	log := svc1log.FromContext(ctx)
-	request := config.Request
+	report := common.HttpRequestResponse{Request: config.Request}
 
-	// Construct the URL
-	constructedURL, err := standardhelpers.ConstructURL(ctx, request)
+	constructedURL, err := standardhelpers.ConstructURL(ctx, config.Request)
 	if err != nil {
-		return common.HttpRequestResponse{Request: request}, fmt.Errorf("URL construction failed: %v", err)
+		return report, fmt.Errorf("URL construction failed: %v", err)
 	}
 	log.Info("Requesting", svc1log.SafeParam("url", *constructedURL))
 
+	// Initialize browser if not already done
 	if b.Browser == nil {
-		log.Info("Initializing browser")
-
-		// Create a new browser launcher
-		launch := launcher.New().Headless(true)
-		if b.PathToBrowser != nil && *b.PathToBrowser != "" {
-			launch = launch.Bin(*b.PathToBrowser)
+		if err := b.InitializeBrowser(ctx); err != nil {
+			return report, fmt.Errorf("browser initialization failed: %v", err)
 		}
 
-		// Use non-panicking launch with context
-		browserURL, err := launch.Context(ctx).Launch()
-		if err != nil {
-			return common.HttpRequestResponse{Request: request}, fmt.Errorf("browser launch failed: %v", err)
-		}
-
-		// Connect to browser with context
-		b.Browser = rod.New().ControlURL(browserURL).Context(ctx)
-		err = b.Browser.Connect()
-		if err != nil {
-			return common.HttpRequestResponse{Request: request}, fmt.Errorf("browser connection failed: %v", err)
-		}
-
-		// Set certificate error handling after browser connection
+		// Configure TLS verification
 		if !config.VerifyTls {
 			err = b.Browser.IgnoreCertErrors(true)
 			if err != nil {
 				log.Warn("Failed to disable certificate error checking", svc1log.SafeParam("error", err.Error()))
-			} else {
-				log.Info("Certificate error checking disabled")
+				return report, fmt.Errorf("failed to disable certificate error checking: %v", err)
 			}
+			log.Info("Certificate error checking disabled")
 		}
-
 		log.Info("Connected to browser")
 	}
 
-	redirectChain := []string{*constructedURL}
-	headers := make(map[string][]string)
-	var statusCode int
-	var once sync.Once
-	requestComplete := make(chan struct{})
-	redirectError := make(chan error, 1)
-	var result common.HttpRequestResponse
-	var redirectErr error
-	var navigationErr error
+	// =========================================================================================
+	// REQUEST EXECUTION
+	// =========================================================================================
+	var (
+		once            sync.Once
+		requestComplete = make(chan struct{})
+		browsersErr     = make(chan error, 1)
+		redirectChain   = []string{*constructedURL}
+		browserErr      error
+		statusCode      int
+	)
 
-	err = rod.Try(func() {
-		// Create page with context and appropriate timeout
+	if err := rod.Try(func() {
+		// Create new page
 		page, err := b.Browser.Page(proto.TargetCreateTarget{})
 		if err != nil {
-			navigationErr = fmt.Errorf("failed to create page: %v", err)
+			browsersErr <- fmt.Errorf("failed to create page: %v", err)
 			return
 		}
-		// Set page context and timeout - Rod has internal timeouts that need to be extended
-		// Add DOM stabilization time to page timeout to ensure enough time for final data extraction
+
+		defer func() {
+			if page != nil {
+				_ = page.Close()
+			}
+		}()
+
+		// Configure page timeout (includes DOM stabilization time)
 		pageTimeout := time.Duration(config.Timeout+b.MinDOMStabalizeTimeSeconds) * time.Second
 		page = page.Context(ctx).Timeout(pageTimeout)
 		log.Info("Set page timeout",
@@ -410,34 +110,24 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 			svc1log.SafeParam("domStabilizeTime", b.MinDOMStabalizeTimeSeconds),
 			svc1log.SafeParam("totalPageTimeout", int(pageTimeout.Seconds())))
 
-		// Ensure page is closed on completion
-		defer func() {
-			if page != nil {
-				_ = page.Close()
-			}
-		}()
+		// Setup request monitoring and navigate
+		headerCapture := setupHeaderInterception(page)
+		handleNavigation(ctx, page, &redirectChain, requestComplete, &once, config.MaxRedirects, browsersErr)
 
-		// Setup header interception and navigation tracking
-		setupHeaderInterception(page)
-
-		setupNavigationTracking(page, &redirectChain, requestComplete, &once, log, config.MaxRedirects, redirectError)
-
-		// Perform the navigation - this should never fail now, but just in case
-		navErr := performNavigation(page, config, constructedURL, request, log)
+		navErr := performNavigation(ctx, page, constructedURL, config)
 		if navErr != nil {
-			// This should not happen anymore since performNavigation never returns errors
-			log.Info("Unexpected navigation error, but continuing to extract data anyway", svc1log.SafeParam("error", extractNavigationError(navErr)))
+			log.Info("Unexpected navigation error, but continuing to extract data anyway", svc1log.SafeParam("error", cleanErrMsg(navErr)))
 		}
 
-		// Wait for navigation to complete or error with timeout
+		// Wait for navigation completion or timeout
 		select {
-		case err := <-redirectError:
+		case err := <-browsersErr:
 			if err != nil {
 				log.Error("Redirect error occurred", svc1log.SafeParam("error", err.Error()))
-				redirectErr = err
+				browserErr = err
 			} else {
 				log.Error("Redirect error occurred", svc1log.SafeParam("error", "unknown redirect error"))
-				redirectErr = fmt.Errorf("unknown redirect error")
+				browserErr = fmt.Errorf("unknown redirect error")
 			}
 			return
 		case <-requestComplete:
@@ -448,25 +138,82 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 					svc1log.SafeParam("url", *constructedURL),
 					svc1log.SafeParam("timeout", config.Timeout),
 					svc1log.SafeParam("redirectChain", strings.Join(redirectChain, " -> ")))
-				navigationErr = fmt.Errorf("request timeout after %d seconds", config.Timeout)
+				browserErr = fmt.Errorf("request timeout after %d seconds", config.Timeout)
 			} else {
 				log.Warn("Request cancelled",
 					svc1log.SafeParam("url", *constructedURL),
 					svc1log.SafeParam("error", ctx.Err()))
-				navigationErr = fmt.Errorf("request cancelled: %v", ctx.Err())
+				browserErr = fmt.Errorf("request cancelled: %v", ctx.Err())
 			}
 			return
 		}
 
-		// Get final URL with timeout context
-		finalURL, err := safeEval(page, `() => window.location.href`)
+		// =========================================================================================
+		// RESPONSE PROCESSING
+		// =========================================================================================
+
+		// Batch JavaScript evaluations for better performance
+		batchJS := `() => {
+			return {
+				finalURL: window.location.href,
+				readyState: document.readyState,
+				isErrorPage: window.location.href.startsWith('chrome-error://'),
+				statusCode: window.lastResponseStatus || 0,
+				performanceStatus: (() => {
+					const entries = performance.getEntriesByType('navigation');
+					return entries.length > 0 && entries[0].responseStatus ? entries[0].responseStatus : 0;
+				})()
+			};
+		}`
+
+		batchResult, err := page.Eval(batchJS)
+		var finalURL string
+		var responseHeaders map[string][]string
+		var isErrorPage bool
+
 		if err != nil {
-			log.Warn("Failed to get final URL", svc1log.SafeParam("error", err.Error()))
-			finalURL = ""
+			log.Warn("Failed to execute batch JavaScript, falling back to individual calls", svc1log.SafeParam("error", err.Error()))
+			// Fallback to individual calls
+			finalURL, _ = safeEval(page, `() => window.location.href`)
+			readyState, err := safeEval(page, `() => document.readyState`)
+			if err == nil && readyState == "complete" {
+				statusCode = 200
+			} else {
+				statusCode = getStatusCodeFromPage(page)
+				if statusCode == 0 && browserErr == nil {
+					statusCode = 200
+				}
+			}
+			isErrorPage = isChromeErrorPage(page)
+		} else {
+			// Parse batch results
+			resultMap := batchResult.Value.Map()
+			if resultMap != nil {
+				if val, ok := resultMap["finalURL"]; ok {
+					finalURL = val.Str()
+				}
+				if val, ok := resultMap["readyState"]; ok && val.Str() == "complete" {
+					statusCode = 200
+				}
+				if val, ok := resultMap["isErrorPage"]; ok {
+					isErrorPage = val.Bool()
+				}
+				if val, ok := resultMap["statusCode"]; ok && val.Int() > 0 {
+					statusCode = val.Int()
+				} else if val, ok := resultMap["performanceStatus"]; ok && val.Int() > 0 {
+					statusCode = val.Int()
+				}
+				if statusCode == 0 && browserErr == nil {
+					statusCode = 200 // Default for successful navigation
+				}
+			}
 		}
 
+		// Always use the reliable headers extraction method
+		responseHeaders = getResponseHeaders(ctx, page, headerCapture)
+
+		// Redirect Chain
 		if finalURL != "" && !utils.IsStaticAsset(finalURL) {
-			// Check if final URL is already in chain
 			exists := false
 			for _, url := range redirectChain {
 				if url == finalURL {
@@ -480,8 +227,9 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 				log.Info("Updated redirect chain", svc1log.SafeParam("chain", strings.Join(redirectChain, " -> ")))
 			}
 		}
+		redirectChain = filterRedirectChain(redirectChain)
 
-		// Wait for page to stabilize
+		// Wait for page to fully load (optimized)
 		err = waitForPageLoad(page, b.MinDOMStabalizeTimeSeconds, log)
 		if err != nil {
 			log.Warn("Page stabilization warning", svc1log.SafeParam("error", err.Error()))
@@ -489,28 +237,17 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 
 		log.Info("Final URL", svc1log.SafeParam("url", finalURL))
 
-		// Capture status code
-		readyState, err := safeEval(page, `() => document.readyState`)
-		if err == nil && readyState == "complete" {
-			statusCode = 200
-		} else {
-			// Try to get actual status code
-			statusCode = getStatusCodeFromPage(page, log)
-			if statusCode == 0 && navigationErr == nil {
-				// Default to 200 if page loaded successfully but we can't determine status
-				statusCode = 200
-			}
+		// Check if Chrome error page using batch result
+		if isErrorPage {
+			log.Warn("Detected Chrome error page, treating as navigation failure")
+			browserErr = fmt.Errorf("navigation failed: Chrome error page detected")
 		}
 
-		// Get response headers
-		headers = getResponseHeaders(page, log)
-
+		// Extract response body
 		var responseBody string
 		if statusCode >= 200 && statusCode < 300 {
-			// Get the response body with timeout context
 			htmlContent, err := page.HTML()
 			if err != nil {
-				// Check if it's an execution context destroyed error (common during redirects)
 				errStr := err.Error()
 				if strings.Contains(errStr, "Execution context was destroyed") || strings.Contains(errStr, "-32000") {
 					log.Info("Execution context destroyed while getting HTML content (likely due to redirect)")
@@ -523,107 +260,27 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 			}
 		}
 
-		// Parse the constructed URL to get the host
-		parsedURL, err := url.Parse(*constructedURL)
-		if err != nil {
-			log.Error("Failed to parse URL", svc1log.SafeParam("error", err.Error()))
-			return
-		}
-		originalHost := getHost(parsedURL.Host)
-
-		// Filter the redirect chain
-		filteredChain := filterRedirectChain(redirectChain, originalHost)
-
-		// If filtered chain is empty, use the original chain
-		if len(filteredChain) == 0 {
-			filteredChain = redirectChain
-		}
-
-		// Create response using the helper function
+		// Build final response
 		response := requesthelpers.CreateHTTPResponse(
 			statusCode,
-			filteredChain,
-			headers,
+			redirectChain,
+			responseHeaders,
 			responseBody,
 		)
-
-		result = common.HttpRequestResponse{
-			Request:  request,
-			Response: &response,
+		report.Response = &response
+	}); err != nil {
+		log.Error("Browser operation failed with panic", svc1log.SafeParam("error", err.Error()))
+		if browserErr == nil {
+			browserErr = fmt.Errorf("browser operation panicked: %v", err)
 		}
-	})
-
-	// Handle various error cases
-	if navigationErr != nil {
-		// Extract specific navigation error details
-		errMsg := extractNavigationError(navigationErr)
-		log.Error("Navigation error details", svc1log.SafeParam("error", errMsg))
-
-		// Create error response
-		response := requesthelpers.CreateHTTPResponse(
-			0, // Status code 0 indicates error
-			redirectChain,
-			headers,
-			fmt.Sprintf("Navigation failed: %s", errMsg),
-		)
-		return common.HttpRequestResponse{
-			Request:  request,
-			Response: &response,
-		}, fmt.Errorf("navigation failed: %s", errMsg)
 	}
 
-	if err != nil {
-		log.Error("Failed during headless capture", svc1log.SafeParam("url", *constructedURL), svc1log.SafeParam("error", extractNavigationError(err)))
-
-		// Create error response
-		errMsg := extractNavigationError(err)
-		response := requesthelpers.CreateHTTPResponse(
-			0,
-			redirectChain,
-			headers,
-			fmt.Sprintf("Headless capture error: %s", errMsg),
-		)
-		return common.HttpRequestResponse{
-			Request:  request,
-			Response: &response,
-		}, fmt.Errorf("headless capture failed: %s", errMsg)
+	// Handle navigation errors
+	var finalErr error
+	if browserErr != nil {
+		log.Error("Navigation failed", svc1log.SafeParam("url", *constructedURL), svc1log.SafeParam("error", browserErr.Error()))
+		finalErr = fmt.Errorf("headless capture failed: %s", cleanErrMsg(browserErr))
 	}
 
-	if redirectErr != nil {
-		// Create a response with error status
-		response := requesthelpers.CreateHTTPResponse(
-			0, // Status code 0 indicates error
-			redirectChain,
-			headers,
-			redirectErr.Error(),
-		)
-		return common.HttpRequestResponse{
-			Request:  request,
-			Response: &response,
-		}, redirectErr
-	}
-
-	return result, nil
-}
-
-func (b *Requester) InitializeBrowser(ctx context.Context) error {
-	launch := launcher.New().Headless(true)
-	if b.PathToBrowser != nil && *b.PathToBrowser != "" {
-		launch = launch.Bin(*b.PathToBrowser)
-	}
-
-	// Use non-panicking launch with context
-	browserURL, err := launch.Context(ctx).Launch()
-	if err != nil {
-		return fmt.Errorf("browser launch failed: %v", err)
-	}
-
-	// Connect to browser with context
-	b.Browser = rod.New().ControlURL(browserURL).Context(ctx)
-	err = b.Browser.Connect()
-	if err != nil {
-		return fmt.Errorf("browser connection failed: %v", err)
-	}
-
-	return nil
+	return report, finalErr
 }

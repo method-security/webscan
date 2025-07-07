@@ -34,7 +34,7 @@ webscan discover probe --targets method.security --request-method HEADLESS -o js
 ```
 
 ```bash
-webscan webscan-cli discover page --target https://method.security
+webscan discover page --target https://method.security
 ```
 
 ### Building a Statically Compiled Container for Local Testing

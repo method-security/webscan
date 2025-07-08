@@ -3,11 +3,16 @@ imports:
   http: ../../common/http.yml
   probe: ./probe.yml
 types:
+  ClassificationDetails:
+    properties:
+      cweIds: optional<list<string>>
+      cveIds: optional<list<string>>
   NucleiFindingInfo:
     properties:
       name: optional<string>
       finding: boolean
       severity: optional<string>
+      classification: optional<ClassificationDetails>
       tags: optional<list<string>>
   NucleiAttemptInfo:
     properties:

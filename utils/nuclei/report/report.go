@@ -2,6 +2,10 @@ package nuclei
 
 import (
 	// Generated
+
+	"regexp"
+	"slices"
+
 	nuclei "github.com/Method-Security/webscan/generated/go/common/nuclei"
 	// External
 	"fmt"
@@ -110,12 +114,42 @@ func (b *Builder) Consume(ev *nout.ResultEvent) {
 		HttpRequestResponse: httpReqResp,
 	}
 
+	// Extract vulnerability details from template if present
+	var classificationDetails *nuclei.ClassificationDetails
+	var cweIds []string
+	var cveIds []string
+
+	// Use regex to match CVE template IDs (e.g., CVE-2001-0537)
+	cveRegex := regexp.MustCompile(`^CVE-\d{4}-\d{4,}$`)
+	if cveRegex.MatchString(ev.TemplateID) {
+		if !slices.Contains(cveIds, ev.TemplateID) {
+			cveIds = append(cveIds, ev.TemplateID)
+		}
+	}
+	// Pull out CWE and CVE IDs from the template classification
+	if ev.Info.Classification != nil {
+		for _, cweId := range ev.Info.Classification.CWEID.ToSlice() {
+			if !slices.Contains(cweIds, cweId) {
+				cweIds = append(cweIds, cweId)
+			}
+		}
+		for _, cveId := range ev.Info.Classification.CVEID.ToSlice() {
+			if !slices.Contains(cveIds, cveId) {
+				cveIds = append(cveIds, cveId)
+			}
+		}
+	}
+	classificationDetails = &nuclei.ClassificationDetails{
+		CweIds: cweIds,
+		CveIds: cveIds,
+	}
 	severity := ev.Info.SeverityHolder.Severity.String()
 	attemptInfo.Finding = &nuclei.NucleiFindingInfo{
-		Name:     &ev.MatcherName,
-		Finding:  ev.MatcherStatus,
-		Severity: &severity,
-		Tags:     ev.Info.Tags.ToSlice(),
+		Name:           &ev.MatcherName,
+		Finding:        ev.MatcherStatus,
+		Severity:       &severity,
+		Tags:           ev.Info.Tags.ToSlice(),
+		Classification: classificationDetails,
 	}
 
 	// Always add the attempt to the report, even if there was an error parsing the request/response

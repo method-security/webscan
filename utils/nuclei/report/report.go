@@ -2,11 +2,11 @@ package nuclei
 
 import (
 	// Generated
-
 	"regexp"
 	"slices"
 
 	nuclei "github.com/Method-Security/webscan/generated/go/common/nuclei"
+
 	// External
 	"fmt"
 
@@ -128,14 +128,14 @@ func (b *Builder) Consume(ev *nout.ResultEvent) {
 	}
 	// Pull out CWE and CVE IDs from the template classification
 	if ev.Info.Classification != nil {
-		for _, cweId := range ev.Info.Classification.CWEID.ToSlice() {
-			if !slices.Contains(cweIds, cweId) {
-				cweIds = append(cweIds, cweId)
+		for _, cweID := range ev.Info.Classification.CWEID.ToSlice() {
+			if !slices.Contains(cweIds, cweID) {
+				cweIds = append(cweIds, cweID)
 			}
 		}
-		for _, cveId := range ev.Info.Classification.CVEID.ToSlice() {
-			if !slices.Contains(cveIds, cveId) {
-				cveIds = append(cveIds, cveId)
+		for _, cveID := range ev.Info.Classification.CVEID.ToSlice() {
+			if !slices.Contains(cveIds, cveID) {
+				cveIds = append(cveIds, cveID)
 			}
 		}
 	}

@@ -32,7 +32,6 @@ Flags:
   -h, --help                      help for application
       --modules strings           Specific fingerprinting modules to run
       --resource-type string      Type of resource to fingerprint (e.g., web, api, cms)
-      --successful-only           Only show successful fingerprint matches
       --targets strings           URL targets to perform fingerprinting against
       --verify-tls                Verify TLS certificates when making HTTPS requests (default true)
       --timeout int               Timeout per request in seconds (default 30)
@@ -199,7 +198,6 @@ Flags:
       --saas-file-paths strings         Files containing SaaS application fingerprints (default ["configs/discover/saas/active/saas_fingerprints.json"]) 
       --sso-companies strings           The specific SSO companies to use for discovery (Must be present in the SSO fingerprints file)
       --sso-file-paths strings          Files containing SSO application fingerprints (default ["configs/discover/saas/active/sso_fingerprints.json"]) 
-      --successful-only                 Only show successful attempts
       --timeout int                     Timeout in seconds for the capture (default 30)
       --verify-tls                      Verify TLS certificates when making HTTPS requests (default true)
 

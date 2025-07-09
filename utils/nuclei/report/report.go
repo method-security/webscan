@@ -3,7 +3,6 @@ package nuclei
 import (
 	// Generated
 	"regexp"
-	"slices"
 
 	nuclei "github.com/Method-Security/webscan/generated/go/common/nuclei"
 
@@ -13,6 +12,65 @@ import (
 	nucleilib "github.com/projectdiscovery/nuclei/v3/lib"
 	nout "github.com/projectdiscovery/nuclei/v3/pkg/output"
 )
+
+// addOrMergeCWE adds a CWE to the slice if it doesn't exist by ID, or merges additional fields if it does
+func addOrMergeCWE(cwes *[]*nuclei.CweDetails, cweID string, name *string, description *string) {
+	// Check if CWE with this ID already exists
+	for _, existing := range *cwes {
+		if existing.Id == cweID {
+			// CWE already exists, merge additional fields if they're not already set
+			if existing.Name == nil && name != nil {
+				existing.Name = name
+			}
+			if existing.Description == nil && description != nil {
+				existing.Description = description
+			}
+			return
+		}
+	}
+
+	// CWE doesn't exist, add it
+	*cwes = append(*cwes, &nuclei.CweDetails{
+		Id:          cweID,
+		Name:        name,
+		Description: description,
+	})
+}
+
+// addOrMergeCVE adds a CVE to the slice if it doesn't exist by ID, or merges additional fields if it does
+func addOrMergeCVE(cves *[]*nuclei.CveDetails, cveID string, cvssMetrics *string, cvssScore *float64, epssScore *float64, epssPercentile *float64, cpe *string) {
+	// Check if CVE with this ID already exists
+	for _, existing := range *cves {
+		if existing.Id == cveID {
+			// Merge additional fields if they're not already set
+			if existing.CvssMetrics == nil && cvssMetrics != nil {
+				existing.CvssMetrics = cvssMetrics
+			}
+			if existing.CvssScore == nil && cvssScore != nil {
+				existing.CvssScore = cvssScore
+			}
+			if existing.EpssScore == nil && epssScore != nil {
+				existing.EpssScore = epssScore
+			}
+			if existing.EpssPercentile == nil && epssPercentile != nil {
+				existing.EpssPercentile = epssPercentile
+			}
+			if existing.Cpe == nil && cpe != nil {
+				existing.Cpe = cpe
+			}
+			return
+		}
+	}
+
+	// CVE doesn't exist, add it with all available fields
+	*cves = append(*cves, &nuclei.CveDetails{
+		Id:             cveID,
+		CvssScore:      cvssScore,
+		EpssScore:      epssScore,
+		EpssPercentile: epssPercentile,
+		Cpe:            cpe,
+	})
+}
 
 // PopulateProbes loads all templates from the Nuclei engine and populates the probe information.
 // It extracts payloads and expected matchers from each template.
@@ -79,7 +137,6 @@ func (b *Builder) PopulateProbes(eng *nucleilib.NucleiEngine) error {
 			}
 		}
 		b.probeIdx[id] = probe
-		b.report.Probes = append(b.report.Probes, probe)
 	}
 	return nil
 }
@@ -95,7 +152,6 @@ func (b *Builder) Consume(ev *nout.ResultEvent) {
 	if !ok {
 		probe = &nuclei.NucleiProbe{Id: ev.TemplateID}
 		b.probeIdx[ev.TemplateID] = probe
-		b.report.Probes = append(b.report.Probes, probe)
 	}
 
 	// Get or create target
@@ -104,7 +160,7 @@ func (b *Builder) Consume(ev *nout.ResultEvent) {
 	if !ok {
 		targetInfo = &nuclei.NucleiTargetInfo{Target: host}
 		b.targetIdx[host] = targetInfo
-		b.report.Targets = append(b.report.Targets, targetInfo)
+		b.targets = append(b.targets, targetInfo)
 	}
 
 	// Build attempt information
@@ -116,39 +172,54 @@ func (b *Builder) Consume(ev *nout.ResultEvent) {
 
 	// Extract vulnerability details from template if present
 	var classificationDetails *nuclei.ClassificationDetails
-	var cweIds []string
-	var cveIds []string
+	var cwes []*nuclei.CweDetails
+	var cves []*nuclei.CveDetails
 
 	// Use regex to match CVE template IDs (e.g., CVE-2001-0537)
 	cveRegex := regexp.MustCompile(`^CVE-\d{4}-\d{4,}$`)
 	if cveRegex.MatchString(ev.TemplateID) {
-		if !slices.Contains(cveIds, ev.TemplateID) {
-			cveIds = append(cveIds, ev.TemplateID)
-		}
+		addOrMergeCVE(&cves, ev.TemplateID, nil, nil, nil, nil, nil)
 	}
 	// Pull out CWE and CVE IDs from the template classification
 	if ev.Info.Classification != nil {
 		for _, cweID := range ev.Info.Classification.CWEID.ToSlice() {
-			if !slices.Contains(cweIds, cweID) {
-				cweIds = append(cweIds, cweID)
-			}
+			addOrMergeCWE(&cwes, cweID, nil, nil)
+		}
+
+		// Extract CVE fields from classification if available
+		var cvssMetrics *string
+		var cvssScore *float64
+		var epssScore *float64
+		var epssPercentile *float64
+		var cpe *string
+		if ev.Info.Classification.CVSSMetrics != "" {
+			cvssMetrics = &ev.Info.Classification.CVSSMetrics
+		}
+		if ev.Info.Classification.CVSSScore != 0 {
+			cvssScore = &ev.Info.Classification.CVSSScore
+		}
+		if ev.Info.Classification.EPSSScore != 0 {
+			epssScore = &ev.Info.Classification.EPSSScore
+		}
+		if ev.Info.Classification.EPSSPercentile != 0 {
+			epssPercentile = &ev.Info.Classification.EPSSPercentile
+		}
+		if ev.Info.Classification.CPE != "" {
+			cpe = &ev.Info.Classification.CPE
 		}
 		for _, cveID := range ev.Info.Classification.CVEID.ToSlice() {
-			if !slices.Contains(cveIds, cveID) {
-				cveIds = append(cveIds, cveID)
-			}
+			addOrMergeCVE(&cves, cveID, cvssMetrics, cvssScore, epssScore, epssPercentile, cpe)
 		}
 	}
 	classificationDetails = &nuclei.ClassificationDetails{
-		CweIds: cweIds,
-		CveIds: cveIds,
+		Cwes: cwes,
+		Cves: cves,
 	}
 	severity := ev.Info.SeverityHolder.Severity.String()
 	attemptInfo.Finding = &nuclei.NucleiFindingInfo{
-		Name:           &ev.MatcherName,
 		Finding:        ev.MatcherStatus,
+		Probe:          probe,
 		Severity:       &severity,
-		Tags:           ev.Info.Tags.ToSlice(),
 		Classification: classificationDetails,
 	}
 
@@ -159,6 +230,6 @@ func (b *Builder) Consume(ev *nout.ResultEvent) {
 
 // Final returns the fully-populated Fern report.
 // It should be called after all ResultEvents have been consumed.
-func (b *Builder) Final() *nuclei.NucleiReport {
-	return b.report
+func (b *Builder) Final() []*nuclei.NucleiTargetInfo {
+	return b.targets
 }

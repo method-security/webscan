@@ -171,7 +171,7 @@ func GetRunnerConfig(fileSystems []fs.FS, config nuclei.NucleiConfig) Config {
 	return rconfig
 }
 
-func Run(ctx context.Context, cfg Config, reportBuilder *report.Builder) (*nuclei.NucleiReport, error) {
+func Run(ctx context.Context, cfg Config, reportBuilder *report.Builder) ([]*nuclei.NucleiTargetInfo, error) {
 	log := svc1log.FromContext(ctx)
 	log.Info("Validating config")
 	if err := validateConfig(cfg); err != nil {

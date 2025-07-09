@@ -34,7 +34,7 @@ type proxifyRequest struct {
 }
 
 // RunNucleiEngine runs the Nuclei engine with the given config.
-func RunNucleiEngine(ctx context.Context, config nuclei.NucleiConfig) (*nuclei.NucleiReport, error) {
+func RunNucleiEngine(ctx context.Context, config nuclei.NucleiConfig) ([]*nuclei.NucleiTargetInfo, error) {
 	log := svc1log.FromContext(ctx)
 	log.Info("Starting Nuclei Run of mode: Scan")
 

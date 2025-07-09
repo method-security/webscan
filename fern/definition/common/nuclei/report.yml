@@ -3,17 +3,29 @@ imports:
   http: ../../common/http.yml
   probe: ./probe.yml
 types:
+  CweDetails:
+    properties:
+      id: string
+      name: optional<string>
+      description: optional<string>
+  CveDetails:
+    properties:
+      id: string
+      cvssMetrics: optional<string>
+      cvssScore: optional<float>
+      epssScore: optional<float>
+      epssPercentile: optional<float>
+      cpe: optional<string>
   ClassificationDetails:
     properties:
-      cweIds: optional<list<string>>
-      cveIds: optional<list<string>>
+      cwes: optional<list<CweDetails>>
+      cves: optional<list<CveDetails>>
   NucleiFindingInfo:
     properties:
-      name: optional<string>
       finding: boolean
+      probe: optional<probe.NucleiProbe>
       severity: optional<string>
       classification: optional<ClassificationDetails>
-      tags: optional<list<string>>
   NucleiAttemptInfo:
     properties:
       probeId: string
@@ -25,8 +37,3 @@ types:
       baselineAttempt: optional<NucleiAttemptInfo>
       attempts: optional<list<NucleiAttemptInfo>>
       requestCount: integer
-  NucleiReport:
-    properties:
-      targets: optional<list<NucleiTargetInfo>>
-      probes: optional<list<probe.NucleiProbe>>
-

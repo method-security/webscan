@@ -1,10 +1,19 @@
 types:
+  NucleiMatcherConditionEnum:
+    enum:
+      - AND
+      - OR
   NucleiExpectedMatcher:
     properties:
       type: string
-      value: list<string>
+      part: optional<string>
+      values: list<string>
+  NucleiMatcherDetails:
+    properties:
+      matcherCondition: NucleiMatcherConditionEnum
+      matchers: list<NucleiExpectedMatcher>
   NucleiProbe:
     properties:
-      id: string # Nuclei Template ID
       payloads: optional<list<string>>
-      expectedMatchers: optional<list<NucleiExpectedMatcher>>
+      matcherDetails: optional<NucleiMatcherDetails>
+      

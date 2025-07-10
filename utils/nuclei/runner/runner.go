@@ -159,14 +159,13 @@ func getProxy(config nuclei.NucleiConfig) string {
 // GetRunnerConfig returns a runner config from a nuclei config.
 func GetRunnerConfig(fileSystems []fs.FS, config nuclei.NucleiConfig) Config {
 	rconfig := Config{
-		Targets:        config.Targets,
-		FS:             fileSystems,
-		Threads:        config.Threads,
-		Proxy:          getProxy(config),
-		RunMode:        config.RunMode,
-		SuccessfulOnly: config.SuccessfulOnly,
-		VerboseLogs:    config.VerboseLogs,
-		Timeout:        config.Timeout,
+		Targets:     config.Targets,
+		FS:          fileSystems,
+		Threads:     config.Threads,
+		Proxy:       getProxy(config),
+		RunMode:     config.RunMode,
+		VerboseLogs: config.VerboseLogs,
+		Timeout:     config.Timeout,
 	}
 	return rconfig
 }
@@ -177,8 +176,6 @@ func Run(ctx context.Context, cfg Config, reportBuilder *report.Builder) ([]*nuc
 	if err := validateConfig(cfg); err != nil {
 		return nil, err
 	}
-
-	log.Info("SuccessfulOnly config value", svc1log.SafeParam("successfulOnly", cfg.SuccessfulOnly))
 
 	log.Info("Copying templates to tmp dir")
 	tmpDir, err := copyTemplatesToTmpDir(cfg)
@@ -200,12 +197,8 @@ func Run(ctx context.Context, cfg Config, reportBuilder *report.Builder) ([]*nuc
 	defer eng.Close()
 
 	// To-Do: Write Customer Writer to enable this to work
-	if cfg.SuccessfulOnly != nil && *cfg.SuccessfulOnly {
-		eng.Options().MatcherStatus = false
-	} else {
-		eng.Options().MatcherStatus = true
-	}
-	log.Info("Set matcher status", svc1log.SafeParam("status", eng.Options().MatcherStatus), svc1log.SafeParam("successfulOnly", cfg.SuccessfulOnly))
+	eng.Options().MatcherStatus = false
+	log.Info("Set matcher status", svc1log.SafeParam("status", eng.Options().MatcherStatus))
 
 	log.Info("Loading targets")
 	if err := loadTargets(eng, cfg); err != nil {

@@ -28,7 +28,7 @@ types:
       classification: optional<ClassificationDetails>
   NucleiAttemptInfo:
     properties:
-      probeId: string
+      templateId: string # Nuclei template ID
       httpRequestResponse: http.HttpRequestResponse
       finding: optional<NucleiFindingInfo>
   NucleiTargetInfo:
@@ -36,4 +36,3 @@ types:
       target: string
       baselineAttempt: optional<NucleiAttemptInfo>
       attempts: optional<list<NucleiAttemptInfo>>
-      requestCount: integer

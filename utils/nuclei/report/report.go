@@ -3,6 +3,7 @@ package nuclei
 import (
 	// Generated
 	"regexp"
+	"strings"
 
 	nuclei "github.com/Method-Security/webscan/generated/go/common/nuclei"
 
@@ -84,9 +85,8 @@ func (b *Builder) PopulateProbes(eng *nucleilib.NucleiEngine) error {
 			continue
 		}
 		probe := &nuclei.NucleiProbe{
-			Id:               id,
-			Payloads:         []string{},
-			ExpectedMatchers: []*nuclei.NucleiExpectedMatcher{},
+			Payloads:       []string{},
+			MatcherDetails: &nuclei.NucleiMatcherDetails{},
 		}
 		for _, request := range template.RequestsHTTP {
 			// Extract payloads
@@ -103,6 +103,8 @@ func (b *Builder) PopulateProbes(eng *nucleilib.NucleiEngine) error {
 				}
 			}
 			// Extract expected matchers
+			var matchers []*nuclei.NucleiExpectedMatcher
+
 			for _, matcher := range request.Matchers {
 				var vals []string
 
@@ -130,10 +132,27 @@ func (b *Builder) PopulateProbes(eng *nucleilib.NucleiEngine) error {
 					vals = append(vals, matcher.Regex...)
 				}
 
-				probe.ExpectedMatchers = append(probe.ExpectedMatchers, &nuclei.NucleiExpectedMatcher{
-					Type:  matcher.Type.String(),
-					Value: vals,
-				})
+				expectedMatcher := &nuclei.NucleiExpectedMatcher{
+					Type:   matcher.Type.String(),
+					Part:   &matcher.Part,
+					Values: vals,
+				}
+
+				matchers = append(matchers, expectedMatcher)
+			}
+
+			// Only add if there are actual matchers to avoid empty entries
+			if len(matchers) > 0 {
+				// Use the request-level MatchersCondition, not individual matcher conditions
+				condition := request.MatchersCondition
+				if condition == "" {
+					condition = "OR" // Default condition
+				}
+
+				probe.MatcherDetails = &nuclei.NucleiMatcherDetails{
+					MatcherCondition: nuclei.NucleiMatcherConditionEnum(strings.ToUpper(condition)),
+					Matchers:         matchers,
+				}
 			}
 		}
 		b.probeIdx[id] = probe
@@ -150,23 +169,23 @@ func (b *Builder) Consume(ev *nout.ResultEvent) {
 	// Get or create probe
 	probe, ok := b.probeIdx[ev.TemplateID]
 	if !ok {
-		probe = &nuclei.NucleiProbe{Id: ev.TemplateID}
+		probe = &nuclei.NucleiProbe{}
 		b.probeIdx[ev.TemplateID] = probe
 	}
 
 	// Get or create target
-	host := hostKey(ev)
-	targetInfo, ok := b.targetIdx[host]
+	baseURL := getBaseURL(ev)
+	targetInfo, ok := b.targetIdx[baseURL]
 	if !ok {
-		targetInfo = &nuclei.NucleiTargetInfo{Target: host}
-		b.targetIdx[host] = targetInfo
+		targetInfo = &nuclei.NucleiTargetInfo{Target: baseURL}
+		b.targetIdx[baseURL] = targetInfo
 		b.targets = append(b.targets, targetInfo)
 	}
 
 	// Build attempt information
 	httpReqResp, _ := getHTTPRequestResponse(ev)
 	attemptInfo := &nuclei.NucleiAttemptInfo{
-		ProbeId:             probe.Id,
+		TemplateId:          ev.TemplateID,
 		HttpRequestResponse: httpReqResp,
 	}
 
@@ -225,7 +244,6 @@ func (b *Builder) Consume(ev *nout.ResultEvent) {
 
 	// Always add the attempt to the report, even if there was an error parsing the request/response
 	targetInfo.Attempts = append(targetInfo.Attempts, attemptInfo)
-	targetInfo.RequestCount++
 }
 
 // Final returns the fully-populated Fern report.

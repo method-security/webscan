@@ -103,8 +103,8 @@ func (b *Builder) PopulateProbes(eng *nucleilib.NucleiEngine) error {
 					}
 				}
 			}
-			// Extract expected matchers - group by condition
-			matchersByCondition := make(map[string][]*nuclei.NucleiExpectedMatcher)
+			// Extract expected matchers
+			var matchers []*nuclei.NucleiExpectedMatcher
 
 			for _, matcher := range request.Matchers {
 				var vals []string
@@ -139,16 +139,17 @@ func (b *Builder) PopulateProbes(eng *nucleilib.NucleiEngine) error {
 					Values: vals,
 				}
 
-				// Group matchers by their condition (default to "or" if not specified)
-				condition := matcher.Condition
-				if condition == "" {
-					condition = "or"
-				}
-				matchersByCondition[condition] = append(matchersByCondition[condition], expectedMatcher)
+				matchers = append(matchers, expectedMatcher)
 			}
 
-			// Create one NucleiMatcherDetails for each condition with all its matchers
-			for condition, matchers := range matchersByCondition {
+			// Only add if there are actual matchers to avoid empty entries
+			if len(matchers) > 0 {
+				// Use the request-level MatchersCondition, not individual matcher conditions
+				condition := request.MatchersCondition
+				if condition == "" {
+					condition = "or" // Default condition
+				}
+
 				probe.MatcherDetails = append(probe.MatcherDetails, &nuclei.NucleiMatcherDetails{
 					MatcherCondition: condition,
 					Matchers:         matchers,

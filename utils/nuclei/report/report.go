@@ -244,7 +244,6 @@ func (b *Builder) Consume(ev *nout.ResultEvent) {
 
 	// Always add the attempt to the report, even if there was an error parsing the request/response
 	targetInfo.Attempts = append(targetInfo.Attempts, attemptInfo)
-	targetInfo.RequestCount++
 }
 
 // Final returns the fully-populated Fern report.

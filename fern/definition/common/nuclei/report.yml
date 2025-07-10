@@ -36,4 +36,3 @@ types:
       target: string
       baselineAttempt: optional<NucleiAttemptInfo>
       attempts: optional<list<NucleiAttemptInfo>>
-      requestCount: integer

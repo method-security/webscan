@@ -15,8 +15,7 @@ import (
 	nout "github.com/projectdiscovery/nuclei/v3/pkg/output"
 )
 
-// hostKey extracts the host identifier from a ResultEvent.
-// It prioritizes the URL host over the event host field.
+// getBaseURL extracts the base URL from a ResultEvent.
 func getBaseURL(ev *nout.ResultEvent) string {
 	parsedURL, err := url.Parse(ev.URL)
 	if err != nil {

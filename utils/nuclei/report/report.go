@@ -85,9 +85,9 @@ func (b *Builder) PopulateProbes(eng *nucleilib.NucleiEngine) error {
 			continue
 		}
 		probe := &nuclei.NucleiProbe{
-			Id:               id,
-			Payloads:         []string{},
-			ExpectedMatchers: []*nuclei.NucleiExpectedMatcher{},
+			Id:             id,
+			Payloads:       []string{},
+			MatcherDetails: []*nuclei.NucleiMatcherDetails{},
 		}
 		for _, request := range template.RequestsHTTP {
 			// Extract payloads
@@ -103,7 +103,9 @@ func (b *Builder) PopulateProbes(eng *nucleilib.NucleiEngine) error {
 					}
 				}
 			}
-			// Extract expected matchers
+			// Extract expected matchers - group by condition
+			matchersByCondition := make(map[string][]*nuclei.NucleiExpectedMatcher)
+
 			for _, matcher := range request.Matchers {
 				var vals []string
 
@@ -131,9 +133,25 @@ func (b *Builder) PopulateProbes(eng *nucleilib.NucleiEngine) error {
 					vals = append(vals, matcher.Regex...)
 				}
 
-				probe.ExpectedMatchers = append(probe.ExpectedMatchers, &nuclei.NucleiExpectedMatcher{
-					Type:  matcher.Type.String(),
-					Value: vals,
+				expectedMatcher := &nuclei.NucleiExpectedMatcher{
+					Type:   matcher.Type.String(),
+					Part:   &matcher.Part,
+					Values: vals,
+				}
+
+				// Group matchers by their condition (default to "or" if not specified)
+				condition := matcher.Condition
+				if condition == "" {
+					condition = "or"
+				}
+				matchersByCondition[condition] = append(matchersByCondition[condition], expectedMatcher)
+			}
+
+			// Create one NucleiMatcherDetails for each condition with all its matchers
+			for condition, matchers := range matchersByCondition {
+				probe.MatcherDetails = append(probe.MatcherDetails, &nuclei.NucleiMatcherDetails{
+					MatcherCondition: condition,
+					Matchers:         matchers,
 				})
 			}
 		}
@@ -218,7 +236,7 @@ func (b *Builder) Consume(ev *nout.ResultEvent) {
 	}
 	severity := ev.Info.SeverityHolder.Severity.String()
 	attemptInfo.Finding = &nuclei.NucleiFindingInfo{
-		Finding:        ev.MatcherStatus,
+		Success:        ev.MatcherStatus,
 		Probe:          probe,
 		Severity:       &severity,
 		Classification: classificationDetails,

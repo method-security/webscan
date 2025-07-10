@@ -4,6 +4,7 @@ import (
 	// Generated
 
 	"regexp"
+	"strings"
 
 	nuclei "github.com/Method-Security/webscan/generated/go/common/nuclei"
 
@@ -87,7 +88,7 @@ func (b *Builder) PopulateProbes(eng *nucleilib.NucleiEngine) error {
 		probe := &nuclei.NucleiProbe{
 			Id:             id,
 			Payloads:       []string{},
-			MatcherDetails: []*nuclei.NucleiMatcherDetails{},
+			MatcherDetails: &nuclei.NucleiMatcherDetails{},
 		}
 		for _, request := range template.RequestsHTTP {
 			// Extract payloads
@@ -147,13 +148,13 @@ func (b *Builder) PopulateProbes(eng *nucleilib.NucleiEngine) error {
 				// Use the request-level MatchersCondition, not individual matcher conditions
 				condition := request.MatchersCondition
 				if condition == "" {
-					condition = "or" // Default condition
+					condition = "OR" // Default condition
 				}
 
-				probe.MatcherDetails = append(probe.MatcherDetails, &nuclei.NucleiMatcherDetails{
-					MatcherCondition: condition,
+				probe.MatcherDetails = &nuclei.NucleiMatcherDetails{
+					MatcherCondition: nuclei.NucleiMatcherConditionEnum(strings.ToUpper(condition)),
 					Matchers:         matchers,
-				})
+				}
 			}
 		}
 		b.probeIdx[id] = probe
@@ -186,7 +187,6 @@ func (b *Builder) Consume(ev *nout.ResultEvent) {
 	// Build attempt information
 	httpReqResp, _ := getHTTPRequestResponse(ev)
 	attemptInfo := &nuclei.NucleiAttemptInfo{
-		ProbeId:             probe.Id,
 		HttpRequestResponse: httpReqResp,
 	}
 

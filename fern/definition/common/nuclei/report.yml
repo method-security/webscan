@@ -28,7 +28,6 @@ types:
       classification: optional<ClassificationDetails>
   NucleiAttemptInfo:
     properties:
-      probeId: string
       httpRequestResponse: http.HttpRequestResponse
       finding: optional<NucleiFindingInfo>
   NucleiTargetInfo:

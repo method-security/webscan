@@ -22,7 +22,7 @@ types:
       cves: optional<list<CveDetails>>
   NucleiFindingInfo:
     properties:
-      success: boolean
+      finding: boolean
       probe: optional<probe.NucleiProbe>
       severity: optional<string>
       classification: optional<ClassificationDetails>

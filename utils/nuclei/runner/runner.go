@@ -159,14 +159,13 @@ func getProxy(config nuclei.NucleiConfig) string {
 // GetRunnerConfig returns a runner config from a nuclei config.
 func GetRunnerConfig(fileSystems []fs.FS, config nuclei.NucleiConfig) Config {
 	rconfig := Config{
-		Targets:        config.Targets,
-		FS:             fileSystems,
-		Threads:        config.Threads,
-		Proxy:          getProxy(config),
-		RunMode:        config.RunMode,
-		SuccessfulOnly: config.SuccessfulOnly,
-		VerboseLogs:    config.VerboseLogs,
-		Timeout:        config.Timeout,
+		Targets:     config.Targets,
+		FS:          fileSystems,
+		Threads:     config.Threads,
+		Proxy:       getProxy(config),
+		RunMode:     config.RunMode,
+		VerboseLogs: config.VerboseLogs,
+		Timeout:     config.Timeout,
 	}
 	return rconfig
 }

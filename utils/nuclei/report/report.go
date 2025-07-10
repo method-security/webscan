@@ -236,7 +236,7 @@ func (b *Builder) Consume(ev *nout.ResultEvent) {
 	}
 	severity := ev.Info.SeverityHolder.Severity.String()
 	attemptInfo.Finding = &nuclei.NucleiFindingInfo{
-		Success:        ev.MatcherStatus,
+		Finding:        ev.MatcherStatus,
 		Probe:          probe,
 		Severity:       &severity,
 		Classification: classificationDetails,

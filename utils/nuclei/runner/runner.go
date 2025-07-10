@@ -177,8 +177,6 @@ func Run(ctx context.Context, cfg Config, reportBuilder *report.Builder) ([]*nuc
 		return nil, err
 	}
 
-	log.Info("SuccessfulOnly config value", svc1log.SafeParam("successfulOnly", cfg.SuccessfulOnly))
-
 	log.Info("Copying templates to tmp dir")
 	tmpDir, err := copyTemplatesToTmpDir(cfg)
 	if err != nil {
@@ -199,12 +197,8 @@ func Run(ctx context.Context, cfg Config, reportBuilder *report.Builder) ([]*nuc
 	defer eng.Close()
 
 	// To-Do: Write Customer Writer to enable this to work
-	if cfg.SuccessfulOnly != nil && *cfg.SuccessfulOnly {
-		eng.Options().MatcherStatus = false
-	} else {
-		eng.Options().MatcherStatus = true
-	}
-	log.Info("Set matcher status", svc1log.SafeParam("status", eng.Options().MatcherStatus), svc1log.SafeParam("successfulOnly", cfg.SuccessfulOnly))
+	eng.Options().MatcherStatus = false
+	log.Info("Set matcher status", svc1log.SafeParam("status", eng.Options().MatcherStatus))
 
 	log.Info("Loading targets")
 	if err := loadTargets(eng, cfg); err != nil {

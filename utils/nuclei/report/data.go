@@ -17,11 +17,12 @@ import (
 
 // hostKey extracts the host identifier from a ResultEvent.
 // It prioritizes the URL host over the event host field.
-func hostKey(ev *nout.ResultEvent) string {
-	if u, err := url.Parse(ev.URL); err == nil && u.Host != "" {
-		return u.Host
+func getBaseURL(ev *nout.ResultEvent) string {
+	parsedURL, err := url.Parse(ev.URL)
+	if err != nil {
+		return ev.URL
 	}
-	return ev.Host
+	return fmt.Sprintf("%s://%s", parsedURL.Scheme, parsedURL.Host)
 }
 
 // parseRawRequest parses a raw HTTP request string into its components.

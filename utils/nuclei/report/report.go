@@ -2,6 +2,7 @@ package nuclei
 
 import (
 	// Generated
+
 	"regexp"
 
 	nuclei "github.com/Method-Security/webscan/generated/go/common/nuclei"
@@ -155,11 +156,11 @@ func (b *Builder) Consume(ev *nout.ResultEvent) {
 	}
 
 	// Get or create target
-	host := hostKey(ev)
-	targetInfo, ok := b.targetIdx[host]
+	baseURL := getBaseURL(ev)
+	targetInfo, ok := b.targetIdx[baseURL]
 	if !ok {
-		targetInfo = &nuclei.NucleiTargetInfo{Target: host}
-		b.targetIdx[host] = targetInfo
+		targetInfo = &nuclei.NucleiTargetInfo{Target: baseURL}
+		b.targetIdx[baseURL] = targetInfo
 		b.targets = append(b.targets, targetInfo)
 	}
 

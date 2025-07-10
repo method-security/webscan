@@ -14,7 +14,6 @@ types:
       matchers: list<NucleiExpectedMatcher>
   NucleiProbe:
     properties:
-      id: string # Nuclei Template ID
       payloads: optional<list<string>>
       matcherDetails: optional<NucleiMatcherDetails>
       

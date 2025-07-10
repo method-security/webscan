@@ -28,6 +28,7 @@ types:
       classification: optional<ClassificationDetails>
   NucleiAttemptInfo:
     properties:
+      templateId: string # Nuclei template ID
       httpRequestResponse: http.HttpRequestResponse
       finding: optional<NucleiFindingInfo>
   NucleiTargetInfo:

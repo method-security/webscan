@@ -2,7 +2,6 @@ package nuclei
 
 import (
 	// Generated
-
 	"regexp"
 	"strings"
 
@@ -86,7 +85,6 @@ func (b *Builder) PopulateProbes(eng *nucleilib.NucleiEngine) error {
 			continue
 		}
 		probe := &nuclei.NucleiProbe{
-			Id:             id,
 			Payloads:       []string{},
 			MatcherDetails: &nuclei.NucleiMatcherDetails{},
 		}
@@ -171,7 +169,7 @@ func (b *Builder) Consume(ev *nout.ResultEvent) {
 	// Get or create probe
 	probe, ok := b.probeIdx[ev.TemplateID]
 	if !ok {
-		probe = &nuclei.NucleiProbe{Id: ev.TemplateID}
+		probe = &nuclei.NucleiProbe{}
 		b.probeIdx[ev.TemplateID] = probe
 	}
 
@@ -187,6 +185,7 @@ func (b *Builder) Consume(ev *nout.ResultEvent) {
 	// Build attempt information
 	httpReqResp, _ := getHTTPRequestResponse(ev)
 	attemptInfo := &nuclei.NucleiAttemptInfo{
+		TemplateId:          ev.TemplateID,
 		HttpRequestResponse: httpReqResp,
 	}
 

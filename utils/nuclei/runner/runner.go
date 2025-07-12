@@ -197,7 +197,7 @@ func Run(ctx context.Context, cfg Config, reportBuilder *report.Builder) ([]*nuc
 	defer eng.Close()
 
 	// To-Do: Write Customer Writer to enable this to work
-	eng.Options().MatcherStatus = true
+	eng.Options().MatcherStatus = false
 	log.Info("Set matcher status", svc1log.SafeParam("status", eng.Options().MatcherStatus))
 
 	log.Info("Loading targets")

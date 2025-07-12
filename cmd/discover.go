@@ -137,6 +137,11 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Config flags
+			responseCodes, err := cmd.Flags().GetString("response-codes")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
 			maxRedirects, err := cmd.Flags().GetInt("max-redirects")
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -173,7 +178,7 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Set Config
-			config := getDiscoverPageConfig(target, maxRedirects, verifyTLS, timeout, takeScreenshot, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
+			config := getDiscoverPageConfig(target, responseCodes, maxRedirects, verifyTLS, timeout, takeScreenshot, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
 
 			// Generate a report
 			report := discoverpage.PerformPageCapture(cmd.Context(), config, requestMethodConfig.BrowserbaseSecrets)
@@ -183,6 +188,7 @@ func (a *WebScan) InitDiscoverCommand() {
 	// Target Flags
 	discoverPageCmd.Flags().String("target", "", "URL target to capture and analyze")
 	// Config Flags
+	discoverPageCmd.Flags().String("response-codes", "200-299", "Response codes to consider as valid responses")
 	discoverPageCmd.Flags().Bool("screenshot", false, "Capture a screenshot of the page")
 	discoverPageCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
 	discoverPageCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
@@ -526,9 +532,10 @@ func getDiscoverApplicationConfig(targets []string, resource string, moduleEnums
 }
 
 // getDiscoverPageConfig builds the config for page capture and analysis.
-func getDiscoverPageConfig(target string, maxRedirects int, verifyTLS bool, timeout int, takeScreenshot bool, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) discover.DiscoverPageConfig {
+func getDiscoverPageConfig(target string, responseCodes string, maxRedirects int, verifyTLS bool, timeout int, takeScreenshot bool, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) discover.DiscoverPageConfig {
 	config := discover.DiscoverPageConfig{
 		Target:            target,
+		ResponseCodes:     responseCodes,
 		MaxRedirects:      maxRedirects,
 		VerifyTls:         verifyTLS,
 		Timeout:           max(timeout, 0),

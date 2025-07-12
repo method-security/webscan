@@ -6,6 +6,7 @@ types:
   DiscoverPageConfig:
     properties:
       target: string
+      responseCodes: string
       screenshot: boolean
       maxRedirects: integer
       verifyTls: boolean

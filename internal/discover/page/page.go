@@ -6,6 +6,7 @@ import (
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
 	"github.com/Method-Security/webscan/generated/go/discover"
+	"github.com/Method-Security/webscan/utils"
 
 	// Utils
 	headless "github.com/Method-Security/webscan/utils/request/headless"
@@ -75,7 +76,26 @@ func PerformPageCapture(
 		report.Errors = errors
 		return &report
 	}
-	result.Request = httpRequestResponse
+
+	// Check if response code is in the allowed list
+	validCodes, err := utils.ParseResponseCodes(config.ResponseCodes)
+	if err != nil {
+		errors = append(errors, err.Error())
+		report.Errors = errors
+		return &report
+	}
+
+	// Only add request if response code is in the allowed list
+	if httpRequestResponse != nil &&
+		httpRequestResponse.Response != nil &&
+		httpRequestResponse.Response.StatusCode != nil {
+		if _, exists := validCodes[*httpRequestResponse.Response.StatusCode]; exists {
+			result.Request = httpRequestResponse
+			return &report
+		}
+	}
+
+	// Return report
 	report.Errors = errors
 	return &report
 }

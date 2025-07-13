@@ -570,9 +570,11 @@ func getDiscoverProbeConfig(targets []string, protocol string, maxRedirects int,
 	if protocol != "" {
 		switch strings.ToUpper(protocol) {
 		case "HTTP":
-			config.Protocol = common.WebProtocolHttp
+			httpProtocol := common.WebProtocolHttp
+			config.Protocol = &httpProtocol
 		case "HTTPS":
-			config.Protocol = common.WebProtocolHttps
+			httpsProtocol := common.WebProtocolHttps
+			config.Protocol = &httpsProtocol
 		default:
 			// Invalid protocol - will be handled by validation in the probe function
 			// For now, leave it unset to maintain existing behavior

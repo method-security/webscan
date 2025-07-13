@@ -79,8 +79,8 @@ func sendRequests(ctx context.Context, target string, config *discover.DiscoverP
 	var httpErr, httpsErr error
 
 	// Check if a specific protocol is configured
-	if config.Protocol != "" {
-		switch config.Protocol {
+	if config.Protocol != nil {
+		switch *config.Protocol {
 		case common.WebProtocolHttp:
 			// Only try HTTP
 			if httpResponse, err := sendHTTPRequest(ctx, target, config, browserbaseSecrets); err != nil {
@@ -115,11 +115,11 @@ func sendRequests(ctx context.Context, target string, config *discover.DiscoverP
 
 	// Return errors based on what was attempted
 	var errors []string
-	if config.Protocol != "" {
+	if config.Protocol != nil {
 		// If specific protocol was set, only return its error if it failed
-		if config.Protocol == common.WebProtocolHttp && httpErr != nil {
+		if *config.Protocol == common.WebProtocolHttp && httpErr != nil {
 			errors = append(errors, httpErr.Error())
-		} else if config.Protocol == common.WebProtocolHttps && httpsErr != nil {
+		} else if *config.Protocol == common.WebProtocolHttps && httpsErr != nil {
 			errors = append(errors, httpsErr.Error())
 		}
 	} else {

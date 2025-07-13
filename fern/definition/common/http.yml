@@ -1,6 +1,11 @@
 imports:
   method: method.yml
 types:
+  # Web Protocol Enum
+  WebProtocol:
+    enum:
+      - HTTP
+      - HTTPS
   # Http Method Enum
   HttpMethod:
     enum:
@@ -77,5 +82,3 @@ types:
     properties:
       request: HttpRequest
       response: optional<HttpResponse>
-
-

@@ -6,6 +6,7 @@ types:
   DiscoverProbeConfig:
     properties:
       targets: list<string>
+      protocol: optional<http.WebProtocol>
       maxRedirects: integer
       verifyTls: boolean
       timeout: integer

@@ -33,39 +33,20 @@ func createSendHTTPRequestConfig(baseURL, path string, config *discover.Discover
 	}
 }
 
-// sendHTTPRequest attempts to connect to a target using HTTP protocol
-func sendHTTPRequest(ctx context.Context, target string, config *discover.DiscoverProbeConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) (*common.HttpRequestResponse, error) {
+// sendRequestWithProtocol attempts to connect to a target using the specified protocol
+func sendRequestWithProtocol(ctx context.Context, target string, protocol string, config *discover.DiscoverProbeConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) (*common.HttpRequestResponse, error) {
 	sanitizedTarget := requesthelpers.RemoveScheme(target)
-	httpURL := "http://" + sanitizedTarget
+	fullURL := protocol + "://" + sanitizedTarget
 
-	baseURL, path, err := requesthelpers.SplitTargetURL(httpURL)
+	baseURL, path, err := requesthelpers.SplitTargetURL(fullURL)
 	if err != nil {
-		return nil, fmt.Errorf("invalid address %s: %v", httpURL, err)
+		return nil, fmt.Errorf("invalid address %s: %v", fullURL, err)
 	}
 
-	httpConfig := createSendHTTPRequestConfig(baseURL, path, config, browserbaseSecrets)
-	httpRequestResponse, err := request.SendRequest(ctx, httpConfig)
+	requestConfig := createSendHTTPRequestConfig(baseURL, path, config, browserbaseSecrets)
+	httpRequestResponse, err := request.SendRequest(ctx, requestConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to probe %s - %s", httpURL, err)
-	}
-
-	return httpRequestResponse, nil
-}
-
-// sendHTTPSRequest attempts to connect to a target using HTTPS protocol
-func sendHTTPSRequest(ctx context.Context, target string, config *discover.DiscoverProbeConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) (*common.HttpRequestResponse, error) {
-	sanitizedTarget := requesthelpers.RemoveScheme(target)
-	httpsURL := "https://" + sanitizedTarget
-
-	baseURL, path, err := requesthelpers.SplitTargetURL(httpsURL)
-	if err != nil {
-		return nil, fmt.Errorf("invalid address %s: %v", httpsURL, err)
-	}
-
-	httpsConfig := createSendHTTPRequestConfig(baseURL, path, config, browserbaseSecrets)
-	httpRequestResponse, err := request.SendRequest(ctx, httpsConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to probe %s - %s", httpsURL, err)
+		return nil, fmt.Errorf("failed to probe %s - %s", fullURL, err)
 	}
 
 	return httpRequestResponse, nil
@@ -83,14 +64,14 @@ func sendRequests(ctx context.Context, target string, config *discover.DiscoverP
 		switch *config.Protocol {
 		case common.WebProtocolHttp:
 			// Only try HTTP
-			if httpResponse, err := sendHTTPRequest(ctx, target, config, browserbaseSecrets); err != nil {
+			if httpResponse, err := sendRequestWithProtocol(ctx, target, "http", config, browserbaseSecrets); err != nil {
 				httpErr = err
 			} else {
 				httpRequestResponses = append(httpRequestResponses, httpResponse)
 			}
 		case common.WebProtocolHttps:
 			// Only try HTTPS
-			if httpsResponse, err := sendHTTPSRequest(ctx, target, config, browserbaseSecrets); err != nil {
+			if httpsResponse, err := sendRequestWithProtocol(ctx, target, "https", config, browserbaseSecrets); err != nil {
 				httpsErr = err
 			} else {
 				httpRequestResponses = append(httpRequestResponses, httpsResponse)
@@ -99,14 +80,14 @@ func sendRequests(ctx context.Context, target string, config *discover.DiscoverP
 	} else {
 		// No specific protocol set - maintain existing behavior (try both)
 		// Try HTTP request
-		if httpResponse, err := sendHTTPRequest(ctx, target, config, browserbaseSecrets); err != nil {
+		if httpResponse, err := sendRequestWithProtocol(ctx, target, "http", config, browserbaseSecrets); err != nil {
 			httpErr = err
 		} else {
 			httpRequestResponses = append(httpRequestResponses, httpResponse)
 		}
 
 		// Try HTTPS request
-		if httpsResponse, err := sendHTTPSRequest(ctx, target, config, browserbaseSecrets); err != nil {
+		if httpsResponse, err := sendRequestWithProtocol(ctx, target, "https", config, browserbaseSecrets); err != nil {
 			httpsErr = err
 		} else {
 			httpRequestResponses = append(httpRequestResponses, httpsResponse)

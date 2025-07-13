@@ -28,8 +28,34 @@ import (
 	yaml "gopkg.in/yaml.v3"
 )
 
+// detectOpenAPISpec tries to parse the response body as both JSON and YAML
+// Returns the document type map and true if it's a valid OpenAPI/Swagger spec
+func detectOpenAPISpec(responseBody string) (map[string]interface{}, bool) {
+	var docType map[string]interface{}
+
+	// Try JSON first
+	if err := json.Unmarshal([]byte(responseBody), &docType); err == nil {
+		// Check if it's a valid OpenAPI/Swagger spec
+		if _, ok := docType["swagger"]; ok || docType["openapi"] != nil {
+			return docType, true
+		}
+	}
+
+	// Try YAML if JSON fails or isn't a valid spec
+	docType = make(map[string]interface{})
+	if err := yaml.Unmarshal([]byte(responseBody), &docType); err == nil {
+		// Check if it's a valid OpenAPI/Swagger spec
+		if _, ok := docType["swagger"]; ok || docType["openapi"] != nil {
+			return docType, true
+		}
+	}
+
+	return nil, false
+}
+
 // Common Swagger/OpenAPI endpoint paths to check
 var commonSpecPaths = []string{
+	// JSON endpoints
 	"/swagger.json",
 	"/api-docs/swagger.json",
 	"/api/swagger.json",
@@ -52,6 +78,52 @@ var commonSpecPaths = []string{
 	"/docs/openapi.json",
 	"/swagger-ui/swagger.json",
 	"/swagger-ui/openapi.json",
+	// YAML endpoints
+	"/static/openapi.yaml",
+	"/swagger.yaml",
+	"/swagger.yml",
+	"/api-docs/swagger.yaml",
+	"/api-docs/swagger.yml",
+	"/api/swagger.yaml",
+	"/api/swagger.yml",
+	"/api/v1/swagger.yaml",
+	"/api/v1/swagger.yml",
+	"/api/v2/swagger.yaml",
+	"/api/v2/swagger.yml",
+	"/api/v3/swagger.yaml",
+	"/api/v3/swagger.yml",
+	"/swagger/v1/swagger.yaml",
+	"/swagger/v1/swagger.yml",
+	"/swagger/v2/swagger.yaml",
+	"/swagger/v2/swagger.yml",
+	"/swagger/v3/swagger.yaml",
+	"/swagger/v3/swagger.yml",
+	"/openapi.yaml",
+	"/openapi.yml",
+	"/api-docs/openapi.yaml",
+	"/api-docs/openapi.yml",
+	"/api/openapi.yaml",
+	"/api/openapi.yml",
+	"/api/v1/openapi.yaml",
+	"/api/v1/openapi.yml",
+	"/api/v2/openapi.yaml",
+	"/api/v2/openapi.yml",
+	"/api/v3/openapi.yaml",
+	"/api/v3/openapi.yml",
+	"/v1/swagger.yaml",
+	"/v1/swagger.yml",
+	"/v2/swagger.yaml",
+	"/v2/swagger.yml",
+	"/v3/swagger.yaml",
+	"/v3/swagger.yml",
+	"/docs/swagger.yaml",
+	"/docs/swagger.yml",
+	"/docs/openapi.yaml",
+	"/docs/openapi.yml",
+	"/swagger-ui/swagger.yaml",
+	"/swagger-ui/swagger.yml",
+	"/swagger-ui/openapi.yaml",
+	"/swagger-ui/openapi.yml",
 }
 
 func createSendHTTPRequestConfig(baseURL, path string, timeout int) common.SendHttpRequestConfig {
@@ -73,22 +145,10 @@ func createSendHTTPRequestConfig(baseURL, path string, timeout int) common.SendH
 	}
 }
 
-// PerformAppEnumerateSwagger performs a Swagger scan against a target URL and returns the report.
-func PerformAppEnumerateSwagger(ctx context.Context, target string, timeout int) enumerateapiapplicationfern.EnumerateSwaggerReport {
-	result := enumerateapiapplicationfern.EnumerateSwaggerResult{}
-	report := enumerateapiapplicationfern.EnumerateSwaggerReport{Config: &enumerateapiapplicationfern.EnumerateSwaggerConfig{Target: target}, Result: &result}
-
-	// Normalize target URL
-	if !strings.HasPrefix(target, "http://") && !strings.HasPrefix(target, "https://") {
-		target = "https://" + target
-	}
-	target = strings.TrimSuffix(target, "/")
-
+// findOpenAPISpec attempts to locate a valid OpenAPI/Swagger specification
+// by trying common endpoint paths. Returns the spec URL, raw bytes, parsed document type, and any error.
+func findOpenAPISpec(ctx context.Context, target string, timeout int) (string, []byte, map[string]interface{}, error) {
 	// Try each common path until we find a valid Swagger/OpenAPI spec
-	var swaggerURL string
-	var bodyBytes []byte
-	var foundSpec bool
-
 	for _, path := range commonSpecPaths {
 		if dl, ok := ctx.Deadline(); ok {
 			timeout = int(time.Until(dl).Seconds())
@@ -96,16 +156,14 @@ func PerformAppEnumerateSwagger(ctx context.Context, target string, timeout int)
 
 		baseURL, parsedTargetPath, err := requesthelpers.SplitTargetURL(target)
 		if err != nil {
-			report.Errors = append(report.Errors, err.Error())
-			return report
+			return "", nil, nil, fmt.Errorf("failed to split target URL: %w", err)
 		}
 
 		// Create a request config for the Swagger/OpenAPI spec and send the request
 		requestConfig := createSendHTTPRequestConfig(baseURL, fmt.Sprintf("%s%s", parsedTargetPath, path), timeout)
 		request, err := request.SendRequest(ctx, requestConfig)
 		if err != nil {
-			report.Errors = append(report.Errors, err.Error())
-			return report
+			continue // Try next path on request failure
 		}
 
 		// Check if the request was successful
@@ -113,27 +171,35 @@ func PerformAppEnumerateSwagger(ctx context.Context, target string, timeout int)
 			continue
 		}
 
-		// Unmarshal the response body into a map
+		// Check if the response body contains a valid OpenAPI/Swagger spec
 		responseBody := requesthelpers.GetResponseBodyStringFromBodyStruct(request.Response.ResponseBody)
 		if responseBody == nil {
 			continue
 		}
-		var docType map[string]interface{}
-		if err := json.Unmarshal([]byte(*responseBody), &docType); err != nil {
-			continue
-		}
 
-		// Check if the response body contains a Swagger or OpenAPI spec
-		if _, ok := docType["swagger"]; ok || docType["openapi"] != nil {
-			swaggerURL = target + path // full URL for the report
-			bodyBytes = []byte(*responseBody)
-			foundSpec = true
-			break
+		docType, isValidSpec := detectOpenAPISpec(*responseBody)
+		if isValidSpec {
+			swaggerURL := target + path // full URL for the report
+			bodyBytes := []byte(*responseBody)
+			return swaggerURL, bodyBytes, docType, nil
 		}
 	}
 
-	if !foundSpec {
-		report.Errors = append(report.Errors, "No valid Swagger/OpenAPI spec found")
+	return "", nil, nil, fmt.Errorf("no valid Swagger/OpenAPI spec found")
+}
+
+// PerformAppEnumerateSwagger performs a Swagger scan against a target URL and returns the report.
+func PerformAppEnumerateSwagger(ctx context.Context, target string, timeout int) enumerateapiapplicationfern.EnumerateSwaggerReport {
+	result := enumerateapiapplicationfern.EnumerateSwaggerResult{}
+	report := enumerateapiapplicationfern.EnumerateSwaggerReport{Config: &enumerateapiapplicationfern.EnumerateSwaggerConfig{Target: target}, Result: &result}
+
+	// Normalize target URL
+	target = strings.TrimSuffix(target, "/")
+
+	// Try to find a valid Swagger/OpenAPI spec
+	swaggerURL, bodyBytes, docType, err := findOpenAPISpec(ctx, target, timeout)
+	if err != nil {
+		report.Errors = append(report.Errors, err.Error())
 		return report
 	}
 
@@ -149,12 +215,7 @@ func PerformAppEnumerateSwagger(ctx context.Context, target string, timeout int)
 		return report
 	}
 
-	// Determine if the document is Swagger (OpenAPI 2.0) or OpenAPI 3.0+
-	var docType map[string]interface{}
-	if err := json.Unmarshal(bodyBytes, &docType); err != nil {
-		report.Errors = append(report.Errors, fmt.Sprintf("failed to unmarshal document type: %v", err))
-		return report
-	}
+	// Use the already-parsed docType from the detection phase
 
 	if version, ok := docType["swagger"]; ok && strings.HasPrefix(version.(string), "2") {
 		versionStr := version.(string)

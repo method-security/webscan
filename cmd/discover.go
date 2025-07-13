@@ -4,6 +4,7 @@ import (
 	// Standard
 	"errors"
 	"fmt"
+	"strings"
 
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
@@ -224,6 +225,11 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Config flags
+			protocol, err := cmd.Flags().GetString("protocol")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
 			maxRedirects, err := cmd.Flags().GetInt("max-redirects")
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -248,7 +254,7 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Set Config
-			config := getDiscoverProbeConfig(targets, maxRedirects, verifyTLS, timeout, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
+			config := getDiscoverProbeConfig(targets, protocol, maxRedirects, verifyTLS, timeout, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
 
 			// Generate report
 			report, err := discoverprobe.PerformWebProbe(cmd.Context(), config, requestMethodConfig.BrowserbaseSecrets)
@@ -261,6 +267,7 @@ func (a *WebScan) InitDiscoverCommand() {
 	}
 	// Target Flags
 	discoverProbeCmd.Flags().StringSlice("targets", []string{}, "URL targets to probe for web applications")
+	discoverProbeCmd.Flags().String("protocol", "", "Protocol to use for the probe (HTTP, HTTPS)")
 	// Config Flags
 	discoverProbeCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
 	discoverProbeCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
@@ -548,7 +555,7 @@ func getDiscoverPageConfig(target string, responseCodes string, maxRedirects int
 }
 
 // getDiscoverProbeConfig builds the config for probe discovery.
-func getDiscoverProbeConfig(targets []string, maxRedirects int, verifyTLS bool, timeout int, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) *discover.DiscoverProbeConfig {
+func getDiscoverProbeConfig(targets []string, protocol string, maxRedirects int, verifyTLS bool, timeout int, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) *discover.DiscoverProbeConfig {
 	config := &discover.DiscoverProbeConfig{
 		Targets:           targets,
 		MaxRedirects:      maxRedirects,
@@ -557,6 +564,19 @@ func getDiscoverProbeConfig(targets []string, maxRedirects int, verifyTLS bool, 
 		RequestMethod:     requestMethod,
 		HeadlessConfig:    headlessConfig,
 		BrowserbaseConfig: browserbaseConfig,
+	}
+
+	// Set protocol if provided, otherwise leave unset for backward compatibility
+	if protocol != "" {
+		switch strings.ToUpper(protocol) {
+		case "HTTP":
+			config.Protocol = common.WebProtocolHttp
+		case "HTTPS":
+			config.Protocol = common.WebProtocolHttps
+		default:
+			// Invalid protocol - will be handled by validation in the probe function
+			// For now, leave it unset to maintain existing behavior
+		}
 	}
 
 	return config

@@ -71,29 +71,62 @@ func sendHTTPSRequest(ctx context.Context, target string, config *discover.Disco
 	return httpRequestResponse, nil
 }
 
-// sendRequests attempts to connect to a target using both HTTPS and HTTP protocols
+// sendRequests attempts to connect to a target using the specified protocol(s)
+// If a specific protocol is set in config, only that protocol is used
+// Otherwise, attempts both HTTPS and HTTP protocols for backward compatibility
 func sendRequests(ctx context.Context, target string, config *discover.DiscoverProbeConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) ([]*common.HttpRequestResponse, []string) {
 	httpRequestResponses := []*common.HttpRequestResponse{}
 	var httpErr, httpsErr error
 
-	// Try HTTP request
-	if httpResponse, err := sendHTTPRequest(ctx, target, config, browserbaseSecrets); err != nil {
-		httpErr = err
+	// Check if a specific protocol is configured
+	if config.Protocol != "" {
+		switch config.Protocol {
+		case common.WebProtocolHttp:
+			// Only try HTTP
+			if httpResponse, err := sendHTTPRequest(ctx, target, config, browserbaseSecrets); err != nil {
+				httpErr = err
+			} else {
+				httpRequestResponses = append(httpRequestResponses, httpResponse)
+			}
+		case common.WebProtocolHttps:
+			// Only try HTTPS
+			if httpsResponse, err := sendHTTPSRequest(ctx, target, config, browserbaseSecrets); err != nil {
+				httpsErr = err
+			} else {
+				httpRequestResponses = append(httpRequestResponses, httpsResponse)
+			}
+		}
 	} else {
-		httpRequestResponses = append(httpRequestResponses, httpResponse)
+		// No specific protocol set - maintain existing behavior (try both)
+		// Try HTTP request
+		if httpResponse, err := sendHTTPRequest(ctx, target, config, browserbaseSecrets); err != nil {
+			httpErr = err
+		} else {
+			httpRequestResponses = append(httpRequestResponses, httpResponse)
+		}
+
+		// Try HTTPS request
+		if httpsResponse, err := sendHTTPSRequest(ctx, target, config, browserbaseSecrets); err != nil {
+			httpsErr = err
+		} else {
+			httpRequestResponses = append(httpRequestResponses, httpsResponse)
+		}
 	}
 
-	// Try HTTPS request
-	if httpsResponse, err := sendHTTPSRequest(ctx, target, config, browserbaseSecrets); err != nil {
-		httpsErr = err
-	} else {
-		httpRequestResponses = append(httpRequestResponses, httpsResponse)
-	}
-
-	// Only return errors if both requests failed
+	// Return errors based on what was attempted
 	var errors []string
-	if httpErr != nil && httpsErr != nil {
-		errors = append(errors, httpErr.Error(), httpsErr.Error())
+	if config.Protocol != "" {
+		// If specific protocol was set, only return its error if it failed
+		if config.Protocol == common.WebProtocolHttp && httpErr != nil {
+			errors = append(errors, httpErr.Error())
+		} else if config.Protocol == common.WebProtocolHttps && httpsErr != nil {
+			errors = append(errors, httpsErr.Error())
+		}
+	} else {
+		// If no specific protocol was set, only return errors if both requests failed
+		if httpErr != nil && httpsErr != nil {
+			errors = append(errors, httpErr.Error(), httpsErr.Error())
+		}
 	}
 
 	return httpRequestResponses, errors

@@ -51,6 +51,7 @@ types:
       targets: list<string>
       resourceType: ApplicationResourceConfigType
       modules: optional<list<string>>
+      maxRedirects: integer
       verifyTls: boolean
       timeout: integer
   # Report Struct

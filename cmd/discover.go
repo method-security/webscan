@@ -91,9 +91,14 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			maxRedirects, err := cmd.Flags().GetInt("max-redirects")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
 
 			// Create config
-			config, err := getDiscoverApplicationConfig(targets, resourceType, modules, verifyTLS, timeout)
+			config, err := getDiscoverApplicationConfig(targets, resourceType, modules, maxRedirects, verifyTLS, timeout)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -111,6 +116,7 @@ func (a *WebScan) InitDiscoverCommand() {
 	// Config Flags
 	discoverApplicationCmd.Flags().String("resource-type", "ALL", "Type of resource to fingerprint (e.g., web, api, cms)")
 	discoverApplicationCmd.Flags().StringSlice("modules", []string{}, "Specific fingerprinting modules to run")
+	discoverApplicationCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
 	discoverApplicationCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
 	discoverApplicationCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
 	discoverApplicationCmd.Flags().String("fingerprint-file", "/opt/method/webscan/var/conf/discover/application/fingerprints.json", "Path to the fingerprint definitions file")
@@ -523,7 +529,7 @@ func (a *WebScan) InitDiscoverCommand() {
 }
 
 // getDiscoverApplicationConfig builds the config for application fingerprinting discovery.
-func getDiscoverApplicationConfig(targets []string, resource string, moduleEnums []string, verifyTLS bool, timeout int) (*discover.DiscoverApplicationConfig, error) {
+func getDiscoverApplicationConfig(targets []string, resource string, moduleEnums []string, maxRedirects int, verifyTLS bool, timeout int) (*discover.DiscoverApplicationConfig, error) {
 	resourceEnum, err := getDiscoverApplicationResourceConfigTypeFromString(resource)
 	if err != nil {
 		return nil, fmt.Errorf("invalid resource type: %s", resource)
@@ -532,6 +538,7 @@ func getDiscoverApplicationConfig(targets []string, resource string, moduleEnums
 		Targets:      targets,
 		ResourceType: &resourceEnum,
 		Modules:      moduleEnums,
+		MaxRedirects: maxRedirects,
 		VerifyTls:    verifyTLS,
 		Timeout:      max(timeout, 0),
 	}

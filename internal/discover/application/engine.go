@@ -23,7 +23,7 @@ func createSendHTTPRequestConfig(baseURL, path string, method common.HttpMethod,
 	}
 	return common.SendHttpRequestConfig{
 		Request:            &request,
-		MaxRedirects:       0,
+		MaxRedirects:       config.MaxRedirects,
 		VerifyTls:          config.VerifyTls,
 		Timeout:            config.Timeout,
 		RequestMethod:      common.RequestMethodStandard,

@@ -105,7 +105,7 @@ func (a *WebScan) InitEnumerateCommand() {
 			}
 
 			// Generate report
-			report := enumerateapiapplication.PerformAppEnumerateSwagger(cmd.Context(), config.Target, config.Timeout)
+			report := enumerateapiapplication.PerformAppEnumerateSwagger(cmd.Context(), config)
 			if len(report.Errors) > 0 {
 				a.OutputSignal.Status = 1
 			}

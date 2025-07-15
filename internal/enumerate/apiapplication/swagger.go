@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -51,6 +52,14 @@ func detectOpenAPISpec(responseBody string) (map[string]interface{}, bool) {
 	}
 
 	return nil, false
+}
+
+// isSwaggerUIPage checks if the HTML content indicates a Swagger UI page
+func isSwaggerUIPage(htmlContent string) bool {
+	content := strings.ToLower(htmlContent)
+	return strings.Contains(content, "swagger-ui") ||
+		strings.Contains(content, "swagger ui") ||
+		strings.Contains(content, "swaggerui")
 }
 
 // Common Swagger/OpenAPI endpoint paths to check
@@ -126,7 +135,7 @@ var commonSpecPaths = []string{
 	"/swagger-ui/openapi.yml",
 }
 
-func createSendHTTPRequestConfig(baseURL, path string, timeout int) common.SendHttpRequestConfig {
+func createSendHTTPRequestConfig(baseURL, path string, timeout int, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig) common.SendHttpRequestConfig {
 	request := common.HttpRequest{
 		BaseUrl: baseURL,
 		Path:    path,
@@ -135,32 +144,211 @@ func createSendHTTPRequestConfig(baseURL, path string, timeout int) common.SendH
 	}
 	return common.SendHttpRequestConfig{
 		Request:            &request,
-		MaxRedirects:       0,
+		MaxRedirects:       1,
 		VerifyTls:          false,
 		Timeout:            timeout,
-		RequestMethod:      common.RequestMethodStandard,
-		HeadlessConfig:     nil,
+		RequestMethod:      requestMethod,
+		HeadlessConfig:     headlessConfig,
 		BrowserbaseConfig:  nil,
 		BrowserbaseSecrets: nil,
 	}
 }
 
+// extractSpecURLFromRenderedContent looks for spec URLs in the rendered HTML content
+func extractSpecURLFromRenderedContent(htmlContent, baseURL string) []string {
+	var specURLs []string
+
+	// Use regex to find anchor tags with href attributes that point to spec files
+	// Pattern matches: <a ...href="/path/to/spec.json"...> or similar
+	anchorRegex := regexp.MustCompile(`<a[^>]+href\s*=\s*["']([^"']*\.(?:json|yaml|yml))[^"']*["'][^>]*>`)
+	matches := anchorRegex.FindAllStringSubmatch(htmlContent, -1)
+
+	for _, match := range matches {
+		if len(match) > 1 {
+			url := match[1]
+
+			// Check if it looks like a spec URL
+			if isLikelySpecURL(url) {
+				// Convert relative URLs to absolute
+				if strings.HasPrefix(url, "/") {
+					url = baseURL + url
+				} else if !strings.HasPrefix(url, "http") {
+					url = baseURL + "/" + url
+				}
+				specURLs = append(specURLs, url)
+			}
+		}
+	}
+
+	// Also look for URLs in the span content (like <span class="url"> /static/openapi.yaml</span>)
+	spanRegex := regexp.MustCompile(`<span[^>]*class\s*=\s*["']url["'][^>]*>\s*([^<]*\.(?:json|yaml|yml))[^<]*</span>`)
+	spanMatches := spanRegex.FindAllStringSubmatch(htmlContent, -1)
+
+	for _, match := range spanMatches {
+		if len(match) > 1 {
+			url := strings.TrimSpace(match[1])
+
+			// Check if it looks like a spec URL
+			if isLikelySpecURL(url) {
+				// Convert relative URLs to absolute
+				if strings.HasPrefix(url, "/") {
+					url = baseURL + url
+				} else if !strings.HasPrefix(url, "http") {
+					url = baseURL + "/" + url
+				}
+				specURLs = append(specURLs, url)
+			}
+		}
+	}
+
+	return specURLs
+}
+
+// isLikelySpecURL checks if a URL is likely to be a spec URL
+func isLikelySpecURL(url string) bool {
+	url = strings.ToLower(url)
+
+	// Check for spec file extensions
+	hasSpecExtension := strings.HasSuffix(url, ".json") ||
+		strings.HasSuffix(url, ".yaml") ||
+		strings.HasSuffix(url, ".yml")
+
+	if !hasSpecExtension {
+		return false
+	}
+
+	// Check for spec-related keywords
+	specKeywords := []string{
+		"swagger", "openapi", "api-docs", "spec", "schema",
+		"docs", "api", "v1", "v2", "v3",
+	}
+
+	for _, keyword := range specKeywords {
+		if strings.Contains(url, keyword) {
+			return true
+		}
+	}
+
+	return false
+}
+
 // findOpenAPISpec attempts to locate a valid OpenAPI/Swagger specification
-// by trying common endpoint paths. Returns the spec URL, raw bytes, parsed document type, and any error.
+// First checks if target is a Swagger UI page, then uses headless if needed,
+// otherwise falls back to trying common endpoint paths.
 func findOpenAPISpec(ctx context.Context, target string, timeout int) (string, []byte, map[string]interface{}, error) {
-	// Try each common path until we find a valid Swagger/OpenAPI spec
+	baseURL, parsedTargetPath, err := requesthelpers.SplitTargetURL(target)
+	if err != nil {
+		return "", nil, nil, fmt.Errorf("failed to split target URL: %w", err)
+	}
+
+	if dl, ok := ctx.Deadline(); ok {
+		timeout = int(time.Until(dl).Seconds())
+	}
+
+	// STEP 1: Make a standard request to check if target is a Swagger UI page
+	requestConfig := createSendHTTPRequestConfig(baseURL, parsedTargetPath, timeout, common.RequestMethodStandard, nil)
+	response, err := request.SendRequest(ctx, requestConfig)
+
+	if err == nil && response.Response != nil && response.Response.StatusCode != nil &&
+		*response.Response.StatusCode == 200 && response.Response.ResponseBody != nil {
+
+		responseBody := requesthelpers.GetResponseBodyStringFromBodyStruct(response.Response.ResponseBody)
+		if responseBody != nil {
+			// Check if this is a Swagger UI page
+			if isSwaggerUIPage(*responseBody) {
+				// STEP 2: Use headless to render the page and extract the spec URL
+				headlessConfig := &common.HeadlessRequestConfig{
+					PathToBrowserShell:  nil, // Use default
+					MinDomStabalizeTime: 5,
+				}
+
+				headlessRequestConfig := createSendHTTPRequestConfig(baseURL, parsedTargetPath, timeout, common.RequestMethodHeadless, headlessConfig)
+				headlessResponse, err := request.SendRequest(ctx, headlessRequestConfig)
+
+				if err == nil && headlessResponse.Response != nil && headlessResponse.Response.StatusCode != nil &&
+					*headlessResponse.Response.StatusCode == 200 && headlessResponse.Response.ResponseBody != nil {
+
+					headlessBody := requesthelpers.GetResponseBodyStringFromBodyStruct(headlessResponse.Response.ResponseBody)
+					if headlessBody != nil {
+						// Extract spec URLs from the rendered content
+						specURLs := extractSpecURLFromRenderedContent(*headlessBody, baseURL)
+
+						// Try each extracted spec URL
+						for _, specURL := range specURLs {
+							// Parse the spec URL to get the path
+							parsedURL, err := url.Parse(specURL)
+							if err != nil {
+								continue
+							}
+
+							specPath := parsedURL.Path
+							if parsedURL.RawQuery != "" {
+								specPath += "?" + parsedURL.RawQuery
+							}
+
+							// Make request to the extracted spec URL
+							specRequestConfig := createSendHTTPRequestConfig(baseURL, specPath, timeout, common.RequestMethodStandard, nil)
+							specResponse, err := request.SendRequest(ctx, specRequestConfig)
+							if err != nil {
+								continue
+							}
+
+							if specResponse.Response == nil || specResponse.Response.StatusCode == nil ||
+								*specResponse.Response.StatusCode != 200 || specResponse.Response.ResponseBody == nil {
+								continue
+							}
+
+							specBody := requesthelpers.GetResponseBodyStringFromBodyStruct(specResponse.Response.ResponseBody)
+							if specBody == nil {
+								continue
+							}
+
+							docType, isValidSpec := detectOpenAPISpec(*specBody)
+							if isValidSpec {
+								bodyBytes := []byte(*specBody)
+								return specURL, bodyBytes, docType, nil
+							}
+						}
+
+						// If no extracted URLs worked, try common paths as fallback
+						for _, path := range commonSpecPaths {
+							specRequestConfig := createSendHTTPRequestConfig(baseURL, path, timeout, common.RequestMethodStandard, nil)
+							specResponse, err := request.SendRequest(ctx, specRequestConfig)
+							if err != nil {
+								continue
+							}
+
+							if specResponse.Response == nil || specResponse.Response.StatusCode == nil ||
+								*specResponse.Response.StatusCode != 200 || specResponse.Response.ResponseBody == nil {
+								continue
+							}
+
+							specBody := requesthelpers.GetResponseBodyStringFromBodyStruct(specResponse.Response.ResponseBody)
+							if specBody == nil {
+								continue
+							}
+
+							docType, isValidSpec := detectOpenAPISpec(*specBody)
+							if isValidSpec {
+								swaggerURL := baseURL + path
+								bodyBytes := []byte(*specBody)
+								return swaggerURL, bodyBytes, docType, nil
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// STEP 3: Fall back to trying common spec paths directly
 	for _, path := range commonSpecPaths {
 		if dl, ok := ctx.Deadline(); ok {
 			timeout = int(time.Until(dl).Seconds())
 		}
 
-		baseURL, parsedTargetPath, err := requesthelpers.SplitTargetURL(target)
-		if err != nil {
-			return "", nil, nil, fmt.Errorf("failed to split target URL: %w", err)
-		}
-
 		// Create a request config for the Swagger/OpenAPI spec and send the request
-		requestConfig := createSendHTTPRequestConfig(baseURL, fmt.Sprintf("%s%s", parsedTargetPath, path), timeout)
+		requestConfig := createSendHTTPRequestConfig(baseURL, fmt.Sprintf("%s%s", parsedTargetPath, path), timeout, common.RequestMethodStandard, nil)
 		request, err := request.SendRequest(ctx, requestConfig)
 		if err != nil {
 			continue // Try next path on request failure
@@ -189,15 +377,15 @@ func findOpenAPISpec(ctx context.Context, target string, timeout int) (string, [
 }
 
 // PerformAppEnumerateSwagger performs a Swagger scan against a target URL and returns the report.
-func PerformAppEnumerateSwagger(ctx context.Context, target string, timeout int) enumerateapiapplicationfern.EnumerateSwaggerReport {
+func PerformAppEnumerateSwagger(ctx context.Context, config enumerateapiapplicationfern.EnumerateSwaggerConfig) enumerateapiapplicationfern.EnumerateSwaggerReport {
 	result := enumerateapiapplicationfern.EnumerateSwaggerResult{}
-	report := enumerateapiapplicationfern.EnumerateSwaggerReport{Config: &enumerateapiapplicationfern.EnumerateSwaggerConfig{Target: target}, Result: &result}
+	report := enumerateapiapplicationfern.EnumerateSwaggerReport{Config: &config, Result: &result}
 
 	// Normalize target URL
-	target = strings.TrimSuffix(target, "/")
+	target := strings.TrimSuffix(config.Target, "/")
 
 	// Try to find a valid Swagger/OpenAPI spec
-	swaggerURL, bodyBytes, docType, err := findOpenAPISpec(ctx, target, timeout)
+	swaggerURL, bodyBytes, docType, err := findOpenAPISpec(ctx, target, config.Timeout)
 	if err != nil {
 		report.Errors = append(report.Errors, err.Error())
 		return report
@@ -831,7 +1019,7 @@ func contains(slice []string, item string) bool {
 
 func extractRequestSchemaV2(operation *v2.Operation, doc libopenapi.Document, report *enumerateapiapplicationfern.EnumerateSwaggerReport) *enumerateapiapplicationfern.RequestSchema {
 	if operation.Parameters == nil {
-		report.Errors = append(report.Errors, "No parameters found in operation")
+		// No parameters is normal for some operations, don't log as error
 		return nil
 	}
 
@@ -842,13 +1030,13 @@ func extractRequestSchemaV2(operation *v2.Operation, doc libopenapi.Document, re
 			}
 		}
 	}
-	report.Errors = append(report.Errors, "No body parameter with schema found in operation")
+	// No body parameter is normal for GET, DELETE, etc. operations, don't log as error
 	return nil
 }
 
 func extractRequestSchemaV3(operation *v3.Operation, doc libopenapi.Document, report *enumerateapiapplicationfern.EnumerateSwaggerReport) *enumerateapiapplicationfern.RequestSchema {
 	if operation.RequestBody == nil || operation.RequestBody.Content == nil {
-		report.Errors = append(report.Errors, "No request body or content found in operation")
+		// No request body is normal for GET, DELETE, etc. operations, don't log as error
 		return nil
 	}
 
@@ -860,7 +1048,7 @@ func extractRequestSchemaV3(operation *v3.Operation, doc libopenapi.Document, re
 			}
 		}
 	}
-	report.Errors = append(report.Errors, "No schema found in request body content")
+	// No schema in request body content might be normal, don't log as error
 	return nil
 }
 

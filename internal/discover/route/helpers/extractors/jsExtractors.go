@@ -39,8 +39,10 @@ var apiPatterns = []struct {
 	{regexp.MustCompile(`\$\.(get|post|put|delete)\(['"]([^'"]+)['"]`), ""},                                  // Method and URL in capture groups
 	{regexp.MustCompile(`\$\.ajax\({\s*(?:method|type):\s*['"]([^'"]+)['"],\s*url:\s*['"]([^'"]+)['"]`), ""}, // Method and URL in capture groups
 
-	// XMLHttpRequest calls
-	{regexp.MustCompile(`\.open\(['"]([^'"]+)['"],\s*['"]([^'"]+)['"]`), ""}, // Method and URL in capture groups
+	// XMLHttpRequest calls (more specific to avoid matching window.open)
+	{regexp.MustCompile(`xhr\.open\(['"]([^'"]+)['"],\s*['"]([^'"]+)['"]`), ""},     // Method and URL in capture groups
+	{regexp.MustCompile(`request\.open\(['"]([^'"]+)['"],\s*['"]([^'"]+)['"]`), ""}, // Method and URL in capture groups
+	{regexp.MustCompile(`xmlhttp\.open\(['"]([^'"]+)['"],\s*['"]([^'"]+)['"]`), ""}, // Method and URL in capture groups
 
 	// Generic URL patterns that might be API endpoints
 	{regexp.MustCompile(`['"](/api/[^'"]+)['"]`), "GET"},
@@ -67,9 +69,20 @@ func extractRoutesFromPatterns(content string, baseURL string, routeCaptureConfi
 				urlStr = match[1]
 				method = pattern.method
 			} else if len(match) == 3 {
-				// Pattern with two capture groups (method and URL)
-				method = strings.ToUpper(match[1])
-				urlStr = match[2]
+				patternStr := pattern.pattern.String()
+
+				// Only the fetch pattern with method options has URL first, method second
+				// All other patterns have method first, URL second
+				if strings.Contains(patternStr, "fetch") && strings.Contains(patternStr, "method") && strings.Contains(patternStr, `{\s*method`) {
+					// fetch('url', { method: 'method' }) - URL first, method second
+					urlStr = match[1]
+					method = strings.ToUpper(match[2])
+				} else {
+					// All other patterns: method first, URL second
+					// xhr.open('method', 'url'), axios.*, jquery.*, etc.
+					method = strings.ToUpper(match[1])
+					urlStr = match[2]
+				}
 			}
 
 			// Skip if no URL found

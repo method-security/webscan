@@ -7,7 +7,7 @@ types:
     properties:
       target: string
       collectStaticAssets: boolean
-      noBaseUrlMatch: boolean
+      ignoreBaseUrlMatch: boolean
       spiderDepth: integer
       maxRedirects: integer
       verifyTls: boolean

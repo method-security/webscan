@@ -11,6 +11,11 @@ types:
   CveDetails:
     properties:
       id: string
+      name: optional<string>
+      description: optional<string>
+      impact: optional<string>
+      remediation: optional<string>
+      reference: optional<list<string>>
       cvssMetrics: optional<string>
       cvssScore: optional<float>
       epssScore: optional<float>

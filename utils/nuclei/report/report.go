@@ -39,7 +39,7 @@ func addOrMergeCWE(cwes *[]*nuclei.CweDetails, cweID string, name *string, descr
 }
 
 // addOrMergeCVE adds a CVE to the slice if it doesn't exist by ID, or merges additional fields if it does
-func addOrMergeCVE(cves *[]*nuclei.CveDetails, cveID string, cvssMetrics *string, cvssScore *float64, epssScore *float64, epssPercentile *float64, cpe *string) {
+func addOrMergeCVE(cves *[]*nuclei.CveDetails, cveID string, cvssMetrics *string, cvssScore *float64, epssScore *float64, epssPercentile *float64, cpe *string, name *string, description *string, impact *string, remediation *string, reference []string) {
 	// Check if CVE with this ID already exists
 	for _, existing := range *cves {
 		if existing.Id == cveID {
@@ -59,6 +59,21 @@ func addOrMergeCVE(cves *[]*nuclei.CveDetails, cveID string, cvssMetrics *string
 			if existing.Cpe == nil && cpe != nil {
 				existing.Cpe = cpe
 			}
+			if existing.Name == nil && name != nil {
+				existing.Name = name
+			}
+			if existing.Description == nil && description != nil {
+				existing.Description = description
+			}
+			if existing.Impact == nil && impact != nil {
+				existing.Impact = impact
+			}
+			if existing.Remediation == nil && remediation != nil {
+				existing.Remediation = remediation
+			}
+			if existing.Reference == nil && len(reference) > 0 {
+				existing.Reference = reference
+			}
 			return
 		}
 	}
@@ -66,10 +81,16 @@ func addOrMergeCVE(cves *[]*nuclei.CveDetails, cveID string, cvssMetrics *string
 	// CVE doesn't exist, add it with all available fields
 	*cves = append(*cves, &nuclei.CveDetails{
 		Id:             cveID,
+		CvssMetrics:    cvssMetrics,
 		CvssScore:      cvssScore,
 		EpssScore:      epssScore,
 		EpssPercentile: epssPercentile,
 		Cpe:            cpe,
+		Name:           name,
+		Description:    description,
+		Impact:         impact,
+		Remediation:    remediation,
+		Reference:      reference,
 	})
 }
 
@@ -197,7 +218,7 @@ func (b *Builder) Consume(ev *nout.ResultEvent) {
 	// Use regex to match CVE template IDs (e.g., CVE-2001-0537)
 	cveRegex := regexp.MustCompile(`^CVE-\d{4}-\d{4,}$`)
 	if cveRegex.MatchString(ev.TemplateID) {
-		addOrMergeCVE(&cves, ev.TemplateID, nil, nil, nil, nil, nil)
+		addOrMergeCVE(&cves, ev.TemplateID, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	}
 	// Pull out CWE and CVE IDs from the template classification
 	if ev.Info.Classification != nil {
@@ -206,11 +227,17 @@ func (b *Builder) Consume(ev *nout.ResultEvent) {
 		}
 
 		// Extract CVE fields from classification if available
+
 		var cvssMetrics *string
 		var cvssScore *float64
 		var epssScore *float64
 		var epssPercentile *float64
 		var cpe *string
+		var name *string
+		var description *string
+		var impact *string
+		var remediation *string
+		var reference []string
 		if ev.Info.Classification.CVSSMetrics != "" {
 			cvssMetrics = &ev.Info.Classification.CVSSMetrics
 		}
@@ -226,8 +253,23 @@ func (b *Builder) Consume(ev *nout.ResultEvent) {
 		if ev.Info.Classification.CPE != "" {
 			cpe = &ev.Info.Classification.CPE
 		}
+		if ev.Info.Name != "" {
+			name = &ev.Info.Name
+		}
+		if ev.Info.Description != "" {
+			description = &ev.Info.Description
+		}
+		if ev.Info.Impact != "" {
+			impact = &ev.Info.Impact
+		}
+		if ev.Info.Remediation != "" {
+			remediation = &ev.Info.Remediation
+		}
+		if ev.Info.Reference != nil {
+			reference = ev.Info.Reference.ToSlice()
+		}
 		for _, cveID := range ev.Info.Classification.CVEID.ToSlice() {
-			addOrMergeCVE(&cves, cveID, cvssMetrics, cvssScore, epssScore, epssPercentile, cpe)
+			addOrMergeCVE(&cves, cveID, cvssMetrics, cvssScore, epssScore, epssPercentile, cpe, name, description, impact, remediation, reference)
 		}
 	}
 	classificationDetails = &nuclei.ClassificationDetails{

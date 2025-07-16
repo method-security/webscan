@@ -130,7 +130,7 @@ func extractRoutes(ctx context.Context, httpRequestResponse *common.HttpRequestR
 		}
 
 		fullRedirectedURL := fmt.Sprintf("%s%s", redirectedURLBase, redirectedURLPath)
-		networkRoutes, networkUrls, networkErrors := capturerouteextractors.ExtractNetworkRoutes(networkRouteCtx, browser, fullRedirectedURL, routeCaptureConfig.RequireBaseUrlMatch, !routeCaptureConfig.IgnoreStaticAssets)
+		networkRoutes, networkUrls, networkErrors := capturerouteextractors.ExtractNetworkRoutes(networkRouteCtx, browser, fullRedirectedURL, routeCaptureConfig.IgnoreBaseUrlMatch, routeCaptureConfig.CollectStaticAssets)
 		routes = append(routes, networkRoutes...)
 		urls = discoverroutehelpers.AddListToSetString(urls, networkUrls)
 		errors = append(errors, networkErrors...)
@@ -144,7 +144,7 @@ func extractRoutes(ctx context.Context, httpRequestResponse *common.HttpRequestR
 	// Filter out static assets from all Route + Static Asset URLs
 	staticAssets := make(map[string]struct{})
 	for url := range urls {
-		if !routeCaptureConfig.IgnoreStaticAssets && utils.IsStaticAsset(url) {
+		if routeCaptureConfig.CollectStaticAssets && utils.IsStaticAsset(url) {
 			staticAssets[url] = struct{}{}
 		}
 	}

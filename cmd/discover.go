@@ -309,12 +309,12 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Get Config flags
-			requireBaseURLMatch, err := cmd.Flags().GetBool("require-base-url-match")
+			ignoreBaseURLMatch, err := cmd.Flags().GetBool("ignore-base-url-match")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			ignoreStaticAssets, err := cmd.Flags().GetBool("ignore-static-assets")
+			collectStaticAssets, err := cmd.Flags().GetBool("collect-static-assets")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -353,7 +353,7 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Set Config
-			config := getDiscoverRouteConfig(target, requireBaseURLMatch, ignoreStaticAssets, spiderDepth, maxRedirects, verifyTLS, timeout, threads, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
+			config := getDiscoverRouteConfig(target, ignoreBaseURLMatch, collectStaticAssets, spiderDepth, maxRedirects, verifyTLS, timeout, threads, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
 
 			// Generate a report
 			report := discoverroute.PerformRouteCapture(cmd.Context(), config, requestMethodConfig.BrowserbaseSecrets)
@@ -363,8 +363,8 @@ func (a *WebScan) InitDiscoverCommand() {
 	// Target Flags
 	discoverRouteCmd.Flags().String("target", "", "URL target to discover routes from")
 	// Config Flags
-	discoverRouteCmd.Flags().Bool("require-base-url-match", true, "Only scan routes sharing the target's base URL")
-	discoverRouteCmd.Flags().Bool("ignore-static-assets", true, "Exclude static assets from route discovery")
+	discoverRouteCmd.Flags().Bool("ignore-base-url-match", false, "Ignore when routes shares the target's base URL")
+	discoverRouteCmd.Flags().Bool("collect-static-assets", false, "Collect static assets from route discovery")
 	discoverRouteCmd.Flags().Int("spider-depth", 1, "Maximum depth for route spidering")
 	discoverRouteCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
 	discoverRouteCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
@@ -592,11 +592,11 @@ func getDiscoverProbeConfig(targets []string, protocol string, maxRedirects int,
 }
 
 // getDiscoverRouteConfig builds the config for route discovery.
-func getDiscoverRouteConfig(target string, requiredBaseURLMatch bool, ignoreStaticAssets bool, spiderDepth int, maxRedirects int, verifyTLS bool, timeout int, threads int, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) discover.DiscoverRouteConfig {
+func getDiscoverRouteConfig(target string, ignoreBaseURLMatch bool, collectStaticAssets bool, spiderDepth int, maxRedirects int, verifyTLS bool, timeout int, threads int, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) discover.DiscoverRouteConfig {
 	config := discover.DiscoverRouteConfig{
 		Target:              target,
-		IgnoreStaticAssets:  ignoreStaticAssets,
-		RequireBaseUrlMatch: requiredBaseURLMatch,
+		CollectStaticAssets: collectStaticAssets,
+		IgnoreBaseUrlMatch:  ignoreBaseURLMatch,
 		SpiderDepth:         spiderDepth,
 		MaxRedirects:        maxRedirects,
 		VerifyTls:           verifyTLS,

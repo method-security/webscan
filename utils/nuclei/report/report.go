@@ -2,17 +2,64 @@ package nuclei
 
 import (
 	// Generated
+	"fmt"
 	"regexp"
 	"strings"
 
 	nuclei "github.com/Method-Security/webscan/generated/go/common/nuclei"
 
 	// External
-	"fmt"
 
 	nucleilib "github.com/projectdiscovery/nuclei/v3/lib"
 	nout "github.com/projectdiscovery/nuclei/v3/pkg/output"
 )
+
+// extractPayloadsFromRequest extracts payloads from a request and adds them to the probe
+func (b *Builder) extractPayloadsFromRequest(probe *nuclei.NucleiProbe, payloads map[string]interface{}) {
+	for _, raw := range payloads {
+		switch v := raw.(type) {
+		case []string:
+			probe.Payloads = append(probe.Payloads, v...)
+		case []interface{}:
+			for _, iv := range v {
+				if s, ok := iv.(string); ok {
+					probe.Payloads = append(probe.Payloads, s)
+				}
+			}
+		}
+	}
+}
+
+// buildMatcherValues builds values array based on matcher type and extracted fields
+func (b *Builder) buildMatcherValues(matcherType string, words []string, regex []string, status []int, size []int, dsl []string, binary []string) []string {
+	var vals []string
+
+	// Handle different matcher types using the original switch logic
+	switch matcherType {
+	case "word":
+		vals = append(vals, words...)
+	case "regex":
+		vals = append(vals, regex...)
+	case "status":
+		for _, s := range status {
+			vals = append(vals, fmt.Sprintf("%d", s))
+		}
+	case "size":
+		for _, s := range size {
+			vals = append(vals, fmt.Sprintf("%d", s))
+		}
+	case "dsl":
+		vals = append(vals, dsl...)
+	case "binary":
+		vals = append(vals, binary...)
+	default:
+		// Fallback for unknown types - try to extract from common fields
+		vals = append(vals, words...)
+		vals = append(vals, regex...)
+	}
+
+	return vals
+}
 
 // addOrMergeCWE adds a CWE to the slice if it doesn't exist by ID
 func addOrMergeCWE(cwes *[]*nuclei.CweDetails, cweID string) {
@@ -82,70 +129,87 @@ func (b *Builder) PopulateProbes(eng *nucleilib.NucleiEngine) error {
 			MatcherDetails: &nuclei.NucleiMatcherDetails{},
 		}
 
-		for _, request := range template.RequestsHTTP {
-			// Extract payloads
-			for _, raw := range request.Payloads {
-				switch v := raw.(type) {
-				case []string:
-					probe.Payloads = append(probe.Payloads, v...)
-				case []interface{}:
-					for _, iv := range v {
-						if s, ok := iv.(string); ok {
-							probe.Payloads = append(probe.Payloads, s)
-						}
+		// Check if RequestsHTTP is available, otherwise use RequestsHeadless
+		if len(template.RequestsHTTP) > 0 {
+			for _, request := range template.RequestsHTTP {
+				// Extract payloads
+				b.extractPayloadsFromRequest(probe, request.Payloads)
+				// Extract expected matchers
+				var matchers []*nuclei.NucleiExpectedMatcher
+
+				for _, matcher := range request.Matchers {
+					vals := b.buildMatcherValues(
+						matcher.Type.String(),
+						matcher.Words,
+						matcher.Regex,
+						matcher.Status,
+						matcher.Size,
+						matcher.DSL,
+						matcher.Binary,
+					)
+
+					expectedMatcher := &nuclei.NucleiExpectedMatcher{
+						Type:   matcher.Type.String(),
+						Part:   &matcher.Part,
+						Values: vals,
+					}
+
+					matchers = append(matchers, expectedMatcher)
+				}
+
+				// Only add if there are actual matchers to avoid empty entries
+				if len(matchers) > 0 {
+					// Use the request-level MatchersCondition, not individual matcher conditions
+					condition := request.MatchersCondition
+					if condition == "" {
+						condition = "OR" // Default condition
+					}
+
+					probe.MatcherDetails = &nuclei.NucleiMatcherDetails{
+						MatcherCondition: nuclei.NucleiMatcherConditionEnum(strings.ToUpper(condition)),
+						Matchers:         matchers,
 					}
 				}
 			}
-			// Extract expected matchers
-			var matchers []*nuclei.NucleiExpectedMatcher
+		} else if len(template.RequestsHeadless) > 0 {
+			for _, request := range template.RequestsHeadless {
+				// Extract payloads
+				b.extractPayloadsFromRequest(probe, request.Payloads)
+				// Extract expected matchers
+				var matchers []*nuclei.NucleiExpectedMatcher
 
-			for _, matcher := range request.Matchers {
-				var vals []string
+				for _, matcher := range request.Matchers {
+					vals := b.buildMatcherValues(
+						matcher.Type.String(),
+						matcher.Words,
+						matcher.Regex,
+						matcher.Status,
+						matcher.Size,
+						matcher.DSL,
+						matcher.Binary,
+					)
 
-				// Handle different matcher types
-				switch matcher.Type.String() {
-				case "word":
-					vals = append(vals, matcher.Words...)
-				case "regex":
-					vals = append(vals, matcher.Regex...)
-				case "status":
-					for _, status := range matcher.Status {
-						vals = append(vals, fmt.Sprintf("%d", status))
+					expectedMatcher := &nuclei.NucleiExpectedMatcher{
+						Type:   matcher.Type.String(),
+						Part:   &matcher.Part,
+						Values: vals,
 					}
-				case "size":
-					for _, size := range matcher.Size {
-						vals = append(vals, fmt.Sprintf("%d", size))
+
+					matchers = append(matchers, expectedMatcher)
+				}
+
+				// Only add if there are actual matchers to avoid empty entries
+				if len(matchers) > 0 {
+					// Use the request-level MatchersCondition, not individual matcher conditions
+					condition := request.MatchersCondition
+					if condition == "" {
+						condition = "OR" // Default condition
 					}
-				case "dsl":
-					vals = append(vals, matcher.DSL...)
-				case "binary":
-					vals = append(vals, matcher.Binary...)
-				default:
-					// Fallback for unknown types - try to extract from common fields
-					vals = append(vals, matcher.Words...)
-					vals = append(vals, matcher.Regex...)
-				}
 
-				expectedMatcher := &nuclei.NucleiExpectedMatcher{
-					Type:   matcher.Type.String(),
-					Part:   &matcher.Part,
-					Values: vals,
-				}
-
-				matchers = append(matchers, expectedMatcher)
-			}
-
-			// Only add if there are actual matchers to avoid empty entries
-			if len(matchers) > 0 {
-				// Use the request-level MatchersCondition, not individual matcher conditions
-				condition := request.MatchersCondition
-				if condition == "" {
-					condition = "OR" // Default condition
-				}
-
-				probe.MatcherDetails = &nuclei.NucleiMatcherDetails{
-					MatcherCondition: nuclei.NucleiMatcherConditionEnum(strings.ToUpper(condition)),
-					Matchers:         matchers,
+					probe.MatcherDetails = &nuclei.NucleiMatcherDetails{
+						MatcherCondition: nuclei.NucleiMatcherConditionEnum(strings.ToUpper(condition)),
+						Matchers:         matchers,
+					}
 				}
 			}
 		}

@@ -31,6 +31,7 @@ Other supported formats are listed below.
   * `true`/`mandatory`/`yes`/`1`/`t` - Data sent between client and server is encrypted.
 * `app name` - The application name (default is go-mssqldb)
 * `authenticator` - Can be used to specify use of a registered authentication provider. (e.g. ntlm, winsspi (on windows) or krb5 (on linux))
+* `timezone` - Sets the time zone used by the driver when parsing time types. For example: `timezone=Asia/Shanghai`. Supports [IANA](https://www.iana.org/time-zones) time zone names.
 
 ### Connection parameters for ODBC and ADO style connection strings
 
@@ -65,6 +66,10 @@ Other supported formats are listed below.
 * `ApplicationIntent` - Can be given the value `ReadOnly` to initiate a read-only connection to an Availability Group listener. The `database` must be specified when connecting with `Application Intent` set to `ReadOnly`.
 * `protocol` - forces use of a protocol. Make sure the corresponding package is imported.
 * `columnencryption` or `column encryption setting` - a boolean value indicating whether Always Encrypted should be enabled on the connection.
+* `multisubnetfailover`
+  * `true` (Default) Client attempt to connect to all IPs simultaneously. 
+  * `false` Client attempts to connect to IPs in serial.
+* `guid conversion` - Enables the conversion of GUIDs, so that byte order is preserved. UniqueIdentifier isn't supported for nullable fields, NullUniqueIdentifier must be used instead.
 
 ### Connection parameters for namedpipe package
 * `pipe`  - If set, no Browser query is made and named pipe used will be `\\<host>\pipe\<pipe>`
@@ -124,10 +129,10 @@ The package supports authentication via 3 methods.
 ### Kerberos Parameters
 
 * `authenticator` - set this to `krb5` to enable kerberos authentication. If this is not present, the default provider would be `ntlm` for unix and `winsspi` for windows.
-* `krb5-configfile` (mandatory) - path to kerberos configuration file. 
-* `krb5-realm` (required with keytab and raw credentials) - Domain name for kerberos authentication. 
-* `krb5-keytabfile` - path to Keytab file.
-* `krb5-credcachefile` - path to Credential cache.
+* `krb5-configfile` (optional) - path to kerberos configuration file. Defaults to `/etc/krb5.conf`. Can also be set using `KRB5_CONFIG` environment variable.
+* `krb5-realm` (required with keytab and raw credentials) - Domain name for kerberos authentication. Omit this parameter if the realm is part of the user name like `username@REALM`.
+* `krb5-keytabfile` - path to Keytab file. Can also be set using environment variable `KRB5_KTNAME`. If no parameter or environment variable is set, the `DefaultClientKeytabName` value from the krb5 config file is used.
+* `krb5-credcachefile` - path to Credential cache. Can also be set using environment variable `KRBCCNAME`.
 * `krb5-dnslookupkdc` - Optional parameter in all contexts. Set to lookup KDCs in DNS. Boolean. Default is true. 
 * `krb5-udppreferencelimit` - Optional parameter in all contexts. 1 means to always use tcp. MIT krb5 has a default value of 1465, and it prevents user setting more than 32700. Integer. Default is 1.
   
@@ -202,6 +207,16 @@ For further information on usage:
 Azure Active Directory authentication uses temporary authentication tokens to authenticate.
 The `mssql` package does not provide an implementation to obtain tokens: instead, import the `azuread` package and use driver name `azuresql`. This driver uses [azidentity](https://pkg.go.dev/github.com/Azure/azure-sdk-for-go/sdk/azidentity#section-readme) to acquire tokens using a variety of credential types.
 
+To reduce friction in local development, `ActiveDirectoryDefault` can authenticate as the user signed into the Azure CLI.
+
+Run the following command to sign into the Azure CLI before running your application using the `ActiveDirectoryDefault` connection string parameter:
+
+```azurecli
+az login
+```
+
+Azure CLI authentication isn't recommended for applications running in Azure. More details are available via the [Azure authentication with the Azure Identity module for Go](https://learn.microsoft.com/en-us/azure/developer/go/azure-sdk-authentication) tutorial.
+
 The credential type is determined by the new `fedauth` connection string parameter.
 
 * `fedauth=ActiveDirectoryServicePrincipal` or `fedauth=ActiveDirectoryApplication` - authenticates using an Azure Active Directory application client ID and client secret or certificate. Implemented using [ClientSecretCredential or CertificateCredential](https://github.com/Azure/azure-sdk-for-go/tree/main/sdk/azidentity#authenticating-service-principals)
@@ -220,6 +235,33 @@ The credential type is determined by the new `fedauth` connection string paramet
   * `applicationclientid=<application id>` - This guid identifies an Azure Active Directory enterprise application that the AAD admin has approved for accessing Azure SQL database resources in the tenant. This driver does not have an associated application id of its own.
 * `fedauth=ActiveDirectoryDeviceCode` - prints a message to stdout giving the user a URL and code to authenticate. Connection continues after user completes the login separately.
 * `fedauth=ActiveDirectoryAzCli` - reuses local authentication the user already performed using Azure CLI.
+* `fedauth=ActiveDirectoryAzureDeveloperCli` - reuses local authentication the user already performed using Azure Developer CLI.
+* `fedauth=ActiveDirectoryEnvironment` - authenticates using environment variables. Uses the same environment variables as [EnvironmentCredential](https://pkg.go.dev/github.com/Azure/azure-sdk-for-go/sdk/azidentity#EnvironmentCredential).
+* `fedauth=ActiveDirectoryWorkloadIdentity` - authenticates using workload identity credentials for Kubernetes and other OIDC environments.
+* `fedauth=ActiveDirectoryAzurePipelines` - authenticates using Azure Pipelines service connection.
+  * `user id=<service principal id>[@tenantid]` - The service principal client ID and tenant ID. If not provided, uses `AZURESUBSCRIPTION_CLIENT_ID` and `AZURESUBSCRIPTION_TENANT_ID` environment variables.
+  * `serviceconnectionid=<connection id>` - The service connection ID from Azure DevOps. If not provided, uses `AZURESUBSCRIPTION_SERVICE_CONNECTION_ID` environment variable.
+  * `systemtoken=<system token>` - The system access token for the pipeline. If not provided, uses `SYSTEM_ACCESSTOKEN` environment variable.
+  * Note: Environment variables are automatically configured by Azure Pipelines in AzureCLI@2 and AzurePowerShell@5 tasks.
+* `fedauth=ActiveDirectoryClientAssertion` - authenticates using a client assertion (JWT token).
+  * `user id=<client id>[@tenantid]` - The client ID and tenant ID.
+  * `clientassertion=<jwt token>` - The JWT assertion token.
+* `fedauth=ActiveDirectoryOnBehalfOf` - authenticates using the on-behalf-of flow for delegated access.
+  * `user id=<client id>[@tenantid]` - The client ID and tenant ID.
+  * `userassertion=<user token>` - The user assertion token.
+  * Use one of the following for client authentication:
+    * `password=<client secret>` - Client secret
+    * `clientcertpath=<path to certificate file>;password=<certificate password>` - Client certificate
+    * `clientassertion=<jwt token>` - Client assertion JWT
+
+#### Common Credential Options
+
+The following connection string parameters can be used with most Azure credential types to provide additional configuration:
+
+* `additionallyallowedtenants=<tenant1,tenant2>` - Comma or semicolon-separated list of additional tenant IDs that the credential may authenticate to. Use "*" to allow any tenant.
+* `disableinstancediscovery=true` - Disables Microsoft Entra instance discovery. Set to `true` only for disconnected or private clouds like Azure Stack.
+* `tokenfilepath=<path>` - For `ActiveDirectoryWorkloadIdentity`, specifies the path to the Kubernetes service account token file.
+* `sendcertificatechain=true` - For certificate-based authentication, controls whether to send the full certificate chain in token requests. Required for Subject Name/Issuer (SNI) authentication.
 
 ```go
 
@@ -233,6 +275,33 @@ import (
 
 func ConnectWithMSI() (*sql.DB, error) {
   return sql.Open(azuread.DriverName, "sqlserver://azuresql.database.windows.net?database=yourdb&fedauth=ActiveDirectoryMSI")
+}
+
+func ConnectWithEnvironmentCredential() (*sql.DB, error) {
+  // Requires AZURE_TENANT_ID, AZURE_CLIENT_ID, and AZURE_CLIENT_SECRET environment variables
+  return sql.Open(azuread.DriverName, "sqlserver://azuresql.database.windows.net?database=yourdb&fedauth=ActiveDirectoryEnvironment")
+}
+
+func ConnectWithWorkloadIdentity() (*sql.DB, error) {
+  // For use in Kubernetes environments with workload identity
+  return sql.Open(azuread.DriverName, "sqlserver://azuresql.database.windows.net?database=yourdb&fedauth=ActiveDirectoryWorkloadIdentity")
+}
+
+func ConnectWithAzurePipelines() (*sql.DB, error) {
+  // For use in Azure DevOps Pipelines with explicit parameters
+  connStr := "sqlserver://azuresql.database.windows.net?database=yourdb&fedauth=ActiveDirectoryAzurePipelines"
+  connStr += "&user+id=" + url.QueryEscape("client-id@tenant-id")
+  connStr += "&serviceconnectionid=connection-id"
+  connStr += "&systemtoken=access-token"
+  return sql.Open(azuread.DriverName, connStr)
+}
+
+func ConnectWithAzurePipelinesEnvVars() (*sql.DB, error) {
+  // For use in Azure DevOps Pipelines with AzureCLI@2 or AzurePowerShell@5 tasks
+  // Environment variables are automatically set by these tasks
+  connStr := "sqlserver://azuresql.database.windows.net?database=yourdb&fedauth=ActiveDirectoryAzurePipelines"
+  connStr += "&systemtoken=access-token"  // Only systemtoken needs to be provided
+  return sql.Open(azuread.DriverName, connStr)
 }
 
 ```
@@ -414,9 +483,8 @@ If the correct key provider is included in your application, decryption of encry
 
 Encryption of parameters passed to `Exec` and `Query` variants requires an extra round trip per query to fetch the encryption metadata. If the error returned by a query attempt indicates a type mismatch between the parameter and the destination table, most likely your input type is not a strict match for the SQL Server data type of the destination. You may be using a Go `string` when you need to use one of the driver-specific aliases like `VarChar` or `NVarCharMax`.
 
-*** NOTE *** - Currently `char` and `varchar` types do not include a collation parameter component so can't be used for inserting encrypted values. Also, using a nullable sql package type like `sql.NullableInt32` to pass a `NULL` value for an encrypted column will not work unless the encrypted column type is `nvarchar`. 
+*** NOTE *** - Currently `char` and `varchar` types do not include a collation parameter component so can't be used for inserting encrypted values. 
 https://github.com/microsoft/go-mssqldb/issues/129
-https://github.com/microsoft/go-mssqldb/issues/130
 
 
 ### Local certificate AE key provider
@@ -464,6 +532,7 @@ Constrain the provider to an allowed list of key vaults by appending vault host 
 * Supports connections to AlwaysOn Availability Group listeners, including re-direction to read-only replicas.
 * Supports query notifications
 * Supports Kerberos Authentication
+* Supports handling the `uniqueidentifier` data type with the `UniqueIdentifier` and `NullUniqueIdentifier` go types
 * Pluggable Dialer implementations through `msdsn.ProtocolParsers` and `msdsn.ProtocolDialers`
 * A `namedpipe` package to support connections using named pipes (np:) on Windows
 * A `sharedmemory` package to support connections using shared memory (lpc:) on Windows

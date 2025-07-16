@@ -143,7 +143,8 @@ func DialWithTLSConfig(tc *tls.Config) DialOpt {
 
 // DialWithTLSDialer is a wrapper for DialWithTLSConfig with the option to
 // specify a net.Dialer to for example define a timeout or a custom resolver.
-// @deprecated Use DialWithDialer and DialWithTLSConfig instead
+//
+// Deprecated:  Use DialWithDialer and DialWithTLSConfig instead
 func DialWithTLSDialer(tlsConfig *tls.Config, dialer *net.Dialer) DialOpt {
 	return func(dc *DialContext) {
 		dc.tlsConfig = tlsConfig
@@ -195,7 +196,8 @@ func (dc *DialContext) dial(u *url.URL) (net.Conn, error) {
 
 // Dial connects to the given address on the given network using net.Dial
 // and then returns a new Conn for the connection.
-// @deprecated Use DialURL instead.
+//
+// Deprecated:  Use DialURL instead.
 func Dial(network, addr string) (*Conn, error) {
 	c, err := net.DialTimeout(network, addr, DefaultTimeout)
 	if err != nil {
@@ -208,7 +210,8 @@ func Dial(network, addr string) (*Conn, error) {
 
 // DialTLS connects to the given address on the given network using tls.Dial
 // and then returns a new Conn for the connection.
-// @deprecated Use DialURL instead.
+//
+// Deprecated:  Use DialURL instead.
 func DialTLS(network, addr string, config *tls.Config) (*Conn, error) {
 	c, err := tls.DialWithDialer(&net.Dialer{Timeout: DefaultTimeout}, network, addr, config)
 	if err != nil {
@@ -262,7 +265,11 @@ func NewConn(conn net.Conn, isTLS bool) *Conn {
 	return l
 }
 
-// Start initializes goroutines to read responses and process messages
+// Start initialises goroutines to read replies and process messages.
+// Warning: Calling this function in addition to Dial or DialURL
+// may cause race conditions.
+//
+// See: https://github.com/go-ldap/ldap/issues/356
 func (l *Conn) Start() {
 	go l.reader()
 	go l.processMessages()
@@ -288,9 +295,9 @@ func (l *Conn) Close() (err error) {
 		l.chanMessage <- &messagePacket{Op: MessageQuit}
 
 		timeoutCtx := context.Background()
-		if l.requestTimeout > 0 {
+		if l.getTimeout() > 0 {
 			var cancelFunc context.CancelFunc
-			timeoutCtx, cancelFunc = context.WithTimeout(timeoutCtx, time.Duration(l.requestTimeout))
+			timeoutCtx, cancelFunc = context.WithTimeout(timeoutCtx, time.Duration(l.getTimeout()))
 			defer cancelFunc()
 		}
 		select {
@@ -316,6 +323,10 @@ func (l *Conn) SetTimeout(timeout time.Duration) {
 	atomic.StoreInt64(&l.requestTimeout, int64(timeout))
 }
 
+func (l *Conn) getTimeout() int64 {
+	return atomic.LoadInt64(&l.requestTimeout)
+}
+
 // Returns the next available messageID
 func (l *Conn) nextMessageID() int64 {
 	if messageID, ok := <-l.chanMessageID; ok {
@@ -325,8 +336,10 @@ func (l *Conn) nextMessageID() int64 {
 }
 
 // GetLastError returns the last recorded error from goroutines like processMessages and reader.
-// // Only the last recorded error will be returned.
+// Only the last recorded error will be returned.
 func (l *Conn) GetLastError() error {
+	l.messageMutex.Lock()
+	defer l.messageMutex.Unlock()
 	return l.err
 }
 
@@ -484,7 +497,7 @@ func (l *Conn) processMessages() {
 			// If we are closing due to an error, inform anyone who
 			// is waiting about the error.
 			if l.IsClosing() && l.closeErr.Load() != nil {
-				msgCtx.sendResponse(&PacketResponse{Error: l.closeErr.Load().(error)}, time.Duration(l.requestTimeout))
+				msgCtx.sendResponse(&PacketResponse{Error: l.closeErr.Load().(error)}, time.Duration(l.getTimeout()))
 			}
 			l.Debug.Printf("Closing channel for MessageID %d", messageID)
 			close(msgCtx.responses)
@@ -512,7 +525,7 @@ func (l *Conn) processMessages() {
 				_, err := l.conn.Write(buf)
 				if err != nil {
 					l.Debug.Printf("Error Sending Message: %s", err.Error())
-					message.Context.sendResponse(&PacketResponse{Error: fmt.Errorf("unable to send request: %s", err)}, time.Duration(l.requestTimeout))
+					message.Context.sendResponse(&PacketResponse{Error: fmt.Errorf("unable to send request: %s", err)}, time.Duration(l.getTimeout()))
 					close(message.Context.responses)
 					break
 				}
@@ -522,9 +535,10 @@ func (l *Conn) processMessages() {
 				l.messageContexts[message.MessageID] = message.Context
 
 				// Add timeout if defined
-				if l.requestTimeout > 0 {
+				requestTimeout := l.getTimeout()
+				if requestTimeout > 0 {
 					go func() {
-						timer := time.NewTimer(time.Duration(l.requestTimeout))
+						timer := time.NewTimer(time.Duration(requestTimeout))
 						defer func() {
 							if err := recover(); err != nil {
 								l.err = fmt.Errorf("ldap: recovered panic in RequestTimeout: %v", err)
@@ -547,7 +561,7 @@ func (l *Conn) processMessages() {
 			case MessageResponse:
 				l.Debug.Printf("Receiving message %d", message.MessageID)
 				if msgCtx, ok := l.messageContexts[message.MessageID]; ok {
-					msgCtx.sendResponse(&PacketResponse{message.Packet, nil}, time.Duration(l.requestTimeout))
+					msgCtx.sendResponse(&PacketResponse{message.Packet, nil}, time.Duration(l.getTimeout()))
 				} else {
 					l.err = fmt.Errorf("ldap: received unexpected message %d, %v", message.MessageID, l.IsClosing())
 					l.Debug.PrintPacket(message.Packet)
@@ -557,7 +571,7 @@ func (l *Conn) processMessages() {
 				// All reads will return immediately
 				if msgCtx, ok := l.messageContexts[message.MessageID]; ok {
 					l.Debug.Printf("Receiving message timeout for %d", message.MessageID)
-					msgCtx.sendResponse(&PacketResponse{message.Packet, NewError(ErrorNetwork, errors.New("ldap: connection timed out"))}, time.Duration(l.requestTimeout))
+					msgCtx.sendResponse(&PacketResponse{message.Packet, NewError(ErrorNetwork, errors.New("ldap: connection timed out"))}, time.Duration(l.getTimeout()))
 					delete(l.messageContexts, message.MessageID)
 					close(msgCtx.responses)
 				}

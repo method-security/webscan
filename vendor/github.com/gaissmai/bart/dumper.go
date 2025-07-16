@@ -13,10 +13,11 @@ import (
 type nodeType byte
 
 const (
-	nullNode         nodeType = iota // empty node
-	fullNode                         // prefixes and children or path-compressed prefixes
-	leafNode                         // no children, only prefixes or path-compressed prefixes
-	intermediateNode                 // only children, no prefix nor path-compressed prefixes
+	nullNode nodeType = iota // empty node
+	fullNode                 // prefixes and children or path-compressed prefixes
+	halfNode                 // no prefixes, only children and path-compressed prefixes
+	pathNode                 // only children, no prefix nor path-compressed prefixes
+	stopNode                 // no children, only prefixes or path-compressed prefixes
 )
 
 // ##################################################
@@ -38,14 +39,18 @@ func (t *Table[V]) dump(w io.Writer) {
 	}
 
 	if t.size4 > 0 {
+		stats := t.root4.nodeStatsRec()
 		fmt.Fprintln(w)
-		fmt.Fprintf(w, "### IPv4: size(%d), nodes(%d)", t.size4, t.root4.nodeStatsRec().nodes)
+		fmt.Fprintf(w, "### IPv4: size(%d), nodes(%d), pfxs(%d), leaves(%d), fringes(%d),",
+			t.size4, stats.nodes, stats.pfxs, stats.leaves, stats.fringes)
 		t.root4.dumpRec(w, stridePath{}, 0, true)
 	}
 
 	if t.size6 > 0 {
+		stats := t.root6.nodeStatsRec()
 		fmt.Fprintln(w)
-		fmt.Fprintf(w, "### IPv6: size(%d), nodes(%d)", t.size6, t.root6.nodeStatsRec().nodes)
+		fmt.Fprintf(w, "### IPv6: size(%d), nodes(%d), pfxs(%d), leaves(%d), fringes(%d),",
+			t.size6, stats.nodes, stats.pfxs, stats.leaves, stats.fringes)
 		t.root6.dumpRec(w, stridePath{}, 0, false)
 	}
 }
@@ -57,8 +62,7 @@ func (n *node[V]) dumpRec(w io.Writer, path stridePath, depth int, is4 bool) {
 
 	// the node may have childs, rec-descent down
 	for i, addr := range n.children.All() {
-		octet := byte(addr)
-		path[depth] = octet
+		path[depth&15] = addr
 
 		if child, ok := n.children.Items[i].(*node[V]); ok {
 			child.dumpRec(w, path, depth+1, is4)
@@ -80,41 +84,49 @@ func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 		allIndices := n.prefixes.All()
 
 		// print the baseIndices for this node.
-		fmt.Fprintf(w, "%sindexs(#%d): %v\n", indent, nPfxCount, allIndices)
+		fmt.Fprintf(w, "%sindexs(#%d): %s\n", indent, nPfxCount, n.prefixes.String())
 
 		// print the prefixes for this node
 		fmt.Fprintf(w, "%sprefxs(#%d):", indent, nPfxCount)
 
 		for _, idx := range allIndices {
-			octet, pfxLen := idxToPfx(idx)
-			fmt.Fprintf(w, " %s/%d", octetFmt(octet, is4), pfxLen)
+			pfx := cidrFromPath(path, depth, is4, idx)
+			fmt.Fprintf(w, " %s", pfx)
 		}
 
 		fmt.Fprintln(w)
 
-		// print the values for this node
-		fmt.Fprintf(w, "%svalues(#%d):", indent, nPfxCount)
+		// skip values if the payload is the empty struct
+		if _, ok := any(n.prefixes.Items[0]).(struct{}); !ok {
 
-		for _, val := range n.prefixes.Items {
-			fmt.Fprintf(w, " %v", val)
+			// print the values for this node
+			fmt.Fprintf(w, "%svalues(#%d):", indent, nPfxCount)
+
+			for _, val := range n.prefixes.Items {
+				fmt.Fprintf(w, " %#v", val)
+			}
+
+			fmt.Fprintln(w)
 		}
-
-		fmt.Fprintln(w)
 	}
 
 	if n.children.Len() != 0 {
 
-		nodeAddrs := make([]uint, 0, maxNodeChildren)
-		leafAddrs := make([]uint, 0, maxNodeChildren)
+		childAddrs := make([]uint8, 0, maxItems)
+		leafAddrs := make([]uint8, 0, maxItems)
+		fringeAddrs := make([]uint8, 0, maxItems)
 
 		// the node has recursive child nodes or path-compressed leaves
 		for i, addr := range n.children.All() {
 			switch n.children.Items[i].(type) {
 			case *node[V]:
-				nodeAddrs = append(nodeAddrs, addr)
+				childAddrs = append(childAddrs, addr)
 				continue
 
-			case *leaf[V]:
+			case *fringeNode[V]:
+				fringeAddrs = append(fringeAddrs, addr)
+
+			case *leafNode[V]:
 				leafAddrs = append(leafAddrs, addr)
 
 			default:
@@ -122,31 +134,62 @@ func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 			}
 		}
 
-		if nodeCount := len(nodeAddrs); nodeCount > 0 {
-			// print the childs for this node
-			fmt.Fprintf(w, "%schilds(#%d):", indent, nodeCount)
-
-			for _, addr := range nodeAddrs {
-				octet := byte(addr)
-				fmt.Fprintf(w, " %s", octetFmt(octet, is4))
-			}
-
-			fmt.Fprintln(w)
-		}
+		// print the children for this node.
+		fmt.Fprintf(w, "%soctets(#%d): %s\n", indent, n.children.Len(), n.children.String())
 
 		if leafCount := len(leafAddrs); leafCount > 0 {
 			// print the pathcomp prefixes for this node
 			fmt.Fprintf(w, "%sleaves(#%d):", indent, leafCount)
 
 			for _, addr := range leafAddrs {
-				octet := byte(addr)
 				k := n.children.MustGet(addr)
-				pc := k.(*leaf[V])
+				pc := k.(*leafNode[V])
 
-				fmt.Fprintf(w, " %s:{%s, %v}", octetFmt(octet, is4), pc.prefix, pc.value)
+				// Lite: val is the empty struct, don't print it
+				switch any(pc.value).(type) {
+				case struct{}:
+					fmt.Fprintf(w, " %s:{%s}", addrFmt(addr, is4), pc.prefix)
+				default:
+					fmt.Fprintf(w, " %s:{%s, %v}", addrFmt(addr, is4), pc.prefix, pc.value)
+				}
 			}
+
 			fmt.Fprintln(w)
 		}
+
+		if fringeCount := len(fringeAddrs); fringeCount > 0 {
+			// print the pathcomp prefixes for this node
+			fmt.Fprintf(w, "%sfringe(#%d):", indent, fringeCount)
+
+			for _, addr := range fringeAddrs {
+				fringePfx := cidrForFringe(path[:], depth, is4, addr)
+
+				k := n.children.MustGet(addr)
+				pc := k.(*fringeNode[V])
+
+				// Lite: val is the empty struct, don't print it
+				switch any(pc.value).(type) {
+				case struct{}:
+					fmt.Fprintf(w, " %s:{%s}", addrFmt(addr, is4), fringePfx)
+				default:
+					fmt.Fprintf(w, " %s:{%s, %v}", addrFmt(addr, is4), fringePfx, pc.value)
+				}
+			}
+
+			fmt.Fprintln(w)
+		}
+
+		if childCount := len(childAddrs); childCount > 0 {
+			// print the next child
+			fmt.Fprintf(w, "%schilds(#%d):", indent, childCount)
+
+			for _, addr := range childAddrs {
+				fmt.Fprintf(w, " %s", addrFmt(addr, is4))
+			}
+
+			fmt.Fprintln(w)
+		}
+
 	}
 }
 
@@ -158,24 +201,26 @@ func (n *node[V]) hasType() nodeType {
 	case s.pfxs == 0 && s.childs == 0:
 		return nullNode
 	case s.nodes == 0:
-		return leafNode
-	case (s.pfxs > 0 || s.leaves > 0) && s.nodes > 0:
+		return stopNode
+	case (s.leaves > 0 || s.fringes > 0) && s.nodes > 0 && s.pfxs == 0:
+		return halfNode
+	case (s.pfxs > 0 || s.leaves > 0 || s.fringes > 0) && s.nodes > 0:
 		return fullNode
-	case (s.pfxs == 0 && s.leaves == 0) && s.nodes > 0:
-		return intermediateNode
+	case (s.pfxs == 0 && s.leaves == 0 && s.fringes == 0) && s.nodes > 0:
+		return pathNode
 	default:
-		panic(fmt.Sprintf("UNREACHABLE: pfx: %d, chld: %d, node: %d, leaf: %d",
-			s.pfxs, s.childs, s.nodes, s.leaves))
+		panic(fmt.Sprintf("UNREACHABLE: pfx: %d, chld: %d, node: %d, leaf: %d, fringe: %d",
+			s.pfxs, s.childs, s.nodes, s.leaves, s.fringes))
 	}
 }
 
-// octetFmt, different format strings for IPv4 and IPv6, decimal versus hex.
-func octetFmt(octet byte, is4 bool) string {
+// addrFmt, different format strings for IPv4 and IPv6, decimal versus hex.
+func addrFmt(addr byte, is4 bool) string {
 	if is4 {
-		return fmt.Sprintf("%d", octet)
+		return fmt.Sprintf("%d", addr)
 	}
 
-	return fmt.Sprintf("0x%02x", octet)
+	return fmt.Sprintf("0x%02x", addr)
 }
 
 // ip stride path, different formats for IPv4 and IPv6, dotted decimal or hex.
@@ -202,7 +247,7 @@ func ipStridePath(path stridePath, depth int, is4 bool) string {
 			buf.WriteString(":")
 		}
 
-		buf.WriteString(fmt.Sprintf("%02x", b))
+		fmt.Fprintf(buf, "%02x", b)
 	}
 
 	return buf.String()
@@ -215,10 +260,12 @@ func (nt nodeType) String() string {
 		return "NULL"
 	case fullNode:
 		return "FULL"
-	case leafNode:
-		return "LEAF"
-	case intermediateNode:
-		return "IMED"
+	case halfNode:
+		return "HALF"
+	case pathNode:
+		return "PATH"
+	case stopNode:
+		return "STOP"
 	default:
 		return "unreachable"
 	}
@@ -226,10 +273,11 @@ func (nt nodeType) String() string {
 
 // stats, only used for dump, tests and benchmarks
 type stats struct {
-	pfxs   int
-	childs int
-	nodes  int
-	leaves int
+	pfxs    int
+	childs  int
+	nodes   int
+	leaves  int
+	fringes int
 }
 
 // node statistics for this single node
@@ -244,7 +292,10 @@ func (n *node[V]) nodeStats() stats {
 		case *node[V]:
 			s.nodes++
 
-		case *leaf[V]:
+		case *fringeNode[V]:
+			s.fringes++
+
+		case *leafNode[V]:
 			s.leaves++
 
 		default:
@@ -266,6 +317,7 @@ func (n *node[V]) nodeStatsRec() stats {
 	s.childs = n.children.Len()
 	s.nodes = 1 // this node
 	s.leaves = 0
+	s.fringes = 0
 
 	for _, kidAny := range n.children.Items {
 		switch kid := kidAny.(type) {
@@ -277,8 +329,12 @@ func (n *node[V]) nodeStatsRec() stats {
 			s.childs += rs.childs
 			s.nodes += rs.nodes
 			s.leaves += rs.leaves
+			s.fringes += rs.fringes
 
-		case *leaf[V]:
+		case *fringeNode[V]:
+			s.fringes++
+
+		case *leafNode[V]:
 			s.leaves++
 
 		default:

@@ -3,6 +3,7 @@ package mssql
 import (
 	"bytes"
 	"context"
+	"database/sql/driver"
 	"encoding/binary"
 	"fmt"
 	"math"
@@ -51,14 +52,14 @@ const (
 	sqlTimeFormat     = "15:04:05.9999999"
 )
 
-func (cn *Conn) CreateBulk(table string, columns []string) (_ *Bulk) {
-	b := Bulk{ctx: context.Background(), cn: cn, tablename: table, headerSent: false, columnsName: columns}
+func (c *Conn) CreateBulk(table string, columns []string) (_ *Bulk) {
+	b := Bulk{ctx: context.Background(), cn: c, tablename: table, headerSent: false, columnsName: columns}
 	b.Debug = false
 	return &b
 }
 
-func (cn *Conn) CreateBulkContext(ctx context.Context, table string, columns []string) (_ *Bulk) {
-	b := Bulk{ctx: ctx, cn: cn, tablename: table, headerSent: false, columnsName: columns}
+func (c *Conn) CreateBulkContext(ctx context.Context, table string, columns []string) (_ *Bulk) {
+	b := Bulk{ctx: ctx, cn: c, tablename: table, headerSent: false, columnsName: columns}
 	b.Debug = false
 	return &b
 }
@@ -206,7 +207,7 @@ func (b *Bulk) makeRowData(row []interface{}) ([]byte, error) {
 			return nil, fmt.Errorf("no writer for column: %s, TypeId: %#x",
 				col.ColName, col.ti.TypeId)
 		}
-		err = col.ti.Writer(buf, param.ti, param.buffer)
+		err = col.ti.Writer(buf, param.ti, param.buffer, b.cn.sess.encoding)
 		if err != nil {
 			return nil, fmt.Errorf("bulkcopy: %s", err.Error())
 		}
@@ -263,7 +264,7 @@ func (b *Bulk) createColMetadata() []byte {
 		}
 		binary.Write(buf, binary.LittleEndian, uint16(col.Flags))
 
-		writeTypeInfo(buf, &b.bulkColumns[i].ti)
+		writeTypeInfo(buf, &b.bulkColumns[i].ti, false, b.cn.sess.encoding)
 
 		if col.ti.TypeId == typeNText ||
 			col.ti.TypeId == typeText ||
@@ -317,6 +318,20 @@ func (b *Bulk) getMetadata(ctx context.Context) (err error) {
 func (b *Bulk) makeParam(val DataValue, col columnStruct) (res param, err error) {
 	res.ti.Size = col.ti.Size
 	res.ti.TypeId = col.ti.TypeId
+	loc := getTimezone(b.cn)
+
+	switch valuer := val.(type) {
+	case driver.Valuer:
+		var e error
+		val, e = driver.DefaultParameterConverter.ConvertValue(valuer)
+		if e != nil {
+			err = e
+			return
+		}
+		if val != nil {
+			return b.makeParam(val, col)
+		}
+	}
 
 	if val == nil {
 		res.ti.Size = 0
@@ -473,7 +488,7 @@ func (b *Bulk) makeParam(val DataValue, col columnStruct) (res param, err error)
 			res.ti.Size = len(res.buffer)
 		case string:
 			var t time.Time
-			if t, err = time.ParseInLocation(sqlDateFormat, val, time.UTC); err != nil {
+			if t, err = time.ParseInLocation(sqlDateFormat, val, loc); err != nil {
 				return res, fmt.Errorf("bulk: unable to convert string to date: %v", err)
 			}
 			res.buffer = encodeDate(t)
@@ -497,7 +512,7 @@ func (b *Bulk) makeParam(val DataValue, col columnStruct) (res param, err error)
 		}
 
 		if col.ti.Size == 4 {
-			res.buffer = encodeDateTim4(t)
+			res.buffer = encodeDateTim4(t, loc)
 			res.ti.Size = len(res.buffer)
 		} else if col.ti.Size == 8 {
 			res.buffer = encodeDateTime(t)
@@ -613,6 +628,6 @@ func (b *Bulk) makeParam(val DataValue, col columnStruct) (res param, err error)
 
 func (b *Bulk) dlogf(ctx context.Context, format string, v ...interface{}) {
 	if b.Debug {
-		b.cn.sess.logger.Log(ctx, msdsn.LogDebug, fmt.Sprintf(format, v...))
+		b.cn.sess.LogF(ctx, msdsn.LogDebug, format, v...)
 	}
 }

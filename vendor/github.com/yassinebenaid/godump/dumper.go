@@ -198,8 +198,16 @@ func (d *Dumper) dump(val reflect.Value, ignoreDepth ...bool) {
 		d.dumpMap(val)
 	case reflect.Func:
 		d.buf.WriteString(__(d.Theme.Func, val.Type().String()))
+		if val.IsNil() {
+			d.writeNil()
+		}
 	case reflect.Chan:
 		d.buf.WriteString(__(d.Theme.Chan, val.Type().String()))
+
+		if val.IsNil() {
+			d.writeNil()
+		}
+
 		if vCap := val.Cap(); vCap > 0 {
 			d.buf.WriteString(__(d.Theme.Chan, fmt.Sprintf("<%d>", vCap)))
 		}
@@ -232,15 +240,26 @@ func (d *Dumper) dump(val reflect.Value, ignoreDepth ...bool) {
 }
 
 func (d *Dumper) dumpSlice(v reflect.Value) {
-	length := v.Len()
-
 	var tag string
 	if d.ptrTag != 0 {
 		tag = __(d.Theme.PointerTag, fmt.Sprintf("#%d", d.ptrTag))
 		d.ptrTag = 0
 	}
 
-	d.buf.WriteString(__(d.Theme.Types, fmt.Sprintf("%s:%d:%d", v.Type(), length, v.Cap())))
+	length := v.Len()
+
+	if v.Kind() == reflect.Slice {
+		if v.IsNil() {
+			d.buf.WriteString(__(d.Theme.Types, v.Type().String()))
+			d.writeNil()
+			d.buf.WriteString(tag)
+			return
+		}
+		d.buf.WriteString(__(d.Theme.Types, fmt.Sprintf("%s:%d:%d", v.Type(), length, v.Cap())))
+	} else {
+		d.buf.WriteString(__(d.Theme.Types, v.Type().String()))
+	}
+
 	d.buf.WriteString(__(d.Theme.Braces, fmt.Sprintf(" {%s", tag)))
 
 	d.depth++
@@ -268,6 +287,13 @@ func (d *Dumper) dumpMap(v reflect.Value) {
 		d.ptrTag = 0
 	}
 
+	if v.IsNil() {
+		d.buf.WriteString(__(d.Theme.Types, v.Type().String()))
+		d.writeNil()
+		d.buf.WriteString(tag)
+		return
+	}
+
 	d.buf.WriteString(__(d.Theme.Types, fmt.Sprintf("%s:%d", v.Type(), len(keys))))
 	d.buf.WriteString(__(d.Theme.Braces, fmt.Sprintf(" {%s", tag)))
 
@@ -290,6 +316,12 @@ func (d *Dumper) dumpMap(v reflect.Value) {
 }
 
 func (d *Dumper) dumpPointer(v reflect.Value) {
+	if v.IsNil() {
+		d.buf.WriteString(__(d.Theme.Types, v.Type().String()))
+		d.writeNil()
+		return
+	}
+
 	elem := v.Elem()
 
 	if isPrimitive(elem) {
@@ -389,4 +421,8 @@ func (d *Dumper) wrapType(v reflect.Value, str string) {
 	}
 
 	d.buf.WriteString(str)
+}
+
+func (d *Dumper) writeNil() {
+	d.buf.WriteString(__(d.Theme.Braces, "(") + __(d.Theme.Nil, "nil") + __(d.Theme.Braces, ")"))
 }

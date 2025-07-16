@@ -3,6 +3,7 @@ package rardecode
 import (
 	"errors"
 	"io"
+	"math/bits"
 )
 
 const (
@@ -56,13 +57,9 @@ func (d *decoder50) init(r byteReader, reset bool, size int64, ver int) {
 	}
 
 	if reset {
-		for i := range d.offset {
-			d.offset[i] = 0
-		}
+		clear(d.offset[:])
 		d.length = 0
-		for i := range d.codeLength {
-			d.codeLength[i] = 0
-		}
+		clear(d.codeLength[:])
 	}
 }
 
@@ -223,25 +220,25 @@ func (d *decoder50) decodeOffset(dr *decodeReader, i int) error {
 	if slot < 4 {
 		offset += slot
 	} else {
-		bits := uint8(slot/2 - 1)
-		offset += (2 | (slot & 1)) << bits
+		bitCount := uint8(slot/2 - 1)
+		offset += (2 | (slot & 1)) << bitCount
 
-		if bits >= 4 {
-			bits -= 4
-			if bits > 0 {
-				if intSize == 32 {
+		if bitCount >= 4 {
+			bitCount -= 4
+			if bitCount > 0 {
+				if bits.UintSize == 32 {
 					// bitReader can only read at most intSize-8 bits.
 					// Split read into two parts.
-					if bits > 24 {
+					if bitCount > 24 {
 						n, err := d.br.readBits(24)
 						if err != nil {
 							return err
 						}
-						bits -= 24
-						offset += n << (4 + bits)
+						bitCount -= 24
+						offset += n << (4 + bitCount)
 					}
 				}
-				n, err := d.br.readBits(bits)
+				n, err := d.br.readBits(bitCount)
 				if err != nil {
 					return err
 				}
@@ -253,7 +250,7 @@ func (d *decoder50) decodeOffset(dr *decodeReader, i int) error {
 			}
 			offset += n
 		} else {
-			n, err := d.br.readBits(bits)
+			n, err := d.br.readBits(bitCount)
 			if err != nil {
 				return err
 			}

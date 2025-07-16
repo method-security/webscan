@@ -438,14 +438,24 @@ func (f ArchiveFS) Open(name string) (fs.File, error) {
 		// paths in archives can't necessarily be trusted; also clean up any "./" prefix
 		file.NameInArchive = path.Clean(file.NameInArchive)
 
-		if !strings.HasPrefix(file.NameInArchive, name) {
+		// ignore this entry if it's neither the file we're looking for, nor
+		// one of its descendents; we can't just check that the filename is
+		// a prefix of the requested file, because that could wrongly match
+		// "a/b/c.jpg.json" if the requested filename is "a/b/c.jpg", and
+		// this could result in loading the wrong file (!!) so we append a
+		// path separator to ensure that can't happen: "a/b/c.jpg.json/"
+		// is not prefixed by "a/b/c.jpg/", but it will still match as we
+		// expect: "a/b/c/d/" is is prefixed by "a/b/c/", allowing us to
+		// match descenedent files, and "a/b/c.jpg/" is prefixed by
+		// "a/b/c.jpg/", allowing us to match exact filenames.
+		if !strings.HasPrefix(file.NameInArchive+"/", name+"/") {
 			return nil
 		}
 
 		// if this is the requested file, and it's a directory, set up the dirFile,
-		// which will include a listing of all its contents as we continue the walk
+		// which will include a listing of all its contents as we continue iterating
 		if file.NameInArchive == name && file.IsDir() {
-			fsFile = &dirFile{info: file} // will fill entries slice as we continue the walk
+			fsFile = &dirFile{info: file} // will fill entries slice as we continue iterating
 			return nil
 		}
 
@@ -467,7 +477,10 @@ func (f ArchiveFS) Open(name string) (fs.File, error) {
 			return err
 		}
 
-		fsFile = closeBoth{File: innerFile, c: archiveFile}
+		fsFile = innerFile
+		if archiveFile != nil {
+			fsFile = closeBoth{File: innerFile, c: archiveFile}
+		}
 
 		if decompressor != nil {
 			fsFile = closeBoth{fsFile, decompressor}
@@ -650,7 +663,7 @@ func (f *ArchiveFS) ReadDir(name string) ([]fs.DirEntry, error) {
 		// one component remains -- then loop again to make sure it's not a duplicate
 		// (start without the base, since we know the full filename is an actual entry
 		// in the archive, we don't need to create an implicit directory entry for it)
-		startingPath := path.Dir(file.NameInArchive)
+		startingPath := strings.TrimPrefix(path.Dir(file.NameInArchive), "/") // see issue #31
 		for dir, base := path.Dir(startingPath), path.Base(startingPath); base != "."; dir, base = path.Dir(dir), path.Base(dir) {
 			if err := ctx.Err(); err != nil {
 				return err
@@ -735,7 +748,8 @@ func (f *ArchiveFS) Sub(dir string) (fs.FS, error) {
 // The exported fields may be changed during the lifetime of a DeepFS value
 // (but not concurrently). It is safe to use this type as an FS concurrently.
 type DeepFS struct {
-	// The root filepath on disk.
+	// The root filepath using OS separator, even if it
+	// traverses into an archive.
 	Root string
 
 	// An optional context, mainly for cancellation.
@@ -751,7 +765,7 @@ func (fsys *DeepFS) Open(name string) (fs.File, error) {
 		return nil, &fs.PathError{Op: "open", Path: name, Err: fmt.Errorf("%w: %s", fs.ErrInvalid, name)}
 	}
 	name = path.Join(filepath.ToSlash(fsys.Root), name)
-	realPath, innerPath := fsys.splitPath(name)
+	realPath, innerPath := fsys.SplitPath(name)
 	if innerPath != "" {
 		if innerFsys := fsys.getInnerFsys(realPath); innerFsys != nil {
 			return innerFsys.Open(innerPath)
@@ -765,7 +779,7 @@ func (fsys *DeepFS) Stat(name string) (fs.FileInfo, error) {
 		return nil, &fs.PathError{Op: "stat", Path: name, Err: fmt.Errorf("%w: %s", fs.ErrInvalid, name)}
 	}
 	name = path.Join(filepath.ToSlash(fsys.Root), name)
-	realPath, innerPath := fsys.splitPath(name)
+	realPath, innerPath := fsys.SplitPath(name)
 	if innerPath != "" {
 		if innerFsys := fsys.getInnerFsys(realPath); innerFsys != nil {
 			return fs.Stat(innerFsys, innerPath)
@@ -784,7 +798,7 @@ func (fsys *DeepFS) ReadDir(name string) ([]fs.DirEntry, error) {
 		return nil, &fs.PathError{Op: "readdir", Path: name, Err: fmt.Errorf("%w: %s", fs.ErrInvalid, name)}
 	}
 	name = path.Join(filepath.ToSlash(fsys.Root), name)
-	realPath, innerPath := fsys.splitPath(name)
+	realPath, innerPath := fsys.SplitPath(name)
 	if innerPath != "" {
 		if innerFsys := fsys.getInnerFsys(realPath); innerFsys != nil {
 			return fs.ReadDir(innerFsys, innerPath)
@@ -797,7 +811,7 @@ func (fsys *DeepFS) ReadDir(name string) ([]fs.DirEntry, error) {
 	// make sure entries that appear to be archive files indicate they are a directory
 	// so the fs package will try to walk them
 	for i, entry := range entries {
-		if slices.Contains(archiveExtensions, strings.ToLower(path.Ext(entry.Name()))) {
+		if PathIsArchive(entry.Name()) {
 			entries[i] = alwaysDirEntry{entry}
 		}
 	}
@@ -826,7 +840,7 @@ func (fsys *DeepFS) getInnerFsys(realPath string) fs.FS {
 	return nil
 }
 
-// splitPath splits a file path into the "real" path and the "inner" path components,
+// SplitPath splits a file path into the "real" path and the "inner" path components,
 // where the split point is the first extension of an archive filetype like ".zip" or
 // ".tar.gz" that occurs in the path.
 //
@@ -837,7 +851,7 @@ func (fsys *DeepFS) getInnerFsys(realPath string) fs.FS {
 // If no archive extension is found in the path, only the realPath is returned.
 // If the input path is precisely an archive file (i.e. ends with an archive file
 // extension), then innerPath is returned as "." which indicates the root of the archive.
-func (*DeepFS) splitPath(path string) (realPath, innerPath string) {
+func (*DeepFS) SplitPath(path string) (realPath, innerPath string) {
 	if len(path) < 2 {
 		realPath = path
 		return
@@ -856,21 +870,20 @@ func (*DeepFS) splitPath(path string) (realPath, innerPath string) {
 
 	for {
 		part := strings.TrimRight(strings.ToLower(path[start:end]), " ")
+		if PathIsArchive(part) {
+			// we've found an archive extension, so the path until the end of this segment is
+			// the "real" OS path, and what remains (if anything( is the path within the archive
+			realPath = filepath.Clean(filepath.FromSlash(path[:end]))
 
-		for _, ext := range archiveExtensions {
-			if strings.HasSuffix(part, ext) {
-				// we've found an archive extension, so the path until the end of this segment is
-				// the "real" OS path, and what remains (if anything( is the path within the archive
-				realPath = filepath.Clean(filepath.FromSlash(path[:end]))
-				if end < len(path) {
-					innerPath = path[end+1:]
-				} else {
-					// signal to the caller that this is an archive,
-					// even though it is the very root of the archive
-					innerPath = "."
-				}
-				return
+			if end < len(path) {
+				innerPath = path[end+1:]
+			} else {
+				// signal to the caller that this is an archive,
+				// even though it is the very root of the archive
+				innerPath = "."
 			}
+			return
+
 		}
 
 		// advance to the next segment, or end of string
@@ -923,6 +936,22 @@ var archiveExtensions = []string{
 	".tar.lz",
 }
 
+// PathIsArchive returns true if the path ends with an archive file (i.e.
+// whether the path traverse to an archive) solely by lexical analysis (no
+// reading the files or headers is performed).
+func PathIsArchive(path string) bool {
+	// normalize the extension
+	path = strings.ToLower(path)
+	for _, ext := range archiveExtensions {
+		// Check the full ext
+		if strings.HasSuffix(path, ext) {
+			return true
+		}
+	}
+
+	return false
+}
+
 // PathContainsArchive returns true if the path contains an archive file (i.e.
 // whether the path traverses into an archive) solely by lexical analysis (no
 // reading of files or headers is performed). Such a path is not typically
@@ -968,6 +997,8 @@ func PathContainsArchive(path string) bool {
 // an archive file or is an extracted archive file, as they will
 // work with the same filename/path inputs regardless of the
 // presence of a top-level directory.
+//
+// EXPERIMENTAL: Subject to change or removal even after stable release.
 func TopDirOpen(fsys fs.FS, name string) (fs.File, error) {
 	file, err := fsys.Open(name)
 	if err == nil {
@@ -977,6 +1008,8 @@ func TopDirOpen(fsys fs.FS, name string) (fs.File, error) {
 }
 
 // TopDirStat is like TopDirOpen but for Stat.
+//
+// EXPERIMENTAL: Subject to change or removal even after stable release.
 func TopDirStat(fsys fs.FS, name string) (fs.FileInfo, error) {
 	info, err := fs.Stat(fsys, name)
 	if err == nil {
@@ -986,6 +1019,8 @@ func TopDirStat(fsys fs.FS, name string) (fs.FileInfo, error) {
 }
 
 // TopDirReadDir is like TopDirOpen but for ReadDir.
+//
+// EXPERIMENTAL: Subject to change or removal even after stable release.
 func TopDirReadDir(fsys fs.FS, name string) ([]fs.DirEntry, error) {
 	entries, err := fs.ReadDir(fsys, name)
 	if err == nil {

@@ -45,6 +45,8 @@ const (
 	RepoUnitProjects RepoUnitType = "repo.projects"
 	// RepoUnitPackages represents packages of a repository
 	RepoUnitPackages RepoUnitType = "repo.packages"
+	// RepoUnitActions represents actions of a repository
+	RepoUnitActions RepoUnitType = "repo.actions"
 )
 
 // ListTeamsOptions options for listing teams
@@ -136,11 +138,11 @@ func (opt *CreateTeamOption) Validate() error {
 	if len(opt.Name) == 0 {
 		return fmt.Errorf("name required")
 	}
-	if len(opt.Name) > 30 {
-		return fmt.Errorf("name to long")
+	if len(opt.Name) > 255 {
+		return fmt.Errorf("name too long")
 	}
 	if len(opt.Description) > 255 {
-		return fmt.Errorf("description to long")
+		return fmt.Errorf("description too long")
 	}
 	return nil
 }

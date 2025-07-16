@@ -6,8 +6,8 @@ types:
   DiscoverRouteConfig:
     properties:
       target: string
-      ignoreStaticAssets: boolean
-      requireBaseUrlMatch: boolean
+      collectStaticAssets: boolean
+      noBaseUrlMatch: boolean
       spiderDepth: integer
       maxRedirects: integer
       verifyTls: boolean

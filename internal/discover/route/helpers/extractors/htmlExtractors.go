@@ -41,7 +41,7 @@ func ExtractFormRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig
 		fullURL := discoverroutehelpers.ResolveURL(baseURL, action)
 
 		// Check if the URL is allowed
-		if !discoverroutehelpers.IsURLAllowed(baseURL, fullURL, routeCaptureConfig.RequireBaseUrlMatch, routeCaptureConfig.IgnoreStaticAssets) {
+		if !discoverroutehelpers.IsURLAllowed(baseURL, fullURL, !routeCaptureConfig.NoBaseUrlMatch, !routeCaptureConfig.CollectStaticAssets) {
 			return
 		}
 
@@ -121,7 +121,7 @@ func ExtractAnchorRoutes(doc *goquery.Document, baseURL string, routeCaptureConf
 			}
 
 			// Check if the URL is allowed
-			if !discoverroutehelpers.IsURLAllowed(baseURL, fullURL, routeCaptureConfig.RequireBaseUrlMatch, routeCaptureConfig.IgnoreStaticAssets) {
+			if !discoverroutehelpers.IsURLAllowed(baseURL, fullURL, routeCaptureConfig.NoBaseUrlMatch, routeCaptureConfig.CollectStaticAssets) {
 				return
 			}
 			urls[urlNoQuery] = struct{}{}
@@ -161,7 +161,7 @@ func ExtractLinkRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig
 			// Skip if this is a static asset
 			if utils.IsStaticAsset(fullURL) {
 				// Only add to URLs if we're not ignoring static assets
-				if !routeCaptureConfig.IgnoreStaticAssets {
+				if routeCaptureConfig.CollectStaticAssets {
 					urls[fullURL] = struct{}{}
 				}
 				return
@@ -175,7 +175,7 @@ func ExtractLinkRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig
 			}
 
 			// Check if the URL is allowed
-			if !discoverroutehelpers.IsURLAllowed(baseURL, fullURL, routeCaptureConfig.RequireBaseUrlMatch, routeCaptureConfig.IgnoreStaticAssets) {
+			if !discoverroutehelpers.IsURLAllowed(baseURL, fullURL, routeCaptureConfig.NoBaseUrlMatch, routeCaptureConfig.CollectStaticAssets) {
 				return
 			}
 

@@ -281,9 +281,7 @@ func (c *Conn) checkBadConn(ctx context.Context, err error, mayRetry bool) error
 	}
 
 	if !c.connectionGood && mayRetry && !c.connector.params.DisableRetry {
-		if c.sess.logFlags&logRetries != 0 {
-			c.sess.logger.Log(ctx, msdsn.LogRetries, err.Error())
-		}
+		c.sess.Log(ctx, msdsn.LogRetries, err.Error)
 		return newRetryableError(err)
 	}
 
@@ -324,9 +322,7 @@ func (c *Conn) sendCommitRequest() error {
 	reset := c.resetSession
 	c.resetSession = false
 	if err := sendCommitXact(c.sess.buf, headers, "", 0, 0, "", reset); err != nil {
-		if c.sess.logFlags&logErrors != 0 {
-			c.sess.logger.Log(c.transactionCtx, msdsn.LogErrors, fmt.Sprintf("Failed to send CommitXact with %v", err))
-		}
+		c.sess.LogF(c.transactionCtx, msdsn.LogErrors, "Failed to send CommitXact with %v", err)
 		c.connectionGood = false
 		return fmt.Errorf("faild to send CommitXact: %v", err)
 	}
@@ -351,9 +347,7 @@ func (c *Conn) sendRollbackRequest() error {
 	reset := c.resetSession
 	c.resetSession = false
 	if err := sendRollbackXact(c.sess.buf, headers, "", 0, 0, "", reset); err != nil {
-		if c.sess.logFlags&logErrors != 0 {
-			c.sess.logger.Log(c.transactionCtx, msdsn.LogErrors, fmt.Sprintf("Failed to send RollbackXact with %v", err))
-		}
+		c.sess.LogF(c.transactionCtx, msdsn.LogErrors, "Failed to send RollbackXact with %v", err)
 		c.connectionGood = false
 		return fmt.Errorf("failed to send RollbackXact: %v", err)
 	}
@@ -388,9 +382,7 @@ func (c *Conn) sendBeginRequest(ctx context.Context, tdsIsolation isoLevel) erro
 	reset := c.resetSession
 	c.resetSession = false
 	if err := sendBeginXact(c.sess.buf, headers, tdsIsolation, "", reset); err != nil {
-		if c.sess.logFlags&logErrors != 0 {
-			c.sess.logger.Log(ctx, msdsn.LogErrors, fmt.Sprintf("Failed to send BeginXact with %v", err))
-		}
+		c.sess.LogF(ctx, msdsn.LogErrors, "Failed to send BeginXact with %v", err)
 		c.connectionGood = false
 		return fmt.Errorf("failed to send BeginXact: %v", err)
 	}
@@ -524,15 +516,13 @@ func (s *Stmt) sendQuery(ctx context.Context, args []namedValue) (err error) {
 	conn := s.c
 
 	// no need to check number of parameters here, it is checked by database/sql
-	if conn.sess.logFlags&logSQL != 0 {
-		conn.sess.logger.Log(ctx, msdsn.LogSQL, s.query)
-	}
+	conn.sess.LogS(ctx, msdsn.LogSQL, s.query)
 	if conn.sess.logFlags&logParams != 0 && len(args) > 0 {
 		for i := 0; i < len(args); i++ {
 			if len(args[i].Name) > 0 {
-				s.c.sess.logger.Log(ctx, msdsn.LogParams, fmt.Sprintf("\t@%s\t%v", args[i].Name, args[i].Value))
+				s.c.sess.LogF(ctx, msdsn.LogParams, "\t@%s\t%v", args[i].Name, args[i].Value)
 			} else {
-				s.c.sess.logger.Log(ctx, msdsn.LogParams, fmt.Sprintf("\t@p%d\t%v", i+1, args[i].Value))
+				s.c.sess.LogF(ctx, msdsn.LogParams, "\t@p%d\t%v", i+1, args[i].Value)
 			}
 		}
 	}
@@ -542,9 +532,7 @@ func (s *Stmt) sendQuery(ctx context.Context, args []namedValue) (err error) {
 	isProc := isProc(s.query)
 	if len(args) == 0 && !isProc {
 		if err = sendSqlBatch72(conn.sess.buf, s.query, headers, reset); err != nil {
-			if conn.sess.logFlags&logErrors != 0 {
-				conn.sess.logger.Log(ctx, msdsn.LogErrors, fmt.Sprintf("Failed to send SqlBatch with %v", err))
-			}
+			conn.sess.LogF(ctx, msdsn.LogErrors, "Failed to send SqlBatch with %v", err)
 			conn.connectionGood = false
 			return fmt.Errorf("failed to send SQL Batch: %v", err)
 		}
@@ -566,15 +554,20 @@ func (s *Stmt) sendQuery(ctx context.Context, args []namedValue) (err error) {
 			params[0] = makeStrParam(s.query)
 			params[1] = makeStrParam(strings.Join(decls, ","))
 		}
-		if err = sendRpc(conn.sess.buf, headers, proc, 0, params, reset); err != nil {
-			if conn.sess.logFlags&logErrors != 0 {
-				conn.sess.logger.Log(ctx, msdsn.LogErrors, fmt.Sprintf("Failed to send Rpc with %v", err))
-			}
+		if err = sendRpc(conn.sess.buf, headers, proc, 0, params, reset, conn.sess.encoding); err != nil {
+			conn.sess.LogF(ctx, msdsn.LogErrors, "Failed to send Rpc with %v", err)
 			conn.connectionGood = false
 			return fmt.Errorf("failed to send RPC: %v", err)
 		}
 	}
 	return
+}
+
+// Builtin commands are not stored procs, but rather T-SQL commands
+// those commands can be invoke without extra options
+var builtinCommands = []string{
+	"RECONFIGURE", "SHUTDOWN", "CHECKPOINT",
+	"COMMIT", "ROLLBACK",
 }
 
 // isProc takes the query text in s and determines if it is a stored proc name
@@ -633,6 +626,12 @@ func isProc(s string) bool {
 			case r == ']':
 				st = outside
 			}
+		}
+	}
+	s = strings.ToUpper(s)
+	for _, cmd := range builtinCommands {
+		if s == cmd {
+			return false
 		}
 	}
 	return true
@@ -982,7 +981,51 @@ func (s *Stmt) makeParam(val driver.Value) (res param, err error) {
 		res.ti.Size = 0
 		return
 	}
+
+	switch valuer := val.(type) {
+	// sql.Nullxxx integer types return an int64. We want the original type, to match the SQL type size.
+	case sql.NullByte:
+		if valuer.Valid {
+			return s.makeParam(valuer.Byte)
+		}
+	case sql.NullInt16:
+		if valuer.Valid {
+			return s.makeParam(valuer.Int16)
+		}
+	case sql.NullInt32:
+		if valuer.Valid {
+			return s.makeParam(valuer.Int32)
+		}
+	case UniqueIdentifier:
+	case NullUniqueIdentifier:
+	default:
+		break
+	case driver.Valuer:
+		// If the value has a non-nil value, call MakeParam on its Value
+		val, e := driver.DefaultParameterConverter.ConvertValue(valuer)
+		if e != nil {
+			err = e
+			return
+		}
+		if val != nil {
+			return s.makeParam(val)
+		}
+	}
 	switch val := val.(type) {
+	case UniqueIdentifier:
+		res.ti.TypeId = typeGuid
+		res.ti.Size = 16
+		guid, _ := val.Value()
+		res.buffer = guid.([]byte)
+	case NullUniqueIdentifier:
+		res.ti.TypeId = typeGuid
+		res.ti.Size = 16
+		if val.Valid {
+			guid, _ := val.Value()
+			res.buffer = guid.([]byte)
+		} else {
+			res.buffer = []byte{}
+		}
 	case int:
 		res.ti.TypeId = typeIntN
 		// Rather than guess if the caller intends to pass a 32bit int from a 64bit app based on the
@@ -1021,6 +1064,21 @@ func (s *Stmt) makeParam(val driver.Value) (res param, err error) {
 		res.ti.TypeId = typeIntN
 		res.ti.Size = 8
 		res.buffer = []byte{}
+	case sql.NullInt32:
+		// only null values should be getting here
+		res.ti.TypeId = typeIntN
+		res.ti.Size = 4
+		res.buffer = []byte{}
+	case sql.NullInt16:
+		// only null values should be getting here
+		res.buffer = []byte{}
+		res.ti.Size = 2
+		res.ti.TypeId = typeIntN
+	case sql.NullByte:
+		// only null values should be getting here
+		res.buffer = []byte{}
+		res.ti.Size = 1
+		res.ti.TypeId = typeIntN
 	case byte:
 		res.ti.TypeId = typeIntN
 		res.buffer = []byte{val}
@@ -1076,6 +1134,18 @@ func (s *Stmt) makeParam(val driver.Value) (res param, err error) {
 			res.buffer = encodeDateTime(val)
 			res.ti.Size = len(res.buffer)
 		}
+	case sql.NullTime: // only null values reach here
+		res.buffer = []byte{}
+		res.ti.Size = 8
+		if s.c.sess.loginAck.TDSVersion >= verTDS73 {
+			res.ti.TypeId = typeDateTimeOffsetN
+			res.ti.Scale = 7
+		} else {
+			res.ti.TypeId = typeDateTimeN
+		}
+	case driver.Valuer:
+		// We have a custom Valuer implementation with a nil value
+		return s.makeParam(nil)
 	default:
 		return s.makeParamExtra(val)
 	}
@@ -1198,7 +1268,6 @@ type Rowsq struct {
 
 func (rc *Rowsq) Close() error {
 	rc.cancel()
-
 	for {
 		tok, err := rc.reader.nextToken()
 		if err == nil {
@@ -1228,9 +1297,7 @@ func (rc *Rowsq) Columns() (res []string) {
 		for {
 			tok, err := rc.reader.nextToken()
 			if err == nil {
-				if rc.reader.sess.logFlags&logDebug != 0 {
-					rc.reader.sess.logger.Log(rc.reader.ctx, msdsn.LogDebug, fmt.Sprintf("Columns() token type:%v", reflect.TypeOf(tok)))
-				}
+				rc.reader.sess.LogF(rc.reader.ctx, msdsn.LogDebug, "Columns() token type:%v", reflect.TypeOf(tok))
 				if tok == nil {
 					return []string{}
 				} else {
@@ -1257,9 +1324,7 @@ func (rc *Rowsq) Next(dest []driver.Value) error {
 	}
 	for {
 		tok, err := rc.reader.nextToken()
-		if rc.reader.sess.logFlags&logDebug != 0 {
-			rc.reader.sess.logger.Log(rc.reader.ctx, msdsn.LogDebug, fmt.Sprintf("Next() token type:%v", reflect.TypeOf(tok)))
-		}
+		rc.reader.sess.LogF(rc.reader.ctx, msdsn.LogDebug, "Next() token type:%v", reflect.TypeOf(tok))
 		if err == nil {
 			if tok == nil {
 				return io.EOF
@@ -1276,6 +1341,7 @@ func (rc *Rowsq) Next(dest []driver.Value) error {
 					return nil
 				case doneStruct:
 					if tokdata.Status&doneMore == 0 {
+						rc.reader.sess.LogF(rc.reader.ctx, msdsn.LogDebug, "Setting requestDone to true for done token with status %d", tokdata.Status)
 						rc.requestDone = true
 					}
 					if tokdata.isError() {
@@ -1309,7 +1375,7 @@ func (rc *Rowsq) Next(dest []driver.Value) error {
 // In Message Queue mode, we always claim another resultset could be on the way
 // to avoid Rows being closed prematurely
 func (rc *Rowsq) HasNextResultSet() bool {
-	return !rc.requestDone
+	return true
 }
 
 // Scans to the end of the current statement being processed
@@ -1321,9 +1387,7 @@ func (rc *Rowsq) NextResultSet() error {
 scan:
 	for {
 		tok, err := rc.reader.nextToken()
-		if rc.reader.sess.logFlags&logDebug != 0 {
-			rc.reader.sess.logger.Log(rc.reader.ctx, msdsn.LogDebug, fmt.Sprintf("NextResultSet() token type:%v", reflect.TypeOf(tok)))
-		}
+		rc.reader.sess.LogF(rc.reader.ctx, msdsn.LogDebug, "NextResultSet() token type:%v", reflect.TypeOf(tok))
 
 		if err != nil {
 			return err

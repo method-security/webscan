@@ -282,21 +282,39 @@ func init() {
 
 		return buffer.String(), nil
 	}))
-	MustAddFunction(NewWithPositionalArgs("gzip_decode", 1, true, func(args ...interface{}) (interface{}, error) {
-		reader, err := gzip.NewReader(strings.NewReader(args[0].(string)))
-		if err != nil {
-			return "", err
-		}
-		limitReader := io.LimitReader(reader, DefaultMaxDecompressionSize)
+	MustAddFunction(NewWithSingleSignature("gzip_decode",
+		"(data string, optionalReadLimit int) string",
+		true,
+		func(args ...interface{}) (interface{}, error) {
+			if len(args) == 0 {
+				return nil, ErrInvalidDslFunction
+			}
 
-		data, err := io.ReadAll(limitReader)
-		if err != nil {
+			argData := toString(args[0])
+			readLimit := DefaultMaxDecompressionSize
+
+			if len(args) > 1 {
+				if limit, ok := args[1].(float64); ok {
+					readLimit = int64(limit)
+				}
+			}
+
+			reader, err := gzip.NewReader(strings.NewReader(argData))
+			if err != nil {
+				return "", err
+			}
+			limitReader := io.LimitReader(reader, readLimit)
+
+			data, err := io.ReadAll(limitReader)
+			if err != nil && err != io.EOF {
+				_ = reader.Close()
+
+				return "", err
+			}
 			_ = reader.Close()
-			return "", err
-		}
-		_ = reader.Close()
-		return string(data), nil
-	}))
+
+			return string(data), nil
+		}))
 	MustAddFunction(NewWithPositionalArgs("zlib", 1, true, func(args ...interface{}) (interface{}, error) {
 		buffer := &bytes.Buffer{}
 		writer := zlib.NewWriter(buffer)
@@ -308,21 +326,39 @@ func init() {
 
 		return buffer.String(), nil
 	}))
-	MustAddFunction(NewWithPositionalArgs("zlib_decode", 1, true, func(args ...interface{}) (interface{}, error) {
-		reader, err := zlib.NewReader(strings.NewReader(args[0].(string)))
-		if err != nil {
-			return "", err
-		}
-		limitReader := io.LimitReader(reader, DefaultMaxDecompressionSize)
+	MustAddFunction(NewWithSingleSignature("zlib_decode",
+		"(data string, optionalReadLimit int) string",
+		true,
+		func(args ...interface{}) (interface{}, error) {
+			if len(args) == 0 {
+				return nil, ErrInvalidDslFunction
+			}
 
-		data, err := io.ReadAll(limitReader)
-		if err != nil {
+			argData := toString(args[0])
+			readLimit := DefaultMaxDecompressionSize
+
+			if len(args) > 1 {
+				if limit, ok := args[1].(float64); ok {
+					readLimit = int64(limit)
+				}
+			}
+
+			reader, err := zlib.NewReader(strings.NewReader(argData))
+			if err != nil {
+				return "", err
+			}
+			limitReader := io.LimitReader(reader, readLimit)
+
+			data, err := io.ReadAll(limitReader)
+			if err != nil && err != io.EOF {
+				_ = reader.Close()
+
+				return "", err
+			}
 			_ = reader.Close()
-			return "", err
-		}
-		_ = reader.Close()
-		return string(data), nil
-	}))
+
+			return string(data), nil
+		}))
 
 	MustAddFunction(NewWithPositionalArgs("deflate", 1, true, func(args ...interface{}) (interface{}, error) {
 		buffer := &bytes.Buffer{}
@@ -338,18 +374,36 @@ func init() {
 
 		return buffer.String(), nil
 	}))
-	MustAddFunction(NewWithPositionalArgs("inflate", 1, true, func(args ...interface{}) (interface{}, error) {
-		reader := flate.NewReader(strings.NewReader(args[0].(string)))
-		limitReader := io.LimitReader(reader, DefaultMaxDecompressionSize)
+	MustAddFunction(NewWithSingleSignature("inflate",
+		"(data string, optionalReadLimit int) string",
+		true,
+		func(args ...interface{}) (interface{}, error) {
+			if len(args) == 0 {
+				return nil, ErrInvalidDslFunction
+			}
 
-		data, err := io.ReadAll(limitReader)
-		if err != nil {
+			argData := toString(args[0])
+			readLimit := DefaultMaxDecompressionSize
+
+			if len(args) > 1 {
+				if limit, ok := args[1].(float64); ok {
+					readLimit = int64(limit)
+				}
+			}
+
+			reader := flate.NewReader(strings.NewReader(argData))
+			limitReader := io.LimitReader(reader, readLimit)
+
+			data, err := io.ReadAll(limitReader)
+			if err != nil && err != io.EOF {
+				_ = reader.Close()
+
+				return "", err
+			}
 			_ = reader.Close()
-			return "", err
-		}
-		_ = reader.Close()
-		return string(data), nil
-	}))
+
+			return string(data), nil
+		}))
 
 	MustAddFunction(NewWithSingleSignature("date_time",
 		"(dateTimeFormat string, optionalUnixTime interface{}) string",
@@ -652,38 +706,67 @@ func init() {
 		}
 		return compiled.MatchString(toString(args[1])), nil
 	}))
-	MustAddFunction(NewWithPositionalArgs("regex_all", 2, true, func(args ...interface{}) (interface{}, error) {
-		for _, arg := range toStringSlice(args[1]) {
-			compiled, err := Regex(toString(arg))
+	MustAddFunction(NewWithSingleSignature("regex_all",
+		"(pattern string, inputs ...string) bool",
+		true,
+		func(args ...interface{}) (interface{}, error) {
+			if len(args) < 2 {
+				return nil, ErrInvalidDslFunction
+			}
+
+			compiled, err := regexp.Compile(toString(args[0]))
 			if err != nil {
 				return nil, err
 			}
-			if !compiled.MatchString(toString(args[0])) {
-				return false, nil
+
+			for _, arg := range args[1:] {
+				if !compiled.MatchString(toString(arg)) {
+					return false, nil
+				}
 			}
-		}
-		return false, nil
-	}))
-	MustAddFunction(NewWithPositionalArgs("regex_any", 2, true, func(args ...interface{}) (interface{}, error) {
-		for _, arg := range toStringSlice(args[1]) {
-			compiled, err := Regex(toString(arg))
+
+			return true, nil
+		}))
+	MustAddFunction(NewWithSingleSignature("regex_any",
+		"(pattern string, inputs ...string) bool",
+		true,
+		func(args ...interface{}) (interface{}, error) {
+			if len(args) < 2 {
+				return nil, ErrInvalidDslFunction
+			}
+
+			pattern := toString(args[0])
+			compiled, err := regexp.Compile(pattern)
 			if err != nil {
 				return nil, err
 			}
-			if compiled.MatchString(toString(args[0])) {
-				return true, nil
+
+			for _, arg := range args[1:] {
+				if compiled.MatchString(toString(arg)) {
+					return true, nil
+				}
 			}
-		}
-		return false, nil
-	}))
-	MustAddFunction(NewWithPositionalArgs("equals_any", 2, true, func(args ...interface{}) (interface{}, error) {
-		for _, arg := range toStringSlice(args[1]) {
-			if args[0] == arg {
-				return true, nil
+
+			return false, nil
+		}))
+	MustAddFunction(NewWithSingleSignature("equals_any",
+		"(s interface{}, subs ...interface{}) bool",
+		true,
+		func(args ...interface{}) (interface{}, error) {
+			if len(args) < 2 {
+				return nil, ErrInvalidDslFunction
 			}
-		}
-		return false, nil
-	}))
+
+			s := toString(args[0])
+
+			for _, arg := range args[1:] {
+				if toString(arg) == s {
+					return true, nil
+				}
+			}
+
+			return false, nil
+		}))
 	MustAddFunction(NewWithPositionalArgs("remove_bad_chars", 2, true, func(args ...interface{}) (interface{}, error) {
 		input := toString(args[0])
 		badChars := toString(args[1])

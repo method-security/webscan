@@ -47,6 +47,7 @@ const (
 	ProtoIMAPS      = "imaps"
 	ProtoIPMI       = "ipmi"
 	ProtoIPSEC      = "ipsec"
+	ProtoJDWP       = "jdwp"
 	ProtoKafka      = "kafka"
 	ProtoLDAP       = "ldap"
 	ProtoLDAPS      = "ldaps"
@@ -64,6 +65,7 @@ const (
 	ProtoRDP        = "rdp"
 	ProtoRPC        = "rpc"
 	ProtoRedis      = "redis"
+	ProtoRedisTLS   = "redis"
 	ProtoRsync      = "rsync"
 	ProtoRtsp       = "rtsp"
 	ProtoSMB        = "smb"
@@ -268,6 +270,7 @@ type ServiceHTTP struct {
 	StatusCode      int         `json:"statusCode"` // e.g. 200
 	ResponseHeaders http.Header `json:"responseHeaders"`
 	Technologies    []string    `json:"technologies,omitempty"`
+	CPEs            []string    `json:"cpes,omitempty"`
 }
 
 func (e ServiceHTTP) Type() string { return ProtoHTTP }
@@ -277,6 +280,7 @@ type ServiceHTTPS struct {
 	StatusCode      int         `json:"statusCode"` // e.g. 200
 	ResponseHeaders http.Header `json:"responseHeaders"`
 	Technologies    []string    `json:"technologies,omitempty"`
+	CPEs            []string    `json:"cpes,omitempty"`
 }
 
 func (e ServiceHTTPS) Type() string { return ProtoHTTPS }
@@ -306,7 +310,7 @@ type RPCB struct {
 	Owner    string `json:"owner"`
 }
 
-func (e ServiceRPC) Type() string { return ProtoRDP }
+func (e ServiceRPC) Type() string { return ProtoRPC }
 
 type ServiceSMB struct {
 	SigningEnabled      bool   `json:"signingEnabled"`  // e.g. Is SMB Signing Enabled?
@@ -403,7 +407,6 @@ func (e ServiceRedis) Type() string { return ProtoRedis }
 
 type ServiceFTP struct {
 	Banner         string `json:"banner"`
-	AnonymousLogin bool   `json:"anonymousLogin"`
 }
 
 func (e ServiceFTP) Type() string { return ProtoFTP }
@@ -496,3 +499,13 @@ func (e ServiceIPMI) Type() string { return ProtoIPMI }
 type ServiceRsync struct{}
 
 func (e ServiceRsync) Type() string { return ProtoRsync }
+
+type ServiceJDWP struct {
+	Description string `json:"description"`
+	JdwpMajor   int32  `json:"jdwpMajor"`
+	JdwpMinor   int32  `json:"jdwpMinor"`
+	VMVersion   string `json:"VMVersion"`
+	VMName      string `json:"VMName"`
+}
+
+func (e ServiceJDWP) Type() string { return ProtoJDWP }

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"hash"
 	"io"
+	"math"
 	"os"
 	"time"
 )
@@ -41,7 +42,8 @@ type FileHeader struct {
 	Name             string    // file name using '/' as the directory separator
 	IsDir            bool      // is a directory
 	Solid            bool      // is a solid file
-	Encrypted        bool      // is encrypted
+	Encrypted        bool      // file contents are encrypted
+	HeaderEncrypted  bool      // file header is encrypted
 	HostOS           byte      // Host OS the archive was created on
 	Attributes       int64     // Host OS specific file attributes
 	PackedSize       int64     // packed file size (or first block if the file spans volumes)
@@ -227,14 +229,9 @@ func (f *packedFileReader) bytes() ([]byte, error) {
 			return nil, err
 		}
 	}
-	n := maxInt
-	if f.n < int64(n) {
-		n = int(f.n)
-	}
+	n := int(min(f.n, math.MaxInt))
 	if k := f.v.br.Buffered(); k > 0 {
-		if k < n {
-			n = k
-		}
+		n = min(k, n)
 	} else {
 		b, err := f.v.peek(n)
 		if err != nil && err != bufio.ErrBufferFull {

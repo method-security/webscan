@@ -34,6 +34,8 @@ type Provider struct {
 	Google     []string `yaml:"google"`
 	Odin       []string `yaml:"odin"`
 	BinaryEdge []string `yaml:"binaryedge"`
+	Onyphe     []string `yaml:"onyphe"`
+	Driftnet   []string `yaml:"driftnet"`
 }
 
 // NewProvider loads provider keys from default location and env variables
@@ -80,12 +82,7 @@ func (provider *Provider) GetKeys() Keys {
 	}
 
 	if len(provider.ZoomEye) > 0 {
-		zoomeye := provider.ZoomEye[rand.Intn(len(provider.ZoomEye))]
-		parts := strings.Split(zoomeye, ":")
-		keys.ZoomEyeToken = parts[0]
-		if len(parts) == 2 {
-			keys.ZoomEyeHost = parts[1]
-		}
+		keys.ZoomEyeToken = provider.ZoomEye[rand.Intn(len(provider.ZoomEye))]
 	}
 
 	if len(provider.Netlas) > 0 {
@@ -115,6 +112,12 @@ func (provider *Provider) GetKeys() Keys {
 	}
 	if len(provider.BinaryEdge) > 0 {
 		keys.BinaryEdgeToken = provider.BinaryEdge[rand.Intn(len(provider.BinaryEdge))]
+	}
+	if len(provider.Onyphe) > 0 {
+		keys.OnypheKey = provider.Onyphe[rand.Intn(len(provider.Onyphe))]
+	}
+	if len(provider.Driftnet) > 0 {
+		keys.DriftnetToken = provider.Driftnet[rand.Intn(len(provider.Driftnet))]
 	}
 
 	return keys
@@ -146,6 +149,8 @@ func (provider *Provider) LoadProviderKeysFromEnv() {
 	provider.CriminalIP = appendIfExists(provider.CriminalIP, "CRIMINALIP_API_KEY")
 	provider.Publicwww = appendIfExists(provider.Publicwww, "PUBLICWWW_API_KEY")
 	provider.HunterHow = appendIfExists(provider.HunterHow, "HUNTERHOW_API_KEY")
+	provider.ZoomEye = appendIfExists(provider.ZoomEye, "ZOOMEYE_API_KEY")
+	provider.Driftnet = appendIfExists(provider.Driftnet, "DRIFTNET_API_KEY")
 
 	appendIfAllExists := func(arr []string, env1 string, env2 string) []string {
 		if val1, ok := os.LookupEnv(env1); ok {
@@ -157,12 +162,12 @@ func (provider *Provider) LoadProviderKeysFromEnv() {
 		}
 		return arr
 	}
-	provider.ZoomEye = appendIfAllExists(provider.ZoomEye, "ZOOMEYE_API_KEY", "ZOOMEYE_HOST")
 	provider.Fofa = appendIfAllExists(provider.Fofa, "FOFA_EMAIL", "FOFA_KEY")
 	provider.Censys = appendIfAllExists(provider.Censys, "CENSYS_API_ID", "CENSYS_API_SECRET")
 	provider.Google = appendIfAllExists(provider.Google, "GOOGLE_API_KEY", "GOOGLE_API_CX")
 	provider.Odin = appendIfExists(provider.Odin, "ODIN_API_KEY")
 	provider.BinaryEdge = appendIfExists(provider.BinaryEdge, "BINARYEDGE_API_KEY")
+	provider.Onyphe = appendIfExists(provider.Onyphe, "ONYPHE_API_KEY")
 }
 
 // HasKeys returns true if at least one agent/source has keys
@@ -181,6 +186,8 @@ func (provider *Provider) HasKeys() bool {
 		len(provider.Publicwww) > 0,
 		len(provider.Odin) > 0,
 		len(provider.BinaryEdge) > 0,
+		len(provider.Onyphe) > 0,
+		len(provider.Driftnet) > 0,
 	)
 }
 

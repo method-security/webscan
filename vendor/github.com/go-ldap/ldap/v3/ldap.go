@@ -32,6 +32,7 @@ const (
 	ApplicationSearchResultReference = 19
 	ApplicationExtendedRequest       = 23
 	ApplicationExtendedResponse      = 24
+	ApplicationIntermediateResponse  = 25
 )
 
 // ApplicationMap contains human readable descriptions of LDAP Application Codes
@@ -56,6 +57,7 @@ var ApplicationMap = map[uint8]string{
 	ApplicationSearchResultReference: "Search Result Reference",
 	ApplicationExtendedRequest:       "Extended Request",
 	ApplicationExtendedResponse:      "Extended Response",
+	ApplicationIntermediateResponse:  "Intermediate Response",
 }
 
 // Ldap Behera Password Policy Draft 10 (https://tools.ietf.org/html/draft-behera-ldap-password-policy-10)
@@ -312,8 +314,6 @@ func DebugBinaryFile(fileName string) error {
 	return nil
 }
 
-var hex = "0123456789abcdef"
-
 func mustEscape(c byte) bool {
 	return c > 0x7f || c == '(' || c == ')' || c == '\\' || c == '*' || c == 0
 }
@@ -322,6 +322,7 @@ func mustEscape(c byte) bool {
 // characters in the set `()*\` and those out of the range 0 < c < 0x80,
 // as defined in RFC4515.
 func EscapeFilter(filter string) string {
+	const hexValues = "0123456789abcdef"
 	escape := 0
 	for i := 0; i < len(filter); i++ {
 		if mustEscape(filter[i]) {
@@ -336,8 +337,8 @@ func EscapeFilter(filter string) string {
 		c := filter[i]
 		if mustEscape(c) {
 			buf[j+0] = '\\'
-			buf[j+1] = hex[c>>4]
-			buf[j+2] = hex[c&0xf]
+			buf[j+1] = hexValues[c>>4]
+			buf[j+2] = hexValues[c&0xf]
 			j += 3
 		} else {
 			buf[j] = c

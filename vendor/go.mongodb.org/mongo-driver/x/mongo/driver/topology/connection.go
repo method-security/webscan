@@ -55,7 +55,7 @@ type connection struct {
 	nc                   net.Conn // When nil, the connection is closed.
 	addr                 address.Address
 	idleTimeout          time.Duration
-	idleDeadline         atomic.Value // Stores a time.Time
+	idleStart            atomic.Value // Stores a time.Time
 	readTimeout          time.Duration
 	writeTimeout         time.Duration
 	desc                 description.Server
@@ -561,25 +561,23 @@ func (c *connection) close() error {
 	return err
 }
 
+// closed returns true if the connection has been closed by the driver.
 func (c *connection) closed() bool {
 	return atomic.LoadInt64(&c.state) == connDisconnected
 }
 
 func (c *connection) idleTimeoutExpired() bool {
-	now := time.Now()
-	if c.idleTimeout > 0 {
-		idleDeadline, ok := c.idleDeadline.Load().(time.Time)
-		if ok && now.After(idleDeadline) {
-			return true
-		}
+	if c.idleTimeout == 0 {
+		return false
 	}
 
-	return false
+	idleStart, ok := c.idleStart.Load().(time.Time)
+	return ok && idleStart.Add(c.idleTimeout).Before(time.Now())
 }
 
-func (c *connection) bumpIdleDeadline() {
+func (c *connection) bumpIdleStart() {
 	if c.idleTimeout > 0 {
-		c.idleDeadline.Store(time.Now().Add(c.idleTimeout))
+		c.idleStart.Store(time.Now())
 	}
 }
 

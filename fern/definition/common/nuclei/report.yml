@@ -6,16 +6,9 @@ types:
   CweDetails:
     properties:
       id: string
-      name: optional<string>
-      description: optional<string>
   CveDetails:
     properties:
       id: string
-      name: optional<string>
-      description: optional<string>
-      impact: optional<string>
-      remediation: optional<string>
-      reference: optional<list<string>>
       cvssMetrics: optional<string>
       cvssScore: optional<float>
       epssScore: optional<float>
@@ -27,10 +20,15 @@ types:
       cves: optional<list<CveDetails>>
   NucleiFindingInfo:
     properties:
+      name: optional<string>
+      description: optional<string>
+      impact: optional<string>
+      remediation: optional<string>
+      reference: optional<list<string>>
+      classification: optional<ClassificationDetails>
+      severity: optional<string>
       finding: boolean
       probe: optional<probe.NucleiProbe>
-      severity: optional<string>
-      classification: optional<ClassificationDetails>
   NucleiAttemptInfo:
     properties:
       templateId: string # Nuclei template ID

@@ -137,6 +137,9 @@ func getHTTPRequestResponse(ev *nout.ResultEvent) (*common.HttpRequestResponse, 
 
 	// Marshal Response Struct
 	statusCode, responseHeaders, responseBody := parseRawResponse(ev.Response)
+	if responseBody == "" {
+		responseBody = ev.Response
+	}
 	response = requesthelpers.CreateHTTPResponse(statusCode, nil, singleToMulti(responseHeaders), responseBody)
 
 	// If there was an error in the response, add it to the response body

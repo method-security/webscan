@@ -38,7 +38,7 @@ func (c *cipherBlockSliceReader) peek(n int) ([]byte, error) {
 }
 
 // readSlice returns the next n bytes of decrypted input.
-// If n is not a mulitple of the block size, the trailing bytes
+// If n is not a multiple of the block size, the trailing bytes
 // of the last decrypted block will be discarded.
 func (c *cipherBlockSliceReader) readSlice(n int) ([]byte, error) {
 	bn := c.sizeInBlocks(n)
@@ -135,10 +135,8 @@ func (cr *cipherBlockReader) Read(p []byte) (int, error) {
 		cr.outbuf = b[n:]
 		return n, nil
 	}
-	if l < n {
-		// output buffer smaller than input
-		n = l
-	}
+	// output buffer smaller than input
+	n = min(l, n)
 	// round down to block size
 	n -= n % bs
 	cr.mode.CryptBlocks(p[:n], cr.inbuf[:n])

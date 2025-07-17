@@ -408,7 +408,7 @@ func PerformAppEnumerateSwagger(ctx context.Context, config enumerateapiapplicat
 	if version, ok := docType["swagger"]; ok && strings.HasPrefix(version.(string), "2") {
 		versionStr := version.(string)
 		result.Version = &versionStr
-		err = handleSwaggerV2(document, &report)
+		err = handleSwaggerV2(document, &report, target)
 	} else if version, ok := docType["openapi"]; ok && strings.HasPrefix(version.(string), "3") {
 		versionStr := version.(string)
 		result.Version = &versionStr
@@ -426,7 +426,7 @@ func PerformAppEnumerateSwagger(ctx context.Context, config enumerateapiapplicat
 	return report
 }
 
-func handleSwaggerV2(document libopenapi.Document, report *enumerateapiapplicationfern.EnumerateSwaggerReport) error {
+func handleSwaggerV2(document libopenapi.Document, report *enumerateapiapplicationfern.EnumerateSwaggerReport, target string) error {
 	report.Result.ApiType = enumerateapiapplicationfern.ApiTypeSwaggerV2
 	var errors []error
 	var v2Model *libopenapi.DocumentModel[v2.Swagger]
@@ -443,7 +443,39 @@ func handleSwaggerV2(document libopenapi.Document, report *enumerateapiapplicati
 	model := v2Model.Model
 
 	// Construct the base endpoint URL from the host and basePath fields
-	baseEndpointURL := fmt.Sprintf("https://%s%s", model.Host, model.BasePath)
+	var baseEndpointURL string
+	if model.Host != "" {
+		// Use the scheme from the original target
+		parsedURL, err := url.Parse(target)
+		if err != nil {
+			errMsg := fmt.Sprintf("failed to parse target URL: %v", err)
+			report.Errors = append(report.Errors, errMsg)
+			return fmt.Errorf("failed to parse target URL: %v", err)
+		}
+		scheme := parsedURL.Scheme
+		if scheme == "" {
+			scheme = "https" // Default to HTTPS if no scheme
+		}
+		basePath := model.BasePath
+		if basePath == "" {
+			basePath = ""
+		}
+		baseEndpointURL = fmt.Sprintf("%s://%s%s", scheme, model.Host, basePath)
+	} else {
+		// No host specified, use the target's base URL
+		parsedURL, err := url.Parse(target)
+		if err != nil {
+			errMsg := fmt.Sprintf("failed to parse target URL: %v", err)
+			report.Errors = append(report.Errors, errMsg)
+			return fmt.Errorf("failed to parse target URL: %v", err)
+		}
+		baseURL := fmt.Sprintf("%s://%s", parsedURL.Scheme, parsedURL.Host)
+		if model.BasePath != "" {
+			baseEndpointURL = baseURL + model.BasePath
+		} else {
+			baseEndpointURL = baseURL
+		}
+	}
 	report.Result.BaseEndpointUrl = baseEndpointURL
 
 	// Extract security definitions
@@ -518,19 +550,46 @@ func handleOpenAPIV3(document libopenapi.Document, report *enumerateapiapplicati
 	model := v3Model.Model
 
 	// Construct the base endpoint URL from the servers array
-	serverPath := ""
+	serverURL := ""
 	if len(model.Servers) > 0 {
-		serverPath = model.Servers[0].URL
+		serverURL = model.Servers[0].URL
 	}
-	parsedURL, err := url.Parse(target)
-	if err != nil {
-		errMsg := fmt.Sprintf("failed to parse target URL: %v", err)
-		report.Errors = append(report.Errors, errMsg)
-		return fmt.Errorf("failed to parse target URL: %v", err)
+
+	var baseEndpointURL string
+	if serverURL != "" {
+		// Check if the server URL is absolute or relative
+		if strings.HasPrefix(serverURL, "http://") || strings.HasPrefix(serverURL, "https://") {
+			// Server URL is absolute, use it directly
+			baseEndpointURL = strings.TrimSuffix(serverURL, "/")
+		} else {
+			// Server URL is relative, append to the base URL from target
+			parsedURL, err := url.Parse(target)
+			if err != nil {
+				errMsg := fmt.Sprintf("failed to parse target URL: %v", err)
+				report.Errors = append(report.Errors, errMsg)
+				return fmt.Errorf("failed to parse target URL: %v", err)
+			}
+			baseURL := fmt.Sprintf("%s://%s", parsedURL.Scheme, parsedURL.Host)
+			baseURL = strings.TrimSuffix(baseURL, "/")
+			serverURL = strings.TrimPrefix(serverURL, "/")
+			if serverURL != "" {
+				baseEndpointURL = baseURL + "/" + serverURL
+			} else {
+				baseEndpointURL = baseURL
+			}
+		}
+	} else {
+		// No server URL specified, use the target's base URL
+		parsedURL, err := url.Parse(target)
+		if err != nil {
+			errMsg := fmt.Sprintf("failed to parse target URL: %v", err)
+			report.Errors = append(report.Errors, errMsg)
+			return fmt.Errorf("failed to parse target URL: %v", err)
+		}
+		baseEndpointURL = fmt.Sprintf("%s://%s", parsedURL.Scheme, parsedURL.Host)
 	}
-	baseURL := fmt.Sprintf("%s://%s", parsedURL.Scheme, parsedURL.Host)
-	baseURL = strings.TrimSuffix(baseURL, "/")
-	report.Result.BaseEndpointUrl = baseURL + serverPath
+
+	report.Result.BaseEndpointUrl = baseEndpointURL
 
 	// Extract security definitions
 	securityDefinitions := make(map[string]*v3.SecurityScheme)

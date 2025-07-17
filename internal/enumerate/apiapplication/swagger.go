@@ -257,8 +257,9 @@ func findOpenAPISpec(ctx context.Context, target string, timeout int) (string, [
 			// Check if this is a Swagger UI page
 			if isSwaggerUIPage(*responseBody) {
 				// STEP 2: Use headless to render the page and extract the spec URL
+				browserShell := "/headless-shell/run.sh"
 				headlessConfig := &common.HeadlessRequestConfig{
-					PathToBrowserShell:  nil, // Use default
+					PathToBrowserShell:  &browserShell, // Use default
 					MinDomStabalizeTime: 5,
 				}
 

@@ -80,36 +80,42 @@ func extractRoutes(ctx context.Context, httpRequestResponse *common.HttpRequestR
 		}
 	}
 
+	// Extract routes from form elements
 	log.Info("Extracting routes from form elements")
 	formRoutes, formUrls, formErrors := capturerouteextractors.ExtractFormRoutes(doc, redirectedURLBase, routeCaptureConfig)
 	routes = append(routes, formRoutes...)
 	urls = discoverroutehelpers.AddListToSetString(urls, formUrls)
 	processErrors("Form Elements", formErrors)
 
+	// Extract routes from anchor elements
 	log.Info("Extracting routes from anchor elements")
 	anchorRoutes, anchorUrls, anchorErrors := capturerouteextractors.ExtractAnchorRoutes(doc, redirectedURLBase, routeCaptureConfig)
 	routes = append(routes, anchorRoutes...)
 	urls = discoverroutehelpers.AddListToSetString(urls, anchorUrls)
 	processErrors("Anchor Elements", anchorErrors)
 
+	// Extract routes from link elements
 	log.Info("Extracting routes from link elements")
 	linkRoutes, linkUrls, linkErrors := capturerouteextractors.ExtractLinkRoutes(doc, redirectedURLBase, routeCaptureConfig)
 	routes = append(routes, linkRoutes...)
 	urls = discoverroutehelpers.AddListToSetString(urls, linkUrls)
 	processErrors("Link Elements", linkErrors)
 
+	// Extract routes from script elements
 	log.Info("Extracting routes from script elements")
 	scriptRoutes, scriptUrls, scriptErrors := capturerouteextractors.ExtractScriptRoutes(ctx, doc, redirectedURLBase, routeCaptureConfig)
 	routes = append(routes, scriptRoutes...)
 	urls = discoverroutehelpers.AddListToSetString(urls, scriptUrls)
 	errors = append(errors, scriptErrors...)
 
+	// Extract routes from inline script elements
 	log.Info("Extracting routes from inline script elements")
 	inlineScriptRoutes, inlineScriptUrls, inlineScriptErrors := capturerouteextractors.ExtractInlineScriptRoutes(ctx, doc, redirectedURLBase, routeCaptureConfig)
 	routes = append(routes, inlineScriptRoutes...)
 	urls = discoverroutehelpers.AddListToSetString(urls, inlineScriptUrls)
 	errors = append(errors, inlineScriptErrors...)
 
+	// Extract routes from network calls
 	// Only to be performed if requestMethod is of type Headless or Browserbase
 	if requestConfig.RequestMethod == common.RequestMethodHeadless || requestConfig.RequestMethod == common.RequestMethodBrowserbase {
 		// Set a timeout for the network route extraction
@@ -136,16 +142,17 @@ func extractRoutes(ctx context.Context, httpRequestResponse *common.HttpRequestR
 		errors = append(errors, networkErrors...)
 	}
 
-	log.Info("Returning results")
-
 	// Merge routes to remove duplicates
-	mergedRoutes := discoverroutehelpers.MergeWebRoutes(routes) // For uniqueness across techniques
+	mergedRoutes := discoverroutehelpers.MergeWebRoutes(routes) // Duplicate routes are removed
+	log.Info("Returning results", svc1log.SafeParam("routes", len(mergedRoutes)))
 
 	// Filter out static assets from all Route + Static Asset URLs
 	staticAssets := make(map[string]struct{})
 	for url := range urls {
 		if routeCaptureConfig.CollectStaticAssets && utils.IsStaticAsset(url) {
-			staticAssets[url] = struct{}{}
+			if discoverroutehelpers.IsSubdomain(redirectedURLBase, url) || routeCaptureConfig.IgnoreBaseUrlMatch {
+				staticAssets[url] = struct{}{}
+			}
 		}
 	}
 	staticAssetsList := discoverroutehelpers.SetToListString(staticAssets)

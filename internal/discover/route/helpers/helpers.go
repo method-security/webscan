@@ -242,11 +242,8 @@ func IsURLAllowed(baseURL string, targetURL string, ignoreBaseURLMatch bool, col
 		return true
 	}
 
-	baseDomain := ExtractDomain(baseURL, 2)
-	targetDomain := ExtractDomain(targetURL, 0)
-
 	// Check if targetDomain is the same as baseDomain or a subdomain
-	return IsSubdomain(baseDomain, targetDomain)
+	return IsSubdomain(baseURL, targetURL)
 }
 
 // ExtractDomain extracts the domain from a URL up to a specified domain level.
@@ -268,11 +265,14 @@ func ExtractDomain(rawURL string, maxDomainLevel int) string {
 }
 
 // IsSubdomain checks if 'sub' is a subdomain of 'base'.
-func IsSubdomain(base string, sub string) bool {
-	if base == "" || sub == "" {
+func IsSubdomain(baseURL string, targetURL string) bool {
+	baseDomain := ExtractDomain(baseURL, 2)
+	targetDomain := ExtractDomain(targetURL, 0)
+
+	if baseDomain == "" || targetDomain == "" {
 		return false
 	}
-	return sub == base || strings.HasSuffix(sub, "."+base)
+	return targetDomain == baseDomain || strings.HasSuffix(targetDomain, "."+baseDomain)
 }
 
 // IsAbsoluteURL returns true if the given URL is absolute.

@@ -99,13 +99,20 @@ func (a *WebScan) InitEnumerateCommand() {
 				return
 			}
 
+			// Headless path flag
+			headlessPath, err := cmd.Flags().GetString("headless-path")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
 			config := enumerateapiapplicationfern.EnumerateSwaggerConfig{
 				Target:  target,
 				Timeout: timeout,
 			}
 
 			// Generate report
-			report := enumerateapiapplication.PerformAppEnumerateSwagger(cmd.Context(), config)
+			report := enumerateapiapplication.PerformAppEnumerateSwagger(cmd.Context(), config, headlessPath)
 			if len(report.Errors) > 0 {
 				a.OutputSignal.Status = 1
 			}
@@ -116,6 +123,7 @@ func (a *WebScan) InitEnumerateCommand() {
 	enumerateAPIApplicationSwaggerCmd.Flags().String("target", "", "URL target to perform Swagger enumeration against")
 	// Config Flags
 	enumerateAPIApplicationSwaggerCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
+	enumerateAPIApplicationSwaggerCmd.Flags().String("headless-path", "", "Path to headless browser executable")
 
 	_ = enumerateAPIApplicationSwaggerCmd.MarkFlagRequired("target")
 

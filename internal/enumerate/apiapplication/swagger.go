@@ -235,7 +235,7 @@ func isLikelySpecURL(url string) bool {
 // findOpenAPISpec attempts to locate a valid OpenAPI/Swagger specification
 // First checks if target is a Swagger UI page, then uses headless if needed,
 // otherwise falls back to trying common endpoint paths.
-func findOpenAPISpec(ctx context.Context, target string, timeout int) (string, []byte, map[string]interface{}, error) {
+func findOpenAPISpec(ctx context.Context, target string, timeout int, headlessPath string) (string, []byte, map[string]interface{}, error) {
 	baseURL, parsedTargetPath, err := requesthelpers.SplitTargetURL(target)
 	if err != nil {
 		return "", nil, nil, fmt.Errorf("failed to split target URL: %w", err)
@@ -257,9 +257,8 @@ func findOpenAPISpec(ctx context.Context, target string, timeout int) (string, [
 			// Check if this is a Swagger UI page
 			if isSwaggerUIPage(*responseBody) {
 				// STEP 2: Use headless to render the page and extract the spec URL
-				browserShell := "/headless-shell/run.sh"
 				headlessConfig := &common.HeadlessRequestConfig{
-					PathToBrowserShell:  &browserShell, // Use default
+					PathToBrowserShell:  &headlessPath, // Use default
 					MinDomStabalizeTime: 5,
 				}
 
@@ -378,7 +377,7 @@ func findOpenAPISpec(ctx context.Context, target string, timeout int) (string, [
 }
 
 // PerformAppEnumerateSwagger performs a Swagger scan against a target URL and returns the report.
-func PerformAppEnumerateSwagger(ctx context.Context, config enumerateapiapplicationfern.EnumerateSwaggerConfig) enumerateapiapplicationfern.EnumerateSwaggerReport {
+func PerformAppEnumerateSwagger(ctx context.Context, config enumerateapiapplicationfern.EnumerateSwaggerConfig, headlessPath string) enumerateapiapplicationfern.EnumerateSwaggerReport {
 	result := enumerateapiapplicationfern.EnumerateSwaggerResult{}
 	report := enumerateapiapplicationfern.EnumerateSwaggerReport{Config: &config, Result: &result}
 
@@ -386,7 +385,7 @@ func PerformAppEnumerateSwagger(ctx context.Context, config enumerateapiapplicat
 	target := strings.TrimSuffix(config.Target, "/")
 
 	// Try to find a valid Swagger/OpenAPI spec
-	swaggerURL, bodyBytes, docType, err := findOpenAPISpec(ctx, target, config.Timeout)
+	swaggerURL, bodyBytes, docType, err := findOpenAPISpec(ctx, target, config.Timeout, headlessPath)
 	if err != nil {
 		report.Errors = append(report.Errors, err.Error())
 		return report

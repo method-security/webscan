@@ -9,7 +9,6 @@ import (
 	nuclei "github.com/Method-Security/webscan/generated/go/common/nuclei"
 
 	// External
-
 	nucleilib "github.com/projectdiscovery/nuclei/v3/lib"
 	nout "github.com/projectdiscovery/nuclei/v3/pkg/output"
 )

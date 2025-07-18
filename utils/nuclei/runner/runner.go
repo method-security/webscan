@@ -79,6 +79,26 @@ func buildNucleiOptions(cfg Config, tmpDir string) []nucleilib.NucleiSDKOptions 
 		nucleilib.WithTemplatesOrWorkflows(nucleilib.TemplateSources{Templates: []string{tmpDir}}),
 		nucleilib.EnableSelfContainedTemplates(),
 		nucleilib.DisableUpdateCheck(),
+		nucleilib.EnableHeadlessWithOpts(
+			&nucleilib.HeadlessOpts{
+				PageTimeout: 30,
+				ShowBrowser: false,
+				UseChrome:   true,
+				HeadlessOptions: func() []string {
+					baseOptions := []string{
+						"--no-sandbox",            // needed when running as root or in many Docker images
+						"--disable-dev-shm-usage", // avoids /dev/shm size limits in containers
+						"--disable-gpu",           // GPU isn't available in headless Linux anyway
+						"--mute-audio",
+						"--disable-background-timer-throttling",
+					}
+					if cfg.Proxy != "" {
+						baseOptions = append(baseOptions, "--proxy-server="+cfg.Proxy)
+					}
+					return baseOptions
+				}(),
+			},
+		),
 		nucleilib.WithNetworkConfig(nucleilib.NetworkConfig{
 			Timeout: cfg.Timeout,
 		}),

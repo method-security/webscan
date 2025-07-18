@@ -1,6 +1,8 @@
 # Dockerfile used as distribution for the webscan CLI in Tool container format
 FROM chromedp/headless-shell:129.0.6643.2 
 
+RUN ln -s /headless-shell/headless-shell /usr/bin/chrome
+
 ARG CLI_NAME="webscan"
 ARG TARGETARCH
 

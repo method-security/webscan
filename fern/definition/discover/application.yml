@@ -19,6 +19,16 @@ types:
     union:
       - ApplicationResourceType
       - ApplicationResourceTypeAll
+  # Config Struct
+  DiscoverApplicationConfig:
+    properties:
+      targets: list<string>
+      resourceType: ApplicationResourceConfigType
+      modules: optional<list<string>>
+      maxRedirects: integer
+      verifyTls: boolean
+      timeout: integer
+      threads: integer
   # Application Fingerprints File Struct
   ApplicationFingerprintModule:
     properties:
@@ -45,15 +55,6 @@ types:
     properties:
       target: string
       attempts: list<ApplicationFingerprintAttempt>
-  # Config Struct
-  DiscoverApplicationConfig:
-    properties:
-      targets: list<string>
-      resourceType: ApplicationResourceConfigType
-      modules: optional<list<string>>
-      maxRedirects: integer
-      verifyTls: boolean
-      timeout: integer
   # Report Struct
   DiscoverApplicationResult:
     properties:

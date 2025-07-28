@@ -3,7 +3,9 @@ package application
 import (
 	// Standard
 	"context"
+	"runtime"
 	"strings"
+	"sync"
 
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
@@ -53,57 +55,82 @@ func run(ctx context.Context, target string, config *discover.DiscoverApplicatio
 
 	var attempts []*discover.ApplicationFingerprintAttempt
 	var errors []string
+	var mu sync.Mutex
+	var wg sync.WaitGroup
 
-	// Process each module separately
+	// Process each module concurrently
 	for _, module := range resourceType.Modules {
-		attempt := &discover.ApplicationFingerprintAttempt{
-			Name:    module.Name,
-			Finding: false,
-		}
+		wg.Add(1)
+		go func(module *discover.ApplicationFingerprintModule) {
+			defer wg.Done()
 
-		var allRequests []*common.HttpRequestResponse
-		for _, path := range module.Paths {
-			// Request Configuration
-			fullPath := parsedTargetPath + path
-			var method = module.Method
-
-			var requestParams common.HttpRequestParams
-			if module.RequestParams != nil {
-				requestParams = *module.RequestParams
+			attempt := &discover.ApplicationFingerprintAttempt{
+				Name:    module.Name,
+				Finding: false,
 			}
 
-			// set request config
-			requestConfig := createSendHTTPRequestConfig(baseURL, fullPath, method, requestParams, config)
-
-			// send request
-			request, err := request.SendRequest(ctx, requestConfig)
-			if err != nil {
-				errors = append(errors, err.Error())
-				continue
-			}
-			allRequests = append(allRequests, request)
-
-			if AnalyzeResponse(request, module) {
-				attempt.Finding = true
-				attempt.Fingerprints = []*discover.ApplicationResource{
-					{
-						Name:    resourceType.Name,
-						Modules: []*discover.ApplicationFingerprintModule{module},
-					},
+			var allRequests []*common.HttpRequestResponse
+			for _, path := range module.Paths {
+				// Check for context cancellation
+				select {
+				case <-ctx.Done():
+					mu.Lock()
+					errors = append(errors, "context cancelled")
+					mu.Unlock()
+					return
+				default:
 				}
-				// Only include the successful request in the results
-				attempt.Requests = []*common.HttpRequestResponse{request}
-				attempts = append(attempts, attempt)
-				break
-			}
-		}
 
-		// For unsuccessful attempts, include all requests made
-		if !attempt.Finding {
-			attempt.Requests = allRequests
-			attempts = append(attempts, attempt)
-		}
+				// Request Configuration
+				fullPath := parsedTargetPath + path
+				var method = module.Method
+
+				var requestParams common.HttpRequestParams
+				if module.RequestParams != nil {
+					requestParams = *module.RequestParams
+				}
+
+				// set request config
+				requestConfig := createSendHTTPRequestConfig(baseURL, fullPath, method, requestParams, config)
+
+				// send request
+				request, err := request.SendRequest(ctx, requestConfig)
+				if err != nil {
+					mu.Lock()
+					errors = append(errors, err.Error())
+					mu.Unlock()
+					continue
+				}
+				allRequests = append(allRequests, request)
+
+				if AnalyzeResponse(request, module) {
+					attempt.Finding = true
+					attempt.Fingerprints = []*discover.ApplicationResource{
+						{
+							Name:    resourceType.Name,
+							Modules: []*discover.ApplicationFingerprintModule{module},
+						},
+					}
+					// Only include the successful request in the results
+					attempt.Requests = []*common.HttpRequestResponse{request}
+					mu.Lock()
+					attempts = append(attempts, attempt)
+					mu.Unlock()
+					return
+				}
+			}
+
+			// For unsuccessful attempts, include all requests made
+			if !attempt.Finding {
+				attempt.Requests = allRequests
+				mu.Lock()
+				attempts = append(attempts, attempt)
+				mu.Unlock()
+			}
+		}(module)
 	}
+
+	wg.Wait()
 	return attempts, errors
 }
 
@@ -162,33 +189,93 @@ func AnalyzeResponse(httpRequestResponse *common.HttpRequestResponse, module *di
 // LaunchFingerprintEngine runs the fingerprinting engine for all targets in the config and returns a report.
 func LaunchFingerprintEngine(ctx context.Context, config *discover.DiscoverApplicationConfig, filteredFingerprints *discover.ApplicationFingerprints) (*discover.DiscoverApplicationReport, error) {
 	report := discover.DiscoverApplicationReport{Config: config}
-	errors := []string{}
+
+	// Determine number of concurrent goroutines
+	maxThreads := config.Threads
+	if maxThreads == 0 {
+		maxThreads = runtime.NumCPU()
+	}
+
+	// Create a semaphore to limit concurrent goroutines
+	semaphore := make(chan struct{}, maxThreads)
 
 	var targets []*discover.ApplicationFingerprintTarget
+	var errors []string
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	// Process each target concurrently with thread limiting
 	for _, target := range config.Targets {
-		var attempts []*discover.ApplicationFingerprintAttempt
+		wg.Add(1)
 
-		// Process each resource type separately
-		for _, resourceType := range filteredFingerprints.Fingerprints {
-			attempt, errs := run(ctx, target, config, resourceType)
-			attempts = append(attempts, attempt...)
-			errors = append(errors, errs...)
-		}
+		// Acquire semaphore (blocks if maxThreads are running)
+		semaphore <- struct{}{}
 
-		filteredAttempts := []*discover.ApplicationFingerprintAttempt{}
-		for _, attempt := range attempts {
-			if attempt.Finding {
-				filteredAttempts = append(filteredAttempts, attempt)
+		go func(target string) {
+			defer wg.Done()
+			defer func() { <-semaphore }() // Release semaphore when done
+
+			// Check for context cancellation
+			select {
+			case <-ctx.Done():
+				mu.Lock()
+				errors = append(errors, "context cancelled")
+				mu.Unlock()
+				return
+			default:
 			}
-		}
-		attempts = filteredAttempts
 
-		// Only include targets that have positive findings (non-empty attempts list)
-		if len(attempts) > 0 {
-			target := discover.ApplicationFingerprintTarget{Target: target, Attempts: attempts}
-			targets = append(targets, &target)
-		}
+			var attempts []*discover.ApplicationFingerprintAttempt
+			var targetErrors []string
+			var targetMu sync.Mutex
+			var targetWg sync.WaitGroup
+
+			// Process each resource type concurrently for this target
+			for _, resourceType := range filteredFingerprints.Fingerprints {
+				targetWg.Add(1)
+				go func(resourceType *discover.ApplicationResource) {
+					defer targetWg.Done()
+
+					attempt, errs := run(ctx, target, config, resourceType)
+
+					targetMu.Lock()
+					attempts = append(attempts, attempt...)
+					targetErrors = append(targetErrors, errs...)
+					targetMu.Unlock()
+				}(resourceType)
+			}
+
+			targetWg.Wait()
+
+			// Filter to only include positive findings
+			filteredAttempts := []*discover.ApplicationFingerprintAttempt{}
+			for _, attempt := range attempts {
+				if attempt.Finding {
+					filteredAttempts = append(filteredAttempts, attempt)
+				}
+			}
+
+			// Only include targets that have positive findings (non-empty attempts list)
+			if len(filteredAttempts) > 0 {
+				targetResult := discover.ApplicationFingerprintTarget{
+					Target:   target,
+					Attempts: filteredAttempts,
+				}
+				mu.Lock()
+				targets = append(targets, &targetResult)
+				mu.Unlock()
+			}
+
+			// Add any errors from this target
+			if len(targetErrors) > 0 {
+				mu.Lock()
+				errors = append(errors, targetErrors...)
+				mu.Unlock()
+			}
+		}(target)
 	}
+
+	wg.Wait()
 
 	// Marshal Report
 	report.Result = &discover.DiscoverApplicationResult{Targets: targets}

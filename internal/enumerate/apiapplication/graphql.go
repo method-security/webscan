@@ -69,10 +69,17 @@ func fetchGraphQLSchema(target string) ([]byte, error) {
 
 func extractTypeFields(schema enumerateapiapplicationfern.GraphQlSchema) map[string][]string {
 	typeFields := make(map[string][]string)
+	// Add nil checks to prevent panic
+	if schema.Data == nil || schema.Data.Schema == nil || schema.Data.Schema.Types == nil {
+		return typeFields
+	}
+
 	for _, t := range schema.Data.Schema.Types {
-		if t.Kind == "OBJECT" {
+		if t != nil && t.Kind == "OBJECT" && t.Fields != nil {
 			for _, field := range t.Fields {
-				typeFields[strings.ToLower(t.Name)] = append(typeFields[strings.ToLower(t.Name)], field.Name)
+				if field != nil {
+					typeFields[strings.ToLower(t.Name)] = append(typeFields[strings.ToLower(t.Name)], field.Name)
+				}
 			}
 		}
 	}
@@ -80,14 +87,21 @@ func extractTypeFields(schema enumerateapiapplicationfern.GraphQlSchema) map[str
 }
 
 func populateReportWithQueries(report *enumerateapiapplicationfern.EnumerateGraphqlResult, schema enumerateapiapplicationfern.GraphQlSchema, typeFields map[string][]string) {
+	// Add nil checks to prevent panic
+	if schema.Data == nil || schema.Data.Schema == nil || schema.Data.Schema.Types == nil {
+		return
+	}
+
 	for _, t := range schema.Data.Schema.Types {
-		if t.Kind == "OBJECT" && (t.Name == "Query" || t.Name == "Mutation" || t.Name == "Subscription") {
+		if t != nil && t.Kind == "OBJECT" && (t.Name == "Query" || t.Name == "Mutation" || t.Name == "Subscription") && t.Fields != nil {
 			for _, field := range t.Fields {
-				query := enumerateapiapplicationfern.GraphQlQuery{
-					Type:   field.Name,
-					Fields: typeFields[strings.ToLower(field.Name)],
+				if field != nil {
+					query := enumerateapiapplicationfern.GraphQlQuery{
+						Type:   field.Name,
+						Fields: typeFields[strings.ToLower(field.Name)],
+					}
+					report.Queries = append(report.Queries, &query)
 				}
-				report.Queries = append(report.Queries, &query)
 			}
 		}
 	}

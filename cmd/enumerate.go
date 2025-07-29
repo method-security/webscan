@@ -61,9 +61,6 @@ func (a *WebScan) InitEnumerateCommand() {
 
 			// Generate report
 			report := enumerateapiapplication.PerformAppEnumerateGraphQL(cmd.Context(), config.Target)
-			if len(report.Errors) > 0 {
-				a.OutputSignal.Status = 1
-			}
 			a.OutputSignal.Content = report
 		},
 	}
@@ -113,9 +110,6 @@ func (a *WebScan) InitEnumerateCommand() {
 
 			// Generate report
 			report := enumerateapiapplication.PerformAppEnumerateSwagger(cmd.Context(), config, headlessPath)
-			if len(report.Errors) > 0 {
-				a.OutputSignal.Status = 1
-			}
 			a.OutputSignal.Content = report
 		},
 	}
@@ -165,9 +159,6 @@ func (a *WebScan) InitEnumerateCommand() {
 
 			// Generate report
 			report := enumeratekube.PerformAppEnumerateKube(cmd.Context(), &config)
-			if len(report.Errors) > 0 {
-				a.OutputSignal.Status = 1
-			}
 			a.OutputSignal.Content = report
 		},
 	}
@@ -282,9 +273,6 @@ func (a *WebScan) InitEnumerateCommand() {
 
 			// Generate report
 			report := enumeratecms.PerformAppEnumerateCMSWordpressPlugins(cmd.Context(), config)
-			if len(report.Errors) > 0 {
-				a.OutputSignal.Status = 1
-			}
 			a.OutputSignal.Content = report
 		},
 	}
@@ -365,9 +353,6 @@ func (a *WebScan) InitEnumerateCommand() {
 
 			// Generate report
 			report := enumerategeneral.PerformGeneralRatelimit(cmd.Context(), &config)
-			if len(report.Errors) > 0 {
-				a.OutputSignal.Status = 1
-			}
 			a.OutputSignal.Content = report
 		},
 	}

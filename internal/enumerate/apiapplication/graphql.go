@@ -18,13 +18,7 @@ import (
 
 // PerformAppEnumerateGraphQL performs a GraphQL scan against a target URL and returns the report.
 func PerformAppEnumerateGraphQL(ctx context.Context, target string) enumerateapiapplicationfern.EnumerateGraphqlReport {
-	result := enumerateapiapplicationfern.EnumerateGraphqlResult{
-		BaseEndpointUrl: target,
-		ApiType:         enumerateapiapplicationfern.ApiTypeGraphQl,
-	}
-	report := enumerateapiapplicationfern.EnumerateGraphqlReport{Config: &enumerateapiapplicationfern.EnumerateGraphqlConfig{Target: target}, Result: &result}
-
-	result.BaseEndpointUrl = target
+	report := enumerateapiapplicationfern.EnumerateGraphqlReport{Config: &enumerateapiapplicationfern.EnumerateGraphqlConfig{Target: target}}
 
 	body, err := fetchGraphQLSchema(target)
 	if err != nil {
@@ -32,12 +26,39 @@ func PerformAppEnumerateGraphQL(ctx context.Context, target string) enumerateapi
 		return report
 	}
 
+	// Check if the response is actually JSON/GraphQL content
+	// If it's HTML or other non-JSON content, don't process it as GraphQL
+	trimmedBody := strings.TrimSpace(string(body))
+	if strings.HasPrefix(trimmedBody, "<") || strings.HasPrefix(trimmedBody, "<!") {
+		// This looks like HTML, not a GraphQL response
+		errMsg := "endpoint returned HTML instead of GraphQL schema"
+		report.Errors = append(report.Errors, errMsg)
+		return report
+	}
+
+	// Quick check if it's valid JSON
+	var jsonCheck interface{}
+	if err := json.Unmarshal(body, &jsonCheck); err != nil {
+		errMsg := fmt.Sprintf("endpoint did not return valid JSON: %v", err)
+		report.Errors = append(report.Errors, errMsg)
+		return report
+	}
+
+	// Only create the result object if we have valid GraphQL content
+	result := enumerateapiapplicationfern.EnumerateGraphqlResult{
+		BaseEndpointUrl: target,
+		ApiType:         enumerateapiapplicationfern.ApiTypeGraphQl,
+	}
+	report.Result = &result
+
 	result.Raw = base64.StdEncoding.EncodeToString(body)
 
 	var schema enumerateapiapplicationfern.GraphQlSchema
 	if err := json.Unmarshal(body, &schema); err != nil {
 		errMsg := fmt.Errorf("failed to unmarshal schema: %v", err)
 		report.Errors = append(report.Errors, errMsg.Error())
+		// Remove the result since schema parsing failed
+		report.Result = nil
 		return report
 	}
 

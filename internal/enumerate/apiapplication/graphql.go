@@ -26,17 +26,7 @@ func PerformAppEnumerateGraphQL(ctx context.Context, target string) enumerateapi
 		return report
 	}
 
-	// Check if the response is actually JSON/GraphQL content
-	// If it's HTML or other non-JSON content, don't process it as GraphQL
-	trimmedBody := strings.TrimSpace(string(body))
-	if strings.HasPrefix(trimmedBody, "<") || strings.HasPrefix(trimmedBody, "<!") {
-		// This looks like HTML, not a GraphQL response
-		errMsg := "endpoint returned HTML instead of GraphQL schema"
-		report.Errors = append(report.Errors, errMsg)
-		return report
-	}
-
-	// Quick check if it's valid JSON
+	// Check if the response is valid JSON
 	var jsonCheck interface{}
 	if err := json.Unmarshal(body, &jsonCheck); err != nil {
 		errMsg := fmt.Sprintf("endpoint did not return valid JSON: %v", err)

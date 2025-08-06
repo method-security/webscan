@@ -21,6 +21,7 @@ types:
   NucleiFindingInfo:
     properties:
       name: optional<string>
+      softwareWeakness: optional<string> # Name to use to create Software Weakness Objects
       description: optional<string>
       impact: optional<string>
       remediation: optional<string>

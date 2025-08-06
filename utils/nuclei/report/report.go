@@ -263,7 +263,6 @@ func (b *Builder) Consume(ev *nout.ResultEvent) {
 		}
 
 		// Extract CVE fields from classification if available
-
 		var cvssMetrics *string
 		var cvssScore *float64
 		var epssScore *float64
@@ -316,17 +315,22 @@ func (b *Builder) Consume(ev *nout.ResultEvent) {
 	if ev.Info.Reference != nil {
 		reference = ev.Info.Reference.ToSlice()
 	}
+	var softwareWeakness string
+	if ev.Info.Metadata["method-software-weakness-name"] != nil {
+		softwareWeakness = ev.Info.Metadata["method-software-weakness-name"].(string)
+	}
 
 	attemptInfo.Finding = &nuclei.NucleiFindingInfo{
-		Name:           name,
-		Description:    description,
-		Impact:         impact,
-		Remediation:    remediation,
-		Reference:      reference,
-		Classification: classificationDetails,
-		Severity:       &severity,
-		Finding:        ev.MatcherStatus,
-		Probe:          probe,
+		Name:             name,
+		SoftwareWeakness: &softwareWeakness,
+		Description:      description,
+		Impact:           impact,
+		Remediation:      remediation,
+		Reference:        reference,
+		Classification:   classificationDetails,
+		Severity:         &severity,
+		Finding:          ev.MatcherStatus,
+		Probe:            probe,
 	}
 
 	// Always add the attempt to the report, even if there was an error parsing the request/response

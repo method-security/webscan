@@ -13,7 +13,10 @@ import (
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
 	enumerategeneralfern "github.com/Method-Security/webscan/generated/go/enumerate/general"
+	waf "github.com/Method-Security/webscan/generated/go/pentest/waf"
 
+	// Internal
+	pentestwafdetect "github.com/Method-Security/webscan/internal/pentest/waf/detect"
 	// Utils
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
 	standard "github.com/Method-Security/webscan/utils/request/standard"
@@ -21,6 +24,36 @@ import (
 	// External
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
+
+// getWafFingerprint is a helper function that extracts WAF fingerprints from HTTP response data
+func getWafFingerprint(httpResponse *common.HttpResponse) *waf.WafFingerprint {
+	if httpResponse == nil {
+		return nil
+	}
+
+	// Extract response body
+	var responseBody *string
+	if httpResponse.ResponseBody != nil {
+		bodyStr := requesthelpers.GetResponseBodyStringFromBodyStruct(httpResponse.ResponseBody)
+		responseBody = bodyStr
+	}
+
+	// Convert headers from map[string][]string to map[string]string
+	var responseHeaders map[string]string
+	if httpResponse.ResponseHeaders != nil {
+		responseHeaders = make(map[string]string)
+		for key, values := range httpResponse.ResponseHeaders {
+			if len(values) > 0 {
+				responseHeaders[key] = values[0] // Take first value if multiple
+			}
+		}
+	}
+
+	// Get WAF fingerprint
+	wafFingerprint := pentestwafdetect.FingerprintApplicationFirewall(responseBody, responseHeaders, httpResponse.StatusCode)
+
+	return wafFingerprint
+}
 
 func createRateLimitRequestConfig(baseURL, path string, config *enumerategeneralfern.EnumerateRateLimitConfig) common.SendHttpRequestConfig {
 	request := common.HttpRequest{
@@ -124,9 +157,21 @@ requestLoop:
 			mu.Unlock()
 
 			if RateLimitDetected(&httpRequestResponse, currentHasSeen200) {
+				// Get WAF fingerprint using helper function
+				wafFingerprint := getWafFingerprint(httpRequestResponse.Response)
+
+				var provider waf.WafProviderEnum
+				if wafFingerprint != nil {
+					provider = wafFingerprint.Provider
+				} else {
+					provider = waf.WafProviderEnumUnknown
+				}
+
 				requestResults <- &enumerategeneralfern.RateLimitAttempt{
 					RequestNumber: reqNum,
 					Request:       &httpRequestResponse,
+					Provider:      provider,
+					Fingerprint:   wafFingerprint,
 				}
 
 				// Signal that rate limit was detected

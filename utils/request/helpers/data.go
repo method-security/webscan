@@ -3,8 +3,8 @@ package request
 import (
 	// Standard
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
+	"net/http"
 	"net/url"
 	"strings"
 	"time"
@@ -113,19 +113,8 @@ func GetResponseBodyStringFromBodyStruct(body *common.Body) *string {
 	return nil
 }
 
-// CreateResponseBody creates a Body struct based on content type and response data
-func CreateResponseBody(contentType string, responseBody string) *common.Body {
-	// If no content type or empty content type, default to text
-	if contentType == "" {
-		return &common.Body{
-			Kind: "text",
-			Text: &common.TextBody{
-				Value: responseBody,
-			},
-		}
-	}
-
-	// Trim any whitespace and split on semicolon to handle charset and other parameters
+// CreateBodyFromBytes creates a Body struct based on content type and body data as bytes
+func CreateBodyFromBytes(contentType string, bodyData []byte) *common.Body {
 	ct := strings.TrimSpace(strings.Split(contentType, ";")[0])
 
 	switch {
@@ -133,13 +122,14 @@ func CreateResponseBody(contentType string, responseBody string) *common.Body {
 		return &common.Body{
 			Kind: "json",
 			Json: &common.JsonBody{
-				Data:     responseBody,
+				Data:     string(bodyData),
 				MimeType: &ct,
 			},
 		}
 	case strings.Contains(ct, "application/x-www-form-urlencoded"):
 		fields := make(map[string]string)
-		for _, pair := range strings.Split(responseBody, "&") {
+		bodyStr := string(bodyData)
+		for _, pair := range strings.Split(bodyStr, "&") {
 			kv := strings.Split(pair, "=")
 			if len(kv) == 2 {
 				fields[kv[0]] = kv[1]
@@ -152,11 +142,19 @@ func CreateResponseBody(contentType string, responseBody string) *common.Body {
 				MimeType: &ct,
 			},
 		}
-	case strings.Contains(ct, "multipart/form-data"):
+	case strings.HasPrefix(ct, "image/"),
+		strings.Contains(ct, "application/octet-stream"),
+		strings.Contains(ct, "application/pdf"),
+		strings.Contains(ct, "application/zip"),
+		strings.Contains(ct, "application/gzip"),
+		strings.HasPrefix(ct, "video/"),
+		strings.HasPrefix(ct, "audio/"):
+		// Handle binary content types
+		base64Data := base64.StdEncoding.EncodeToString(bodyData)
 		return &common.Body{
-			Kind: "text",
-			Text: &common.TextBody{
-				Value:    responseBody,
+			Kind: "binary",
+			Binary: &common.BinaryBody{
+				Base64:   base64Data,
 				MimeType: &ct,
 			},
 		}
@@ -164,40 +162,15 @@ func CreateResponseBody(contentType string, responseBody string) *common.Body {
 		return &common.Body{
 			Kind: "text",
 			Text: &common.TextBody{
-				Value:    responseBody,
+				Value:    string(bodyData),
 				MimeType: &ct,
 			},
 		}
 	}
 }
 
-// DetectContentType attempts to detect the content type from the response body
-func DetectContentType(body string) string {
-	// Try to detect JSON
-	if strings.TrimSpace(body) != "" {
-		var jsonCheck interface{}
-		if err := json.Unmarshal([]byte(body), &jsonCheck); err == nil {
-			return "application/json"
-		}
-	}
-
-	// Check for HTML
-	if strings.Contains(strings.ToLower(body), "<!doctype html") ||
-		strings.Contains(strings.ToLower(body), "<html") {
-		return "text/html"
-	}
-
-	// Check for XML
-	if strings.HasPrefix(strings.TrimSpace(body), "<?xml") {
-		return "application/xml"
-	}
-
-	// Default to text/plain
-	return "text/plain"
-}
-
-// CreateHTTPResponse creates an HttpResponse struct from HttpResponse data
-func CreateHTTPResponse(statusCode int, redirectChain []string, headers map[string][]string, responseBody string) common.HttpResponse {
+// CreateHTTPResponseFromBytes creates an HttpResponse struct from HttpResponse data using byte array
+func CreateHTTPResponseFromBytes(statusCode int, redirectChain []string, headers map[string][]string, responseBody []byte) common.HttpResponse {
 	// Process headers to split comma-delimited values
 	processedHeaders := make(map[string][]string)
 	for key, values := range headers {
@@ -218,13 +191,13 @@ func CreateHTTPResponse(statusCode int, redirectChain []string, headers map[stri
 		contentType = ct[0]
 	}
 
-	// If no content type is provided, try to detect it
+	// If no content type is provided, try to detect it from string representation
 	if contentType == "" {
-		contentType = DetectContentType(responseBody)
+		contentType = http.DetectContentType(responseBody)
 	}
 
 	// Create the response body based on content type
-	bodyStruct := CreateResponseBody(contentType, responseBody)
+	bodyStruct := CreateBodyFromBytes(contentType, responseBody)
 
 	// Get current time for received timestamp
 	receivedAt := time.Now()
@@ -238,4 +211,10 @@ func CreateHTTPResponse(statusCode int, redirectChain []string, headers map[stri
 		ReceivedAt:      &receivedAt,
 		SizeBytes:       &sizeBytes,
 	}
+}
+
+// CreateHTTPResponse creates an HttpResponse struct from HttpResponse data (string version)
+// This is a compatibility wrapper that converts string to bytes
+func CreateHTTPResponse(statusCode int, redirectChain []string, headers map[string][]string, responseBody string) common.HttpResponse {
+	return CreateHTTPResponseFromBytes(statusCode, redirectChain, headers, []byte(responseBody))
 }

@@ -3,6 +3,7 @@ package nuclei
 import (
 	// Standard
 	"fmt"
+	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
@@ -111,7 +112,7 @@ func getHTTPRequestResponse(ev *nout.ResultEvent) (*common.HttpRequestResponse, 
 
 	method, path, requestHeaders, body := parseRawRequest(ev.Request)
 	request.Path = path
-	contentType := requesthelpers.DetectContentType(body)
+	contentType := http.DetectContentType([]byte(body))
 	if m, err := common.NewHttpMethodFromString(strings.ToUpper(method)); err == nil {
 		request.Method = m
 	}
@@ -124,7 +125,7 @@ func getHTTPRequestResponse(ev *nout.ResultEvent) (*common.HttpRequestResponse, 
 		Query: map[string]string{},
 	}
 	if body != "" {
-		params.Body = requesthelpers.CreateResponseBody("", body)
+		params.Body = requesthelpers.CreateBodyFromBytes(contentType, []byte(body))
 	}
 	if u2, err := url.Parse(path); err == nil {
 		for k, vs := range u2.Query() {
@@ -144,7 +145,7 @@ func getHTTPRequestResponse(ev *nout.ResultEvent) (*common.HttpRequestResponse, 
 
 	// If there was an error in the response, add it to the response body
 	if ev.Error != "" {
-		response.ResponseBody = requesthelpers.CreateResponseBody("text/plain", fmt.Sprintf("Error: %s", ev.Error))
+		response.ResponseBody = requesthelpers.CreateBodyFromBytes("text/plain", []byte(fmt.Sprintf("Error: %s", ev.Error)))
 	}
 
 	// Return HttpRequestResponse

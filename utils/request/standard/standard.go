@@ -54,8 +54,7 @@ func SendStandardRequest(ctx context.Context, config common.SendHttpRequestConfi
 	if err != nil {
 		return common.HttpRequestResponse{Request: request}, fmt.Errorf("failed to read response body: %v", err)
 	}
-	bodyStr := string(bodyBytes)
-	response := requesthelpers.CreateHTTPResponse(resp.StatusCode, redirectChain, resp.Header, bodyStr)
+	response := requesthelpers.CreateHTTPResponseFromBytes(resp.StatusCode, redirectChain, resp.Header, bodyBytes)
 	err = resp.Body.Close()
 	if err != nil {
 		return common.HttpRequestResponse{Request: request}, fmt.Errorf("failed to close response body: %v", err)

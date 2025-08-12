@@ -29,7 +29,7 @@ types:
       mimeType: optional<string>
   BinaryBody:
     properties:
-      base64: base64
+      base64: string
       mimeType: optional<string>
   MultipartPart:
     properties:

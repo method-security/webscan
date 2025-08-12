@@ -259,7 +259,6 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 				responseBody = htmlContent
 			}
 		}
-
 		// Build final response
 		response := requesthelpers.CreateHTTPResponse(
 			statusCode,

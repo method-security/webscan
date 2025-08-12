@@ -122,7 +122,7 @@ func PrepareRequestBody(ctx context.Context, request *common.HttpRequest) (io.Re
 			}
 
 			// Decode base64 content
-			content, err := base64.StdEncoding.DecodeString(string(part.Content.Base64))
+			content, err := base64.StdEncoding.DecodeString(part.Content.Base64)
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode base64 content: %v", err)
 			}
@@ -180,7 +180,7 @@ func PrepareRequestBody(ctx context.Context, request *common.HttpRequest) (io.Re
 		return strings.NewReader(body.Text.Value), nil
 
 	case "binary":
-		content, err := base64.StdEncoding.DecodeString(string(body.Binary.Base64))
+		content, err := base64.StdEncoding.DecodeString(body.Binary.Base64)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode base64 content: %v", err)
 		}

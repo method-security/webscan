@@ -70,7 +70,7 @@ func GetResponseBodyStringFromBodyStruct(body *common.Body) *string {
 	switch body.Kind {
 	case "binary":
 		if body.Binary != nil {
-			str := string(body.Binary.Base64)
+			str := body.Binary.Base64
 			return &str
 		}
 	case "form":
@@ -92,7 +92,7 @@ func GetResponseBodyStringFromBodyStruct(body *common.Body) *string {
 			var parts []string
 			for _, part := range body.Multipart.Parts {
 				if part.Content != nil {
-					decoded, err := base64.StdEncoding.DecodeString(string(part.Content.Base64))
+					decoded, err := base64.StdEncoding.DecodeString(part.Content.Base64)
 					if err != nil {
 						continue
 					}

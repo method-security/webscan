@@ -54,15 +54,9 @@ func CaptureScreenshot(ctx context.Context, browser *headless.Requester, sendHTT
 		log.Info("Page load wait timed out (this is normal)", svc1log.SafeParam("error", err.Error()))
 	}
 
-	// Additional wait for DOM stabilization (using the configured time from browser)
+	// Wait for DOM stabilization
 	if browser.MinDOMStabalizeTimeSeconds > 0 {
-		log.Info("Waiting for DOM stabilization", svc1log.SafeParam("seconds", browser.MinDOMStabalizeTimeSeconds))
-		select {
-		case <-time.After(time.Duration(browser.MinDOMStabalizeTimeSeconds) * time.Second):
-			// Normal case - sleep completed
-		case <-ctx.Done():
-			log.Warn("DOM stabilization interrupted by context timeout")
-		}
+		time.Sleep(time.Duration(browser.MinDOMStabalizeTimeSeconds) * time.Second)
 	}
 
 	// Capture the screenshot

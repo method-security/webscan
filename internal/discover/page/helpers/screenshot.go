@@ -4,6 +4,7 @@ import (
 	// Standard
 	"context"
 	"fmt"
+	"time"
 
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
@@ -33,7 +34,30 @@ func CaptureScreenshot(ctx context.Context, browser *headless.Requester, sendHTT
 	// Get the page from the browser
 	fullURL := fmt.Sprintf("%s%s", sendHTTPRequestConfig.Request.BaseUrl, sendHTTPRequestConfig.Request.Path)
 	log.Info("Capturing screenshot", svc1log.SafeParam("url", fullURL))
-	page := browser.Browser.MustPage(fullURL)
+
+	// Create a new page
+	page, err := browser.Browser.Page(proto.TargetCreateTarget{})
+	if err != nil {
+		log.Error("Failed to create page for screenshot", svc1log.SafeParam("error", err))
+		return nil, err
+	}
+
+	// Navigate to the URL
+	err = page.Navigate(fullURL)
+	if err != nil {
+		log.Warn("Navigation encountered error but continuing", svc1log.SafeParam("error", err.Error()))
+	}
+
+	// Wait for the page to load
+	err = page.WaitLoad()
+	if err != nil {
+		log.Info("Page load wait timed out (this is normal)", svc1log.SafeParam("error", err.Error()))
+	}
+
+	// Wait for DOM stabilization
+	if browser.MinDOMStabalizeTimeSeconds > 0 {
+		time.Sleep(time.Duration(browser.MinDOMStabalizeTimeSeconds) * time.Second)
+	}
 
 	// Capture the screenshot
 	log.Info("Capturing screenshot")

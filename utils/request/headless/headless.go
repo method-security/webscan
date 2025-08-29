@@ -50,6 +50,7 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 	// SETUP
 	// =========================================================================================
 	log := svc1log.FromContext(ctx)
+
 	report := common.HttpRequestResponse{Request: config.Request}
 
 	constructedURL, err := standardhelpers.ConstructURL(ctx, config.Request)
@@ -87,6 +88,10 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 		browserErr      error
 		statusCode      int
 	)
+
+	// Set the request sent timestamp
+	sentAt := time.Now()
+	config.Request.SentAt = sentAt
 
 	if err := rod.Try(func() {
 		// Create new page

@@ -21,4 +21,5 @@ types:
       threads: integer
       proxy: optional<string>
       verboseLogs: boolean
+      extractAllResults: optional<boolean>
 

@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	// Generated
 	nuclei "github.com/Method-Security/webscan/generated/go/common/nuclei"
@@ -19,15 +20,16 @@ import (
 )
 
 type Config struct {
-	Targets        []string
-	RawRequests    []string // JSONL lines when fuzzing
-	FS             []fs.FS  // template sources
-	Threads        int
-	Proxy          string
-	RunMode        nuclei.NucleiRunMode
-	SuccessfulOnly *bool
-	VerboseLogs    bool
-	Timeout        int
+	Targets           []string
+	RawRequests       []string // JSONL lines when fuzzing
+	FS                []fs.FS  // template sources
+	Threads           int
+	Proxy             string
+	RunMode           nuclei.NucleiRunMode
+	SuccessfulOnly    *bool
+	VerboseLogs       bool
+	Timeout           int
+	ExtractAllResults bool // When true, return all extracted results regardless of matcher status
 }
 
 func validateConfig(cfg Config) error {
@@ -115,6 +117,18 @@ func buildNucleiOptions(cfg Config, tmpDir string) []nucleilib.NucleiSDKOptions 
 		// Explicitly set StopAtFirstMatch to false to ensure we get all requests
 		func(e *nucleilib.NucleiEngine) error {
 			e.Options().StopAtFirstMatch = false
+			// Check environment variable for extracting all results mode
+			extractAllResults := cfg.ExtractAllResults
+			if envVar := os.Getenv("WEBSCAN_EXTRACT_ALL_RESULTS"); envVar != "" {
+				if val, err := strconv.ParseBool(envVar); err == nil {
+					extractAllResults = val
+				}
+			}
+			// If ExtractAllResults is enabled, we need to modify matcher behavior
+			if extractAllResults {
+				// Force matcher-status to true to capture all results including non-matching ones
+				e.Options().MatcherStatus = true
+			}
 			return nil
 		},
 	}
@@ -178,14 +192,25 @@ func getProxy(config nuclei.NucleiConfig) string {
 
 // GetRunnerConfig returns a runner config from a nuclei config.
 func GetRunnerConfig(fileSystems []fs.FS, config nuclei.NucleiConfig) Config {
+	extractAllResults := false
+	if config.ExtractAllResults != nil {
+		extractAllResults = *config.ExtractAllResults
+	}
+	// Also check environment variable 
+	if envVar := os.Getenv("WEBSCAN_EXTRACT_ALL_RESULTS"); envVar != "" {
+		if val, err := strconv.ParseBool(envVar); err == nil {
+			extractAllResults = val
+		}
+	}
 	rconfig := Config{
-		Targets:     config.Targets,
-		FS:          fileSystems,
-		Threads:     config.Threads,
-		Proxy:       getProxy(config),
-		RunMode:     config.RunMode,
-		VerboseLogs: config.VerboseLogs,
-		Timeout:     config.Timeout,
+		Targets:           config.Targets,
+		FS:                fileSystems,
+		Threads:           config.Threads,
+		Proxy:             getProxy(config),
+		RunMode:           config.RunMode,
+		VerboseLogs:       config.VerboseLogs,
+		Timeout:           config.Timeout,
+		ExtractAllResults: extractAllResults,
 	}
 	return rconfig
 }
@@ -216,9 +241,17 @@ func Run(ctx context.Context, cfg Config, reportBuilder *report.Builder) ([]*nuc
 	}
 	defer eng.Close()
 
-	// To-Do: Write Customer Writer to enable this to work
-	eng.Options().MatcherStatus = false
-	log.Info("Set matcher status", svc1log.SafeParam("status", eng.Options().MatcherStatus))
+	// Configure matcher status based on ExtractAllResults setting and environment variable
+	extractAllResults := cfg.ExtractAllResults
+	if envVar := os.Getenv("WEBSCAN_EXTRACT_ALL_RESULTS"); envVar != "" {
+		if val, err := strconv.ParseBool(envVar); err == nil {
+			extractAllResults = val
+		}
+	}
+	if !extractAllResults {
+		eng.Options().MatcherStatus = false
+	}
+	log.Info("Set matcher status", svc1log.SafeParam("status", eng.Options().MatcherStatus), svc1log.SafeParam("extractAllResults", extractAllResults))
 
 	log.Info("Loading targets")
 	if err := loadTargets(eng, cfg); err != nil {

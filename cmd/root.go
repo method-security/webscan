@@ -91,6 +91,7 @@ func (a *WebScan) InitRootCommand() {
 	// Root flags
 	a.RootCmd.PersistentFlags().BoolVarP(&a.RootFlags.Quiet, "quiet", "q", false, "Suppress output")
 	a.RootCmd.PersistentFlags().BoolVarP(&a.RootFlags.Verbose, "verbose", "v", false, "Verbose output")
+	a.RootCmd.PersistentFlags().BoolVar(&a.RootFlags.ExtractAllResults, "extract-all-results", false, "Extract all results from Nuclei templates, even when matchers don't match")
 	a.RootCmd.PersistentFlags().StringVarP(&outputFile, "output-file", "f", "", "Path to output file. If blank, will output to STDOUT")
 	a.RootCmd.PersistentFlags().StringVarP(&outputFormat, "output", "o", "signal", "Output format (signal, json, yaml). Default value is signal")
 

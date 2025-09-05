@@ -169,6 +169,61 @@ func CreateBodyFromBytes(contentType string, bodyData []byte) *common.Body {
 	}
 }
 
+// isXSSResponse checks if the response contains XSS indicators
+func isXSSResponse(responseBody []byte, headers map[string][]string) bool {
+	bodyStr := strings.ToLower(string(responseBody))
+
+	// Check for common XSS patterns in response body
+	xssPatterns := []string{
+		"<script>",
+		"javascript:",
+		"alert(",
+		"onerror=",
+		"onload=",
+		"onclick=",
+		"onfocus=",
+		"onmouseover=",
+		"<img src=",
+		"<svg onload=",
+		"<iframe src=",
+		"<embed src=",
+		"<object data=",
+		"<form action=",
+		"document.domain",
+		"document.cookie",
+		"xss",
+	}
+
+	// Check if response body contains XSS patterns
+	for _, pattern := range xssPatterns {
+		if strings.Contains(bodyStr, pattern) {
+			return true
+		}
+	}
+
+	// Check if content type is HTML (XSS typically affects HTML responses)
+	if ct, ok := headers["Content-Type"]; ok && len(ct) > 0 {
+		contentType := strings.ToLower(ct[0])
+		if strings.Contains(contentType, "text/html") {
+			// Additional check for XSS-related content in HTML responses
+			htmlXssPatterns := []string{
+				"<script",
+				"javascript:",
+				"alert",
+				"onerror",
+				"onload",
+			}
+			for _, pattern := range htmlXssPatterns {
+				if strings.Contains(bodyStr, pattern) {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
+}
+
 // CreateHTTPResponseFromBytes creates an HttpResponse struct from HttpResponse data using byte array
 func CreateHTTPResponseFromBytes(statusCode int, redirectChain []string, headers map[string][]string, responseBody []byte) common.HttpResponse {
 	// Process headers to split comma-delimited values
@@ -194,6 +249,11 @@ func CreateHTTPResponseFromBytes(statusCode int, redirectChain []string, headers
 	// If no content type is provided, try to detect it from string representation
 	if contentType == "" {
 		contentType = http.DetectContentType(responseBody)
+	}
+
+	// Handle XSS-related status code correction: if status code is 0 and response contains XSS indicators, set to 200
+	if statusCode == 0 && isXSSResponse(responseBody, processedHeaders) {
+		statusCode = 200
 	}
 
 	// Create the response body based on content type

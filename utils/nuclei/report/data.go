@@ -141,6 +141,12 @@ func getHTTPRequestResponse(ev *nout.ResultEvent) (*common.HttpRequestResponse, 
 	if responseBody == "" {
 		responseBody = ev.Response
 	}
+
+	// Handle status code correction for headless requests: if status code is 0 but the template matched successfully, set to 200
+	if statusCode == 0 && ev.MatcherStatus && ev.Type == "headless" {
+		statusCode = 200
+	}
+
 	response = requesthelpers.CreateHTTPResponse(statusCode, nil, singleToMulti(responseHeaders), responseBody)
 
 	// If there was an error in the response, add it to the response body

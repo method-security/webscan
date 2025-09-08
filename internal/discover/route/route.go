@@ -4,6 +4,7 @@ import (
 	// Standard
 	"context"
 	"fmt"
+	"net/url"
 	"runtime"
 	"strings"
 	"sync"
@@ -28,12 +29,103 @@ import (
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
-func createSendHTTPRequestConfig(baseURL, path string, config discover.DiscoverRouteConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) common.SendHttpRequestConfig {
+// ExtractRedirectRoutes analyzes redirect chain URLs to extract routes with parameters
+func ExtractRedirectRoutes(redirectChain []string, baseURL string, routeCaptureConfig discover.DiscoverRouteConfig) ([]*discover.RouteDetails, []string, []string) {
+	routes := []*discover.RouteDetails{}
+	urls := make(map[string]struct{})
+	errors := []string{}
+
+	for _, redirectURL := range redirectChain {
+		// Parse the redirect URL
+		parsedURL, err := url.Parse(redirectURL)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("Failed to parse redirect URL %s: %s", redirectURL, err))
+			continue
+		}
+
+		// Only process URLs with query parameters
+		if parsedURL.RawQuery == "" {
+			continue
+		}
+
+		// Check if the URL is allowed
+		if !discoverroutehelpers.IsURLAllowed(baseURL, redirectURL, routeCaptureConfig.IgnoreBaseUrlMatch, routeCaptureConfig.CollectStaticAssets) {
+			continue
+		}
+
+		// Extract query parameters
+		queryParams := discoverroutehelpers.ParseQueryParams(parsedURL)
+		if len(queryParams) == 0 {
+			continue
+		}
+
+		// Create route without query params in the URL
+		urlNoQuery, err := discoverroutehelpers.URLRemoveQueryParams(redirectURL)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("Failed to remove query params from %s: %s", redirectURL, err))
+			continue
+		}
+
+		parsedCleanURL, err := url.Parse(urlNoQuery)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("Failed to parse clean redirect URL %s: %s", urlNoQuery, err))
+			continue
+		}
+
+		urls[urlNoQuery] = struct{}{}
+
+		routeVar := &discover.RouteDetails{
+			BaseUrl:     baseURL,
+			Path:        parsedCleanURL.Path,
+			Method:      common.HttpMethodGet.Ptr(), // Redirects are typically GET
+			QueryParams: queryParams,
+		}
+
+		routes = append(routes, routeVar)
+	}
+
+	return discoverroutehelpers.MergeWebRoutes(routes), discoverroutehelpers.SetToListString(urls), errors
+}
+
+// buildAllParameterURLs creates URLs for ALL discovered parameter values (no sampling)
+func buildAllParameterURLs(route *discover.RouteDetails) []string {
+	var allURLs []string
+	baseURL := route.BaseUrl + route.Path
+
+	if route.QueryParams == nil || len(route.QueryParams) == 0 {
+		return allURLs
+	}
+
+	// Build URLs with ALL discovered parameter values - no sampling or limits
+	for _, param := range route.QueryParams {
+		if param.ExampleValues != nil && len(param.ExampleValues) > 0 {
+			// Test EVERY value for this parameter to ensure complete coverage
+			for _, value := range param.ExampleValues {
+				// For single parameter, create simple query string
+				if len(route.QueryParams) == 1 {
+					paramURL := fmt.Sprintf("%s?%s=%s", baseURL, param.Name, value)
+					allURLs = append(allURLs, paramURL)
+				} else {
+					// For multiple parameters, we'd need more complex combination logic
+					// For now, handle single parameter case which covers most scenarios
+					paramURL := fmt.Sprintf("%s?%s=%s", baseURL, param.Name, value)
+					allURLs = append(allURLs, paramURL)
+				}
+			}
+		}
+	}
+
+	return allURLs
+}
+
+func createSendHTTPRequestConfigWithQuery(baseURL, path string, queryParams map[string]string, config discover.DiscoverRouteConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) common.SendHttpRequestConfig {
 	request := common.HttpRequest{
 		BaseUrl: baseURL,
 		Path:    path,
 		Method:  common.HttpMethodGet,
-		Params:  &common.HttpRequestParams{},
+		Params: &common.HttpRequestParams{
+			Query: queryParams,
+		},
 	}
 	return common.SendHttpRequestConfig{
 		Request:            &request,
@@ -65,13 +157,18 @@ func extractRoutes(ctx context.Context, httpRequestResponse *common.HttpRequestR
 
 	redirectedURL := httpRequestResponse.Response.RedirectChain[len(httpRequestResponse.Response.RedirectChain)-1]
 	log.Info("Redirected URL", svc1log.SafeParam("url", redirectedURL))
-	redirectedURLBase, redirectedURLPath, err := requesthelpers.SplitTargetURL(redirectedURL)
+
+	// Parse the redirected URL to preserve query parameters
+	parsedRedirectedURL, err := url.Parse(redirectedURL)
 	if err != nil {
-		errorMsg := fmt.Sprintf("Failed to split redirected URL %s: %s", redirectedURL, err)
+		errorMsg := fmt.Sprintf("Failed to parse redirected URL %s: %s", redirectedURL, err)
 		log.Error(errorMsg)
 		errors = append(errors, errorMsg)
 		return routes, discoverroutehelpers.SetToListString(urls), errors
 	}
+
+	// Extract base URL (without query parameters for route extraction context)
+	redirectedURLBase := fmt.Sprintf("%s://%s", parsedRedirectedURL.Scheme, parsedRedirectedURL.Host)
 
 	// Helper function to process errors with context
 	processErrors := func(source string, newErrors []string) {
@@ -115,6 +212,13 @@ func extractRoutes(ctx context.Context, httpRequestResponse *common.HttpRequestR
 	urls = discoverroutehelpers.AddListToSetString(urls, inlineScriptUrls)
 	errors = append(errors, inlineScriptErrors...)
 
+	// Extract routes from redirect chain (analyze redirect URLs for parameters)
+	log.Info("Extracting routes from redirect chain")
+	redirectRoutes, redirectUrls, redirectErrors := ExtractRedirectRoutes(httpRequestResponse.Response.RedirectChain, redirectedURLBase, routeCaptureConfig)
+	routes = append(routes, redirectRoutes...)
+	urls = discoverroutehelpers.AddListToSetString(urls, redirectUrls)
+	processErrors("Redirect Chain", redirectErrors)
+
 	// Extract routes from network calls
 	// Only to be performed if requestMethod is of type Headless or Browserbase
 	if requestConfig.RequestMethod == common.RequestMethodHeadless || requestConfig.RequestMethod == common.RequestMethodBrowserbase {
@@ -135,7 +239,7 @@ func extractRoutes(ctx context.Context, httpRequestResponse *common.HttpRequestR
 			return routes, discoverroutehelpers.SetToListString(urls), errors
 		}
 
-		fullRedirectedURL := fmt.Sprintf("%s%s", redirectedURLBase, redirectedURLPath)
+		fullRedirectedURL := redirectedURL
 		networkRoutes, networkUrls, networkErrors := capturerouteextractors.ExtractNetworkRoutes(networkRouteCtx, browser, fullRedirectedURL, routeCaptureConfig.IgnoreBaseUrlMatch, routeCaptureConfig.CollectStaticAssets)
 		routes = append(routes, networkRoutes...)
 		urls = discoverroutehelpers.AddListToSetString(urls, networkUrls)
@@ -210,44 +314,62 @@ func PerformRouteCapture(ctx context.Context, config discover.DiscoverRouteConfi
 		semaphore := make(chan struct{}, maxGoroutines)
 
 		// Process each URL concurrently
-		for _, currentURL := range urlsAtCurrentDepth {
+		for _, urlToProcess := range urlsAtCurrentDepth {
 			wg.Add(1)
 
 			// Acquire semaphore (blocks if maxGoroutines are running)
 			semaphore <- struct{}{}
 
-			go func(url string) {
+			go func(targetURL string) {
 				defer wg.Done()
 				defer func() { <-semaphore }() // Release semaphore when done
 
 				// Skip if already visited
 				mu.Lock()
-				if _, visited := visitedURLs[url]; visited {
+				if _, visited := visitedURLs[targetURL]; visited {
 					mu.Unlock()
 					return
 				}
-				visitedURLs[url] = struct{}{}
+				visitedURLs[targetURL] = struct{}{}
 				mu.Unlock()
 
-				// Split and standardize the current URL
-				currentBaseURL, currentPath, err := requesthelpers.SplitTargetURL(url)
+				// Parse the URL to preserve query parameters
+				parsedURL, err := url.Parse(targetURL)
 				if err != nil {
-					errChan <- fmt.Sprintf("error splitting URL %s: %s", url, err)
+					errChan <- fmt.Sprintf("error parsing URL %s: %s", targetURL, err)
 					return
 				}
 
+				// Extract base URL
+				currentBaseURL := fmt.Sprintf("%s://%s", parsedURL.Scheme, parsedURL.Host)
+
+				// Separate path and query parameters
+				currentPath := parsedURL.Path
+				var queryParams map[string]string
+				if parsedURL.RawQuery != "" {
+					queryParams = make(map[string]string)
+					values, err := url.ParseQuery(parsedURL.RawQuery)
+					if err == nil {
+						for key, vals := range values {
+							if len(vals) > 0 {
+								queryParams[key] = vals[0] // Use first value if multiple
+							}
+						}
+					}
+				}
+
 				// Send the request
-				requestConfig := createSendHTTPRequestConfig(currentBaseURL, currentPath, config, browserbaseSecrets)
+				requestConfig := createSendHTTPRequestConfigWithQuery(currentBaseURL, currentPath, queryParams, config, browserbaseSecrets)
 				request, err := request.SendRequest(ctx, requestConfig)
 				if err != nil {
-					errChan <- fmt.Sprintf("error performing request to %s: %s", url, err)
+					errChan <- fmt.Sprintf("error performing request to %s: %s", targetURL, err)
 					return
 				}
 
 				// Extract the routes and if enabled, static assets
 				if request.Response == nil || request.Response.ResponseBody == nil {
-					log.Info("No response from", svc1log.SafeParam("url", url))
-					errChan <- fmt.Sprintf("no response from %s", url)
+					log.Info("No response from", svc1log.SafeParam("url", targetURL))
+					errChan <- fmt.Sprintf("no response from %s", targetURL)
 					return
 				}
 
@@ -262,16 +384,32 @@ func PerformRouteCapture(ctx context.Context, config discover.DiscoverRouteConfi
 
 				// Collect routes to spider
 				for _, route := range routes {
-					routeURL := route.BaseUrl + route.Path
+					// Visit the base route (without parameters)
+					baseRouteURL := route.BaseUrl + route.Path
 					mu.Lock()
-					if _, visited := visitedURLs[routeURL]; !visited {
+					if _, visited := visitedURLs[baseRouteURL]; !visited {
 						nextDepthMu.Lock()
-						nextDepthUrls = append(nextDepthUrls, routeURL)
+						nextDepthUrls = append(nextDepthUrls, baseRouteURL)
 						nextDepthMu.Unlock()
 					}
 					mu.Unlock()
+
+					// Visit routes with ALL their discovered query parameter values (comprehensive testing)
+					if route.QueryParams != nil && len(route.QueryParams) > 0 {
+						// Build URLs with ALL parameter values - no sampling to ensure complete coverage
+						allParameterURLs := buildAllParameterURLs(route)
+						mu.Lock()
+						for _, paramURL := range allParameterURLs {
+							if _, visited := visitedURLs[paramURL]; !visited {
+								nextDepthMu.Lock()
+								nextDepthUrls = append(nextDepthUrls, paramURL)
+								nextDepthMu.Unlock()
+							}
+						}
+						mu.Unlock()
+					}
 				}
-			}(currentURL)
+			}(urlToProcess)
 		}
 
 		// Wait for all goroutines to complete

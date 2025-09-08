@@ -371,8 +371,8 @@ func (a *WebScan) InitDiscoverCommand() {
 	// Config Flags
 	discoverRouteCmd.Flags().Bool("ignore-base-url-match", false, "Add route even if it does not share the target's base URL")
 	discoverRouteCmd.Flags().Bool("collect-static-assets", false, "Collect static assets from route discovery")
-	discoverRouteCmd.Flags().Int("spider-depth", 1, "Maximum depth for route spidering")
-	discoverRouteCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
+	discoverRouteCmd.Flags().Int("spider-depth", 3, "Maximum depth for route spidering")
+	discoverRouteCmd.Flags().Int("max-redirects", 100, "Maximum number of redirects to follow")
 	discoverRouteCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
 	discoverRouteCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
 	discoverRouteCmd.Flags().Int("threads", 0, "Number of concurrent threads for scanning")

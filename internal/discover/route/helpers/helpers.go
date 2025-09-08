@@ -55,7 +55,15 @@ func MergeWebRoutes(routes []*discover.RouteDetails) []*discover.RouteDetails {
 		if route.Method != nil {
 			method = string(*route.Method)
 		}
-		key := fmt.Sprintf("%s:%s%s", method, route.BaseUrl, route.Path)
+
+		// Normalize path: treat empty path "" and root path "/" as equivalent
+		// Follow existing codebase convention: root paths should be empty strings
+		normalizedPath := route.Path
+		if normalizedPath == "/" {
+			normalizedPath = ""
+		}
+
+		key := fmt.Sprintf("%s:%s%s", method, route.BaseUrl, normalizedPath)
 
 		if existingRoute, exists := routeMap[key]; exists {
 			// Merge QueryParams
@@ -65,8 +73,10 @@ func MergeWebRoutes(routes []*discover.RouteDetails) []*discover.RouteDetails {
 		} else {
 			// Add new route to the map
 			// Create a copy to avoid modifying the original
-			newRoute := route
-			routeMap[key] = newRoute
+			newRoute := *route
+			// Normalize the path in the route object itself for consistent output
+			newRoute.Path = normalizedPath
+			routeMap[key] = &newRoute
 		}
 	}
 
@@ -99,7 +109,20 @@ func MergeQueryParams(params1 []*discover.RouteQueryParam, params2 []*discover.R
 		if _, exists := paramMap[param.Name]; exists {
 			existingParam := paramMap[param.Name]
 			if existingParam.ExampleValues != nil && param.ExampleValues != nil {
-				existingParam.ExampleValues = append(existingParam.ExampleValues, param.ExampleValues...)
+				// Use a set to deduplicate example values
+				valueSet := make(map[string]struct{})
+				for _, val := range existingParam.ExampleValues {
+					valueSet[val] = struct{}{}
+				}
+				for _, val := range param.ExampleValues {
+					valueSet[val] = struct{}{}
+				}
+				// Convert back to slice
+				deduplicatedValues := make([]string, 0, len(valueSet))
+				for val := range valueSet {
+					deduplicatedValues = append(deduplicatedValues, val)
+				}
+				existingParam.ExampleValues = deduplicatedValues
 			} else if param.ExampleValues != nil {
 				existingParam.ExampleValues = param.ExampleValues
 			} // else existingParam.ExampleValues is already set
@@ -135,7 +158,20 @@ func MergeBodyParams(params1 []*discover.RouteBodyParam, params2 []*discover.Rou
 		if _, exists := paramMap[param.Name]; exists {
 			existingParam := paramMap[param.Name]
 			if existingParam.ExampleValues != nil && param.ExampleValues != nil {
-				existingParam.ExampleValues = append(existingParam.ExampleValues, param.ExampleValues...)
+				// Use a set to deduplicate example values
+				valueSet := make(map[string]struct{})
+				for _, val := range existingParam.ExampleValues {
+					valueSet[val] = struct{}{}
+				}
+				for _, val := range param.ExampleValues {
+					valueSet[val] = struct{}{}
+				}
+				// Convert back to slice
+				deduplicatedValues := make([]string, 0, len(valueSet))
+				for val := range valueSet {
+					deduplicatedValues = append(deduplicatedValues, val)
+				}
+				existingParam.ExampleValues = deduplicatedValues
 			} else if param.ExampleValues != nil {
 				existingParam.ExampleValues = param.ExampleValues
 			}

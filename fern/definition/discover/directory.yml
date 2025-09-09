@@ -1,0 +1,45 @@
+imports:
+  http: ../common/http.yml
+types:
+  # Wordlist Enums
+  WordlistType:
+    enum:
+      - directories
+      - files
+  WordlistSize:
+    enum:
+      - small
+      - medium
+      - large
+  # Config Struct
+  DiscoverDirectoryConfig:
+    properties:
+      targets: list<string>
+      paths: optional<list<string>>
+      wordlistType: optional<WordlistType>
+      wordlistSize: optional<WordlistSize>
+      httpMethods: list<http.HttpMethod>
+      responseCodes: string
+      ignoreBaseContentMatch: boolean
+      verifyTls: boolean
+      threshold: float
+      timeout: integer
+      maxRedirectsBaselineRequest: integer
+      maxRuntime: integer
+      retries: integer
+      sleep: integer
+      threads: integer
+  # Report Structs
+  DirectoryTargetInfo:
+    properties:
+      target: string
+      baselineAttempts: list<http.HttpRequestResponse>
+      attempts: list<http.HttpRequestResponse>
+  DiscoverDirectoryResult:
+    properties:
+      targets: optional<list<DirectoryTargetInfo>>
+  DiscoverDirectoryReport:
+    properties:
+      config: DiscoverDirectoryConfig
+      result: DiscoverDirectoryResult
+      errors: optional<list<string>>

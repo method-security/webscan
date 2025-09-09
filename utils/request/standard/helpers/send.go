@@ -20,7 +20,7 @@ import (
 
 func SendHTTPRequest(ctx context.Context, url string, headers map[string]string, bodyReader io.Reader, config common.SendHttpRequestConfig) (*http.Response, []string, error) {
 	log := svc1log.FromContext(ctx)
-	log.Info("Sending request", svc1log.SafeParam("url", url), svc1log.SafeParam("maxRedirects", config.MaxRedirects))
+	log.Debug("Sending request", svc1log.SafeParam("url", url), svc1log.SafeParam("maxRedirects", config.MaxRedirects))
 
 	// Configure HTTP Client
 	client := &http.Client{
@@ -81,7 +81,7 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 		// Get Location Header (Case Insensitive)
 		location := resp.Header.Get("Location")
 		if location == "" {
-			log.Info("No location header found returning response", svc1log.SafeParam("url", currentURL), svc1log.SafeParam("status", resp.StatusCode))
+			log.Debug("No location header found returning response", svc1log.SafeParam("url", currentURL), svc1log.SafeParam("status", resp.StatusCode))
 			return resp, redirectChain, nil
 		}
 
@@ -94,7 +94,7 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 
 		// Check if this is just a trailing slash redirect (should not count as a redirect)
 		if utils.IsTrailingSlashRedirect(currentURL, nextURL.String()) {
-			log.Info("Detected trailing slash redirect, not counting as redirect", svc1log.SafeParam("from", currentURL), svc1log.SafeParam("to", nextURL.String()))
+			log.Debug("Detected trailing slash redirect, not counting as redirect", svc1log.SafeParam("from", currentURL), svc1log.SafeParam("to", nextURL.String()))
 			// Close Response Body
 			err = resp.Body.Close()
 			if err != nil {
@@ -115,7 +115,7 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 		}
 
 		// Update Redirect Chain + Current URL
-		log.Info("Following redirect", svc1log.SafeParam("from", currentURL), svc1log.SafeParam("to", nextURL.String()))
+		log.Debug("Following redirect", svc1log.SafeParam("from", currentURL), svc1log.SafeParam("to", nextURL.String()))
 		redirectChain = append(redirectChain, nextURL.String())
 		currentURL = nextURL.String()
 	}

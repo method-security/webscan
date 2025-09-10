@@ -113,6 +113,19 @@ func ExtractAnchorRoutes(doc *goquery.Document, baseURL string, routeCaptureConf
 		if exists && href != "" {
 			fullURL := discoverroutehelpers.ResolveURL(baseURL, href)
 
+			// Parse the full URL to extract query parameters before removing them
+			parsedFullURL, err := url.Parse(fullURL)
+			if err != nil {
+				errors = append(errors, err.Error())
+				return
+			}
+
+			// Extract query parameters from the original URL
+			var queryParams []*discover.RouteQueryParam
+			if parsedFullURL.RawQuery != "" {
+				queryParams = discoverroutehelpers.ParseQueryParams(parsedFullURL)
+			}
+
 			// The route URL should not have query params, those are stored in QueryParams
 			urlNoQuery, err := discoverroutehelpers.URLRemoveQueryParams(fullURL)
 			if err != nil {
@@ -126,7 +139,7 @@ func ExtractAnchorRoutes(doc *goquery.Document, baseURL string, routeCaptureConf
 			}
 			urls[urlNoQuery] = struct{}{}
 
-			// Get the path from the full URL
+			// Get the path from the full URL without query params
 			parsedURL, err := url.Parse(urlNoQuery)
 			if err != nil {
 				errors = append(errors, err.Error())
@@ -137,6 +150,11 @@ func ExtractAnchorRoutes(doc *goquery.Document, baseURL string, routeCaptureConf
 				BaseUrl: baseURL,
 				Path:    parsedURL.Path,
 				Method:  common.HttpMethodGet.Ptr(), // Anchor links are accessed via GET
+			}
+
+			// Add query parameters if any were found
+			if len(queryParams) > 0 {
+				routeVar.QueryParams = queryParams
 			}
 
 			routes = append(routes, routeVar)

@@ -90,8 +90,44 @@ func handleNavigation(ctx context.Context, page *rod.Page, redirectChain *[]stri
 	// Use a simple completion flag to prevent further event processing
 	var completed int32 // Use atomic operations for thread safety
 
-	// Set up event listeners for navigation events
+	// Enable network events to capture HTTP redirects
+	enableNetworkErr := proto.NetworkEnable{}.Call(page)
+	if enableNetworkErr != nil {
+		log.Warn("Failed to enable network tracking for redirects", svc1log.SafeParam("error", enableNetworkErr))
+	}
+
+	// Set up event listeners for navigation events and network redirects
 	go page.EachEvent(
+		// Capture HTTP redirect responses at the network level
+		func(e *proto.NetworkResponseReceived) {
+
+			// Only capture redirect responses for the main document
+			if e.Type == proto.NetworkResourceTypeDocument && e.Response.Status >= 300 && e.Response.Status < 400 {
+				// Check if request is already complete
+				if atomic.LoadInt32(&completed) == 1 {
+					return
+				}
+
+				// Extract the Location header from the redirect response
+				if location, exists := e.Response.Headers["location"]; exists && location.Str() != "" {
+					locationURL := location.Str()
+					log.Debug("Captured HTTP redirect", svc1log.SafeParam("from", e.Response.URL), svc1log.SafeParam("to", locationURL), svc1log.SafeParam("status", e.Response.Status))
+
+					// Add the redirect destination to the chain if not already present
+					exists := false
+					for _, url := range *redirectChain {
+						if url == locationURL {
+							exists = true
+							break
+						}
+					}
+					if !exists {
+						*redirectChain = append(*redirectChain, locationURL)
+						log.Debug("Added redirect URL to chain", svc1log.SafeParam("url", locationURL))
+					}
+				}
+			}
+		},
 		func(e *proto.PageFrameNavigated) {
 			// Check if request is already complete
 			if atomic.LoadInt32(&completed) == 1 {

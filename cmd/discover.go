@@ -13,6 +13,7 @@ import (
 	// Internal
 	discoverprobe "github.com/Method-Security/webscan/internal/discover"
 	discoverapplication "github.com/Method-Security/webscan/internal/discover/application"
+	discoverdirectory "github.com/Method-Security/webscan/internal/discover/directory"
 	discoverpage "github.com/Method-Security/webscan/internal/discover/page"
 	discoverroute "github.com/Method-Security/webscan/internal/discover/route"
 	discoversaas "github.com/Method-Security/webscan/internal/discover/saas/active"
@@ -27,11 +28,11 @@ import (
 // InitDiscoverCommand initializes the 'discover' command and its subcommands for the CLI.
 func (a *WebScan) InitDiscoverCommand() {
 	// Discover Command
-	// Subcommands: application, page, probe, route, saas
+	// Subcommands: application, directory, page, probe, route, saas
 	discoverCmd := &cobra.Command{
 		Use:   "discover",
 		Short: "Perform various discovery scans",
-		Long:  `Perform various discovery scans to identify web applications, routes, and static assets.`,
+		Long:  `Perform various discovery scans to identify web applications, directories, routes, and static assets.`,
 	}
 
 	// Application Command
@@ -132,6 +133,155 @@ func (a *WebScan) InitDiscoverCommand() {
 
 	// Add Command to 'Discover' Command
 	discoverCmd.AddCommand(discoverApplicationCmd)
+
+	// Directory Command
+	discoverDirectoryCmd := &cobra.Command{
+		Use:   "directory",
+		Short: "Perform directory and file bruteforce discovery",
+		Long:  `Perform directory and file bruteforce discovery to identify hidden directories, files, and endpoints on web applications.`,
+		Run: func(cmd *cobra.Command, args []string) {
+			defer a.OutputSignal.PanicHandler(cmd.Context())
+
+			// Targets flag
+			targets, err := cmd.Flags().GetStringSlice("targets")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Directory Discovery Flags
+			// Paths flag
+			paths, err := cmd.Flags().GetStringSlice("paths")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			// Wordlist Type flag
+			wordlistType, err := cmd.Flags().GetString("wordlist-type")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			// Wordlist Size flag
+			wordlistSize, err := cmd.Flags().GetString("wordlist-size")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			
+			// Validation: at least one input method must be specified
+			if len(paths) == 0 && wordlistType == "" {
+				a.OutputSignal.AddError(fmt.Errorf("at least one of flags 'paths' or 'wordlist-type' must be provided"))
+				return
+			}
+			
+			// If wordlist-type is specified, wordlist-size is required
+			if wordlistType != "" && wordlistSize == "" {
+				a.OutputSignal.AddError(fmt.Errorf("when 'wordlist-type' is specified, 'wordlist-size' must also be provided"))
+				return
+			}
+			// HTTP Methods flag
+			httpMethodsStr, err := cmd.Flags().GetStringSlice("http-methods")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			httpMethods := make([]common.HttpMethod, 0, len(httpMethodsStr))
+			for _, ms := range httpMethodsStr {
+				m, err := common.NewHttpMethodFromString(strings.ToUpper(ms))
+				if err != nil {
+					a.OutputSignal.AddError(err)
+					return
+				}
+				httpMethods = append(httpMethods, m)
+			}
+
+			// Config flags
+			responseCodes, err := cmd.Flags().GetString("response-codes")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			ignoreBaseContentMatch, err := cmd.Flags().GetBool("ignore-base-content-match")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			verifyTLS, err := cmd.Flags().GetBool("verify-tls")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			threshold, err := cmd.Flags().GetFloat64("threshold")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			timeout, err := cmd.Flags().GetInt("timeout")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			maxRedirectsBaselineRequest, err := cmd.Flags().GetInt("max-redirects-baseline-request")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			maxRuntime, err := cmd.Flags().GetInt("max-runtime")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			threads, err := cmd.Flags().GetInt("threads")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			retries, err := cmd.Flags().GetInt("retries")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			sleep, err := cmd.Flags().GetInt("sleep")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			// Set config
+			config := getDiscoverDirectoryConfig(targets, paths, wordlistType, wordlistSize, httpMethods, responseCodes, ignoreBaseContentMatch, verifyTLS, threshold, timeout, maxRedirectsBaselineRequest, threads, maxRuntime, retries, sleep)
+
+			// Generate a report
+			rep, err := discoverdirectory.RunDirectoryDiscovery(cmd.Context(), config)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+			}
+			a.OutputSignal.Content = rep
+		},
+	}
+	// Target Flags
+	discoverDirectoryCmd.Flags().StringSlice("targets", []string{}, "Targets to be scanned")
+	// Directory Discovery Flags
+	discoverDirectoryCmd.Flags().StringSlice("paths", []string{}, "Paths to scan")
+	discoverDirectoryCmd.Flags().String("wordlist-type", "", "Type of wordlist to use automatically (directories, files)")
+	discoverDirectoryCmd.Flags().String("wordlist-size", "", "Size of wordlist to use (small, medium, large)")
+	discoverDirectoryCmd.Flags().StringSlice("http-methods", []string{"GET"}, "HTTP methods to use (e.g. GET,POST,PUT)")
+	// Config Flags
+	discoverDirectoryCmd.Flags().String("response-codes", "200-299", "Response codes to consider as valid responses")
+	discoverDirectoryCmd.Flags().Bool("ignore-base-content-match", true, "Ignores valid responses with identical size and word length to the base path, typically signifying a web backend redirect")
+	discoverDirectoryCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
+	discoverDirectoryCmd.Flags().Float64("threshold", 0.25, "Threshold for successful results")
+	discoverDirectoryCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
+	discoverDirectoryCmd.Flags().Int("max-redirects-baseline-request", 10, "Maximum number of redirects to follow for the baseline request")
+	discoverDirectoryCmd.Flags().Int("max-runtime", 0, "Maximum time to run the engagement (seconds) (Default is 0, which will run indefinitely)")
+	discoverDirectoryCmd.Flags().Int("threads", 0, "Number of threads to use")
+	discoverDirectoryCmd.Flags().Int("retries", 0, "Number of times to retry a request if it fails")
+	discoverDirectoryCmd.Flags().Int("sleep", 0, "Number of seconds to sleep between requests")
+
+	// Mark Required Flags
+	_ = discoverDirectoryCmd.MarkFlagRequired("targets")
+
+	// Add Command to 'Discover' Command
+	discoverCmd.AddCommand(discoverDirectoryCmd)
 
 	// Page Command
 	// Subcommands: capture
@@ -630,6 +780,42 @@ func getDiscoverSaasConfig(orgs []string, saasCompanies []string, ssoCompanies [
 		HeadlessConfig:    headlessConfig,
 		BrowserbaseConfig: browserbaseConfig,
 	}
+	return config
+}
+
+// getDiscoverDirectoryConfig builds the config for directory discovery.
+func getDiscoverDirectoryConfig(targets []string, paths []string, wordlistType string, wordlistSize string, httpMethods []common.HttpMethod, responseCodes string, ignoreBaseContentMatch bool, verifyTLS bool, threshold float64, timeout int, maxRedirectsBaselineRequest int, threads int, maxRuntime int, retries int, sleep int) discover.DiscoverDirectoryConfig {
+	config := discover.DiscoverDirectoryConfig{
+		Targets:                     targets,
+		Paths:                       paths,
+		HttpMethods:                 httpMethods,
+		ResponseCodes:               responseCodes,
+		IgnoreBaseContentMatch:      ignoreBaseContentMatch,
+		VerifyTls:                   verifyTLS,
+		Threshold:                   threshold,
+		Timeout:                     timeout,
+		MaxRedirectsBaselineRequest: maxRedirectsBaselineRequest,
+		Threads:                     threads,
+		MaxRuntime:                  maxRuntime,
+		Retries:                     retries,
+		Sleep:                       sleep,
+	}
+	
+	// Set wordlist type and size if provided
+	if wordlistType != "" {
+		wordlistTypeEnum, err := discover.NewWordlistTypeFromString(wordlistType)
+		if err == nil {
+			config.WordlistType = &wordlistTypeEnum
+		}
+	}
+	
+	if wordlistSize != "" {
+		wordlistSizeEnum, err := discover.NewWordlistSizeFromString(wordlistSize)
+		if err == nil {
+			config.WordlistSize = &wordlistSizeEnum
+		}
+	}
+	
 	return config
 }
 

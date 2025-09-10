@@ -29,7 +29,7 @@ func SendRequest(ctx context.Context, config common.SendHttpRequestConfig) (*com
 	switch config.RequestMethod {
 	// Standard capture
 	case common.RequestMethodStandard:
-		log.Info("Sending standard request")
+		log.Debug("Sending standard request")
 		httpRequestResponse, err := standard.SendStandardRequest(requestCtx, config)
 		if err != nil {
 			return nil, fmt.Errorf("standard capture failed: %w", err)
@@ -38,7 +38,7 @@ func SendRequest(ctx context.Context, config common.SendHttpRequestConfig) (*com
 
 	// Headless capture
 	case common.RequestMethodHeadless:
-		log.Info("Sending headless request")
+		log.Debug("Sending headless request")
 		var headlessRequester *headless.Requester
 
 		// If the browser is already initialized, use the existing browser
@@ -55,7 +55,7 @@ func SendRequest(ctx context.Context, config common.SendHttpRequestConfig) (*com
 
 	// Browserbase capture
 	case common.RequestMethodBrowserbase:
-		log.Info("Sending browserbase request")
+		log.Debug("Sending browserbase request")
 		client := browserbase.NewBrowserbaseClient(config.BrowserbaseConfig, config.BrowserbaseSecrets)
 		browserbase := browserbase.NewBrowserbaseRequester(ctx, *client, config.Timeout, config.HeadlessConfig.MinDomStabalizeTime)
 		if browserbase == nil {

@@ -18,15 +18,10 @@ package art
 
 import "math/bits"
 
-// HostIdx is just PfxToIdx(octet/8) but faster.
-func HostIdx(octet uint8) uint {
-	return uint(octet) + 256
-}
-
-// pfxToIdx maps 8bit prefixes to numbers. The prefixes range from 0/0 to 255/8
-// and the mapped values from:
+// PfxToIdx maps 8bit prefixes to numbers. The prefixes range from 0/0 to 255/7
+// The return values range from 1 to 255.
 //
-//	  [0x0000_00001 .. 0x0000_0001_1111_1111] = [1 .. 511]
+//	  [0x0000_00001 .. 0x1111_1111] = [1 .. 255]
 //
 //		example: octet/pfxLen: 160/3 = 0b1010_0000/3 => IdxToPfx(160/3) => 13
 //
@@ -37,29 +32,19 @@ func HostIdx(octet uint8) uint {
 //		                          ^ << 3      ^
 //		                 + -----------------------
 //		                               0b0000_1101 = 13
-func pfxToIdx(octet, pfxLen uint8) uint {
-	return uint(octet>>(8-pfxLen)) + uint(1<<pfxLen)
+func PfxToIdx(octet, pfxLen uint8) uint8 {
+	return octet>>(8-pfxLen) + 1<<pfxLen
 }
 
-// PfxToIdx256 maps 8bit prefixes to numbers. The values range [1 .. 255].
-// Values > 255 are shifted by >> 1.
-func PfxToIdx256(octet, pfxLen uint8) uint8 {
-	idx := pfxToIdx(octet, pfxLen)
-	if idx > 255 {
-		idx >>= 1
-	}
-	return uint8(idx)
+// OctetToIdx maps octet/8 prefixes to numbers. The return values range from 256 to 511.
+// OctetToIdx is a special case of PfxToIdx.
+func OctetToIdx(octet uint8) uint {
+	return uint(octet) + 256
 }
 
-// IdxToPfx256 returns the octet and prefix len of baseIdx.
+// IdxToPfx returns the octet and prefix len of baseIdx.
 // It's the inverse to pfxToIdx256.
-//
-// It panics on invalid input.
-func IdxToPfx256(idx uint8) (octet, pfxLen uint8) {
-	if idx == 0 {
-		panic("logic error, idx is 0")
-	}
-
+func IdxToPfx(idx uint8) (octet, pfxLen uint8) {
 	pfxLen = uint8(bits.Len8(idx)) - 1
 	shiftBits := 8 - pfxLen
 
@@ -69,18 +54,14 @@ func IdxToPfx256(idx uint8) (octet, pfxLen uint8) {
 	return
 }
 
-// PfxLen256 returns the bits based on depth and idx.
-func PfxLen256(depth int, idx uint8) uint8 {
-	// see IdxToPfx256
-	if idx == 0 {
-		panic("logic error, idx is 0")
-	}
+// PfxBits returns the bits based on depth and idx.
+func PfxBits(depth int, idx uint8) uint8 {
 	return uint8(depth<<3 + bits.Len8(idx) - 1)
 }
 
-// IdxToRange256 returns the first and last octet of prefix idx.
-func IdxToRange256(idx uint8) (first, last uint8) {
-	first, pfxLen := IdxToPfx256(idx)
+// IdxToRange returns the first and last octet of prefix idx.
+func IdxToRange(idx uint8) (first, last uint8) {
+	first, pfxLen := IdxToPfx(idx)
 	last = first | ^NetMask(pfxLen)
 	return
 }

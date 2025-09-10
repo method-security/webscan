@@ -118,6 +118,21 @@ github.com/Mzack9999/gcache/internal/list
 # github.com/Mzack9999/go-http-digest-auth-client v0.6.1-0.20220414142836-eb8883508809
 ## explicit; go 1.17
 github.com/Mzack9999/go-http-digest-auth-client
+# github.com/Mzack9999/goja v0.0.0-20250507184235-e46100e9c697
+## explicit; go 1.20
+github.com/Mzack9999/goja
+github.com/Mzack9999/goja/ast
+github.com/Mzack9999/goja/file
+github.com/Mzack9999/goja/ftoa
+github.com/Mzack9999/goja/ftoa/internal/fast
+github.com/Mzack9999/goja/parser
+github.com/Mzack9999/goja/token
+github.com/Mzack9999/goja/unistring
+# github.com/Mzack9999/goja_nodejs v0.0.0-20250507184139-66bcbf65c883
+## explicit; go 1.20
+github.com/Mzack9999/goja_nodejs/console
+github.com/Mzack9999/goja_nodejs/require
+github.com/Mzack9999/goja_nodejs/util
 # github.com/ProtonMail/go-crypto v1.1.6
 ## explicit; go 1.17
 github.com/ProtonMail/go-crypto/bitcurves
@@ -408,7 +423,7 @@ github.com/bodgit/windows
 # github.com/buger/jsonparser v1.1.1
 ## explicit; go 1.13
 github.com/buger/jsonparser
-# github.com/bytedance/sonic v1.13.3
+# github.com/bytedance/sonic v1.14.0
 ## explicit; go 1.17
 github.com/bytedance/sonic
 github.com/bytedance/sonic/ast
@@ -442,7 +457,7 @@ github.com/bytedance/sonic/internal/utils
 github.com/bytedance/sonic/option
 github.com/bytedance/sonic/unquote
 github.com/bytedance/sonic/utf8
-# github.com/bytedance/sonic/loader v0.2.4
+# github.com/bytedance/sonic/loader v0.3.0
 ## explicit; go 1.16
 github.com/bytedance/sonic/loader
 github.com/bytedance/sonic/loader/internal/abi
@@ -581,21 +596,6 @@ github.com/dlclark/regexp2/syntax
 # github.com/docker/go-units v0.5.0
 ## explicit
 github.com/docker/go-units
-# github.com/dop251/goja v0.0.0-20250624190929-4d26883d182a
-## explicit; go 1.20
-github.com/dop251/goja
-github.com/dop251/goja/ast
-github.com/dop251/goja/file
-github.com/dop251/goja/ftoa
-github.com/dop251/goja/ftoa/internal/fast
-github.com/dop251/goja/parser
-github.com/dop251/goja/token
-github.com/dop251/goja/unistring
-# github.com/dop251/goja_nodejs v0.0.0-20250409162600-f7acab6894b0
-## explicit; go 1.20
-github.com/dop251/goja_nodejs/console
-github.com/dop251/goja_nodejs/require
-github.com/dop251/goja_nodejs/util
 # github.com/dprotaso/go-yit v0.0.0-20220510233725-9ba8df137936
 ## explicit; go 1.13
 github.com/dprotaso/go-yit
@@ -616,7 +616,7 @@ github.com/emirpasic/gods/lists/arraylist
 github.com/emirpasic/gods/trees
 github.com/emirpasic/gods/trees/binaryheap
 github.com/emirpasic/gods/utils
-# github.com/fatih/color v1.16.0
+# github.com/fatih/color v1.18.0
 ## explicit; go 1.17
 github.com/fatih/color
 # github.com/fatih/structs v1.1.0
@@ -634,7 +634,7 @@ github.com/gabriel-vasile/mimetype
 github.com/gabriel-vasile/mimetype/internal/charset
 github.com/gabriel-vasile/mimetype/internal/json
 github.com/gabriel-vasile/mimetype/internal/magic
-# github.com/gaissmai/bart v0.20.4
+# github.com/gaissmai/bart v0.20.5
 ## explicit; go 1.23.0
 github.com/gaissmai/bart
 github.com/gaissmai/bart/internal/allot
@@ -870,8 +870,8 @@ github.com/hashicorp/go-cleanhttp
 # github.com/hashicorp/go-multierror v1.1.1
 ## explicit; go 1.13
 github.com/hashicorp/go-multierror
-# github.com/hashicorp/go-retryablehttp v0.7.7
-## explicit; go 1.19
+# github.com/hashicorp/go-retryablehttp v0.7.8
+## explicit; go 1.23
 github.com/hashicorp/go-retryablehttp
 # github.com/hashicorp/go-uuid v1.0.3
 ## explicit
@@ -1136,9 +1136,21 @@ github.com/oasdiff/yaml
 # github.com/oasdiff/yaml3 v0.0.0-20250309153720-d2182401db90
 ## explicit; go 1.22.5
 github.com/oasdiff/yaml3
-# github.com/olekukonko/tablewriter v0.0.5
-## explicit; go 1.12
+# github.com/olekukonko/errors v1.1.0
+## explicit; go 1.21
+github.com/olekukonko/errors
+# github.com/olekukonko/ll v0.0.9
+## explicit; go 1.21
+github.com/olekukonko/ll
+github.com/olekukonko/ll/lh
+github.com/olekukonko/ll/lx
+# github.com/olekukonko/tablewriter v1.0.8
+## explicit; go 1.21
 github.com/olekukonko/tablewriter
+github.com/olekukonko/tablewriter/pkg/twwarp
+github.com/olekukonko/tablewriter/pkg/twwidth
+github.com/olekukonko/tablewriter/renderer
+github.com/olekukonko/tablewriter/tw
 # github.com/palantir/pkg v1.1.0
 ## explicit; go 1.19
 github.com/palantir/pkg
@@ -1255,7 +1267,7 @@ github.com/projectdiscovery/asnmap/libs
 # github.com/projectdiscovery/blackrock v0.0.1
 ## explicit; go 1.18
 github.com/projectdiscovery/blackrock
-# github.com/projectdiscovery/cdncheck v1.1.17
+# github.com/projectdiscovery/cdncheck v1.1.26
 ## explicit; go 1.21
 github.com/projectdiscovery/cdncheck
 # github.com/projectdiscovery/clistats v0.1.1
@@ -1267,8 +1279,8 @@ github.com/projectdiscovery/dsl
 github.com/projectdiscovery/dsl/deserialization
 github.com/projectdiscovery/dsl/llm
 github.com/projectdiscovery/dsl/randomip
-# github.com/projectdiscovery/fastdialer v0.4.1
-## explicit; go 1.22.0
+# github.com/projectdiscovery/fastdialer v0.4.4
+## explicit; go 1.24.0
 github.com/projectdiscovery/fastdialer/fastdialer
 github.com/projectdiscovery/fastdialer/fastdialer/ja3/impersonate
 github.com/projectdiscovery/fastdialer/fastdialer/metafiles
@@ -1311,7 +1323,7 @@ github.com/projectdiscovery/gostruct
 github.com/projectdiscovery/gozero
 github.com/projectdiscovery/gozero/cmdexec
 github.com/projectdiscovery/gozero/types
-# github.com/projectdiscovery/hmap v0.0.91
+# github.com/projectdiscovery/hmap v0.0.92
 ## explicit; go 1.24.0
 github.com/projectdiscovery/hmap/filekv
 github.com/projectdiscovery/hmap/store/cache
@@ -1344,10 +1356,10 @@ github.com/projectdiscovery/mapcidr/asn
 ## explicit; go 1.17
 github.com/projectdiscovery/n3iwf/pkg/ike/message
 github.com/projectdiscovery/n3iwf/pkg/logger
-# github.com/projectdiscovery/networkpolicy v0.1.17
+# github.com/projectdiscovery/networkpolicy v0.1.18
 ## explicit; go 1.24.0
 github.com/projectdiscovery/networkpolicy
-# github.com/projectdiscovery/nuclei/v3 v3.4.7
+# github.com/projectdiscovery/nuclei/v3 v3.4.10
 ## explicit; go 1.24.1
 github.com/projectdiscovery/nuclei/v3/internal/colorizer
 github.com/projectdiscovery/nuclei/v3/internal/httpapi
@@ -1543,12 +1555,12 @@ github.com/projectdiscovery/rdap
 github.com/projectdiscovery/rdap/bootstrap
 github.com/projectdiscovery/rdap/bootstrap/cache
 github.com/projectdiscovery/rdap/sandbox
-# github.com/projectdiscovery/retryabledns v1.0.103
+# github.com/projectdiscovery/retryabledns v1.0.105
 ## explicit; go 1.24.0
 github.com/projectdiscovery/retryabledns
 github.com/projectdiscovery/retryabledns/doh
 github.com/projectdiscovery/retryabledns/hostsfile
-# github.com/projectdiscovery/retryablehttp-go v1.0.116
+# github.com/projectdiscovery/retryablehttp-go v1.0.119
 ## explicit; go 1.24.0
 github.com/projectdiscovery/retryablehttp-go
 # github.com/projectdiscovery/sarif v0.0.1
@@ -1589,7 +1601,7 @@ github.com/projectdiscovery/uncover/sources/agent/zoomeye
 # github.com/projectdiscovery/useragent v0.0.101
 ## explicit; go 1.21
 github.com/projectdiscovery/useragent
-# github.com/projectdiscovery/utils v0.4.21
+# github.com/projectdiscovery/utils v0.4.23
 ## explicit; go 1.24.0
 github.com/projectdiscovery/utils/auth/pdcp
 github.com/projectdiscovery/utils/conn/connpool
@@ -1607,7 +1619,6 @@ github.com/projectdiscovery/utils/generic
 github.com/projectdiscovery/utils/global
 github.com/projectdiscovery/utils/http
 github.com/projectdiscovery/utils/ip
-github.com/projectdiscovery/utils/log
 github.com/projectdiscovery/utils/maps
 github.com/projectdiscovery/utils/memguardian
 github.com/projectdiscovery/utils/memoize
@@ -1633,7 +1644,7 @@ github.com/projectdiscovery/utils/time
 github.com/projectdiscovery/utils/unit
 github.com/projectdiscovery/utils/update
 github.com/projectdiscovery/utils/url
-# github.com/projectdiscovery/wappalyzergo v0.2.35
+# github.com/projectdiscovery/wappalyzergo v0.2.36
 ## explicit; go 1.23.0
 github.com/projectdiscovery/wappalyzergo
 # github.com/projectdiscovery/yamldoc-go v1.0.6
@@ -1650,8 +1661,8 @@ github.com/redis/go-redis/v9/internal/pool
 github.com/redis/go-redis/v9/internal/proto
 github.com/redis/go-redis/v9/internal/rand
 github.com/redis/go-redis/v9/internal/util
-# github.com/refraction-networking/utls v1.7.0
-## explicit; go 1.24.0
+# github.com/refraction-networking/utls v1.7.1
+## explicit; go 1.24
 github.com/refraction-networking/utls
 github.com/refraction-networking/utls/dicttls
 github.com/refraction-networking/utls/internal/boring
@@ -1831,7 +1842,7 @@ github.com/valyala/fasttemplate
 # github.com/vmware-labs/yaml-jsonpath v0.3.2
 ## explicit; go 1.13
 github.com/vmware-labs/yaml-jsonpath/pkg/yamlpath
-# github.com/weppos/publicsuffix-go v0.40.3-0.20250311103038-7794c8c0723b
+# github.com/weppos/publicsuffix-go v0.40.3-0.20250408071509-6074bbe7fd39
 ## explicit; go 1.23.0
 github.com/weppos/publicsuffix-go/publicsuffix
 # github.com/wk8/go-ordered-map/v2 v2.1.8

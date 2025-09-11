@@ -125,7 +125,7 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 			randomBaselineValidCodes[code] = true
 		}
 		randomBaselineValidCodes[404] = true // Accept 404 for random paths (expected behavior)
-		
+
 		baselineRandomRequest, baselineSizeRandomPath, baselineWordsRandomPath, err := baseLine(ctx, baseURL, "xxxx", randomBaselineValidCodes, 0, &config)
 		if err != nil {
 			log.Debug("Failed to get baseline random path", svc1log.SafeParam("error", err.Error()))
@@ -292,24 +292,24 @@ func baseLine(ctx context.Context, baseURL string, path string, validCodes map[i
 // gatherPaths gathers all paths from the config
 func gatherPaths(paths []string, wordlistType *discover.WordlistType, wordlistSize *discover.WordlistSize) ([]string, error) {
 	var allPaths []string
-	
+
 	// Add manual paths
 	allPaths = append(allPaths, paths...)
-	
+
 	// Add paths from automatic wordlist selection
 	if wordlistType != nil && wordlistSize != nil {
 		wordlistPath, err := getWordlistPath(*wordlistType, *wordlistSize)
 		if err != nil {
 			return nil, err
 		}
-		
+
 		wordlistPaths, err := utils.GetEntriesFromTXTFiles([]string{wordlistPath})
 		if err != nil {
 			return nil, fmt.Errorf("failed to load wordlist %s: %v", wordlistPath, err)
 		}
 		allPaths = append(allPaths, wordlistPaths...)
 	}
-	
+
 	return allPaths, nil
 }
 
@@ -318,22 +318,22 @@ func getWordlistPath(wordlistType discover.WordlistType, wordlistSize discover.W
 	// Convert enums to strings
 	typeStr := strings.ToLower(string(wordlistType))
 	sizeStr := strings.ToLower(string(wordlistSize))
-	
+
 	// Construct filename following the pattern: raft-{size}-{type}-lowercase.txt
 	filename := fmt.Sprintf("raft-%s-%s-lowercase.txt", sizeStr, typeStr)
-	
+
 	// Try container path first (for Docker deployment)
 	containerPath := fmt.Sprintf("var/conf/discover/directory/%s", filename)
 	if _, err := os.Stat(containerPath); err == nil {
 		return containerPath, nil
 	}
-	
+
 	// Fallback to local development path
 	localPath := fmt.Sprintf("configs/discover/directory/%s", filename)
 	if _, err := os.Stat(localPath); err == nil {
 		return localPath, nil
 	}
-	
+
 	// If neither path exists, return an error with both attempted paths
 	return "", fmt.Errorf("wordlist file not found at %s or %s", containerPath, localPath)
 }

@@ -174,7 +174,7 @@ if err != nil {
   ResponseCode:
     enum: [OK_200, NOT_FOUND_404, SERVER_ERROR_500, ...]
   VulnerabilityType:
-    enum: [SQL_INJECTION, XSS, CSRF, DIRECTORY_TRAVERSAL, ...]
+    enum: [SQL_INJECTION, XSS, CSRF, ...]
   ```
 - **Type Organization**: Follow the CLI Development Conventions type ordering:
   1. ENUMs (e.g., `HttpMethod`, `VulnerabilityType`)

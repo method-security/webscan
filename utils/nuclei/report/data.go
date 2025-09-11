@@ -117,12 +117,6 @@ func getHTTPRequestResponse(ev *nout.ResultEvent) (*common.HttpRequestResponse, 
 		request.Method = m
 	}
 
-	// Headless template fallback: if method is empty and we have a headless template, default to GET
-	if method == "" && strings.Contains(strings.ToLower(ev.Type), "headless") && ev.TemplateID == "xss-injection" {
-		if m, err := common.NewHttpMethodFromString("GET"); err == nil {
-			request.Method = m
-		}
-	}
 	request.BaseHeaders = singleToMulti(requestHeaders)
 	if _, ok := request.BaseHeaders["Content-Type"]; !ok {
 		request.BaseHeaders["Content-Type"] = []string{contentType}
@@ -147,11 +141,6 @@ func getHTTPRequestResponse(ev *nout.ResultEvent) (*common.HttpRequestResponse, 
 	statusCode, responseHeaders, responseBody := parseRawResponse(ev.Response)
 	if responseBody == "" {
 		responseBody = ev.Response
-	}
-
-	// Headless template fallback: if status code is 0 and we have a valid response, default to 200
-	if statusCode == 0 && strings.Contains(strings.ToLower(ev.Type), "headless") && responseBody != "" && ev.TemplateID == "xss-injection" {
-		statusCode = 200
 	}
 
 	response = requesthelpers.CreateHTTPResponse(statusCode, nil, singleToMulti(responseHeaders), responseBody)

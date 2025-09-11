@@ -38,16 +38,28 @@ func RunNucleiEngine(ctx context.Context, config nuclei.NucleiConfig) ([]*nuclei
 	log := svc1log.FromContext(ctx)
 	log.Info("Starting Nuclei Run of mode: Scan")
 
-	// Get the template file system
-	var fileSystems []fs.FS
+	// Get the template and workflow file systems
+	var templateFileSystems, workflowFileSystems []fs.FS
 	var err error
-	fileSystems, err = templates.GetTemplateFileSystem(ctx, config.TemplatePaths)
-	if err != nil {
-		return nil, err
+
+	// Get template file systems
+	if config.TemplatePaths != nil {
+		templateFileSystems, err = templates.GetTemplateFileSystem(ctx, config.TemplatePaths)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Get workflow file systems
+	if config.WorkflowPaths != nil {
+		workflowFileSystems, err = templates.GetTemplateFileSystem(ctx, config.WorkflowPaths)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Get the runner config
-	runnerConfig := runner.GetRunnerConfig(fileSystems, config)
+	runnerConfig := runner.GetRunnerConfig(templateFileSystems, workflowFileSystems, config)
 
 	// Build the raw requests for dast mode
 	if config.RunMode == nuclei.NucleiRunModeDast {

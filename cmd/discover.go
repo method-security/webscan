@@ -168,13 +168,13 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			
+
 			// Validation: at least one input method must be specified
 			if len(paths) == 0 && wordlistType == "" {
 				a.OutputSignal.AddError(fmt.Errorf("at least one of flags 'paths' or 'wordlist-type' must be provided"))
 				return
 			}
-			
+
 			// If wordlist-type is specified, wordlist-size is required
 			if wordlistType != "" && wordlistSize == "" {
 				a.OutputSignal.AddError(fmt.Errorf("when 'wordlist-type' is specified, 'wordlist-size' must also be provided"))
@@ -800,7 +800,7 @@ func getDiscoverDirectoryConfig(targets []string, paths []string, wordlistType s
 		Retries:                     retries,
 		Sleep:                       sleep,
 	}
-	
+
 	// Set wordlist type and size if provided
 	if wordlistType != "" {
 		wordlistTypeEnum, err := discover.NewWordlistTypeFromString(wordlistType)
@@ -808,14 +808,14 @@ func getDiscoverDirectoryConfig(targets []string, paths []string, wordlistType s
 			config.WordlistType = &wordlistTypeEnum
 		}
 	}
-	
+
 	if wordlistSize != "" {
 		wordlistSizeEnum, err := discover.NewWordlistSizeFromString(wordlistSize)
 		if err == nil {
 			config.WordlistSize = &wordlistSizeEnum
 		}
 	}
-	
+
 	return config
 }
 

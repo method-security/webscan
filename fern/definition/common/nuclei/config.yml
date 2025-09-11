@@ -17,6 +17,7 @@ types:
       runMode: NucleiRunMode
       dast: optional<NucleiDastConfig>
       templatePaths: optional<list<string>>
+      workflowPaths: optional<list<string>>
       timeout: integer
       threads: integer
       proxy: optional<string>

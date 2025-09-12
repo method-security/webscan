@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"maps"
 	"net/http"
 	"strconv"
 	"strings"
@@ -743,7 +742,7 @@ func (request *Request) executeRequest(input *contextargs.Context, generatedRequ
 		})
 	} else {
 		//** For Normal requests **//
-		hostname = generatedRequest.request.Host
+		hostname = generatedRequest.request.URL.Host
 		formedURL = generatedRequest.request.String()
 		// if nuclei-project is available check if the request was already sent previously
 		if request.options.ProjectFile != nil {
@@ -819,11 +818,6 @@ func (request *Request) executeRequest(input *contextargs.Context, generatedRequ
 		}
 	}
 
-	dialers := protocolstate.GetDialersWithId(request.options.Options.ExecutionId)
-	if dialers == nil {
-		return fmt.Errorf("dialers not found for execution id %s", request.options.Options.ExecutionId)
-	}
-
 	if err != nil {
 		// rawhttp doesn't support draining response bodies.
 		if resp != nil && resp.Body != nil && generatedRequest.rawRequest == nil && !generatedRequest.original.Pipeline {
@@ -844,7 +838,7 @@ func (request *Request) executeRequest(input *contextargs.Context, generatedRequ
 		if input.MetaInput.CustomIP != "" {
 			outputEvent["ip"] = input.MetaInput.CustomIP
 		} else {
-			outputEvent["ip"] = dialers.Fastdialer.GetDialedIP(hostname)
+			outputEvent["ip"] = request.dialer.GetDialedIP(hostname)
 			// try getting cname
 			request.addCNameIfAvailable(hostname, outputEvent)
 		}
@@ -864,10 +858,8 @@ func (request *Request) executeRequest(input *contextargs.Context, generatedRequ
 	var curlCommand string
 	if !request.Unsafe && resp != nil && generatedRequest.request != nil && resp.Request != nil && !request.Race {
 		bodyBytes, _ := generatedRequest.request.BodyBytes()
-		// Use a clone to avoid a race condition with the http transport
-		req := resp.Request.Clone(resp.Request.Context())
-		req.Body = io.NopCloser(bytes.NewReader(bodyBytes))
-		command, err := http2curl.GetCurlCommand(req)
+		resp.Request.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+		command, err := http2curl.GetCurlCommand(generatedRequest.request.Request)
 		if err == nil && command != nil {
 			curlCommand = command.String()
 		}
@@ -966,7 +958,7 @@ func (request *Request) executeRequest(input *contextargs.Context, generatedRequ
 		if input.MetaInput.CustomIP != "" {
 			outputEvent["ip"] = input.MetaInput.CustomIP
 		} else {
-			dialer := dialers.Fastdialer
+			dialer := protocolstate.GetDialer()
 			if dialer != nil {
 				outputEvent["ip"] = dialer.GetDialedIP(hostname)
 			}
@@ -977,8 +969,12 @@ func (request *Request) executeRequest(input *contextargs.Context, generatedRequ
 		if request.options.Interactsh != nil {
 			request.options.Interactsh.MakePlaceholders(generatedRequest.interactshURLs, outputEvent)
 		}
-		maps.Copy(finalEvent, previousEvent)
-		maps.Copy(finalEvent, outputEvent)
+		for k, v := range previousEvent {
+			finalEvent[k] = v
+		}
+		for k, v := range outputEvent {
+			finalEvent[k] = v
+		}
 
 		// Add to history the current request number metadata if asked by the user.
 		if request.NeedsRequestCondition() {

@@ -12,6 +12,7 @@ import (
 	"github.com/projectdiscovery/nuclei/v3/pkg/catalog/config"
 	"github.com/projectdiscovery/nuclei/v3/pkg/catalog/loader"
 
+	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/nuclei/v3/pkg/templates"
 	"github.com/projectdiscovery/nuclei/v3/pkg/types"
 )
@@ -24,7 +25,7 @@ func (r *Runner) logAvailableTemplate(tplPath string) {
 		panic("not a template")
 	}
 	if err != nil {
-		r.Logger.Error().Msgf("Could not parse file '%s': %s\n", tplPath, err)
+		gologger.Error().Msgf("Could not parse file '%s': %s\n", tplPath, err)
 	} else {
 		r.verboseTemplate(tpl)
 	}
@@ -32,14 +33,14 @@ func (r *Runner) logAvailableTemplate(tplPath string) {
 
 // log available templates for verbose (-vv)
 func (r *Runner) verboseTemplate(tpl *templates.Template) {
-	r.Logger.Print().Msgf("%s\n", templates.TemplateLogMessage(tpl.ID,
+	gologger.Print().Msgf("%s\n", templates.TemplateLogMessage(tpl.ID,
 		types.ToString(tpl.Info.Name),
 		tpl.Info.Authors.ToSlice(),
 		tpl.Info.SeverityHolder.Severity))
 }
 
 func (r *Runner) listAvailableStoreTemplates(store *loader.Store) {
-	r.Logger.Print().Msgf(
+	gologger.Print().Msgf(
 		"\nListing available %v nuclei templates for %v",
 		config.DefaultConfig.TemplateVersion,
 		config.DefaultConfig.TemplatesDirectory,
@@ -51,20 +52,20 @@ func (r *Runner) listAvailableStoreTemplates(store *loader.Store) {
 				path := tpl.Path
 				tplBody, err := store.ReadTemplateFromURI(path, true)
 				if err != nil {
-					r.Logger.Error().Msgf("Could not read the template %s: %s", path, err)
+					gologger.Error().Msgf("Could not read the template %s: %s", path, err)
 					continue
 				}
 				if colorize {
 					path = aurora.Cyan(tpl.Path).String()
 					tplBody, err = r.highlightTemplate(&tplBody)
 					if err != nil {
-						r.Logger.Error().Msgf("Could not highlight the template %s: %s", tpl.Path, err)
+						gologger.Error().Msgf("Could not highlight the template %s: %s", tpl.Path, err)
 						continue
 					}
 				}
-				r.Logger.Print().Msgf("Template: %s\n\n%s", path, tplBody)
+				gologger.Silent().Msgf("Template: %s\n\n%s", path, tplBody)
 			} else {
-				r.Logger.Print().Msgf("%s\n", strings.TrimPrefix(tpl.Path, config.DefaultConfig.TemplatesDirectory+string(filepath.Separator)))
+				gologger.Silent().Msgf("%s\n", strings.TrimPrefix(tpl.Path, config.DefaultConfig.TemplatesDirectory+string(filepath.Separator)))
 			}
 		} else {
 			r.verboseTemplate(tpl)
@@ -73,7 +74,7 @@ func (r *Runner) listAvailableStoreTemplates(store *loader.Store) {
 }
 
 func (r *Runner) listAvailableStoreTags(store *loader.Store) {
-	r.Logger.Print().Msgf(
+	gologger.Print().Msgf(
 		"\nListing available %v nuclei tags for %v",
 		config.DefaultConfig.TemplateVersion,
 		config.DefaultConfig.TemplatesDirectory,
@@ -99,9 +100,9 @@ func (r *Runner) listAvailableStoreTags(store *loader.Store) {
 	for _, tag := range tagsList {
 		if r.options.JSONL {
 			marshalled, _ := jsoniter.Marshal(tag)
-			r.Logger.Debug().Msgf("%s", string(marshalled))
+			gologger.Silent().Msgf("%s\n", string(marshalled))
 		} else {
-			r.Logger.Debug().Msgf("%s (%d)", tag.Key, tag.Value)
+			gologger.Silent().Msgf("%s (%d)\n", tag.Key, tag.Value)
 		}
 	}
 }

@@ -1,21 +1,15 @@
 package rdapclientpool
 
 import (
-	"sync"
-
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/nuclei/v3/pkg/types"
 	"github.com/projectdiscovery/rdap"
 )
 
 var normalClient *rdap.Client
-var m sync.Mutex
 
 // Init initializes the client pool implementation
 func Init(options *types.Options) error {
-	m.Lock()
-	defer m.Unlock()
-
 	// Don't create clients if already created in the past.
 	if normalClient != nil {
 		return nil
@@ -30,12 +24,6 @@ func Init(options *types.Options) error {
 	return nil
 }
 
-func getNormalClient() *rdap.Client {
-	m.Lock()
-	defer m.Unlock()
-	return normalClient
-}
-
 // Configuration contains the custom configuration options for a client - placeholder
 type Configuration struct{}
 
@@ -46,5 +34,5 @@ func (c *Configuration) Hash() string {
 
 // Get creates or gets a client for the protocol based on custom configuration
 func Get(options *types.Options, configuration *Configuration) (*rdap.Client, error) {
-	return getNormalClient(), nil
+	return normalClient, nil
 }

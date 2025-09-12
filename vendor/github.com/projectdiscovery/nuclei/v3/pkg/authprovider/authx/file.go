@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/projectdiscovery/nuclei/v3/pkg/utils/json"
-	"github.com/projectdiscovery/utils/errkit"
+	errorutil "github.com/projectdiscovery/utils/errors"
 	"github.com/projectdiscovery/utils/generic"
 	stringsutil "github.com/projectdiscovery/utils/strings"
 	"gopkg.in/yaml.v3"
@@ -237,7 +237,7 @@ func GetAuthDataFromYAML(data []byte) (*Authx, error) {
 	var auth Authx
 	err := yaml.Unmarshal(data, &auth)
 	if err != nil {
-		return nil, errkit.Append(errkit.New("could not unmarshal yaml"), err)
+		return nil, errorutil.NewWithErr(err).Msgf("could not unmarshal yaml")
 	}
 	return &auth, nil
 }
@@ -247,7 +247,7 @@ func GetAuthDataFromJSON(data []byte) (*Authx, error) {
 	var auth Authx
 	err := json.Unmarshal(data, &auth)
 	if err != nil {
-		return nil, errkit.Append(errkit.New("could not unmarshal json"), err)
+		return nil, errorutil.NewWithErr(err).Msgf("could not unmarshal json")
 	}
 	return &auth, nil
 }

@@ -3,7 +3,6 @@ package dns
 import (
 	"encoding/hex"
 	"fmt"
-	maps0 "maps"
 	"strings"
 	"sync"
 
@@ -182,8 +181,12 @@ func (request *Request) execute(input *contextargs.Context, domain string, metad
 	// expose response variables in proto_var format
 	// this is no-op if the template is not a multi protocol template
 	request.options.AddTemplateVars(input.MetaInput, request.Type(), request.ID, outputEvent)
-	maps0.Copy(outputEvent, previous)
-	maps0.Copy(outputEvent, vars)
+	for k, v := range previous {
+		outputEvent[k] = v
+	}
+	for k, v := range vars {
+		outputEvent[k] = v
+	}
 	// add variables from template context before matching/extraction
 	if request.options.HasTemplateCtx(input.MetaInput) {
 		outputEvent = generators.MergeMaps(outputEvent, request.options.GetTemplateCtx(input.MetaInput).GetAll())

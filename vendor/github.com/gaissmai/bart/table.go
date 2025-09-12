@@ -65,12 +65,12 @@ func (t *Table[V]) rootNodeByVersion(is4 bool) *node[V] {
 	return &t.root6
 }
 
-// maxDepthAndLastBits, get the max depth in the trie and remaining bits
-// for a given CIDR at max depth.
+// maxDepthAndLastBits, get last significant octet and remaining bits
+// for a given netip.Prefix.
 //
 // ATTENTION: Split the IP prefixes at 8bit borders, count from 0.
 //
-//	/7, /15, /23, /31, ..., /127
+//	/0, /7, /15, /23, ...
 //
 //	BitPos: [0-7],[8-15],[16-23],[24-31],[32]
 //	BitPos: [0-7],[8-15],[16-23],[24-31],[32-39],[40-47],[48-55],[56-63],...,[120-127],[128]
@@ -92,15 +92,15 @@ func (t *Table[V]) rootNodeByVersion(is4 bool) *node[V] {
 //	as path-compressed leaf.
 //
 // We are not splitting at /8, /16, ..., because this would mean that the
-// first node would have 512 prefixes, 9 bits from [0-8]. All remaining nodes
-// would then only have 8 bits from [9-16], [17-24], [25..32], ...
-// but the algorithm would then require a variable length bitset.
+// first node would have 512 prefixes, bits from [0-8]. All remaining nodes
+// would then only have 256 prefixes, e.g. bits from [9-16], [17-24], ...
+// but the algorithm would then require a variable bitset.
 //
 // If you can commit to a fixed size of [4]uint64, then the algorithm is
 // much faster due to modern CPUs.
 //
-// Perhaps a future Go version that supports SIMD instructions for the [4]uint64 vectors
-// will make the algorithm even faster on suitable hardware.
+// One could also imagine special hardware, since the actual algorithm consists
+// only of a few standardized bitset operations on a fixed length of 256 bits.
 func maxDepthAndLastBits(bits int) (maxDepth int, lastBits uint8) {
 	// maxDepth:  range from 0..4 or 0..16 !ATTENTION: not 0..3 or 0..15
 	// lastBits:  range from 0..7
@@ -155,7 +155,7 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 	for depth, octet := range octets {
 		// last octet from prefix, update/insert prefix into node
 		if depth == maxDepth {
-			newVal, exists := n.prefixes.UpdateAt(art.PfxToIdx(octet, lastBits), cb)
+			newVal, exists := n.prefixes.UpdateAt(art.PfxToIdx256(octet, lastBits), cb)
 			if !exists {
 				t.sizeUpdate(is4, 1)
 			}
@@ -265,7 +265,7 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
 
 		if depth == maxDepth {
 			// try to delete prefix in trie node
-			val, exists = n.prefixes.DeleteAt(art.PfxToIdx(octet, lastBits))
+			val, exists = n.prefixes.DeleteAt(art.PfxToIdx256(octet, lastBits))
 			if !exists {
 				return
 			}
@@ -346,7 +346,7 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 	// find the trie node
 	for depth, octet := range octets {
 		if depth == maxDepth {
-			return n.prefixes.Get(art.PfxToIdx(octet, lastBits))
+			return n.prefixes.Get(art.PfxToIdx256(octet, lastBits))
 		}
 
 		if !n.children.Test(octet) {
@@ -395,7 +395,7 @@ func (t *Table[V]) Contains(ip netip.Addr) bool {
 
 	for _, octet := range ip.AsSlice() {
 		// for contains, any lpm match is good enough, no backtracking needed
-		if n.prefixes.Len() != 0 && n.lpmTest(art.OctetToIdx(octet)) {
+		if n.prefixes.Len() != 0 && n.lpmTest(art.HostIdx(octet)) {
 			return true
 		}
 
@@ -490,7 +490,7 @@ LOOP:
 
 		// longest prefix match, skip if node has no prefixes
 		if n.prefixes.Len() != 0 {
-			idx := art.OctetToIdx(octets[depth])
+			idx := art.HostIdx(octets[depth])
 			// lpmGet(idx), manually inlined
 			// --------------------------------------------------------------
 			if topIdx, ok := n.prefixes.IntersectionTop(lpm.BackTrackingBitset(idx)); ok {
@@ -613,9 +613,9 @@ LOOP:
 		var idx uint
 		octet = octets[depth]
 		if depth == maxDepth {
-			idx = uint(art.PfxToIdx(octet, lastBits))
+			idx = uint(art.PfxToIdx256(octet, lastBits))
 		} else {
-			idx = art.OctetToIdx(octet)
+			idx = art.HostIdx(octet)
 		}
 
 		// manually inlined: lpmGet(idx)
@@ -629,11 +629,11 @@ LOOP:
 
 			// called from LookupPrefixLPM
 
-			// get the bits from depth and top idx
-			pfxBits := int(art.PfxBits(depth, topIdx))
+			// get the pfxLen from depth and top idx
+			pfxLen := art.PfxLen256(depth, topIdx)
 
 			// calculate the lpmPfx from incoming ip and new mask
-			lpmPfx, _ = ip.Prefix(pfxBits)
+			lpmPfx, _ = ip.Prefix(int(pfxLen))
 			return lpmPfx, val, ok
 		}
 	}
@@ -732,9 +732,9 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 			var idx uint
 			octet = octets[depth]
 			if depth == maxDepth {
-				idx = uint(art.PfxToIdx(octet, lastBits))
+				idx = uint(art.PfxToIdx256(octet, lastBits))
 			} else {
-				idx = art.OctetToIdx(octet)
+				idx = art.HostIdx(octet)
 			}
 
 			// micro benchmarking, skip if there is no match
@@ -774,7 +774,7 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 		// find the trie node
 		for depth, octet := range octets {
 			if depth == maxDepth {
-				idx := art.PfxToIdx(octet, lastBits)
+				idx := art.PfxToIdx256(octet, lastBits)
 				_ = n.eachSubnet(octets, depth, is4, idx, yield)
 				return
 			}
@@ -931,7 +931,7 @@ func (t *Table[V]) All6() iter.Seq2[netip.Prefix, V] {
 	}
 }
 
-// AllSorted returns an iterator over key-value pairs from Table in natural CIDR sort order.
+// AllSorted returns an iterator over key-value pairs from Table2 in natural CIDR sort order.
 func (t *Table[V]) AllSorted() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
 		_ = t.root4.allRecSorted(stridePath{}, 0, true, yield) &&

@@ -6,5 +6,4 @@ use (
 	./fuzz
 	./generic_test
 	./loader
-	./issue_test
 )

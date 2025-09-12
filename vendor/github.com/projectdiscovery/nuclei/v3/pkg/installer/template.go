@@ -17,7 +17,7 @@ import (
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/nuclei/v3/pkg/catalog/config"
 	"github.com/projectdiscovery/nuclei/v3/pkg/external/customtemplates"
-	"github.com/projectdiscovery/utils/errkit"
+	errorutil "github.com/projectdiscovery/utils/errors"
 	fileutil "github.com/projectdiscovery/utils/file"
 	stringsutil "github.com/projectdiscovery/utils/strings"
 	updateutils "github.com/projectdiscovery/utils/update"
@@ -53,14 +53,11 @@ func (t *templateUpdateResults) String() string {
 		},
 	}
 	table := tablewriter.NewWriter(&buff)
-	table.Header([]string{"Total", "Added", "Modified", "Removed"})
+	table.SetHeader([]string{"Total", "Added", "Modified", "Removed"})
 	for _, v := range data {
-		_ = table.Append(v)
+		table.Append(v)
 	}
-	_ = table.Render()
-	defer func() {
-		_ = table.Close()
-	}()
+	table.Render()
 	return buff.String()
 }
 
@@ -80,7 +77,7 @@ func (t *TemplateManager) FreshInstallIfNotExists() error {
 	}
 	gologger.Info().Msgf("nuclei-templates are not installed, installing...")
 	if err := t.installTemplatesAt(config.DefaultConfig.TemplatesDirectory); err != nil {
-		return errkit.Append(errkit.New(fmt.Sprintf("failed to install templates at %s", config.DefaultConfig.TemplatesDirectory)), err)
+		return errorutil.NewWithErr(err).Msgf("failed to install templates at %s", config.DefaultConfig.TemplatesDirectory)
 	}
 	if t.CustomTemplates != nil {
 		t.CustomTemplates.Download(context.TODO())
@@ -94,24 +91,7 @@ func (t *TemplateManager) UpdateIfOutdated() error {
 	if !fileutil.FolderExists(config.DefaultConfig.TemplatesDirectory) {
 		return t.FreshInstallIfNotExists()
 	}
-
-	needsUpdate := config.DefaultConfig.NeedsTemplateUpdate()
-
-	// NOTE(dwisiswant0): if PDTM API data is not available
-	// (LatestNucleiTemplatesVersion is empty) but we have a current template
-	// version, so we MUST verify against GitHub directly.
-	if !needsUpdate && config.DefaultConfig.LatestNucleiTemplatesVersion == "" && config.DefaultConfig.TemplateVersion != "" {
-		ghrd, err := updateutils.NewghReleaseDownloader(config.OfficialNucleiTemplatesRepoName)
-		if err == nil {
-			latestVersion := ghrd.Latest.GetTagName()
-			if config.IsOutdatedVersion(config.DefaultConfig.TemplateVersion, latestVersion) {
-				needsUpdate = true
-				gologger.Debug().Msgf("PDTM API unavailable, verified update needed via GitHub API: %s -> %s", config.DefaultConfig.TemplateVersion, latestVersion)
-			}
-		}
-	}
-
-	if needsUpdate {
+	if config.DefaultConfig.NeedsTemplateUpdate() {
 		return t.updateTemplatesAt(config.DefaultConfig.TemplatesDirectory)
 	}
 	return nil
@@ -121,7 +101,7 @@ func (t *TemplateManager) UpdateIfOutdated() error {
 func (t *TemplateManager) installTemplatesAt(dir string) error {
 	if !fileutil.FolderExists(dir) {
 		if err := fileutil.CreateFolder(dir); err != nil {
-			return errkit.Append(errkit.New(fmt.Sprintf("failed to create directory at %s", dir)), err)
+			return errorutil.NewWithErr(err).Msgf("failed to create directory at %s", dir)
 		}
 	}
 	if t.DisablePublicTemplates {
@@ -130,12 +110,12 @@ func (t *TemplateManager) installTemplatesAt(dir string) error {
 	}
 	ghrd, err := updateutils.NewghReleaseDownloader(config.OfficialNucleiTemplatesRepoName)
 	if err != nil {
-		return errkit.Append(errkit.New(fmt.Sprintf("failed to install templates at %s", dir)), err)
+		return errorutil.NewWithErr(err).Msgf("failed to install templates at %s", dir)
 	}
 
 	// write templates to disk
 	if err := t.writeTemplatesToDisk(ghrd, dir); err != nil {
-		return errkit.Append(errkit.New(fmt.Sprintf("failed to write templates to disk at %s", dir)), err)
+		return errorutil.NewWithErr(err).Msgf("failed to write templates to disk at %s", dir)
 	}
 	gologger.Info().Msgf("Successfully installed nuclei-templates at %s", dir)
 	return nil
@@ -156,17 +136,10 @@ func (t *TemplateManager) updateTemplatesAt(dir string) error {
 
 	ghrd, err := updateutils.NewghReleaseDownloader(config.OfficialNucleiTemplatesRepoName)
 	if err != nil {
-		return errkit.Append(errkit.New(fmt.Sprintf("failed to install templates at %s", dir)), err)
+		return errorutil.NewWithErr(err).Msgf("failed to install templates at %s", dir)
 	}
 
-	latestVersion := ghrd.Latest.GetTagName()
-	currentVersion := config.DefaultConfig.TemplateVersion
-
-	if config.IsOutdatedVersion(currentVersion, latestVersion) {
-		gologger.Info().Msgf("Your current nuclei-templates %s are outdated. Latest is %s\n", currentVersion, latestVersion)
-	} else {
-		gologger.Debug().Msgf("Updating nuclei-templates from %s to %s (forced update)\n", currentVersion, latestVersion)
-	}
+	gologger.Info().Msgf("Your current nuclei-templates %s are outdated. Latest is %s\n", config.DefaultConfig.TemplateVersion, ghrd.Latest.GetTagName())
 
 	// write templates to disk
 	if err := t.writeTemplatesToDisk(ghrd, dir); err != nil {
@@ -177,7 +150,7 @@ func (t *TemplateManager) updateTemplatesAt(dir string) error {
 	newchecksums, err := t.getChecksumFromDir(dir)
 	if err != nil {
 		// unlikely this case will happen
-		return errkit.Append(errkit.New(fmt.Sprintf("failed to get checksums from %s after update", dir)), err)
+		return errorutil.NewWithErr(err).Msgf("failed to get checksums from %s after update", dir)
 	}
 
 	// summarize all changes
@@ -299,7 +272,7 @@ func (t *TemplateManager) writeTemplatesToDisk(ghrd *updateutils.GHReleaseDownlo
 		bin, err := io.ReadAll(r)
 		if err != nil {
 			// if error occurs, iteration also stops
-			return errkit.Append(errkit.New(fmt.Sprintf("failed to read file %s", uri)), err)
+			return errorutil.NewWithErr(err).Msgf("failed to read file %s", uri)
 		}
 		// TODO: It might be better to just download index file from nuclei templates repo
 		// instead of creating it from scratch
@@ -310,7 +283,7 @@ func (t *TemplateManager) writeTemplatesToDisk(ghrd *updateutils.GHReleaseDownlo
 				if oldPath != writePath {
 					// write new template at a new path and delete old template
 					if err := os.WriteFile(writePath, bin, f.Mode()); err != nil {
-						return errkit.Append(errkit.New(fmt.Sprintf("failed to write file %s", uri)), err)
+						return errorutil.NewWithErr(err).Msgf("failed to write file %s", uri)
 					}
 					// after successful write, remove old template
 					if err := os.Remove(oldPath); err != nil {
@@ -325,20 +298,20 @@ func (t *TemplateManager) writeTemplatesToDisk(ghrd *updateutils.GHReleaseDownlo
 	}
 	err = ghrd.DownloadSourceWithCallback(!HideProgressBar, callbackFunc)
 	if err != nil {
-		return errkit.Append(errkit.New("failed to download templates"), err)
+		return errorutil.NewWithErr(err).Msgf("failed to download templates")
 	}
 
 	if err := config.DefaultConfig.WriteTemplatesConfig(); err != nil {
-		return errkit.Append(errkit.New("failed to write templates config"), err)
+		return errorutil.NewWithErr(err).Msgf("failed to write templates config")
 	}
 	// update ignore hash after writing new templates
 	if err := config.DefaultConfig.UpdateNucleiIgnoreHash(); err != nil {
-		return errkit.Append(errkit.New("failed to update nuclei ignore hash"), err)
+		return errorutil.NewWithErr(err).Msgf("failed to update nuclei ignore hash")
 	}
 
 	// update templates version in config file
 	if err := config.DefaultConfig.SetTemplatesVersion(ghrd.Latest.GetTagName()); err != nil {
-		return errkit.Append(errkit.New("failed to update templates version"), err)
+		return errorutil.NewWithErr(err).Msgf("failed to update templates version")
 	}
 
 	PurgeEmptyDirectories(dir)
@@ -348,11 +321,11 @@ func (t *TemplateManager) writeTemplatesToDisk(ghrd *updateutils.GHReleaseDownlo
 
 	index, err := config.GetNucleiTemplatesIndex()
 	if err != nil {
-		return errkit.Append(errkit.New("failed to get nuclei templates index"), err)
+		return errorutil.NewWithErr(err).Msgf("failed to get nuclei templates index")
 	}
 
 	if err = config.DefaultConfig.WriteTemplatesIndex(index); err != nil {
-		return errkit.Append(errkit.New("failed to write nuclei templates index"), err)
+		return errorutil.NewWithErr(err).Msgf("failed to write nuclei templates index")
 	}
 
 	if !HideReleaseNotes {
@@ -448,8 +421,5 @@ func (t *TemplateManager) calculateChecksumMap(dir string) (map[string]string, e
 		}
 		return nil
 	})
-	if err != nil {
-		return nil, errkit.Append(errkit.New("failed to calculate checksums of templates"), err)
-	}
-	return checksumMap, nil
+	return checksumMap, errorutil.WrapfWithNil(err, "failed to calculate checksums of templates")
 }

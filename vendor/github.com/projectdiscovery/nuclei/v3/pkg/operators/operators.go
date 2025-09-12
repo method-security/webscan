@@ -2,7 +2,6 @@ package operators
 
 import (
 	"fmt"
-	"maps"
 	"strconv"
 	"strings"
 
@@ -219,7 +218,9 @@ func (r *Result) Merge(result *Result) {
 			r.DynamicValues[k] = sliceutil.Dedupe(append(r.DynamicValues[k], v...))
 		}
 	}
-	maps.Copy(r.PayloadValues, result.PayloadValues)
+	for k, v := range result.PayloadValues {
+		r.PayloadValues[k] = v
+	}
 }
 
 // MatchFunc performs matching operation for a matcher on model and returns true or false.

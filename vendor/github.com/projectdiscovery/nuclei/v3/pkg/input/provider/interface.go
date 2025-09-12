@@ -13,18 +13,14 @@ import (
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/contextargs"
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/generators"
 	configTypes "github.com/projectdiscovery/nuclei/v3/pkg/types"
-	"github.com/projectdiscovery/utils/errkit"
+	errorutil "github.com/projectdiscovery/utils/errors"
 	stringsutil "github.com/projectdiscovery/utils/strings"
 )
 
 var (
-	ErrInactiveInput = fmt.Errorf("input is inactive")
+	ErrNotImplemented = errorutil.NewWithFmt("provider %s does not implement %s")
+	ErrInactiveInput  = fmt.Errorf("input is inactive")
 )
-
-// ErrNotImplemented returns an error when a provider does not implement a method
-func ErrNotImplemented(provider, method string) error {
-	return errkit.New(fmt.Sprintf("provider %s does not implement %s", provider, method)).Build()
-}
 
 const (
 	MultiFormatInputProvider = "MultiFormatInputProvider"
@@ -63,11 +59,11 @@ type InputProvider interface {
 	// Iterate over all inputs in order
 	Iterate(callback func(value *contextargs.MetaInput) bool)
 	// Set adds item to input provider
-	Set(executionId string, value string)
+	Set(value string)
 	// SetWithProbe adds item to input provider with http probing
-	SetWithProbe(executionId string, value string, probe types.InputLivenessProbe) error
+	SetWithProbe(value string, probe types.InputLivenessProbe) error
 	// SetWithExclusions adds item to input provider if it doesn't match any of the exclusions
-	SetWithExclusions(executionId string, value string) error
+	SetWithExclusions(value string) error
 	// InputType returns the type of input provider
 	InputType() string
 	// Close the input provider and cleanup any resources

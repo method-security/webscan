@@ -1,7 +1,6 @@
 package http
 
 import (
-	"maps"
 	"net/http"
 	"strings"
 	"time"
@@ -109,7 +108,9 @@ func (request *Request) getMatchPart(part string, data output.InternalEvent) (st
 // responseToDSLMap converts an HTTP response to a map for use in DSL matching
 func (request *Request) responseToDSLMap(resp *http.Response, host, matched, rawReq, rawResp, body, headers string, duration time.Duration, extra map[string]interface{}) output.InternalEvent {
 	data := make(output.InternalEvent, 12+len(extra)+len(resp.Header)+len(resp.Cookies()))
-	maps.Copy(data, extra)
+	for k, v := range extra {
+		data[k] = v
+	}
 	for _, cookie := range resp.Cookies() {
 		request.setHashOrDefault(data, strings.ToLower(cookie.Name), cookie.Value)
 	}

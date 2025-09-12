@@ -1,7 +1,7 @@
 package sliceutil
 
 import (
-	"math/rand/v2"
+	"math/rand"
 	"strconv"
 	"time"
 
@@ -61,7 +61,7 @@ func DedupeFunc[T any](inputSlice []T, keyFunc func(T) any) (result []T) {
 
 // PickRandom item from a slice of elements
 func PickRandom[T any](v []T) T {
-	return v[rand.IntN(len(v))]
+	return v[rand.Intn(len(v))]
 }
 
 // Contains if a slice contains an element

@@ -38,6 +38,6 @@ func Init(options *types.Options) error {
 	return nil
 }
 
-func Close(executionId string) {
-	protocolstate.Close(executionId)
+func Close() {
+	protocolstate.Close()
 }

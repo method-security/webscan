@@ -1,13 +1,12 @@
 package ssh
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/protocolstate"
-	"github.com/projectdiscovery/utils/errkit"
+	errorutil "github.com/projectdiscovery/utils/errors"
 	"github.com/zmap/zgrab2/lib/ssh"
 )
 
@@ -46,14 +45,12 @@ func (c *SSHClient) SetTimeout(sec int) {
 // const client = new ssh.SSHClient();
 // const connected = client.Connect('acme.com', 22, 'username', 'password');
 // ```
-func (c *SSHClient) Connect(ctx context.Context, host string, port int, username, password string) (bool, error) {
-	executionId := ctx.Value("executionId").(string)
+func (c *SSHClient) Connect(host string, port int, username, password string) (bool, error) {
 	conn, err := connect(&connectOptions{
-		Host:        host,
-		Port:        port,
-		User:        username,
-		Password:    password,
-		ExecutionId: executionId,
+		Host:     host,
+		Port:     port,
+		User:     username,
+		Password: password,
 	})
 	if err != nil {
 		return false, err
@@ -74,14 +71,12 @@ func (c *SSHClient) Connect(ctx context.Context, host string, port int, username
 // const privateKey = `-----BEGIN RSA PRIVATE KEY----- ...`;
 // const connected = client.ConnectWithKey('acme.com', 22, 'username', privateKey);
 // ```
-func (c *SSHClient) ConnectWithKey(ctx context.Context, host string, port int, username, key string) (bool, error) {
-	executionId := ctx.Value("executionId").(string)
+func (c *SSHClient) ConnectWithKey(host string, port int, username, key string) (bool, error) {
 	conn, err := connect(&connectOptions{
-		Host:        host,
-		Port:        port,
-		User:        username,
-		PrivateKey:  key,
-		ExecutionId: executionId,
+		Host:       host,
+		Port:       port,
+		User:       username,
+		PrivateKey: key,
 	})
 
 	if err != nil {
@@ -105,12 +100,10 @@ func (c *SSHClient) ConnectWithKey(ctx context.Context, host string, port int, u
 // const info = client.ConnectSSHInfoMode('acme.com', 22);
 // log(to_json(info));
 // ```
-func (c *SSHClient) ConnectSSHInfoMode(ctx context.Context, host string, port int) (*ssh.HandshakeLog, error) {
-	executionId := ctx.Value("executionId").(string)
+func (c *SSHClient) ConnectSSHInfoMode(host string, port int) (*ssh.HandshakeLog, error) {
 	return memoizedconnectSSHInfoMode(&connectOptions{
-		Host:        host,
-		Port:        port,
-		ExecutionId: executionId,
+		Host: host,
+		Port: port,
 	})
 }
 
@@ -129,15 +122,15 @@ func (c *SSHClient) ConnectSSHInfoMode(ctx context.Context, host string, port in
 // ```
 func (c *SSHClient) Run(cmd string) (string, error) {
 	if c.connection == nil {
-		return "", errkit.New("no connection").Build()
+		return "", errorutil.New("no connection")
 	}
 	session, err := c.connection.NewSession()
 	if err != nil {
 		return "", err
 	}
 	defer func() {
-		_ = session.Close()
-	}()
+         _ = session.Close()
+       }()
 
 	data, err := session.Output(cmd)
 	if err != nil {
@@ -166,25 +159,24 @@ func (c *SSHClient) Close() (bool, error) {
 
 // unexported functions
 type connectOptions struct {
-	Host        string
-	Port        int
-	User        string
-	Password    string
-	PrivateKey  string
-	Timeout     time.Duration // default 10s
-	ExecutionId string
+	Host       string
+	Port       int
+	User       string
+	Password   string
+	PrivateKey string
+	Timeout    time.Duration // default 10s
 }
 
 func (c *connectOptions) validate() error {
 	if c.Host == "" {
-		return errkit.New("host is required").Build()
+		return errorutil.New("host is required")
 	}
 	if c.Port <= 0 {
-		return errkit.New("port is required").Build()
+		return errorutil.New("port is required")
 	}
-	if !protocolstate.IsHostAllowed(c.ExecutionId, c.Host) {
+	if !protocolstate.IsHostAllowed(c.Host) {
 		// host is not valid according to network policy
-		return protocolstate.ErrHostDenied(c.Host)
+		return protocolstate.ErrHostDenied.Msgf(c.Host)
 	}
 	if c.Timeout == 0 {
 		c.Timeout = 10 * time.Second
@@ -214,8 +206,8 @@ func connectSSHInfoMode(opts *connectOptions) (*ssh.HandshakeLog, error) {
 		return nil, err
 	}
 	defer func() {
-		_ = client.Close()
-	}()
+         _ = client.Close()
+       }()
 
 	return data, nil
 }

@@ -5,16 +5,13 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
-	"sync"
 
 	"github.com/pkg/errors"
 
 	"github.com/projectdiscovery/nuclei/v3/pkg/templates/extensions"
 	"github.com/projectdiscovery/nuclei/v3/pkg/utils"
 	"github.com/projectdiscovery/retryablehttp-go"
-	sliceutil "github.com/projectdiscovery/utils/slice"
 	stringsutil "github.com/projectdiscovery/utils/strings"
-	syncutil "github.com/projectdiscovery/utils/sync"
 )
 
 type ContentType string
@@ -31,73 +28,67 @@ type RemoteContent struct {
 }
 
 func getRemoteTemplatesAndWorkflows(templateURLs, workflowURLs, remoteTemplateDomainList []string) ([]string, []string, error) {
-	var (
-		err   error
-		muErr sync.Mutex
-	)
-	remoteTemplateList := sliceutil.NewSyncSlice[string]()
-	remoteWorkFlowList := sliceutil.NewSyncSlice[string]()
+	remoteContentChannel := make(chan RemoteContent)
 
-	awg, errAwg := syncutil.New(syncutil.WithSize(50))
-	if errAwg != nil {
-		return nil, nil, errAwg
+	for _, templateURL := range templateURLs {
+		go getRemoteContent(templateURL, remoteTemplateDomainList, remoteContentChannel, Template)
+	}
+	for _, workflowURL := range workflowURLs {
+		go getRemoteContent(workflowURL, remoteTemplateDomainList, remoteContentChannel, Workflow)
 	}
 
-	loadItem := func(URL string, contentType ContentType) {
-		defer awg.Done()
-
-		remoteContent := getRemoteContent(URL, remoteTemplateDomainList, contentType)
+	var remoteTemplateList []string
+	var remoteWorkFlowList []string
+	var err error
+	for i := 0; i < (len(templateURLs) + len(workflowURLs)); i++ {
+		remoteContent := <-remoteContentChannel
 		if remoteContent.Error != nil {
-			muErr.Lock()
 			if err != nil {
 				err = errors.New(remoteContent.Error.Error() + ": " + err.Error())
 			} else {
 				err = remoteContent.Error
 			}
-			muErr.Unlock()
 		} else {
 			switch remoteContent.Type {
 			case Template:
-				remoteTemplateList.Append(remoteContent.Content...)
+				remoteTemplateList = append(remoteTemplateList, remoteContent.Content...)
 			case Workflow:
-				remoteWorkFlowList.Append(remoteContent.Content...)
+				remoteWorkFlowList = append(remoteWorkFlowList, remoteContent.Content...)
 			}
 		}
 	}
-
-	for _, templateURL := range templateURLs {
-		awg.Add()
-		go loadItem(templateURL, Template)
-	}
-	for _, workflowURL := range workflowURLs {
-		awg.Add()
-		go loadItem(workflowURL, Workflow)
-	}
-
-	awg.Wait()
-
-	return remoteTemplateList.Slice, remoteWorkFlowList.Slice, err
+	return remoteTemplateList, remoteWorkFlowList, err
 }
 
-func getRemoteContent(URL string, remoteTemplateDomainList []string, contentType ContentType) RemoteContent {
+func getRemoteContent(URL string, remoteTemplateDomainList []string, remoteContentChannel chan<- RemoteContent, contentType ContentType) {
 	if err := validateRemoteTemplateURL(URL, remoteTemplateDomainList); err != nil {
-		return RemoteContent{Error: err}
+		remoteContentChannel <- RemoteContent{
+			Error: err,
+		}
+		return
 	}
 	if strings.HasPrefix(URL, "http") && stringsutil.HasSuffixAny(URL, extensions.YAML) {
-		return RemoteContent{
+		remoteContentChannel <- RemoteContent{
 			Content: []string{URL},
 			Type:    contentType,
 		}
+		return
 	}
 	response, err := retryablehttp.DefaultClient().Get(URL)
 	if err != nil {
-		return RemoteContent{Error: err}
+		remoteContentChannel <- RemoteContent{
+			Error: err,
+		}
+		return
 	}
 	defer func() {
-		_ = response.Body.Close()
-	}()
+         _ = response.Body.Close()
+       }()
 	if response.StatusCode < 200 || response.StatusCode > 299 {
-		return RemoteContent{Error: fmt.Errorf("get \"%s\": unexpect status %d", URL, response.StatusCode)}
+		remoteContentChannel <- RemoteContent{
+			Error: fmt.Errorf("get \"%s\": unexpect status %d", URL, response.StatusCode),
+		}
+		return
 	}
 
 	scanner := bufio.NewScanner(response.Body)
@@ -109,17 +100,23 @@ func getRemoteContent(URL string, remoteTemplateDomainList []string, contentType
 		}
 		if utils.IsURL(text) {
 			if err := validateRemoteTemplateURL(text, remoteTemplateDomainList); err != nil {
-				return RemoteContent{Error: err}
+				remoteContentChannel <- RemoteContent{
+					Error: err,
+				}
+				return
 			}
 		}
 		templateList = append(templateList, text)
 	}
 
 	if err := scanner.Err(); err != nil {
-		return RemoteContent{Error: errors.Wrap(err, "get \"%s\"")}
+		remoteContentChannel <- RemoteContent{
+			Error: errors.Wrap(err, "get \"%s\""),
+		}
+		return
 	}
 
-	return RemoteContent{
+	remoteContentChannel <- RemoteContent{
 		Content: templateList,
 		Type:    contentType,
 	}

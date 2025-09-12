@@ -19,7 +19,6 @@ import (
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/utils/vardump"
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/headless/engine"
 	"github.com/projectdiscovery/nuclei/v3/pkg/templates/types"
-	pkgtypes "github.com/projectdiscovery/nuclei/v3/pkg/types"
 )
 
 // TemplateSources contains template sources
@@ -102,7 +101,7 @@ type InteractshOpts interactsh.Options
 func WithInteractshOptions(opts InteractshOpts) NucleiSDKOptions {
 	return func(e *NucleiEngine) error {
 		if e.mode == threadSafe {
-			return ErrOptionsNotSupported("WithInteractshOptions")
+			return ErrOptionsNotSupported.Msgf("WithInteractshOptions")
 		}
 		optsPtr := &opts
 		e.interactshOpts = (*interactsh.Options)(optsPtr)
@@ -206,7 +205,7 @@ func EnableHeadlessWithOpts(hopts *HeadlessOpts) NucleiSDKOptions {
 			e.opts.UseInstalledChrome = hopts.UseChrome
 		}
 		if engine.MustDisableSandbox() {
-			e.Logger.Warning().Msgf("The current platform and privileged user will run the browser without sandbox")
+			gologger.Warning().Msgf("The current platform and privileged user will run the browser without sandbox\n")
 		}
 		browser, err := engine.New(e.opts)
 		if err != nil {
@@ -229,7 +228,7 @@ type StatsOptions struct {
 func EnableStatsWithOpts(opts StatsOptions) NucleiSDKOptions {
 	return func(e *NucleiEngine) error {
 		if e.mode == threadSafe {
-			return ErrOptionsNotSupported("EnableStatsWithOpts")
+			return ErrOptionsNotSupported.Msgf("EnableStatsWithOpts")
 		}
 		if opts.Interval == 0 {
 			opts.Interval = 5 //sec
@@ -257,7 +256,7 @@ type VerbosityOptions struct {
 func WithVerbosity(opts VerbosityOptions) NucleiSDKOptions {
 	return func(e *NucleiEngine) error {
 		if e.mode == threadSafe {
-			return ErrOptionsNotSupported("WithVerbosity")
+			return ErrOptionsNotSupported.Msgf("WithVerbosity")
 		}
 		e.opts.Verbose = opts.Verbose
 		e.opts.Silent = opts.Silent
@@ -290,15 +289,15 @@ type NetworkConfig struct {
 func WithNetworkConfig(opts NetworkConfig) NucleiSDKOptions {
 	return func(e *NucleiEngine) error {
 		if e.mode == threadSafe {
-			return ErrOptionsNotSupported("WithNetworkConfig")
+			return ErrOptionsNotSupported.Msgf("WithNetworkConfig")
 		}
 		e.opts.NoHostErrors = opts.DisableMaxHostErr
 		e.opts.MaxHostError = opts.MaxHostError
 		if e.opts.ShouldUseHostError() {
 			maxHostError := opts.MaxHostError
 			if e.opts.TemplateThreads > maxHostError {
-				e.Logger.Warning().Msg("The concurrency value is higher than max-host-error")
-				e.Logger.Info().Msgf("Adjusting max-host-error to the concurrency value: %d", e.opts.TemplateThreads)
+				gologger.Print().Msgf("[%v] The concurrency value is higher than max-host-error", e.executerOpts.Colorizer.BrightYellow("WRN"))
+				gologger.Info().Msgf("Adjusting max-host-error to the concurrency value: %d", e.opts.TemplateThreads)
 				maxHostError = e.opts.TemplateThreads
 				e.opts.MaxHostError = maxHostError
 			}
@@ -321,7 +320,7 @@ func WithNetworkConfig(opts NetworkConfig) NucleiSDKOptions {
 func WithProxy(proxy []string, proxyInternalRequests bool) NucleiSDKOptions {
 	return func(e *NucleiEngine) error {
 		if e.mode == threadSafe {
-			return ErrOptionsNotSupported("WithProxy")
+			return ErrOptionsNotSupported.Msgf("WithProxy")
 		}
 		e.opts.Proxy = proxy
 		e.opts.ProxyInternal = proxyInternalRequests
@@ -346,7 +345,7 @@ type OutputWriter output.Writer
 func UseOutputWriter(writer OutputWriter) NucleiSDKOptions {
 	return func(e *NucleiEngine) error {
 		if e.mode == threadSafe {
-			return ErrOptionsNotSupported("UseOutputWriter")
+			return ErrOptionsNotSupported.Msgf("UseOutputWriter")
 		}
 		e.customWriter = writer
 		return nil
@@ -361,7 +360,7 @@ type StatsWriter progress.Progress
 func UseStatsWriter(writer StatsWriter) NucleiSDKOptions {
 	return func(e *NucleiEngine) error {
 		if e.mode == threadSafe {
-			return ErrOptionsNotSupported("UseStatsWriter")
+			return ErrOptionsNotSupported.Msgf("UseStatsWriter")
 		}
 		e.customProgress = writer
 		return nil
@@ -375,7 +374,7 @@ func UseStatsWriter(writer StatsWriter) NucleiSDKOptions {
 func WithTemplateUpdateCallback(disableTemplatesAutoUpgrade bool, callback func(newVersion string)) NucleiSDKOptions {
 	return func(e *NucleiEngine) error {
 		if e.mode == threadSafe {
-			return ErrOptionsNotSupported("WithTemplateUpdateCallback")
+			return ErrOptionsNotSupported.Msgf("WithTemplateUpdateCallback")
 		}
 		e.disableTemplatesAutoUpgrade = disableTemplatesAutoUpgrade
 		e.onUpdateAvailableCallback = callback
@@ -387,7 +386,7 @@ func WithTemplateUpdateCallback(disableTemplatesAutoUpgrade bool, callback func(
 func WithSandboxOptions(allowLocalFileAccess bool, restrictLocalNetworkAccess bool) NucleiSDKOptions {
 	return func(e *NucleiEngine) error {
 		if e.mode == threadSafe {
-			return ErrOptionsNotSupported("WithSandboxOptions")
+			return ErrOptionsNotSupported.Msgf("WithSandboxOptions")
 		}
 		e.opts.AllowLocalFileAccess = allowLocalFileAccess
 		e.opts.RestrictLocalNetworkAccess = restrictLocalNetworkAccess
@@ -416,14 +415,6 @@ func EnableSelfContainedTemplates() NucleiSDKOptions {
 func EnableGlobalMatchersTemplates() NucleiSDKOptions {
 	return func(e *NucleiEngine) error {
 		e.opts.EnableGlobalMatchersTemplates = true
-		return nil
-	}
-}
-
-// DisableTemplateCache disables template caching
-func DisableTemplateCache() NucleiSDKOptions {
-	return func(e *NucleiEngine) error {
-		e.opts.DoNotCacheTemplates = true
 		return nil
 	}
 }
@@ -533,28 +524,6 @@ func DisableUpdateCheck() NucleiSDKOptions {
 func WithResumeFile(file string) NucleiSDKOptions {
 	return func(e *NucleiEngine) error {
 		e.opts.Resume = file
-		return nil
-	}
-}
-
-// WithLogger allows setting a shared gologger instance
-func WithLogger(logger *gologger.Logger) NucleiSDKOptions {
-	return func(e *NucleiEngine) error {
-		e.Logger = logger
-		if e.opts != nil {
-			e.opts.Logger = logger
-		}
-		if e.executerOpts != nil {
-			e.executerOpts.Logger = logger
-		}
-		return nil
-	}
-}
-
-// WithOptions sets all options at once
-func WithOptions(opts *pkgtypes.Options) NucleiSDKOptions {
-	return func(e *NucleiEngine) error {
-		e.opts = opts
 		return nil
 	}
 }

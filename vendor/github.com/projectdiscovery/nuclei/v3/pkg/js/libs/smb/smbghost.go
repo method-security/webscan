@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"net"
 	"strconv"
 	"time"
@@ -26,23 +25,18 @@ const (
 // const smb = require('nuclei/smb');
 // const isSMBGhost = smb.DetectSMBGhost('acme.com', 445);
 // ```
-func (c *SMBClient) DetectSMBGhost(ctx context.Context, host string, port int) (bool, error) {
-	executionId := ctx.Value("executionId").(string)
-	return memoizeddetectSMBGhost(executionId, host, port)
+func (c *SMBClient) DetectSMBGhost(host string, port int) (bool, error) {
+	return memoizeddetectSMBGhost(host, port)
 }
 
 // @memo
-func detectSMBGhost(executionId string, host string, port int) (bool, error) {
-	if !protocolstate.IsHostAllowed(executionId, host) {
+func detectSMBGhost(host string, port int) (bool, error) {
+	if !protocolstate.IsHostAllowed(host) {
 		// host is not valid according to network policy
-		return false, protocolstate.ErrHostDenied(host)
+		return false, protocolstate.ErrHostDenied.Msgf(host)
 	}
 	addr := net.JoinHostPort(host, strconv.Itoa(port))
-	dialer := protocolstate.GetDialersWithId(executionId)
-	if dialer == nil {
-		return false, fmt.Errorf("dialers not initialized for %s", executionId)
-	}
-	conn, err := dialer.Fastdialer.Dial(context.TODO(), "tcp", addr)
+	conn, err := protocolstate.Dialer.Dial(context.TODO(), "tcp", addr)
 	if err != nil {
 		return false, err
 

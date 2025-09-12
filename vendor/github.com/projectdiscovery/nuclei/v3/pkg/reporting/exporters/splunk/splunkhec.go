@@ -30,8 +30,7 @@ type Options struct {
 	Token     string `yaml:"token"  validate:"required"`
 	IndexName string `yaml:"index-name"  validate:"required"`
 
-	HttpClient  *retryablehttp.Client `yaml:"-"`
-	ExecutionId string                `yaml:"-"`
+	HttpClient *retryablehttp.Client `yaml:"-"`
 }
 
 type data struct {
@@ -49,11 +48,6 @@ type Exporter struct {
 func New(option *Options) (*Exporter, error) {
 	var ei *Exporter
 
-	dialers := protocolstate.GetDialersWithId(option.ExecutionId)
-	if dialers == nil {
-		return nil, fmt.Errorf("dialers not initialized for %s", option.ExecutionId)
-	}
-
 	var client *http.Client
 	if option.HttpClient != nil {
 		client = option.HttpClient.HTTPClient
@@ -63,8 +57,8 @@ func New(option *Options) (*Exporter, error) {
 			Transport: &http.Transport{
 				MaxIdleConns:        10,
 				MaxIdleConnsPerHost: 10,
-				DialContext:         dialers.Fastdialer.Dial,
-				DialTLSContext:      dialers.Fastdialer.DialTLS,
+				DialContext:         protocolstate.Dialer.Dial,
+				DialTLSContext:      protocolstate.Dialer.DialTLS,
 				TLSClientConfig:     &tls.Config{InsecureSkipVerify: option.SSLVerification},
 			},
 		}

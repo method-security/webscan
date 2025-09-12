@@ -41,7 +41,7 @@ type nucleiExecutor struct {
 	engine       *core.Engine
 	store        *loader.Store
 	options      *NucleiExecutorOptions
-	executorOpts *protocols.ExecutorOptions
+	executorOpts protocols.ExecutorOptions
 }
 
 type NucleiExecutorOptions struct {
@@ -58,7 +58,6 @@ type NucleiExecutorOptions struct {
 	Colorizer          aurora.Aurora
 	Parser             parser.Parser
 	TemporaryDirectory string
-	Logger             *gologger.Logger
 }
 
 func newNucleiExecutor(opts *NucleiExecutorOptions) (*nucleiExecutor, error) {
@@ -67,7 +66,7 @@ func newNucleiExecutor(opts *NucleiExecutorOptions) (*nucleiExecutor, error) {
 
 	// Create the executor options which will be used throughout the execution
 	// stage by the nuclei engine modules.
-	executorOpts := &protocols.ExecutorOptions{
+	executorOpts := protocols.ExecutorOptions{
 		Output:              opts.Output,
 		Options:             opts.Options,
 		Progress:            opts.Progress,
@@ -86,7 +85,6 @@ func newNucleiExecutor(opts *NucleiExecutorOptions) (*nucleiExecutor, error) {
 		FuzzParamsFrequency: fuzzFreqCache,
 		GlobalMatchers:      globalmatchers.New(),
 		FuzzStatsDB:         opts.FuzzStatsDB,
-		Logger:              opts.Logger,
 	}
 
 	if opts.Options.ShouldUseHostError() {
@@ -95,7 +93,7 @@ func newNucleiExecutor(opts *NucleiExecutorOptions) (*nucleiExecutor, error) {
 			maxHostError = 100 // auto adjust for fuzzings
 		}
 		if opts.Options.TemplateThreads > maxHostError {
-			opts.Logger.Info().Msgf("Adjusting max-host-error to the concurrency value: %d", opts.Options.TemplateThreads)
+			gologger.Info().Msgf("Adjusting max-host-error to the concurrency value: %d", opts.Options.TemplateThreads)
 
 			maxHostError = opts.Options.TemplateThreads
 		}
@@ -109,7 +107,7 @@ func newNucleiExecutor(opts *NucleiExecutorOptions) (*nucleiExecutor, error) {
 	executorEngine := core.New(opts.Options)
 	executorEngine.SetExecuterOptions(executorOpts)
 
-	workflowLoader, err := parsers.NewLoader(executorOpts)
+	workflowLoader, err := parsers.NewLoader(&executorOpts)
 	if err != nil {
 		return nil, errors.Wrap(err, "Could not create loader options.")
 	}

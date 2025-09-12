@@ -14,7 +14,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/nuclei/v3/pkg/catalog/config"
-	"github.com/projectdiscovery/utils/errkit"
+	errorutil "github.com/projectdiscovery/utils/errors"
 )
 
 // GetNewTemplatesInVersions returns templates path of all newly added templates
@@ -52,7 +52,7 @@ func getNewAdditionsFileFromGitHub(version string) ([]string, error) {
 		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, errkit.New("version not found").Build()
+		return nil, errorutil.New("version not found")
 	}
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {

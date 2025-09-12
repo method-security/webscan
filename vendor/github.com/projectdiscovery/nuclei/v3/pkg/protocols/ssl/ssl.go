@@ -2,7 +2,6 @@ package ssl
 
 import (
 	"fmt"
-	"maps"
 	"net"
 	"strings"
 	"time"
@@ -33,7 +32,7 @@ import (
 	"github.com/projectdiscovery/tlsx/pkg/tlsx"
 	"github.com/projectdiscovery/tlsx/pkg/tlsx/clients"
 	"github.com/projectdiscovery/tlsx/pkg/tlsx/openssl"
-	"github.com/projectdiscovery/utils/errkit"
+	errorutil "github.com/projectdiscovery/utils/errors"
 	stringsutil "github.com/projectdiscovery/utils/strings"
 )
 
@@ -109,8 +108,7 @@ func (request *Request) TmplClusterKey() uint64 {
 }
 
 func (request *Request) IsClusterable() bool {
-	// nolint
-	return !(len(request.CipherSuites) > 0 || request.MinVersion != "" || request.MaxVersion != "")
+	return len(request.CipherSuites) <= 0 && request.MinVersion == "" && request.MaxVersion == ""
 }
 
 // Compile compiles the request generators preparing any requests possible.
@@ -121,7 +119,7 @@ func (request *Request) Compile(options *protocols.ExecutorOptions) error {
 		CustomDialer: options.CustomFastdialer,
 	})
 	if err != nil {
-		return errkit.Append(errkit.New("ssl: could not get network client"), err)
+		return errorutil.NewWithTag("ssl", "could not get network client").Wrap(err)
 	}
 	request.dialer = client
 	switch {
@@ -130,7 +128,7 @@ func (request *Request) Compile(options *protocols.ExecutorOptions) error {
 		request.ScanMode = "auto"
 
 	case !stringsutil.EqualFoldAny(request.ScanMode, "auto", "openssl", "ztls", "ctls"):
-		return errkit.New(fmt.Sprintf("%s: template %v does not contain valid scan-mode", request.TemplateID, request.TemplateID)).Build()
+		return errorutil.NewWithTag(request.TemplateID, "template %v does not contain valid scan-mode", request.TemplateID)
 
 	case request.ScanMode == "openssl" && !openssl.IsAvailable():
 		// if openssl is not installed instead of failing "auto" scanmode is used
@@ -169,7 +167,7 @@ func (request *Request) Compile(options *protocols.ExecutorOptions) error {
 
 	tlsxService, err := tlsx.New(tlsxOptions)
 	if err != nil {
-		return errkit.New(fmt.Sprintf("%s: could not create tlsx service", request.TemplateID)).Build()
+		return errorutil.NewWithTag(request.TemplateID, "could not create tlsx service")
 	}
 	request.tlsx = tlsxService
 
@@ -178,7 +176,7 @@ func (request *Request) Compile(options *protocols.ExecutorOptions) error {
 		compiled.ExcludeMatchers = options.ExcludeMatchers
 		compiled.TemplateID = options.TemplateID
 		if err := compiled.Compile(); err != nil {
-			return errkit.New(fmt.Sprintf("%s: could not compile operators got %v", request.TemplateID, err)).Build()
+			return errorutil.NewWithTag(request.TemplateID, "could not compile operators got %v", err)
 		}
 		request.CompiledOperators = compiled
 	}
@@ -207,7 +205,9 @@ func (request *Request) ExecuteWithResults(input *contextargs.Context, dynamicVa
 
 	requestOptions := request.options
 	payloadValues := generators.BuildPayloadFromOptions(request.options.Options)
-	maps.Copy(payloadValues, dynamicValues)
+	for k, v := range dynamicValues {
+		payloadValues[k] = v
+	}
 
 	payloadValues["Hostname"] = hostPort
 	payloadValues["Host"] = hostname
@@ -236,7 +236,7 @@ func (request *Request) ExecuteWithResults(input *contextargs.Context, dynamicVa
 	addressToDial := string(finalAddress)
 	host, port, err := net.SplitHostPort(addressToDial)
 	if err != nil {
-		return errkit.Append(errkit.New("could not split input host port"), err)
+		return errorutil.NewWithErr(err).Msgf("could not split input host port")
 	}
 
 	var hostIp string
@@ -250,7 +250,7 @@ func (request *Request) ExecuteWithResults(input *contextargs.Context, dynamicVa
 	if err != nil {
 		requestOptions.Output.Request(requestOptions.TemplateID, input.MetaInput.Input, request.Type().String(), err)
 		requestOptions.Progress.IncrementFailedRequestsBy(1)
-		return errkit.Append(errkit.New(fmt.Sprintf("%s: could not connect to server", request.TemplateID)), err)
+		return errorutil.NewWithTag(request.TemplateID, "could not connect to server").Wrap(err)
 	}
 
 	requestOptions.Output.Request(requestOptions.TemplateID, hostPort, request.Type().String(), err)
@@ -270,7 +270,9 @@ func (request *Request) ExecuteWithResults(input *contextargs.Context, dynamicVa
 	jsonDataString := string(jsonData)
 
 	data := make(map[string]interface{})
-	maps.Copy(data, payloadValues)
+	for k, v := range payloadValues {
+		data[k] = v
+	}
 	data["type"] = request.Type().String()
 	data["response"] = jsonDataString
 	data["host"] = input.MetaInput.Input
@@ -287,7 +289,7 @@ func (request *Request) ExecuteWithResults(input *contextargs.Context, dynamicVa
 
 	// if response is not struct compatible, error out
 	if !structs.IsStruct(response) {
-		return errkit.New(fmt.Sprintf("ssl: response cannot be parsed into a struct: %v", response)).Build()
+		return errorutil.NewWithTag("ssl", "response cannot be parsed into a struct: %v", response)
 	}
 
 	// Convert response to key value pairs and first cert chain item as well
@@ -307,7 +309,7 @@ func (request *Request) ExecuteWithResults(input *contextargs.Context, dynamicVa
 
 	// if certificate response is not struct compatible, error out
 	if !structs.IsStruct(response.CertificateResponse) {
-		return errkit.New(fmt.Sprintf("ssl: certificate response cannot be parsed into a struct: %v", response.CertificateResponse)).Build()
+		return errorutil.NewWithTag("ssl", "certificate response cannot be parsed into a struct: %v", response.CertificateResponse)
 	}
 
 	responseParsed = structs.New(response.CertificateResponse)
@@ -434,9 +436,4 @@ func (request *Request) MakeResultEventItem(wrapped *output.InternalWrappedEvent
 		Error:            types.ToString(wrapped.InternalEvent["error"]),
 	}
 	return data
-}
-
-// UpdateOptions replaces this request's options with a new copy
-func (r *Request) UpdateOptions(opts *protocols.ExecutorOptions) {
-	r.options.ApplyNewEngineOptions(opts)
 }

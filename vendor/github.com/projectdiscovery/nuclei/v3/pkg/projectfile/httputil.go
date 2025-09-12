@@ -6,7 +6,6 @@ import (
 	"encoding/gob"
 	"encoding/hex"
 	"io"
-	"maps"
 	"net/http"
 )
 
@@ -86,7 +85,9 @@ func toInternalResponse(resp *http.Response, body []byte) *InternalResponse {
 	intResp.HTTPMinor = resp.ProtoMinor
 	intResp.StatusCode = resp.StatusCode
 	intResp.StatusReason = resp.Status
-	maps.Copy(intResp.Headers, resp.Header)
+	for k, v := range resp.Header {
+		intResp.Headers[k] = v
+	}
 	intResp.Body = body
 	return intResp
 }

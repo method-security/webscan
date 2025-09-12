@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
-	"fmt"
 	"net"
 	"strings"
 	"sync/atomic"
@@ -15,19 +14,19 @@ import (
 
 	"github.com/Mzack9999/gcache"
 	gounit "github.com/docker/go-units"
+	"github.com/pkg/errors"
+	"github.com/projectdiscovery/fastdialer/fastdialer/ja3/impersonate"
+	"github.com/projectdiscovery/fastdialer/fastdialer/metafiles"
+	"github.com/projectdiscovery/fastdialer/fastdialer/utils"
 	"github.com/projectdiscovery/hmap/store/hybrid"
 	"github.com/projectdiscovery/networkpolicy"
-	"github.com/projectdiscovery/retryabledns"
+	retryabledns "github.com/projectdiscovery/retryabledns"
 	cryptoutil "github.com/projectdiscovery/utils/crypto"
 	"github.com/projectdiscovery/utils/env"
 	"github.com/projectdiscovery/utils/errkit"
 	"github.com/zmap/zcrypto/encoding/asn1"
 	ztls "github.com/zmap/zcrypto/tls"
 	"golang.org/x/net/proxy"
-
-	"github.com/projectdiscovery/fastdialer/fastdialer/ja3/impersonate"
-	"github.com/projectdiscovery/fastdialer/fastdialer/metafiles"
-	"github.com/projectdiscovery/fastdialer/fastdialer/utils"
 )
 
 // option to disable ztls fallback in case of handshake error
@@ -157,7 +156,7 @@ func NewDialer(options Options) (*Dialer, error) {
 	} else {
 		np, err = createNetworkPolicy(options)
 		if err != nil {
-			return nil, fmt.Errorf("could not create network policy: %w", err)
+			return nil, errors.Wrap(err, "could not create network policy")
 		}
 	}
 
@@ -304,13 +303,13 @@ func (d *Dialer) Close() {
 		d.mDnsCache.Purge()
 	}
 	if d.hmDnsCache != nil {
-		_ = d.hmDnsCache.Close()
+		d.hmDnsCache.Close()
 	}
 	if d.options.WithDialerHistory && d.dialerHistory != nil {
-		_ = d.dialerHistory.Close()
+		d.dialerHistory.Close()
 	}
 	if d.options.WithTLSData {
-		_ = d.dialerTLSData.Close()
+		d.dialerTLSData.Close()
 	}
 	if d.dialCache != nil {
 		d.dialCache.Purge()

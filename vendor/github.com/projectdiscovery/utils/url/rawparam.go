@@ -175,15 +175,9 @@ func URLEncodeWithEscapes(data string, charset ...rune) string {
 			buff.WriteRune('%')
 			buff.WriteString(getasciihex(r)) // 2 digit hex
 		case r == ' ':
-			// use configuration to determine space encoding
-			switch SpaceEncoding {
-			case "percent":
-				buff.WriteRune('%')
-				buff.WriteRune('2')
-				buff.WriteRune('0')
-			default:
-				buff.WriteRune('+')
-			}
+			// prefer using + when space
+			buff.WriteRune('+')
+			// case
 		case r < rune(127):
 			if _, ok := mustescape[r]; ok {
 				// reserved char must escape

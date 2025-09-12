@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/projectdiscovery/nuclei/v3/pkg/input"
-	"github.com/projectdiscovery/nuclei/v3/pkg/reporting"
 
 	"github.com/logrusorgru/aurora"
 	"github.com/pkg/errors"
@@ -30,12 +29,15 @@ import (
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/protocolinit"
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/protocolstate"
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/http/httpclientpool"
+	"github.com/projectdiscovery/nuclei/v3/pkg/reporting"
 	"github.com/projectdiscovery/nuclei/v3/pkg/templates"
 	"github.com/projectdiscovery/nuclei/v3/pkg/testutils"
 	"github.com/projectdiscovery/nuclei/v3/pkg/types"
 	nucleiUtils "github.com/projectdiscovery/nuclei/v3/pkg/utils"
 	"github.com/projectdiscovery/ratelimit"
 )
+
+var sharedInit *sync.Once
 
 // applyRequiredDefaults to options
 func (e *NucleiEngine) applyRequiredDefaults(ctx context.Context) {
@@ -96,39 +98,27 @@ func (e *NucleiEngine) applyRequiredDefaults(ctx context.Context) {
 
 // init
 func (e *NucleiEngine) init(ctx context.Context) error {
-	// Set a default logger if one isn't provided in the options
-	if e.opts.Logger != nil {
-		e.Logger = e.opts.Logger
-	} else {
-		e.opts.Logger = &gologger.Logger{}
-	}
-	e.Logger = e.opts.Logger
-
 	if e.opts.Verbose {
-		e.Logger.SetMaxLevel(levels.LevelVerbose)
+		gologger.DefaultLogger.SetMaxLevel(levels.LevelVerbose)
 	} else if e.opts.Debug {
-		e.Logger.SetMaxLevel(levels.LevelDebug)
+		gologger.DefaultLogger.SetMaxLevel(levels.LevelDebug)
 	} else if e.opts.Silent {
-		e.Logger.SetMaxLevel(levels.LevelSilent)
+		gologger.DefaultLogger.SetMaxLevel(levels.LevelSilent)
 	}
 
 	if err := runner.ValidateOptions(e.opts); err != nil {
 		return err
 	}
 
-	if e.opts.Parser != nil {
-		if op, ok := e.opts.Parser.(*templates.Parser); ok {
-			e.parser = op
-		}
+	e.parser = templates.NewParser()
+
+	if sharedInit == nil || protocolstate.ShouldInit() {
+		sharedInit = &sync.Once{}
 	}
 
-	if e.parser == nil {
-		e.parser = templates.NewParser()
-	}
-
-	if protocolstate.ShouldInit(e.opts.ExecutionId) {
+	sharedInit.Do(func() {
 		_ = protocolinit.Init(e.opts)
-	}
+	})
 
 	if e.opts.ProxyInternal && e.opts.AliveHttpProxy != "" || e.opts.AliveSocksProxy != "" {
 		httpclient, err := httpclientpool.Get(e.opts, &httpclientpool.Configuration{})
@@ -170,7 +160,7 @@ func (e *NucleiEngine) init(ctx context.Context) error {
 		e.catalog = disk.NewCatalog(config.DefaultConfig.TemplatesDirectory)
 	}
 
-	e.executerOpts = &protocols.ExecutorOptions{
+	e.executerOpts = protocols.ExecutorOptions{
 		Output:       e.customWriter,
 		Options:      e.opts,
 		Progress:     e.customProgress,
@@ -183,13 +173,12 @@ func (e *NucleiEngine) init(ctx context.Context) error {
 		Browser:      e.browserInstance,
 		Parser:       e.parser,
 		InputHelper:  input.NewHelper(),
-		Logger:       e.opts.Logger,
 	}
 	if e.opts.ShouldUseHostError() && e.hostErrCache != nil {
 		e.executerOpts.HostErrorsCache = e.hostErrCache
 	}
 	if len(e.opts.SecretsFile) > 0 {
-		authTmplStore, err := runner.GetAuthTmplStore(e.opts, e.catalog, e.executerOpts)
+		authTmplStore, err := runner.GetAuthTmplStore(*e.opts, e.catalog, e.executerOpts)
 		if err != nil {
 			return errors.Wrap(err, "failed to load dynamic auth templates")
 		}
@@ -229,25 +218,6 @@ func (e *NucleiEngine) init(ctx context.Context) error {
 		} else {
 			e.executerOpts.RateLimiter = ratelimit.New(ctx, uint(e.opts.RateLimit), e.opts.RateLimitDuration)
 		}
-	}
-
-	// Handle the case where the user passed an existing parser that we can use as a cache
-	if e.opts.Parser != nil {
-		if cachedParser, ok := e.opts.Parser.(*templates.Parser); ok {
-			e.parser = cachedParser
-			e.opts.Parser = cachedParser
-			e.executerOpts.Parser = cachedParser
-			e.executerOpts.Options.Parser = cachedParser
-		}
-	}
-
-	// Create a new parser if necessary
-	if e.parser == nil {
-		op := templates.NewParser()
-		e.parser = op
-		e.opts.Parser = op
-		e.executerOpts.Parser = op
-		e.executerOpts.Options.Parser = op
 	}
 
 	e.engine = core.New(e.opts)

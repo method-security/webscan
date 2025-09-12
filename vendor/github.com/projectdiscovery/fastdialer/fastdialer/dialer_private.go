@@ -259,16 +259,15 @@ func (d *Dialer) dialIPS(ctx context.Context, l4 l4dialer, opts *dialOptions) (c
 				CipherSuites:       tlsconfigCopy.CipherSuites,
 			}
 			var uTLSConn *utls.UConn
-			switch opts.impersonateStrategy {
-			case impersonate.Random:
+			if opts.impersonateStrategy == impersonate.Random {
 				uTLSConn = utls.UClient(nativeConn, uTLSConfig, utls.HelloRandomized)
-			case impersonate.Custom:
+			} else if opts.impersonateStrategy == impersonate.Custom {
 				uTLSConn = utls.UClient(nativeConn, uTLSConfig, utls.HelloCustom)
 				clientHelloSpec := utls.ClientHelloSpec(ptrutil.Safe(opts.impersonateIdentity))
 				if err := uTLSConn.ApplyPreset(&clientHelloSpec); err != nil {
 					return nil, err
 				}
-			case impersonate.Chrome:
+			} else if opts.impersonateStrategy == impersonate.Chrome {
 				uTLSConn = utls.UClient(nativeConn, uTLSConfig, utls.HelloChrome_106_Shuffle)
 			}
 			if err := uTLSConn.Handshake(); err != nil {
@@ -332,7 +331,7 @@ func (d *Dialer) dialIPS(ctx context.Context, l4 l4dialer, opts *dialOptions) (c
 	}
 	// fallback to ztls  in case of handshake error with chrome ciphers
 	// ztls fallback can either be disabled by setting env variable DISABLE_ZTLS_FALLBACK=true or by setting DisableZtlsFallback=true in options
-	if err != nil && !errkit.Is(err, os.ErrDeadlineExceeded) && !(d.options.DisableZtlsFallback && disableZTLSFallback) { //nolint
+	if err != nil && !errkit.Is(err, os.ErrDeadlineExceeded) && !(d.options.DisableZtlsFallback && disableZTLSFallback) {
 		var ztlsconfigCopy *ztls.Config
 		if opts.shouldUseZTLS {
 			ztlsconfigCopy = opts.ztlsconfig.Clone()
@@ -374,7 +373,7 @@ func (d *Dialer) handleDialError(err error, opts *dialOptions) error {
 		return nil
 	}
 	errx := errkit.FromError(err)
-	errx = errx.SetAttr(slog.Any("address", opts.logAddress())) //nolint (ref https://github.com/projectdiscovery/utils/issues/657)
+	errx = errx.SetAttr(slog.Any("address", opts.logAddress()))
 
 	if errx.Kind() == errkit.ErrKindUnknown {
 		if errx.Cause() != nil && strings.Contains(errx.Cause().Error(), "i/o timeout") {

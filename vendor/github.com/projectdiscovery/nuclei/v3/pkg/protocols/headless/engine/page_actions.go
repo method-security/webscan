@@ -23,6 +23,7 @@ import (
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/protocolstate"
 	contextutil "github.com/projectdiscovery/utils/context"
 	"github.com/projectdiscovery/utils/errkit"
+	errorutil "github.com/projectdiscovery/utils/errors"
 	fileutil "github.com/projectdiscovery/utils/file"
 	folderutil "github.com/projectdiscovery/utils/folder"
 	stringsutil "github.com/projectdiscovery/utils/strings"
@@ -31,8 +32,8 @@ import (
 )
 
 var (
-	errinvalidArguments = errkit.New("invalid arguments provided").Build()
-	ErrLFAccessDenied   = errkit.New("Use -allow-local-file-access flag to enable local file access").Build()
+	errinvalidArguments = errorutil.New("invalid arguments provided")
+	ErrLFAccessDenied   = errorutil.New("Use -allow-local-file-access flag to enable local file access")
 	// ErrActionExecDealine is the error returned when alloted time for action execution exceeds
 	ErrActionExecDealine = errkit.New("headless action execution deadline exceeded").SetKind(errkit.ErrKindDeadline).Build()
 )
@@ -59,7 +60,7 @@ func (p *Page) ExecuteActions(input *contextargs.Context, actions []*Action) (ou
 		}
 
 		if r := recover(); r != nil {
-			err = errkit.New(fmt.Sprintf("panic on headless action: %v", r)).Build()
+			err = errorutil.New("panic on headless action: %v", r)
 		}
 	}()
 
@@ -72,7 +73,7 @@ func (p *Page) ExecuteActions(input *contextargs.Context, actions []*Action) (ou
 				for _, waitFunc := range waitFuncs {
 					if waitFunc != nil {
 						if err := waitFunc(); err != nil {
-							return nil, errkit.Append(errkit.New("error occurred while executing waitFunc"), err)
+							return nil, errorutil.NewWithErr(err).Msgf("error occurred while executing waitFunc")
 						}
 					}
 				}
@@ -400,7 +401,7 @@ func (p *Page) NavigateURL(action *Action, out ActionData) error {
 
 	parsedURL, err := urlutil.ParseURL(url, true)
 	if err != nil {
-		return errkit.New(fmt.Sprintf("headless: failed to parse url %v while creating http request", url)).Build()
+		return errorutil.NewWithTag("headless", "failed to parse url %v while creating http request", url)
 	}
 
 	// ===== parameter automerge =====
@@ -410,7 +411,7 @@ func (p *Page) NavigateURL(action *Action, out ActionData) error {
 	parsedURL.Params = finalparams
 
 	if err := p.page.Navigate(parsedURL.String()); err != nil {
-		return errkit.Append(errkit.New(fmt.Sprintf("could not navigate to url %s", parsedURL.String())), err)
+		return errorutil.NewWithErr(err).Msgf("could not navigate to url %s", parsedURL.String())
 	}
 
 	p.updateLastNavigatedURL()
@@ -524,14 +525,14 @@ func (p *Page) Screenshot(act *Action, out ActionData) error {
 
 	to, err = fileutil.CleanPath(to)
 	if err != nil {
-		return errkit.New(fmt.Sprintf("could not clean output screenshot path %s", to)).Build()
+		return errorutil.New("could not clean output screenshot path %s", to)
 	}
 
 	// allow if targetPath is child of current working directory
-	if !protocolstate.IsLfaAllowed(p.options.Options) {
+	if !protocolstate.IsLFAAllowed() {
 		cwd, err := os.Getwd()
 		if err != nil {
-			return errkit.Append(errkit.New("could not get current working directory"), err)
+			return errorutil.NewWithErr(err).Msgf("could not get current working directory")
 		}
 
 		if !strings.HasPrefix(to, cwd) {
@@ -550,7 +551,7 @@ func (p *Page) Screenshot(act *Action, out ActionData) error {
 		// creates new directory if needed based on path `to`
 		// TODO: replace all permission bits with fileutil constants (https://github.com/projectdiscovery/utils/issues/113)
 		if err := os.MkdirAll(filepath.Dir(to), 0700); err != nil {
-			return errkit.Append(errkit.New("failed to create directory while writing screenshot"), err)
+			return errorutil.NewWithErr(err).Msgf("failed to create directory while writing screenshot")
 		}
 	}
 
@@ -562,7 +563,7 @@ func (p *Page) Screenshot(act *Action, out ActionData) error {
 
 	if fileutil.FileExists(filePath) {
 		// return custom error as overwriting files is not supported
-		return errkit.New(fmt.Sprintf("screenshot: failed to write screenshot, file %v already exists", filePath)).Build()
+		return errorutil.NewWithTag("screenshot", "failed to write screenshot, file %v already exists", filePath)
 	}
 	err = os.WriteFile(filePath, data, 0540)
 	if err != nil {
@@ -677,7 +678,7 @@ func (p *Page) WaitPageLifecycleEvent(act *Action, out ActionData, event proto.P
 
 // WaitStable waits until the page is stable
 func (p *Page) WaitStable(act *Action, out ActionData) error {
-	dur := time.Second // default stable page duration: 1s
+	var dur = time.Second // default stable page duration: 1s
 
 	timeout, err := getTimeout(p, act)
 	if err != nil {
@@ -805,12 +806,12 @@ func (p *Page) WaitEvent(act *Action, out ActionData) (func() error, error) {
 
 	gotType := proto.GetType(event)
 	if gotType == nil {
-		return nil, errkit.New(fmt.Sprintf("event %q does not exist", event)).Build()
+		return nil, errorutil.New("event %q does not exist", event)
 	}
 
 	tmp, ok := reflect.New(gotType).Interface().(proto.Event)
 	if !ok {
-		return nil, errkit.New(fmt.Sprintf("event %q is not a page event", event)).Build()
+		return nil, errorutil.New("event %q is not a page event", event)
 	}
 
 	waitEvent = tmp
@@ -947,7 +948,7 @@ func (p *Page) getActionArg(action *Action, arg string) (string, error) {
 
 	err = expressions.ContainsUnresolvedVariables(exprs...)
 	if err != nil {
-		return "", errkit.Append(errkit.New(fmt.Sprintf("argument %q, value: %q", arg, argValue)), err)
+		return "", errorutil.NewWithErr(err).Msgf("argument %q, value: %q", arg, argValue)
 	}
 
 	argValue, err = expressions.Evaluate(argValue, p.variables)

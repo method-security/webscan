@@ -139,7 +139,7 @@ func (i *ListInputProvider) Iterate(callback func(value *contextargs.MetaInput) 
 }
 
 // Set normalizes and stores passed input values
-func (i *ListInputProvider) Set(executionId string, value string) {
+func (i *ListInputProvider) Set(value string) {
 	URL := strings.TrimSpace(value)
 	if URL == "" {
 		return
@@ -169,12 +169,7 @@ func (i *ListInputProvider) Set(executionId string, value string) {
 
 	if i.ipOptions.ScanAllIPs {
 		// scan all ips
-		dialers := protocolstate.GetDialersWithId(executionId)
-		if dialers == nil {
-			panic("dialers with executionId " + executionId + " not found")
-		}
-
-		dnsData, err := dialers.Fastdialer.GetDNSData(urlx.Hostname())
+		dnsData, err := protocolstate.Dialer.GetDNSData(urlx.Hostname())
 		if err == nil {
 			if (len(dnsData.A) + len(dnsData.AAAA)) > 0 {
 				var ips []string
@@ -206,12 +201,7 @@ func (i *ListInputProvider) Set(executionId string, value string) {
 	ips := []string{}
 	// only scan the target but ipv6 if it has one
 	if i.ipOptions.IPV6 {
-		dialers := protocolstate.GetDialersWithId(executionId)
-		if dialers == nil {
-			panic("dialers with executionId " + executionId + " not found")
-		}
-
-		dnsData, err := dialers.Fastdialer.GetDNSData(urlx.Hostname())
+		dnsData, err := protocolstate.Dialer.GetDNSData(urlx.Hostname())
 		if err == nil && len(dnsData.AAAA) > 0 {
 			// pick/ prefer 1st
 			ips = append(ips, dnsData.AAAA[0])
@@ -238,17 +228,17 @@ func (i *ListInputProvider) Set(executionId string, value string) {
 }
 
 // SetWithProbe only sets the input if it is live
-func (i *ListInputProvider) SetWithProbe(executionId string, value string, probe providerTypes.InputLivenessProbe) error {
+func (i *ListInputProvider) SetWithProbe(value string, probe providerTypes.InputLivenessProbe) error {
 	probedValue, err := probe.ProbeURL(value)
 	if err != nil {
 		return err
 	}
-	i.Set(executionId, probedValue)
+	i.Set(probedValue)
 	return nil
 }
 
 // SetWithExclusions normalizes and stores passed input values if not excluded
-func (i *ListInputProvider) SetWithExclusions(executionId string, value string) error {
+func (i *ListInputProvider) SetWithExclusions(value string) error {
 	URL := strings.TrimSpace(value)
 	if URL == "" {
 		return nil
@@ -257,7 +247,7 @@ func (i *ListInputProvider) SetWithExclusions(executionId string, value string) 
 		i.skippedCount++
 		return nil
 	}
-	i.Set(executionId, URL)
+	i.Set(URL)
 	return nil
 }
 
@@ -283,20 +273,18 @@ func (i *ListInputProvider) initializeInputSources(opts *Options) error {
 		switch {
 		case iputil.IsCIDR(target):
 			ips := expand.CIDR(target)
-			i.addTargets(options.ExecutionId, ips)
+			i.addTargets(ips)
 		case asn.IsASN(target):
 			ips := expand.ASN(target)
-			i.addTargets(options.ExecutionId, ips)
+			i.addTargets(ips)
 		default:
-			i.Set(options.ExecutionId, target)
+			i.Set(target)
 		}
 	}
 
 	// Handle stdin
 	if options.Stdin {
-		i.scanInputFromReader(
-			options.ExecutionId,
-			readerutil.TimeoutReader{Reader: os.Stdin, Timeout: time.Duration(options.InputReadTimeout)})
+		i.scanInputFromReader(readerutil.TimeoutReader{Reader: os.Stdin, Timeout: time.Duration(options.InputReadTimeout)})
 	}
 
 	// Handle target file
@@ -309,7 +297,7 @@ func (i *ListInputProvider) initializeInputSources(opts *Options) error {
 			}
 		}
 		if input != nil {
-			i.scanInputFromReader(options.ExecutionId, input)
+			i.scanInputFromReader(input)
 			_ = input.Close()
 		}
 	}
@@ -329,7 +317,7 @@ func (i *ListInputProvider) initializeInputSources(opts *Options) error {
 			return err
 		}
 		for c := range ch {
-			i.Set(options.ExecutionId, c)
+			i.Set(c)
 		}
 	}
 
@@ -343,7 +331,7 @@ func (i *ListInputProvider) initializeInputSources(opts *Options) error {
 				ips := expand.ASN(target)
 				i.removeTargets(ips)
 			default:
-				i.Del(options.ExecutionId, target)
+				i.Del(target)
 			}
 		}
 	}
@@ -352,19 +340,19 @@ func (i *ListInputProvider) initializeInputSources(opts *Options) error {
 }
 
 // scanInputFromReader scans a line of input from reader and passes it for storage
-func (i *ListInputProvider) scanInputFromReader(executionId string, reader io.Reader) {
+func (i *ListInputProvider) scanInputFromReader(reader io.Reader) {
 	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
 		item := scanner.Text()
 		switch {
 		case iputil.IsCIDR(item):
 			ips := expand.CIDR(item)
-			i.addTargets(executionId, ips)
+			i.addTargets(ips)
 		case asn.IsASN(item):
 			ips := expand.ASN(item)
-			i.addTargets(executionId, ips)
+			i.addTargets(ips)
 		default:
-			i.Set(executionId, item)
+			i.Set(item)
 		}
 	}
 }
@@ -383,7 +371,7 @@ func (i *ListInputProvider) isExcluded(URL string) bool {
 	return exists
 }
 
-func (i *ListInputProvider) Del(executionId string, value string) {
+func (i *ListInputProvider) Del(value string) {
 	URL := strings.TrimSpace(value)
 	if URL == "" {
 		return
@@ -413,12 +401,7 @@ func (i *ListInputProvider) Del(executionId string, value string) {
 
 	if i.ipOptions.ScanAllIPs {
 		// scan all ips
-		dialers := protocolstate.GetDialersWithId(executionId)
-		if dialers == nil {
-			panic("dialers with executionId " + executionId + " not found")
-		}
-
-		dnsData, err := dialers.Fastdialer.GetDNSData(urlx.Hostname())
+		dnsData, err := protocolstate.Dialer.GetDNSData(urlx.Hostname())
 		if err == nil {
 			if (len(dnsData.A) + len(dnsData.AAAA)) > 0 {
 				var ips []string
@@ -450,12 +433,7 @@ func (i *ListInputProvider) Del(executionId string, value string) {
 	ips := []string{}
 	// only scan the target but ipv6 if it has one
 	if i.ipOptions.IPV6 {
-		dialers := protocolstate.GetDialersWithId(executionId)
-		if dialers == nil {
-			panic("dialers with executionId " + executionId + " not found")
-		}
-
-		dnsData, err := dialers.Fastdialer.GetDNSData(urlx.Hostname())
+		dnsData, err := protocolstate.Dialer.GetDNSData(urlx.Hostname())
 		if err == nil && len(dnsData.AAAA) > 0 {
 			// pick/ prefer 1st
 			ips = append(ips, dnsData.AAAA[0])
@@ -541,9 +519,9 @@ func (i *ListInputProvider) setHostMapStream(data string) {
 	}
 }
 
-func (i *ListInputProvider) addTargets(executionId string, targets []string) {
+func (i *ListInputProvider) addTargets(targets []string) {
 	for _, target := range targets {
-		i.Set(executionId, target)
+		i.Set(target)
 	}
 }
 

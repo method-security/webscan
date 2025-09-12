@@ -1,7 +1,6 @@
 package network
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -13,7 +12,7 @@ import (
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/expressions"
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/generators"
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/network/networkclientpool"
-	"github.com/projectdiscovery/utils/errkit"
+	errorutil "github.com/projectdiscovery/utils/errors"
 	fileutil "github.com/projectdiscovery/utils/file"
 )
 
@@ -197,10 +196,10 @@ func (request *Request) Compile(options *protocols.ExecutorOptions) error {
 			}
 			portInt, err := strconv.Atoi(port)
 			if err != nil {
-				return errkit.Append(errkit.New(fmt.Sprintf("could not parse port %v from '%s'", port, request.Port)), err)
+				return errorutil.NewWithErr(err).Msgf("could not parse port %v from '%s'", port, request.Port)
 			}
 			if portInt < 1 || portInt > 65535 {
-				return errkit.New(fmt.Sprintf("%s: port %v is not in valid range", request.TemplateID, portInt)).Build()
+				return errorutil.NewWithTag(request.TemplateID, "port %v is not in valid range", portInt)
 			}
 			request.ports = append(request.ports, port)
 		}
@@ -261,13 +260,4 @@ func (request *Request) Compile(options *protocols.ExecutorOptions) error {
 // Requests returns the total number of requests the YAML rule will perform
 func (request *Request) Requests() int {
 	return len(request.Address)
-}
-
-func (request *Request) SetDialer(dialer *fastdialer.Dialer) {
-	request.dialer = dialer
-}
-
-// UpdateOptions replaces this request's options with a new copy
-func (r *Request) UpdateOptions(opts *protocols.ExecutorOptions) {
-	r.options.ApplyNewEngineOptions(opts)
 }

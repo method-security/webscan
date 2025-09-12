@@ -8,11 +8,11 @@ import (
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/protocolstate"
 )
 
-func memoizedisMySQL(executionId string, host string, port int) (bool, error) {
+func memoizedisMySQL(host string, port int) (bool, error) {
 	hash := "isMySQL" + ":" + fmt.Sprint(host) + ":" + fmt.Sprint(port)
 
 	v, err, _ := protocolstate.Memoizer.Do(hash, func() (interface{}, error) {
-		return isMySQL(executionId, host, port)
+		return isMySQL(host, port)
 	})
 	if err != nil {
 		return false, err
@@ -24,11 +24,11 @@ func memoizedisMySQL(executionId string, host string, port int) (bool, error) {
 	return false, errors.New("could not convert cached result")
 }
 
-func memoizedfingerprintMySQL(executionId string, host string, port int) (MySQLInfo, error) {
+func memoizedfingerprintMySQL(host string, port int) (MySQLInfo, error) {
 	hash := "fingerprintMySQL" + ":" + fmt.Sprint(host) + ":" + fmt.Sprint(port)
 
 	v, err, _ := protocolstate.Memoizer.Do(hash, func() (interface{}, error) {
-		return fingerprintMySQL(executionId, host, port)
+		return fingerprintMySQL(host, port)
 	})
 	if err != nil {
 		return MySQLInfo{}, err

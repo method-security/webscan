@@ -539,8 +539,3 @@ const (
 func init() {
 	stats.NewEntry(SetThreadToCountZero, "Setting thread count to 0 for %d templates, dynamic extractors are not supported with payloads yet")
 }
-
-// UpdateOptions replaces this request's options with a new copy
-func (r *Request) UpdateOptions(opts *protocols.ExecutorOptions) {
-	r.options.ApplyNewEngineOptions(opts)
-}

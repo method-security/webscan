@@ -1,7 +1,6 @@
 package fs
 
 import (
-	"context"
 	"os"
 
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/protocolstate"
@@ -28,9 +27,8 @@ import (
 // // when no itemType is provided, it will return both files and directories
 // const items = fs.ListDir('/tmp');
 // ```
-func ListDir(ctx context.Context, path string, itemType string) ([]string, error) {
-	executionId := ctx.Value("executionId").(string)
-	finalPath, err := protocolstate.NormalizePathWithExecutionId(executionId, path)
+func ListDir(path string, itemType string) ([]string, error) {
+	finalPath, err := protocolstate.NormalizePath(path)
 	if err != nil {
 		return nil, err
 	}
@@ -59,9 +57,8 @@ func ListDir(ctx context.Context, path string, itemType string) ([]string, error
 // // here permitted directories are $HOME/nuclei-templates/*
 // const content = fs.ReadFile('helpers/usernames.txt');
 // ```
-func ReadFile(ctx context.Context, path string) ([]byte, error) {
-	executionId := ctx.Value("executionId").(string)
-	finalPath, err := protocolstate.NormalizePathWithExecutionId(executionId, path)
+func ReadFile(path string) ([]byte, error) {
+	finalPath, err := protocolstate.NormalizePath(path)
 	if err != nil {
 		return nil, err
 	}
@@ -77,8 +74,8 @@ func ReadFile(ctx context.Context, path string) ([]byte, error) {
 // // here permitted directories are $HOME/nuclei-templates/*
 // const content = fs.ReadFileAsString('helpers/usernames.txt');
 // ```
-func ReadFileAsString(ctx context.Context, path string) (string, error) {
-	bin, err := ReadFile(ctx, path)
+func ReadFileAsString(path string) (string, error) {
+	bin, err := ReadFile(path)
 	if err != nil {
 		return "", err
 	}
@@ -94,14 +91,14 @@ func ReadFileAsString(ctx context.Context, path string) (string, error) {
 // const contents = fs.ReadFilesFromDir('helpers/ssh-keys');
 // log(contents);
 // ```
-func ReadFilesFromDir(ctx context.Context, dir string) ([]string, error) {
-	files, err := ListDir(ctx, dir, "file")
+func ReadFilesFromDir(dir string) ([]string, error) {
+	files, err := ListDir(dir, "file")
 	if err != nil {
 		return nil, err
 	}
 	var results []string
 	for _, file := range files {
-		content, err := ReadFileAsString(ctx, dir+"/"+file)
+		content, err := ReadFileAsString(dir + "/" + file)
 		if err != nil {
 			return nil, err
 		}

@@ -4,7 +4,6 @@ package generators
 
 import (
 	"github.com/pkg/errors"
-	"maps"
 
 	"github.com/projectdiscovery/nuclei/v3/pkg/catalog"
 	"github.com/projectdiscovery/nuclei/v3/pkg/types"
@@ -33,7 +32,9 @@ func New(payloads map[string]interface{}, attackType AttackType, templatePath st
 			if err != nil {
 				return nil, errors.Wrap(err, "could not parse payloads with aggression")
 			}
-			maps.Copy(payloadsFinal, values)
+			for k, v := range values {
+				payloadsFinal[k] = v
+			}
 		default:
 			payloadsFinal[payloadName] = v
 		}

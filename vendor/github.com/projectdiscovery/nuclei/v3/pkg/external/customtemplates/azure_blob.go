@@ -3,7 +3,6 @@ package customtemplates
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,7 +12,7 @@ import (
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/nuclei/v3/pkg/catalog/config"
 	"github.com/projectdiscovery/nuclei/v3/pkg/types"
-	"github.com/projectdiscovery/utils/errkit"
+	errorutil "github.com/projectdiscovery/utils/errors"
 )
 
 var _ Provider = &customTemplateAzureBlob{}
@@ -30,7 +29,7 @@ func NewAzureProviders(options *types.Options) ([]*customTemplateAzureBlob, erro
 		// Establish a connection to Azure and build a client object with which to download templates from Azure Blob Storage
 		azClient, err := getAzureBlobClient(options.AzureTenantID, options.AzureClientID, options.AzureClientSecret, options.AzureServiceURL)
 		if err != nil {
-			return nil, errkit.Append(errkit.New(fmt.Sprintf("Error establishing Azure Blob client for %s", options.AzureContainerName)), err)
+			return nil, errorutil.NewWithErr(err).Msgf("Error establishing Azure Blob client for %s", options.AzureContainerName)
 		}
 
 		// Create a new Azure Blob Storage container object

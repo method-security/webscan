@@ -70,7 +70,7 @@ func (n *node[V]) overlaps(o *node[V], depth int) bool {
 	}
 
 	// stop condition, no child with identical octet in n and o
-	if !n.children.Intersects(&o.children.BitSet256) {
+	if !n.children.IntersectsAny(&o.children.BitSet256) {
 		return false
 	}
 
@@ -80,7 +80,7 @@ func (n *node[V]) overlaps(o *node[V], depth int) bool {
 // overlapsRoutes, test if n overlaps o prefixes and vice versa
 func (n *node[V]) overlapsRoutes(o *node[V]) bool {
 	// some prefixes are identical, trivial overlap
-	if n.prefixes.Intersects(&o.prefixes.BitSet256) {
+	if n.prefixes.IntersectsAny(&o.prefixes.BitSet256) {
 		return true
 	}
 
@@ -146,7 +146,7 @@ func (n *node[V]) overlapsChildrenIn(o *node[V]) bool {
 	// do range over, not so many childs and maybe too many prefixes for other algo below
 	if doRange {
 		for _, addr := range o.children.AsSlice(&[256]uint8{}) {
-			if n.lpmTest(art.OctetToIdx(addr)) {
+			if n.lpmTest(art.HostIdx(addr)) {
 				return true
 			}
 		}
@@ -169,7 +169,7 @@ func (n *node[V]) overlapsChildrenIn(o *node[V]) bool {
 		hostRoutes = hostRoutes.Union(allot.IdxToFringeRoutes(idx))
 	}
 
-	return hostRoutes.Intersects(&o.children.BitSet256)
+	return hostRoutes.IntersectsAny(&o.children.BitSet256)
 }
 
 // overlapsSameChildren, find same octets with bitset intersection.
@@ -267,12 +267,12 @@ func (n *node[V]) overlapsPrefixAtDepth(pfx netip.Prefix, depth int) bool {
 
 		// full octet path in node trie, check overlap with last prefix octet
 		if depth == maxDepth {
-			return n.overlapsIdx(art.PfxToIdx(octet, lastBits))
+			return n.overlapsIdx(art.PfxToIdx256(octet, lastBits))
 		}
 
 		// test if any route overlaps prefix´ so far
 		// no best match needed, forward tests without backtracking
-		if n.prefixes.Len() != 0 && n.lpmTest(art.OctetToIdx(octet)) {
+		if n.prefixes.Len() != 0 && n.lpmTest(art.HostIdx(octet)) {
 			return true
 		}
 
@@ -312,12 +312,12 @@ func (n *node[V]) overlapsIdx(idx uint8) bool {
 	// use bitset intersections instead of range loops
 	// shallow copy pre alloted bitset for idx
 	allotedPrefixRoutes := allot.IdxToPrefixRoutes(idx)
-	if allotedPrefixRoutes.Intersects(&n.prefixes.BitSet256) {
+	if allotedPrefixRoutes.IntersectsAny(&n.prefixes.BitSet256) {
 		return true
 	}
 
 	// 3. Test if prefix overlaps any child in this node
 
 	allotedHostRoutes := allot.IdxToFringeRoutes(idx)
-	return allotedHostRoutes.Intersects(&n.children.BitSet256)
+	return allotedHostRoutes.IntersectsAny(&n.children.BitSet256)
 }

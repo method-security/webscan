@@ -25,9 +25,7 @@ func loadHostsFile(hm *hybrid.HybridMap, max int) error {
 	if err != nil {
 		return err
 	}
-	defer func() {
-		_ = file.Close()
-	}()
+	defer file.Close()
 
 	dnsDatas := make(map[string]retryabledns.DNSData)
 	scanner := bufio.NewScanner(utfbom.SkipOnly(file))

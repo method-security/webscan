@@ -11,13 +11,13 @@
 
 ## Overview
 
-`package bart` provides a Balanced-Routing-Table (BART) for very fast IP to CIDR lookups and more.
+`package bart` provides a Balanced-Routing-Table (BART).
 
 BART is balanced in terms of memory usage and lookup time for the longest-prefix
 match.
 
 BART is a multibit-trie with fixed stride length of 8 bits, using a fast mapping
-function (based on Donald E. Knuths ART algorithm) to map the 256 prefixes in each level
+function (taken from the ART algorithm) to map the 256 prefixes in each level
 node to form a complete-binary-tree.
 
 This complete binary tree is implemented with popcount compressed sparse arrays
@@ -29,9 +29,6 @@ The BART algorithm is based on fixed size bit vectors and precalculated
 lookup tables. The lookup is performed entirely by fast,
 cache-friendly bitmask operations, which in modern CPUs are performed
 by advanced bit manipulation instruction sets (POPCNT, LZCNT, TZCNT, ...).
-
-You should specify the CPU feature set when compiling, e.g. GOAMD64=v2 for 
-maximum performance, see also https://go.dev/wiki/MinimumRequirements#architectures
 
 The algorithm was specially developed so that it can always work with a fixed
 length of 256 bits. This means that the bitset fit very well in a cache line and
@@ -46,8 +43,6 @@ func (b *BitSet256) popcnt() (cnt int) {
 	return
 }
 ```
-A future Go version that supports SIMD intrinsics for the `[4]uint64` vectors will
-probably allow the algorithm to be made even faster on suitable hardware.
 
 The BART algorithm is also excellent for determining whether two tables
 contain overlapping IP addresses, just in a few nanoseconds.
@@ -183,25 +178,23 @@ Just a teaser, `Contains` and `Lookup` against the Tier1 full Internet routing t
 random IP address probes:
 
 ```
-$ GOAMD64=v2 go test -run=xxx -bench=FullM/Contains -cpu=1
 goos: linux
 goarch: amd64
 pkg: github.com/gaissmai/bart
 cpu: Intel(R) Core(TM) i5-8250U CPU @ 1.60GHz
-BenchmarkFullMatch4/Contains         	83951143	        14.15 ns/op
-BenchmarkFullMatch6/Contains         	62731105	        19.14 ns/op
-BenchmarkFullMiss4/Contains          	74333276	        16.17 ns/op
-BenchmarkFullMiss6/Contains          	142984221	         8.610 ns/op
+BenchmarkFullMatch4/Contains        129756907	         8.409 ns/op
+BenchmarkFullMatch6/Contains        96855786	        11.72 ns/op
+BenchmarkFullMiss4/Contains         56269990	        18.58 ns/op
+BenchmarkFullMiss6/Contains         131779195	        10.08 ns/op
 
-$ GOAMD64=v2 go test -run=xxx -bench=FullM/Lookup -skip=/x -cpu=1
 goos: linux
 goarch: amd64
 pkg: github.com/gaissmai/bart
 cpu: Intel(R) Core(TM) i5-8250U CPU @ 1.60GHz
-BenchmarkFullMatch4/Lookup         	54066939	        22.09 ns/op
-BenchmarkFullMatch6/Lookup         	27839944	        44.13 ns/op
-BenchmarkFullMiss4/Lookup          	55061455	        21.80 ns/op
-BenchmarkFullMiss6/Lookup          	100000000	        11.21 ns/op
+BenchmarkFullMatch4/Lookup         	47039798	        24.44 ns/op
+BenchmarkFullMatch6/Lookup         	81769753	        13.61 ns/op
+BenchmarkFullMiss4/Lookup          	51986374	        22.72 ns/op
+BenchmarkFullMiss6/Lookup          	100000000	        11.47 ns/op
 ```
 
 ## Compatibility Guarantees

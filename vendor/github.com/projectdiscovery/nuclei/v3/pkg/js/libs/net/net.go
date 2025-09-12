@@ -10,7 +10,7 @@ import (
 
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/protocolstate"
 	"github.com/projectdiscovery/nuclei/v3/pkg/types"
-	"github.com/projectdiscovery/utils/errkit"
+	errorutil "github.com/projectdiscovery/utils/errors"
 	"github.com/projectdiscovery/utils/reader"
 )
 
@@ -25,13 +25,8 @@ var (
 // const net = require('nuclei/net');
 // const conn = net.Open('tcp', 'acme.com:80');
 // ```
-func Open(ctx context.Context, protocol, address string) (*NetConn, error) {
-	executionId := ctx.Value("executionId").(string)
-	dialer := protocolstate.GetDialersWithId(executionId)
-	if dialer == nil {
-		return nil, fmt.Errorf("dialers not initialized for %s", executionId)
-	}
-	conn, err := dialer.Fastdialer.Dial(ctx, protocol, address)
+func Open(protocol, address string) (*NetConn, error) {
+	conn, err := protocolstate.Dialer.Dial(context.TODO(), protocol, address)
 	if err != nil {
 		return nil, err
 	}
@@ -45,7 +40,7 @@ func Open(ctx context.Context, protocol, address string) (*NetConn, error) {
 // const net = require('nuclei/net');
 // const conn = net.OpenTLS('tcp', 'acme.com:443');
 // ```
-func OpenTLS(ctx context.Context, protocol, address string) (*NetConn, error) {
+func OpenTLS(protocol, address string) (*NetConn, error) {
 	config := &tls.Config{InsecureSkipVerify: true, MinVersion: tls.VersionTLS10}
 	host, _, _ := net.SplitHostPort(address)
 	if host != "" {
@@ -53,13 +48,7 @@ func OpenTLS(ctx context.Context, protocol, address string) (*NetConn, error) {
 		c.ServerName = host
 		config = c
 	}
-	executionId := ctx.Value("executionId").(string)
-	dialer := protocolstate.GetDialersWithId(executionId)
-	if dialer == nil {
-		return nil, fmt.Errorf("dialers not initialized for %s", executionId)
-	}
-
-	conn, err := dialer.Fastdialer.DialTLSWithConfig(ctx, protocol, address, config)
+	conn, err := protocolstate.Dialer.DialTLSWithConfig(context.TODO(), protocol, address, config)
 	if err != nil {
 		return nil, err
 	}
@@ -201,7 +190,7 @@ func (c *NetConn) RecvFull(N int) ([]byte, error) {
 	}
 	bin, err := reader.ConnReadNWithTimeout(c.conn, int64(N), c.timeout)
 	if err != nil {
-		return []byte{}, errkit.Append(errkit.New(fmt.Sprintf("failed to read %d bytes", N)), err)
+		return []byte{}, errorutil.NewWithErr(err).Msgf("failed to read %d bytes", N)
 	}
 	return bin, nil
 }
@@ -226,7 +215,7 @@ func (c *NetConn) Recv(N int) ([]byte, error) {
 	b := make([]byte, N)
 	n, err := c.conn.Read(b)
 	if err != nil {
-		return []byte{}, errkit.Append(errkit.New(fmt.Sprintf("failed to read %d bytes", N)), err)
+		return []byte{}, errorutil.NewWithErr(err).Msgf("failed to read %d bytes", N)
 	}
 	return b[:n], nil
 }

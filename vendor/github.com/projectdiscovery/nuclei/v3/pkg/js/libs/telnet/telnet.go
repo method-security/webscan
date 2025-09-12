@@ -2,7 +2,6 @@ package telnet
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"strconv"
 	"time"
@@ -34,22 +33,16 @@ type (
 // const isTelnet = telnet.IsTelnet('acme.com', 23);
 // log(toJSON(isTelnet));
 // ```
-func IsTelnet(ctx context.Context, host string, port int) (IsTelnetResponse, error) {
-	executionId := ctx.Value("executionId").(string)
-	return memoizedisTelnet(executionId, host, port)
+func IsTelnet(host string, port int) (IsTelnetResponse, error) {
+	return memoizedisTelnet(host, port)
 }
 
 // @memo
-func isTelnet(executionId string, host string, port int) (IsTelnetResponse, error) {
+func isTelnet(host string, port int) (IsTelnetResponse, error) {
 	resp := IsTelnetResponse{}
 
 	timeout := 5 * time.Second
-	dialer := protocolstate.GetDialersWithId(executionId)
-	if dialer == nil {
-		return IsTelnetResponse{}, fmt.Errorf("dialers not initialized for %s", executionId)
-	}
-
-	conn, err := dialer.Fastdialer.Dial(context.TODO(), "tcp", net.JoinHostPort(host, strconv.Itoa(port)))
+	conn, err := protocolstate.Dialer.Dial(context.TODO(), "tcp", net.JoinHostPort(host, strconv.Itoa(port)))
 	if err != nil {
 		return resp, err
 	}

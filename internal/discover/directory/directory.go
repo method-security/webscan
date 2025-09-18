@@ -81,7 +81,9 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 
 	// Check for timeout before starting main processing
 	if ctx.Err() != nil {
-		return nil, fmt.Errorf("directory discovery operation timed out after %d seconds", config.MaxRuntime)
+		report.Result = &result
+		report.Errors = append(report.Errors, fmt.Sprintf("directory discovery operation timed out after %d seconds before processing started", config.MaxRuntime))
+		return &report, nil
 	}
 
 	// Initialize targets
@@ -90,7 +92,11 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 
 		// Check if context has expired
 		if ctx.Err() != nil {
-			return nil, fmt.Errorf("directory discovery operation timed out after %d seconds", config.MaxRuntime)
+			// Return partial results collected so far
+			result.Targets = targets
+			report.Result = &result
+			report.Errors = append(report.Errors, fmt.Sprintf("directory discovery operation timed out after %d seconds during target processing", config.MaxRuntime))
+			return &report, nil
 		}
 
 		// Initialize target info
@@ -139,7 +145,11 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 
 		// Check if context expired during baseline setup
 		if ctx.Err() != nil {
-			return nil, fmt.Errorf("directory discovery operation timed out after %d seconds", config.MaxRuntime)
+			// Return partial results collected so far
+			result.Targets = targets
+			report.Result = &result
+			report.Errors = append(report.Errors, fmt.Sprintf("directory discovery operation timed out after %d seconds during baseline setup", config.MaxRuntime))
+			return &report, nil
 		}
 
 		// Multi-threaded request processing
@@ -164,7 +174,16 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 				for _, method := range config.HttpMethods {
 					// Check if context has expired
 					if ctx.Err() != nil {
-						return nil, fmt.Errorf("directory discovery operation timed out after %d seconds", config.MaxRuntime)
+						// Wait for any running goroutines to complete before returning partial results
+						wg.Wait()
+						if len(attempts) > 0 {
+							targetInfo.Attempts = attempts
+							targets = append(targets, &targetInfo)
+						}
+						result.Targets = targets
+						report.Result = &result
+						report.Errors = append(report.Errors, fmt.Sprintf("directory discovery operation timed out after %d seconds during request processing", config.MaxRuntime))
+						return &report, nil
 					}
 
 					wg.Add(1)
@@ -224,14 +243,18 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 		// Wait for all goroutines to complete
 		wg.Wait()
 
-		// Check if context expired during processing
-		if ctx.Err() != nil {
-			return nil, fmt.Errorf("directory discovery operation timed out after %d seconds", config.MaxRuntime)
-		}
-
+		// Always add results if we have any, even if context expired
 		if len(attempts) > 0 {
 			targetInfo.Attempts = attempts
 			targets = append(targets, &targetInfo)
+		}
+
+		// Check if context expired during processing - still return partial results
+		if ctx.Err() != nil {
+			result.Targets = targets
+			report.Result = &result
+			report.Errors = append(report.Errors, fmt.Sprintf("directory discovery operation timed out after %d seconds during processing, returning partial results", config.MaxRuntime))
+			return &report, nil
 		}
 	}
 

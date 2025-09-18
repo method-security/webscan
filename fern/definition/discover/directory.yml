@@ -4,13 +4,13 @@ types:
   # Wordlist Enums
   WordlistType:
     enum:
-      - directories
-      - files
+      - DIRECTORIES
+      - FILES
   WordlistSize:
     enum:
-      - small
-      - medium
-      - large
+      - SMALL
+      - MEDIUM
+      - LARGE
   # Config Struct
   DiscoverDirectoryConfig:
     properties:

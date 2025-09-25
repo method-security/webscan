@@ -3,8 +3,15 @@ version: 2
 project_name: webscan
 
 builds:
-  - id: prebuilt
-    builder: prebuilt
+  - id: main
+    binary: webscan
+    main: .
+    mod_timestamp: '{{ .CommitTimestamp }}'
+    ldflags:
+      - -s -w
+      - -X github.com/method-security/webscan/main.version={{.Version}}
+    env:
+      - CGO_ENABLED=1
     goos:
       - linux
       - darwin
@@ -19,9 +26,6 @@ builds:
         goarch: arm64
       - goos: darwin
         goarch: amd64
-    prebuilt:
-      path: output/build-{{ .Os }}_{{ .Arch }}/webscan{{ if eq .Os "windows" }}.exe{{ end }}
-    binary: webscan
 
 archives:
   - id: archive
@@ -56,7 +60,7 @@ dockers:
     goos: linux
     goarch: amd64
     ids:
-      - prebuilt
+      - main
     build_flag_templates:
       - "--label=org.opencontainers.image.title={{ .ProjectName }}"
       - "--label=org.opencontainers.image.description=An on-rails Webscan enumeration tool"
@@ -79,7 +83,7 @@ dockers:
     goos: linux
     goarch: arm64
     ids:
-      - prebuilt
+      - main
     build_flag_templates:
       - "--label=org.opencontainers.image.title={{ .ProjectName }}"
       - "--label=org.opencontainers.image.description=An on-rails Webscan enumeration tool"
@@ -113,9 +117,14 @@ docker_manifests:
     - 'methodsecurity/webscan:{{ .Version }}-arm64'
 
 sboms:
-  - artifacts: archive
-  - id: source
-    artifacts: source
+  - artifacts: binary
+    cmd: syft
+    args:
+      - "file:{{ .ArtifactPath }}"
+      - "--output"
+      - "spdx-json={{ .ArtifactName }}.sbom.json"
+    env:
+      - SYFT_CHECK_FOR_APP_UPDATE=false
 
 signs:
   - cmd: cosign

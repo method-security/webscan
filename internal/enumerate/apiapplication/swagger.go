@@ -236,7 +236,7 @@ func isLikelySpecURL(url string) bool {
 // First checks if target is a Swagger UI page, then uses headless if needed,
 // otherwise falls back to trying common endpoint paths.
 func findOpenAPISpec(ctx context.Context, target string, timeout int, headlessPath string) (string, []byte, map[string]interface{}, error) {
-	baseURL, parsedTargetPath, err := requesthelpers.SplitTargetURL(target)
+	baseURL, parsedTargetPath, _, err := requesthelpers.SplitTargetURL(target)
 	if err != nil {
 		return "", nil, nil, fmt.Errorf("failed to split target URL: %w", err)
 	}

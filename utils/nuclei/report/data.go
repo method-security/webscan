@@ -102,7 +102,7 @@ func getHTTPRequestResponse(ev *nout.ResultEvent) (*common.HttpRequestResponse, 
 	}
 
 	// Marshal Request Struct
-	baseURL, _, err := requesthelpers.SplitTargetURL(ev.URL)
+	baseURL, _, _, err := requesthelpers.SplitTargetURL(ev.URL)
 	if err != nil {
 		// If we can't parse the URL, still include what we can
 		request.BaseUrl = ev.URL

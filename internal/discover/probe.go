@@ -14,12 +14,14 @@ import (
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
 )
 
-func createSendHTTPRequestConfig(baseURL, path string, config *discover.DiscoverProbeConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) common.SendHttpRequestConfig {
+func createSendHTTPRequestConfig(baseURL, path string, queryParams map[string]string, config *discover.DiscoverProbeConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) common.SendHttpRequestConfig {
 	request := common.HttpRequest{
 		BaseUrl: baseURL,
 		Path:    path,
 		Method:  common.HttpMethodGet,
-		Params:  &common.HttpRequestParams{},
+		Params: &common.HttpRequestParams{
+			Query: queryParams,
+		},
 	}
 	return common.SendHttpRequestConfig{
 		Request:            &request,
@@ -38,12 +40,12 @@ func sendRequestWithProtocol(ctx context.Context, target string, protocol string
 	sanitizedTarget := requesthelpers.RemoveScheme(target)
 	fullURL := protocol + "://" + sanitizedTarget
 
-	baseURL, path, err := requesthelpers.SplitTargetURL(fullURL)
+	baseURL, path, queryParams, err := requesthelpers.SplitTargetURL(fullURL)
 	if err != nil {
 		return nil, fmt.Errorf("invalid address %s: %v", fullURL, err)
 	}
 
-	requestConfig := createSendHTTPRequestConfig(baseURL, path, config, browserbaseSecrets)
+	requestConfig := createSendHTTPRequestConfig(baseURL, path, queryParams, config, browserbaseSecrets)
 	httpRequestResponse, err := request.SendRequest(ctx, requestConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to probe %s - %s", fullURL, err)

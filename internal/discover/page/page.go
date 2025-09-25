@@ -15,12 +15,14 @@ import (
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
 )
 
-func getHTTPRequestConfig(baseURL string, path string, config discover.DiscoverPageConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) common.SendHttpRequestConfig {
+func getHTTPRequestConfig(baseURL string, path string, queryParams map[string]string, config discover.DiscoverPageConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) common.SendHttpRequestConfig {
 	request := common.HttpRequest{
 		BaseUrl: baseURL,
 		Path:    path,
 		Method:  common.HttpMethodGet,
-		Params:  &common.HttpRequestParams{},
+		Params: &common.HttpRequestParams{
+			Query: queryParams,
+		},
 	}
 	return common.SendHttpRequestConfig{
 		Request:            &request,
@@ -46,7 +48,7 @@ func PerformPageCapture(
 	report := discover.DiscoverPageReport{Config: &config, Result: &result}
 
 	// Split target
-	baseURL, path, err := requesthelpers.SplitTargetURL(config.Target)
+	baseURL, path, queryParams, err := requesthelpers.SplitTargetURL(config.Target)
 	if err != nil {
 		errors = append(errors, err.Error())
 		report.Errors = errors
@@ -54,7 +56,7 @@ func PerformPageCapture(
 	}
 
 	// Get request config
-	requestConfig := getHTTPRequestConfig(baseURL, path, config, browserbaseSecrets)
+	requestConfig := getHTTPRequestConfig(baseURL, path, queryParams, config, browserbaseSecrets)
 
 	// Perform screenshot capture if enabled
 	if config.Screenshot {

@@ -103,7 +103,7 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 		targetInfo := discover.DirectoryTargetInfo{Target: target, BaselineAttempts: []*common.HttpRequestResponse{}}
 
 		// Split target
-		baseURL, parsedTargetPath, err := requesthelpers.SplitTargetURL(target)
+		baseURL, parsedTargetPath, _, err := requesthelpers.SplitTargetURL(target)
 		if err != nil {
 			errors = append(errors, fmt.Sprintf("failed to split target url: %v", err))
 			report.Errors = errors

@@ -88,6 +88,9 @@ func run(ctx context.Context, target string, config *discover.DiscoverApplicatio
 				var requestParams common.HttpRequestParams
 				if module.RequestParams != nil {
 					requestParams = *module.RequestParams
+				}
+				// Always set query parameters if they exist
+				if queryParams != nil {
 					requestParams.Query = queryParams
 				}
 

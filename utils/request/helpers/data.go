@@ -24,11 +24,11 @@ func RemoveScheme(url string) string {
 	return url
 }
 
-// SplitTargetURL splits a target URL and standardizes it into its base URL and path components.
-func SplitTargetURL(target string) (string, string, error) {
+// SplitTargetURL splits a target URL and standardizes it into its base URL, path, and query parameter components.
+func SplitTargetURL(target string) (string, string, map[string]string, error) {
 	parsedURL, err := url.Parse(target)
 	if err != nil {
-		return "", "", fmt.Errorf("error parsing URL: %w", err)
+		return "", "", nil, fmt.Errorf("error parsing URL: %w", err)
 	}
 
 	// Standardize the base URL (ie. http://example.com:8080/ -> http://example.com:8080)
@@ -42,7 +42,21 @@ func SplitTargetURL(target string) (string, string, error) {
 		path = fmt.Sprintf("/%s", path)
 	}
 
-	return baseURL, path, nil
+	// Parse query parameters
+	var queryParams map[string]string
+	if parsedURL.RawQuery != "" {
+		queryParams = make(map[string]string)
+		values, err := url.ParseQuery(parsedURL.RawQuery)
+		if err == nil {
+			for key, vals := range values {
+				if len(vals) > 0 {
+					queryParams[key] = vals[0] // Use first value if multiple values exist
+				}
+			}
+		}
+	}
+
+	return baseURL, path, queryParams, nil
 }
 
 // GetHeaderValueFromHeaderMap extracts a single header value from response header map.

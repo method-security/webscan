@@ -121,7 +121,7 @@ func scanTarget(ctx context.Context, url string, config *enumeratecmswordpressfe
 	errors := []string{}
 
 	// Send initial request
-	baseURL, path, err := requesthelpers.SplitTargetURL(url)
+	baseURL, path, _, err := requesthelpers.SplitTargetURL(url)
 	if err != nil {
 		errors = append(errors, err.Error())
 		return result, errors
@@ -227,7 +227,7 @@ func checkWordPressAPI(ctx context.Context, url string, config *enumeratecmsword
 	errors := []string{}
 
 	// Check main REST API endpoint
-	baseURL, path, err := requesthelpers.SplitTargetURL(url)
+	baseURL, path, _, err := requesthelpers.SplitTargetURL(url)
 	if err != nil {
 		errors = append(errors, err.Error())
 		return pluginsList, errors
@@ -394,7 +394,7 @@ func checkReadmeFiles(ctx context.Context, url string, config *enumeratecmswordp
 
 	// Loop through plugins and check for readme.txt
 	for _, plugin := range config.Plugins {
-		baseURL, path, err := requesthelpers.SplitTargetURL(url)
+		baseURL, path, _, err := requesthelpers.SplitTargetURL(url)
 		if err != nil {
 			errors = append(errors, err.Error())
 			continue

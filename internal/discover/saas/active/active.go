@@ -146,7 +146,7 @@ func LaunchDiscoverSaas(ctx context.Context, config discover.DiscoverSaasConfig,
 						fullURL := fmt.Sprintf("%s://%s", schema, slug)
 
 						// Construct the full URL
-						baseURL, path, err := requesthelpers.SplitTargetURL(fullURL)
+						baseURL, path, _, err := requesthelpers.SplitTargetURL(fullURL)
 						if err != nil {
 							errorsMutex.Lock()
 							errors = append(errors, fmt.Sprintf("invalid address %s: %v", fullURL, err))

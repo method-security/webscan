@@ -48,7 +48,7 @@ func run(ctx context.Context, target string, config *discover.DiscoverApplicatio
 		return []*discover.ApplicationFingerprintAttempt{}, []string{"invalid config: no modules found for resource type"}
 	}
 
-	baseURL, parsedTargetPath, err := requesthelpers.SplitTargetURL(target)
+	baseURL, parsedTargetPath, queryParams, err := requesthelpers.SplitTargetURL(target)
 	if err != nil {
 		return []*discover.ApplicationFingerprintAttempt{}, []string{err.Error()}
 	}
@@ -88,6 +88,10 @@ func run(ctx context.Context, target string, config *discover.DiscoverApplicatio
 				var requestParams common.HttpRequestParams
 				if module.RequestParams != nil {
 					requestParams = *module.RequestParams
+				}
+				// Always set query parameters if they exist
+				if queryParams != nil {
+					requestParams.Query = queryParams
 				}
 
 				// set request config

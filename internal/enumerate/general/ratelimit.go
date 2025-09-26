@@ -55,12 +55,14 @@ func getWafFingerprint(httpResponse *common.HttpResponse) *waf.WafFingerprint {
 	return wafFingerprint
 }
 
-func createRateLimitRequestConfig(baseURL, path string, config *enumerategeneralfern.EnumerateRateLimitConfig) common.SendHttpRequestConfig {
+func createRateLimitRequestConfig(baseURL, path string, queryParams map[string]string, config *enumerategeneralfern.EnumerateRateLimitConfig) common.SendHttpRequestConfig {
 	request := common.HttpRequest{
 		BaseUrl: baseURL,
 		Path:    path,
 		Method:  common.HttpMethodGet,
-		Params:  &common.HttpRequestParams{},
+		Params: &common.HttpRequestParams{
+			Query: queryParams,
+		},
 	}
 	return common.SendHttpRequestConfig{
 		Request:            &request,
@@ -85,7 +87,7 @@ func processTarget(ctx context.Context, target string, config *enumerategeneralf
 	targetInfo := &enumerategeneralfern.RateLimitTarget{Target: target, StartTimestamp: time.Now()}
 
 	// Split target URL into base URL and path
-	baseURL, parsedTargetPath, err := requesthelpers.SplitTargetURL(target)
+	baseURL, parsedTargetPath, queryParams, err := requesthelpers.SplitTargetURL(target)
 	if err != nil {
 		errors <- err.Error()
 		return
@@ -139,7 +141,7 @@ requestLoop:
 			log.Warn("Sending ratelimit request", svc1log.SafeParam("requestNumber", reqNum), svc1log.SafeParam("target", target))
 
 			// Create Request Config
-			requestConfig := createRateLimitRequestConfig(baseURL, parsedTargetPath, config)
+			requestConfig := createRateLimitRequestConfig(baseURL, parsedTargetPath, queryParams, config)
 
 			// Send lightweight request directly
 			httpRequestResponse, err := standard.SendStandardRequest(ctx, requestConfig)

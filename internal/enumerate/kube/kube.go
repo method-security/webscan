@@ -42,7 +42,7 @@ func PerformAppEnumerateKube(ctx context.Context, config *enumeratekubefern.Enum
 	var errors []string
 
 	// Split target URL into base URL and path
-	baseURL, parsedTargetPath, err := requesthelpers.SplitTargetURL(config.Target)
+	baseURL, parsedTargetPath, _, err := requesthelpers.SplitTargetURL(config.Target)
 	if err != nil {
 		errors = append(errors, err.Error())
 		report.Errors = errors

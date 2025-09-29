@@ -36,6 +36,7 @@ types:
   SaasActiveRequest:
     properties:
       request: http.HttpRequestResponse
+      screenshot: optional<base64>
       findings: optional<SaasActiveFinding>
   SaasActiveCompany:
     properties:

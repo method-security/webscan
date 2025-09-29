@@ -13,7 +13,7 @@ import (
 	discover "github.com/Method-Security/webscan/generated/go/discover"
 
 	// Internal
-	discoverpage "github.com/Method-Security/webscan/internal/discover/page/helpers"
+	pagehelpers "github.com/Method-Security/webscan/internal/discover/page/helpers"
 	discoversaashelpers "github.com/Method-Security/webscan/internal/discover/saas/active/helpers"
 
 	// Utils
@@ -183,7 +183,7 @@ func LaunchDiscoverSaas(ctx context.Context, config discover.DiscoverSaasConfig,
 									MinDOMStabalizeTimeSeconds: config.HeadlessConfig.MinDomStabalizeTime,
 								}
 
-								screenshotBytes, err := discoverpage.CaptureScreenshot(ctx, screenshotRequester, &httpConfig)
+								screenshotBytes, err := pagehelpers.CaptureScreenshot(ctx, screenshotRequester, &httpConfig)
 								if err != nil {
 									log.Warn("Failed to capture screenshot", svc1log.SafeParam("url", fullURL), svc1log.SafeParam("error", err.Error()))
 								} else {

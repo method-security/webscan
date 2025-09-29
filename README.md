@@ -30,11 +30,38 @@ For the full list of available installation options, please see the [Installatio
 ### Examples
 
 ```bash
+# Probe targets for web applications using headless browser
 webscan discover probe --targets method.security --request-method HEADLESS -o json --headless-path /headless-shell/run.sh
 ```
 
 ```bash
+# Capture and analyze a web page
 webscan discover page --target https://method.security
+```
+
+```bash
+# Perform application fingerprinting
+webscan discover application --targets https://method.security --resource-type ALL
+```
+
+```bash
+# Discover directories and files
+webscan discover directory --targets https://method.security --wordlist-type directories --wordlist-size small
+```
+
+```bash
+# Enumerate WordPress plugins
+webscan enumerate cms wordpress plugins --targets https://method.security
+```
+
+```bash
+# Scan for CVEs
+webscan pentest application scan cve --targets https://method.security
+```
+
+```bash
+# Detect WAFs
+webscan pentest waf detect --targets https://method.security --http-methods GET,POST
 ```
 
 ### Building a Statically Compiled Container for Local Testing

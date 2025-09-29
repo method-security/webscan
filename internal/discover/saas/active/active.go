@@ -13,7 +13,9 @@ import (
 	discover "github.com/Method-Security/webscan/generated/go/discover"
 
 	// Internal
+	pagehelpers "github.com/Method-Security/webscan/internal/discover/page/helpers"
 	discoversaashelpers "github.com/Method-Security/webscan/internal/discover/saas/active/helpers"
+
 	// Utils
 	request "github.com/Method-Security/webscan/utils/request"
 	"github.com/Method-Security/webscan/utils/request/headless"
@@ -170,6 +172,26 @@ func LaunchDiscoverSaas(ctx context.Context, config discover.DiscoverSaasConfig,
 
 						// Add request if company or sso page is found (Positive hit)
 						if discoversaashelpers.ShouldAddRequest(saasRequest) {
+							// Capture screenshot for positive hits if using headless method
+							if config.RequestMethod == common.RequestMethodHeadless && sharedBrowser != nil {
+								log.Info("Capturing screenshot for positive hit", svc1log.SafeParam("url", fullURL))
+
+								// Create a headless requester with the shared browser for screenshot
+								screenshotRequester := &headless.Requester{
+									Browser:                    sharedBrowser,
+									TimeoutSeconds:             config.Timeout,
+									MinDOMStabalizeTimeSeconds: config.HeadlessConfig.MinDomStabalizeTime,
+								}
+
+								screenshotBytes, err := pagehelpers.CaptureScreenshot(ctx, screenshotRequester, &httpConfig)
+								if err != nil {
+									log.Warn("Failed to capture screenshot", svc1log.SafeParam("url", fullURL), svc1log.SafeParam("error", err.Error()))
+								} else {
+									saasRequest.Screenshot = &screenshotBytes
+									log.Info("Screenshot captured successfully", svc1log.SafeParam("url", fullURL))
+								}
+							}
+
 							requestsChan <- saasRequest
 						}
 					}(domainSlug, schema)

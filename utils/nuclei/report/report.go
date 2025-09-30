@@ -5,9 +5,13 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
+	common "github.com/Method-Security/webscan/generated/go/common"
 	nuclei "github.com/Method-Security/webscan/generated/go/common/nuclei"
 
+	// Utils
+	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
 	// External
 	nucleilib "github.com/projectdiscovery/nuclei/v3/lib"
 	nout "github.com/projectdiscovery/nuclei/v3/pkg/output"
@@ -239,11 +243,59 @@ func (b *Builder) Consume(ev *nout.ResultEvent) {
 		b.targets = append(b.targets, targetInfo)
 	}
 
-	// Build attempt information
+	// Build request-response for this event
 	httpReqResp, _ := getHTTPRequestResponse(ev)
+
+	// Create unique key for template+target combination
+	requestKey := ev.TemplateID + ":" + baseURL
+
+	// Always collect this request for potential multi-request templates
+	b.pendingRequests[requestKey] = append(b.pendingRequests[requestKey], httpReqResp)
+
+	// Only create an attempt if this is a positive match
+	if !ev.MatcherStatus {
+		return
+	}
+
+	// This is a positive match - collect all requests for this template+target
+	allRequests := b.pendingRequests[requestKey]
+
+	// Extract all HTTP requests from the metadata if available
+	// This contains all the HTTP requests from the template execution
+	var allHTTPRequestResponses []*common.HttpRequestResponse
+	if ev.Metadata != nil {
+		if allReqs, ok := ev.Metadata["all_http_requests"].([]map[string]string); ok && len(allReqs) > 0 {
+			// Convert from Nuclei format to our common format
+			for _, req := range allReqs {
+				// Parse the request and response to create our HttpRequestResponse
+				parsedReq := b.parseNucleiHTTPRequest(req, baseURL)
+				if parsedReq != nil {
+					allHTTPRequestResponses = append(allHTTPRequestResponses, parsedReq)
+				}
+			}
+		} else {
+			// Fallback to the single request we collected
+			allHTTPRequestResponses = allRequests
+		}
+	} else {
+		// Fallback to the single request we collected
+		allHTTPRequestResponses = allRequests
+	}
+
+	// Filter out the matching request from the supporting requests
+	var supportingRequests []*common.HttpRequestResponse
+	for _, req := range allHTTPRequestResponses {
+		// Compare request details to see if this is the matching request
+		if !b.isSameRequest(req, httpReqResp) {
+			supportingRequests = append(supportingRequests, req)
+		}
+	}
+
+	// Build attempt information
 	attemptInfo := &nuclei.NucleiAttemptInfo{
-		TemplateId:          ev.TemplateID,
-		HttpRequestResponse: httpReqResp,
+		TemplateId:                     ev.TemplateID,
+		HttpRequestResponse:            httpReqResp,        // The matching request
+		SupportingHttpRequestResponses: supportingRequests, // All other requests from template execution
 	}
 
 	// Extract vulnerability details from template if present
@@ -335,6 +387,80 @@ func (b *Builder) Consume(ev *nout.ResultEvent) {
 
 	// Always add the attempt to the report, even if there was an error parsing the request/response
 	targetInfo.Attempts = append(targetInfo.Attempts, attemptInfo)
+
+	// Clean up pending requests for this template+target since we've processed them
+	delete(b.pendingRequests, requestKey)
+}
+
+// parseNucleiHTTPRequest converts a Nuclei HttpRequestResponse to our common format
+func (b *Builder) parseNucleiHTTPRequest(nucleiReq map[string]string, baseURL string) *common.HttpRequestResponse {
+	// Parse the raw request string to extract components
+	method, path, headers, body := parseRawRequest(nucleiReq["request"])
+
+	// Create the request object
+	request := common.HttpRequest{
+		BaseUrl:     baseURL,
+		Path:        path,
+		Params:      &common.HttpRequestParams{},
+		BaseHeaders: singleToMulti(headers),
+		SentAt:      time.Now(), // We don't have the exact time, use current
+	}
+
+	// Set the HTTP method
+	if m, err := common.NewHttpMethodFromString(strings.ToUpper(method)); err == nil {
+		request.Method = m
+	}
+
+	// Parse body if present
+	if body != "" {
+		contentType := "application/x-www-form-urlencoded" // Default
+		if ct, ok := headers["Content-Type"]; ok {
+			contentType = ct
+		}
+		request.Params.Body = requesthelpers.CreateBodyFromBytes(contentType, []byte(body))
+	}
+
+	// Parse the raw response string to extract components
+	statusCode, responseHeaders, responseBody := parseRawResponse(nucleiReq["response"])
+
+	// Create the response object using the helper function
+	response := requesthelpers.CreateHTTPResponse(statusCode, nil, singleToMulti(responseHeaders), responseBody)
+
+	return &common.HttpRequestResponse{
+		Request:  &request,
+		Response: &response,
+	}
+}
+
+// isSameRequest compares two HTTP request-response pairs to see if they're the same
+func (b *Builder) isSameRequest(req1, req2 *common.HttpRequestResponse) bool {
+	if req1 == nil || req2 == nil {
+		return false
+	}
+	if req1.Request == nil || req2.Request == nil {
+		return false
+	}
+	if req1.Response == nil || req2.Response == nil {
+		return false
+	}
+
+	// Compare request path and method
+	if req1.Request.Path != req2.Request.Path {
+		return false
+	}
+	if req1.Request.Method != req2.Request.Method {
+		return false
+	}
+
+	// Compare response status code
+	if req1.Response.StatusCode == nil || req2.Response.StatusCode == nil {
+		return req1.Response.StatusCode == req2.Response.StatusCode
+	}
+	if *req1.Response.StatusCode != *req2.Response.StatusCode {
+		return false
+	}
+
+	return true
 }
 
 // Final returns the fully-populated Fern report.

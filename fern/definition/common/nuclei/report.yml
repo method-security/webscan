@@ -33,7 +33,8 @@ types:
   NucleiAttemptInfo:
     properties:
       templateId: string # Nuclei template ID
-      httpRequestResponse: http.HttpRequestResponse
+      httpRequestResponse: http.HttpRequestResponse # Primary/matching request-response
+      supportingHttpRequestResponses: optional<list<http.HttpRequestResponse>> # All requests from template execution
       finding: optional<NucleiFindingInfo>
   NucleiTargetInfo:
     properties:

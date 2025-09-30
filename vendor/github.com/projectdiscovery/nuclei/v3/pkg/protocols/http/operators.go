@@ -1,6 +1,7 @@
 package http
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -174,6 +175,34 @@ func (request *Request) MakeResultEventItem(wrapped *output.InternalWrappedEvent
 	if value, ok := wrapped.InternalEvent["analyzer_details"]; ok {
 		analyzerDetails = value.(string)
 	}
+	// Extract numbered request/response data and add to metadata
+	metadata := wrapped.OperatorsResult.PayloadValues
+	if metadata == nil {
+		metadata = make(map[string]interface{})
+	}
+
+	// Look for numbered request/response pairs in the internal event
+	var allHttpRequests []map[string]string
+	for i := 1; i <= 100; i++ { // Check up to 100 requests
+		requestKey := fmt.Sprintf("request_%d", i)
+		responseKey := fmt.Sprintf("response_%d", i)
+
+		if request, hasRequest := wrapped.InternalEvent[requestKey]; hasRequest {
+			if response, hasResponse := wrapped.InternalEvent[responseKey]; hasResponse {
+				allHttpRequests = append(allHttpRequests, map[string]string{
+					"request":  types.ToString(request),
+					"response": types.ToString(response),
+				})
+			}
+		} else {
+			break // No more numbered requests
+		}
+	}
+
+	if len(allHttpRequests) > 0 {
+		metadata["all_http_requests"] = allHttpRequests
+	}
+
 	data := &output.ResultEvent{
 		TemplateID:       types.ToString(wrapped.InternalEvent["template-id"]),
 		TemplatePath:     types.ToString(wrapped.InternalEvent["template-path"]),
@@ -186,7 +215,7 @@ func (request *Request) MakeResultEventItem(wrapped *output.InternalWrappedEvent
 		URL:              fields.URL,
 		Path:             fields.Path,
 		Matched:          types.ToString(wrapped.InternalEvent["matched"]),
-		Metadata:         wrapped.OperatorsResult.PayloadValues,
+		Metadata:         metadata,
 		ExtractedResults: wrapped.OperatorsResult.OutputExtracts,
 		Timestamp:        time.Now(),
 		MatcherStatus:    true,

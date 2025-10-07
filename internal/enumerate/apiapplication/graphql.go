@@ -19,6 +19,7 @@ import (
 // PerformAppEnumerateGraphQL performs a GraphQL scan against a target URL and returns the report.
 func PerformAppEnumerateGraphQL(ctx context.Context, target string) enumerateapiapplicationfern.EnumerateGraphqlReport {
 	report := enumerateapiapplicationfern.EnumerateGraphqlReport{Config: &enumerateapiapplicationfern.EnumerateGraphqlConfig{Target: target}}
+	report.Result = &enumerateapiapplicationfern.EnumerateGraphqlResult{}
 
 	body, err := fetchGraphQLSchema(target)
 	if err != nil {
@@ -34,27 +35,21 @@ func PerformAppEnumerateGraphQL(ctx context.Context, target string) enumerateapi
 		return report
 	}
 
-	// Only create the result object if we have valid GraphQL content
-	result := enumerateapiapplicationfern.EnumerateGraphqlResult{
-		BaseEndpointUrl: target,
-		ApiType:         enumerateapiapplicationfern.ApiTypeGraphQl,
-	}
-	report.Result = &result
-
-	result.Raw = base64.StdEncoding.EncodeToString(body)
-
 	var schema enumerateapiapplicationfern.GraphQlSchema
 	if err := json.Unmarshal(body, &schema); err != nil {
 		errMsg := fmt.Errorf("failed to unmarshal schema: %v", err)
 		report.Errors = append(report.Errors, errMsg.Error())
-		// Remove the result since schema parsing failed
-		report.Result = nil
 		return report
 	}
 
+	// Set result data after all functions succeed
+	report.Result.BaseEndpointUrl = target
+	report.Result.ApiType = enumerateapiapplicationfern.ApiTypeGraphQl
+	report.Result.Raw = base64.StdEncoding.EncodeToString(body)
+
 	typeFields := extractTypeFields(schema)
 
-	populateReportWithQueries(&result, schema, typeFields)
+	populateReportWithQueries(report.Result, schema, typeFields)
 
 	return report
 }
@@ -75,7 +70,27 @@ func fetchGraphQLSchema(target string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %v", err)
 	}
+
+	// Check if the response looks like HTML instead of JSON
+	bodyStr := strings.TrimSpace(string(body))
+	if strings.HasPrefix(bodyStr, "<") {
+		return nil, fmt.Errorf("endpoint returned HTML instead of JSON (status: %d). This may not be a GraphQL endpoint or it may be at a different path (try /graphql, /api/graphql, /v1/graphql, etc.)", resp.StatusCode)
+	}
+
+	// Check for common non-GraphQL responses
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("endpoint returned status %d: %s. Response: %s", resp.StatusCode, resp.Status, string(body[:min(len(body), 200)]))
+	}
+
 	return body, nil
+}
+
+// Helper function to get minimum of two integers
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func extractTypeFields(schema enumerateapiapplicationfern.GraphQlSchema) map[string][]string {

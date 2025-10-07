@@ -27,7 +27,7 @@ types:
   EnumerateGraphqlConfig:
     properties:
       target: string
-  EnumerateGraphqlResult:
+  EnumerateGraphqlData:
     properties:
       apiType: common.ApiType
       baseEndpointUrl: string
@@ -38,6 +38,9 @@ types:
       security: optional<list<common.SecurityRequirement>>
       queries: optional<list<GraphQlQuery>>
       raw: string
+  EnumerateGraphqlResult:
+    properties:
+      data: optional<EnumerateGraphqlData>
   EnumerateGraphqlReport:
     properties:
       config: EnumerateGraphqlConfig

@@ -20,6 +20,7 @@ import (
 func PerformAppEnumerateGraphQL(ctx context.Context, target string) enumerateapiapplicationfern.EnumerateGraphqlReport {
 	report := enumerateapiapplicationfern.EnumerateGraphqlReport{Config: &enumerateapiapplicationfern.EnumerateGraphqlConfig{Target: target}}
 	report.Result = &enumerateapiapplicationfern.EnumerateGraphqlResult{}
+	data := &enumerateapiapplicationfern.EnumerateGraphqlData{}
 
 	body, err := fetchGraphQLSchema(target)
 	if err != nil {
@@ -42,15 +43,17 @@ func PerformAppEnumerateGraphQL(ctx context.Context, target string) enumerateapi
 		return report
 	}
 
-	// Set result data after all functions succeed
-	report.Result.BaseEndpointUrl = target
-	report.Result.ApiType = enumerateapiapplicationfern.ApiTypeGraphQl
-	report.Result.Raw = base64.StdEncoding.EncodeToString(body)
+	// Set data after all functions succeed
+	data.BaseEndpointUrl = target
+	data.ApiType = enumerateapiapplicationfern.ApiTypeGraphQl
+	data.Raw = base64.StdEncoding.EncodeToString(body)
 
 	typeFields := extractTypeFields(schema)
 
-	populateReportWithQueries(report.Result, schema, typeFields)
+	populateReportWithQueries(data, schema, typeFields)
 
+	// Marshal Report data
+	report.Result.Data = data
 	return report
 }
 
@@ -74,7 +77,7 @@ func fetchGraphQLSchema(target string) ([]byte, error) {
 	// Check if the response looks like HTML instead of JSON
 	bodyStr := strings.TrimSpace(string(body))
 	if strings.HasPrefix(bodyStr, "<") {
-		return nil, fmt.Errorf("endpoint returned HTML instead of JSON (status: %d). This may not be a GraphQL endpoint or it may be at a different path (try /graphql, /api/graphql, /v1/graphql, etc.)", resp.StatusCode)
+		return nil, fmt.Errorf("endpoint returned HTML instead of JSON (status: %d)", resp.StatusCode)
 	}
 
 	// Check for common non-GraphQL responses
@@ -112,7 +115,7 @@ func extractTypeFields(schema enumerateapiapplicationfern.GraphQlSchema) map[str
 	return typeFields
 }
 
-func populateReportWithQueries(report *enumerateapiapplicationfern.EnumerateGraphqlResult, schema enumerateapiapplicationfern.GraphQlSchema, typeFields map[string][]string) {
+func populateReportWithQueries(data *enumerateapiapplicationfern.EnumerateGraphqlData, schema enumerateapiapplicationfern.GraphQlSchema, typeFields map[string][]string) {
 	// Add nil checks to prevent panic
 	if schema.Data == nil || schema.Data.Schema == nil || schema.Data.Schema.Types == nil {
 		return
@@ -126,7 +129,7 @@ func populateReportWithQueries(report *enumerateapiapplicationfern.EnumerateGrap
 						Type:   field.Name,
 						Fields: typeFields[strings.ToLower(field.Name)],
 					}
-					report.Queries = append(report.Queries, &query)
+					data.Queries = append(data.Queries, &query)
 				}
 			}
 		}

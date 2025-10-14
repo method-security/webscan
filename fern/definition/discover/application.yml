@@ -8,6 +8,7 @@ types:
   ApplicationResourceType:
     enum:
       - API_APPLICATION
+      - CI_CD_PLATFORM
       - CLOUD_BUCKET
       - CONTENT_MANAGEMENT_SYSTEM
       - KUBE

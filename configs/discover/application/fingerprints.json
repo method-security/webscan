@@ -56,6 +56,41 @@
       ]
     },
     {
+      "name": "CI_CD_PLATFORM",
+      "modules": [
+        {
+          "name": "JENKINS",
+          "method": "GET",
+          "paths": [
+            "/",
+            "/login",
+            "/jenkins",
+            "/view/all",
+            "/manage",
+            "/script",
+            "/computer",
+            "/user/admin",
+            "/cli"
+          ],
+          "headerIndicators": {
+            "x-jenkins": [""],
+            "x-hudson": [""],
+            "x-powered-by": ["jenkins"],
+            "server": ["jenkins"]
+          },
+          "bodyIndicators": [
+            "jenkins.model.jenkins",
+            "<title>jenkins</title>",
+            "<h1>jenkins</h1>",
+            "All Jenkins Logs",
+            "Jenkins Dashboard",
+            "Welcome to Jenkins!",
+            "Sign in to Jenkins"
+          ]
+        }
+      ]
+    },
+    {
       "name": "CLOUD_BUCKET",
       "modules": [
         {

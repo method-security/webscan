@@ -1,12 +1,12 @@
 id: discover-swagger
-
 info:
   name: Public Swagger / OpenAPI - Detect
-  author: pdteam, c-sh0, AmirHossein Raeisi, method-security
+  author: pdteam, c-sh0, AmirHossein Raeisi, method.security
   severity: info
-  description: >
-    Detects public Swagger / OpenAPI documentation and spec endpoints by probing
-    common UI and spec paths and checking for header/body fingerprints.
+  description: |
+    Detects public Swagger / OpenAPI documentation and specification endpoints by probing
+    common UI and spec paths and checking for header or body fingerprints that indicate
+    exposed Swagger or OpenAPI definitions.
   reference:
     - https://swagger.io/
   classification:
@@ -18,53 +18,44 @@ info:
     shodan-query: http.title:"swagger"
     category: api
     confidence: 85
-  tags:
-    - discovery
-    - exposure
-    - api
-    - swagger
-
+  tags: discovery, exposure, api, swagger, openapi
 http:
   - method: GET
     path:
-      - "{{BaseURL}}{{paths}}"
-    payloads:
-      paths:
-        - /swagger-ui.html
-        - /swagger/index.html
-        - /swagger.json
-        - /swagger.yaml
-        - /swagger/v1/swagger.json
-        - /swagger/v1/swagger.yaml
-        - /api/swagger.json
-        - /api/swagger.yaml
-        - /api-docs/swagger.json
-        - /api-docs/swagger.yaml
-        - /docs
-        - /swagger
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/"
+      - "{{BaseURL}}/swagger-ui.html"
+      - "{{BaseURL}}/swagger/index.html"
+      - "{{BaseURL}}/swagger.json"
+      - "{{BaseURL}}/swagger.yaml"
+      - "{{BaseURL}}/swagger/v1/swagger.json"
+      - "{{BaseURL}}/swagger/v1/swagger.yaml"
+      - "{{BaseURL}}/api/swagger.json"
+      - "{{BaseURL}}/api/swagger.yaml"
+      - "{{BaseURL}}/api-docs/swagger.json"
+      - "{{BaseURL}}/api-docs/swagger.yaml"
+      - "{{BaseURL}}/docs"
+      - "{{BaseURL}}/swagger"
     stop-at-first-match: true
     redirects: true
+    max-redirects: 2
     matchers-condition: or
     matchers:
       - type: regex
         name: swagger-header-fingerprints
         part: header
         regex:
-          - '(?i)^x-swagger-router-basepath:'
-          - '(?i)^x-swagger-router-controller:'
-          - '(?i)^x-powered-by:\s*swagger'
-          - '(?i)^x-generator:\s*(swagger codegen|openapi generator)'
-          - '(?i)^server:\s*swagger'
-      - type: regex
+          - '(?i)x-powered-by:\s*swagger'
+          - '(?i)x-generator:\s*(swagger codegen|openapi generator)'
+          - '(?i)server:\s*swagger'
+      - type: word
         name: swagger-body-fingerprints
         part: body
-        regex:
-          - '(?i)"openapi"\s*:\s*"[0-9\.]+'        # OpenAPI version in JSON
-          - '(?i)"swagger"\s*:\s*"[0-9\.]+'        # Swagger 2.0 in JSON
-          - '(?i)id="?swagger-ui'                  # swagger-ui id attribute
-          - '(?i)loadSwaggerUI|loadswaggerui'
-          - '(?i)swagger[\s-]*ui'
-          - '(?i)swagger[\s-]*editor'
-          - '(?i)swagger[-_\.]json|swagger[-_\.]yaml|openapi[-_\.]yaml|openapi[-_\.]json'
-          - '(?i)swagger-js|swagger-ui-bundle'
-          - '(?i)api-docs|api docs'
+        words:
+          - '<div id="swagger-ui">'
+          - '<title>Swagger UI</title>'
+          - 'window.ui = SwaggerUIBundle'
+          - 'SwaggerUIBundle('
+          - 'swagger-ui-init.js'
+          - 'swagger-ui.css'
+        case-insensitive: true

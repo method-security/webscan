@@ -1,0 +1,52 @@
+id: joomla-detect
+info:
+  name: Joomla CMS Detection
+  author: method-security
+  severity: info
+  description: Detects Joomla CMS installations by analyzing response headers, body
+    content, and common paths
+  reference: https://www.joomla.org/
+  metadata:
+    method-application-type: CONTENT_MANAGEMENT_SYSTEM
+    method-module-name: JOOMLA
+  tags: tech,joomla,cms
+http:
+- method: GET
+  path:
+  - '{{BaseURL}}'
+  - '{{BaseURL}}/administrator'
+  - '{{BaseURL}}/administrator/index.php'
+  - '{{BaseURL}}/administrator/manifests/files/joomla.xml'
+  - '{{BaseURL}}/language/en-GB/en-GB.xml'
+  - '{{BaseURL}}/templates/system/css/system.css'
+  - '{{BaseURL}}/media/system/js/core.js'
+  - '{{BaseURL}}/libraries/joomla'
+  - '{{BaseURL}}/plugins/system/'
+  - '{{BaseURL}}/components/com_content/'
+  - '{{BaseURL}}/modules/mod_menu/'
+  - '{{BaseURL}}/cache/'
+  - '{{BaseURL}}/tmp/'
+  stop-at-first-match: true
+  matchers-condition: or
+  matchers:
+  - type: word
+    part: header
+    words:
+    - 'x-content-encoded-by: joomla'
+    - 'x-powered-by: joomla'
+    condition: or
+    case-insensitive: true
+  - type: word
+    part: body
+    words:
+    - generator" content="joomla
+    - joomla_version
+    - powered by joomla
+    condition: or
+    case-insensitive: true
+  - type: regex
+    part: body
+    regex:
+    - (?i)joomla!?.*?[0-9]+\.[0-9]+\.[0-9]+
+    - (?i)generator.*?joomla!?\s+[0-9]+\.[0-9]+
+    condition: or

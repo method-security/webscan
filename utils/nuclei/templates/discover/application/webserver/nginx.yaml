@@ -1,0 +1,22 @@
+id: nginx-version
+info:
+  name: Nginx version detect
+  author: philippedelteil,daffainfo
+  severity: info
+  description: Some nginx servers have the version on the response header. Useful
+    when you need to find specific CVEs on your targets.
+  metadata:
+    method-application-type: WEB_SERVER
+    method-module-name: NGINX
+  tags: tech,nginx
+http:
+- method: GET
+  path:
+  - '{{BaseURL}}'
+  matchers-condition: and
+  matchers:
+  - type: word
+    part: header
+    words:
+    - nginx
+    case-insensitive: true

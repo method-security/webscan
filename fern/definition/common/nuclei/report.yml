@@ -30,6 +30,7 @@ types:
       severity: optional<string>
       finding: boolean
       probe: optional<probe.NucleiProbe>
+      metadata: optional<map<string, string>>
   NucleiAttemptInfo:
     properties:
       templateId: string # Nuclei template ID

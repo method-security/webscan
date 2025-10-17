@@ -1,0 +1,49 @@
+id: drupal-detect
+
+info:
+  name: Drupal - Detect
+  author: 1nf1n7y,pathtaga # updated by method-security
+  severity: info
+  classification:
+    cvss-metrics: CVSS:3.0/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:N
+    cwe-id: CWE-200
+    cpe: cpe:2.3:a:drupal:drupal:*:*:*:*:*:*:*:*
+  metadata:
+    verified: true
+    vendor: drupal
+    product: drupal
+    shodan-query:
+      - http.component:"drupal"
+      - cpe:"cpe:2.3:a:drupal:drupal"
+    method-application-type: CONTENT_MANAGEMENT_SYSTEM
+    method-module-name: DRUPAL
+  tags: tech,drupal
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/CHANGELOG.txt"
+      - "{{BaseURL}}/core/install.php"
+      - "{{BaseURL}}/user/login"
+    stop-at-first-match: true
+    matchers-condition: or
+    matchers:
+      - type: word
+        part: body
+        words:
+          - 'Initial release'
+          - 'Drupal 1.0.0'
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - 'content="Drupal'
+        case-insensitive: true
+      - type: regex
+        part: header
+        regex:
+          - '(?i)x-drupal'
+          - "(?i)x-generator: drupal"
+
+

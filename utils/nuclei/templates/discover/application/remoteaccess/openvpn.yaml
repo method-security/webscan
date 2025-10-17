@@ -1,0 +1,26 @@
+id: discover-openvpn
+info:
+  name: OpenVPN Discovery
+  author: method-security
+  severity: info
+  description: Detects OpenVPN Access Server web interface
+  metadata:
+    method-application-type: REMOTE_ACCESS # Added by method-security
+    method-module-name: OPEN_VPN # Added by method-security
+  tags: discovery,openvpn,vpn,remote-access
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/admin"
+      - "{{BaseURL}}/connect"
+      - "{{BaseURL}}/+webvpn+"
+    stop-at-first-match: true
+    matchers-condition: or
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "OpenVPN Access Server"
+          - "Connect to OpenVPN"
+        case-insensitive: true

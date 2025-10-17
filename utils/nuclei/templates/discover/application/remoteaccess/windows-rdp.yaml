@@ -1,0 +1,41 @@
+id: windows-rdp-detect
+info:
+  name: Windows RDP Gateway Detection
+  author: method-security
+  severity: info
+  description: Detects Windows RDP Gateway and Remote Desktop Web Access installations
+  reference: https://docs.microsoft.com/en-us/windows-server/remote/remote-desktop-services/
+  metadata:
+    method-application-type: REMOTE_ACCESS
+    method-module-name: WINDOWS_RDP
+  tags: tech,microsoft,rdp,remote-access,windows,rds
+http:
+- method: GET
+  path:
+  - '{{BaseURL}}'
+  - '{{BaseURL}}/RDWeb/'
+  - '{{BaseURL}}/RDWeb/Pages/en-US/login.aspx'
+  - '{{BaseURL}}/RemoteDesktop/'
+  - '{{BaseURL}}/rpc/rpcproxy.dll'
+  - '{{BaseURL}}/ts/'
+  - '{{BaseURL}}/tsweb/'
+  stop-at-first-match: true
+  matchers-condition: or
+  matchers:
+  - type: word
+    part: header
+    words:
+    - 'server: microsoft-httpapi'
+    - 'server: microsoft-iis'
+    - 'x-powered-by: asp.net'
+    case-insensitive: true
+  - type: regex
+    part: body
+    regex:
+    - (?i)remote.*?desktop.*(gateway|services|web|access)
+    - (?i)rdp.*?gateway
+    - (?i)terminal.*?services.*?gateway
+    - (?i)rd.*?(gateway|web).*?access
+    - (?i)rds.*?(gateway|web)
+    - (?i)/RDWeb/.*?\.aspx
+    - (?i)microsoft.*?remote.*?desktop

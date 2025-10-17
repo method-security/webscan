@@ -2,135 +2,61 @@ package application
 
 import (
 	// Standard
-	"encoding/json"
 	"fmt"
-	"os"
-	"slices"
+
+	// Generated
 
 	"github.com/Method-Security/webscan/generated/go/discover"
-	// Generated
 )
 
-// LoadFingerprints loads and unmarshals the fingerprints.json file into the generated AppFingerprints struct
-func LoadFingerprints(filePath string) (*discover.ApplicationFingerprints, error) {
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		return nil, err
+// getTemplatePaths creates template paths for Nuclei scanning based on resource type, modules, and request methods
+// This replaces the old fingerprints.json approach with direct template path selection
+func getTemplatePaths(resourceConfigType *discover.ApplicationResourceConfigType, modules []string) ([]string, error) {
+	// Get all supported resource types
+	supportedResourceTypes := []discover.ApplicationResourceType{
+		discover.ApplicationResourceTypeApiApplication,
+		discover.ApplicationResourceTypeCloudBucket,
+		discover.ApplicationResourceTypeContentManagementSystem,
+		discover.ApplicationResourceTypeKube,
+		discover.ApplicationResourceTypeRemoteAccess,
+		discover.ApplicationResourceTypeWebServer,
 	}
 
-	var config discover.ApplicationFingerprints
-	if err := json.Unmarshal(data, &config); err != nil {
-		return nil, err
+	// Map resource types to base template paths (without request method subdirectory)
+	resourceTypeToPath := map[discover.ApplicationResourceType]string{
+		discover.ApplicationResourceTypeApiApplication:          "apiapplication",
+		discover.ApplicationResourceTypeCloudBucket:             "cloud",
+		discover.ApplicationResourceTypeContentManagementSystem: "cms",
+		discover.ApplicationResourceTypeKube:                    "kube",
+		discover.ApplicationResourceTypeRemoteAccess:            "remoteaccess",
+		discover.ApplicationResourceTypeWebServer:               "webserver",
 	}
 
-	return &config, nil
-}
+	var templatePaths []string
 
-// FilterFingerprints filters the fingerprints based on resource types and modules
-// Returns error if resource type or module doesn't exist
-// If resourceType is 'ALL', it returns all resource types as separate resources
-func FilterFingerprints(fingerprints *discover.ApplicationFingerprints, resourceConfigType *discover.ApplicationResourceConfigType, modules []string) (*discover.ApplicationFingerprints, error) {
-	// Handle 'ALL' resource type - return all resource types with their modules
+	// Handle 'ALL' resource type - return all template paths
 	if resourceConfigType.GetApplicationResourceTypeAll() == discover.ApplicationResourceTypeAllAll {
-		var filteredResources []*discover.ApplicationResource
-
-		// Collect all resource types with their modules
-		for _, rt := range fingerprints.Fingerprints {
-			var filteredModules []*discover.ApplicationFingerprintModule
-
-			// If specific modules are requested, filter them
-			if len(modules) > 0 {
-				for _, m := range rt.Modules {
-					if slices.Contains(modules, m.Name) {
-						filteredModules = append(filteredModules, m)
-					}
-				}
-			} else {
-				// No specific modules requested, add all modules from this resource type
-				filteredModules = append(filteredModules, rt.Modules...)
-			}
-
-			// Only add the resource type if it has matching modules
-			if len(filteredModules) > 0 {
-				filteredResources = append(filteredResources, &discover.ApplicationResource{
-					Name:    rt.Name,
-					Modules: filteredModules,
-				})
+		// Add all resource type template paths for each request method
+		for _, resourceType := range supportedResourceTypes {
+			if resourceTypeName, exists := resourceTypeToPath[resourceType]; exists {
+				templatePath := fmt.Sprintf("discover/application/%s", resourceTypeName)
+				templatePaths = append(templatePaths, templatePath)
 			}
 		}
-
-		if len(filteredResources) == 0 {
-			if len(modules) > 0 {
-				return nil, fmt.Errorf("none of the specified modules %v were found", modules)
-			}
-			return nil, fmt.Errorf("no modules found for resource type ALL")
-		}
-
-		// Return all resource types as separate resources
-		return &discover.ApplicationFingerprints{
-			Fingerprints: filteredResources,
-		}, nil
+		return templatePaths, nil
 	}
 
-	resourceTypeEnum, err := discover.NewApplicationResourceTypeFromString(string(resourceConfigType.GetApplicationResourceType()))
-	if err != nil {
-		return nil, fmt.Errorf("invalid resource type: %s", resourceConfigType)
+	// Handle specific resource type
+	resourceType := resourceConfigType.GetApplicationResourceType()
+
+	// Validate that the resource type is supported
+	resourceTypeName, exists := resourceTypeToPath[resourceType]
+	if !exists {
+		return nil, fmt.Errorf("resource type %v is not supported", resourceType)
 	}
 
-	// Handle specific resource type (existing logic)
-	var foundResourceType *discover.ApplicationResource
-	for _, rt := range fingerprints.Fingerprints {
-		if rt.Name.GetApplicationResourceType() == resourceTypeEnum {
-			foundResourceType = rt
-			break
-		}
-	}
-	if foundResourceType == nil {
-		return nil, fmt.Errorf("resource type %s not found", resourceConfigType)
-	}
+	templatePath := fmt.Sprintf("discover/application/%s", resourceTypeName)
+	templatePaths = append(templatePaths, templatePath)
 
-	// If no module specified, return all modules for this type
-	if len(modules) == 0 {
-		return &discover.ApplicationFingerprints{
-			Fingerprints: []*discover.ApplicationResource{foundResourceType},
-		}, nil
-	}
-
-	// Find the specific modules
-	var foundModules []*discover.ApplicationFingerprintModule
-	for _, m := range foundResourceType.Modules {
-		if slices.Contains(modules, m.Name) {
-			foundModules = append(foundModules, m)
-		}
-	}
-	if len(foundModules) == 0 {
-		return nil, fmt.Errorf("modules %v not found for resource type %s", modules, resourceConfigType)
-	}
-
-	// Return filtered config with just the requested modules
-	return &discover.ApplicationFingerprints{
-		Fingerprints: []*discover.ApplicationResource{
-			{
-				Name:    foundResourceType.Name,
-				Modules: foundModules,
-			},
-		},
-	}, nil
-}
-
-// GetModule returns the module configuration for a given resource type and module
-func GetModule(resourceType discover.ApplicationResourceType, module string, fingerprints *discover.ApplicationFingerprints) (*discover.ApplicationFingerprintModule, error) {
-	// Check if resource type exists
-	for _, rt := range fingerprints.Fingerprints {
-		if rt.Name.GetApplicationResourceType() == resourceType {
-			// Check if module exists
-			for _, m := range rt.Modules {
-				if m.Name == module {
-					return m, nil
-				}
-			}
-			return nil, fmt.Errorf("module %s not found for resource type %s", module, resourceType)
-		}
-	}
-	return nil, fmt.Errorf("resource type %s not found", resourceType)
+	return templatePaths, nil
 }

@@ -1,0 +1,42 @@
+id: cherokee-detect
+info:
+  name: Cherokee Web Server Detection
+  author: method-security 
+  severity: info
+  description: Detects Cherokee Web Server installations by analyzing response headers,
+    body content, and common paths
+  reference: https://cherokee-project.com/
+  metadata:
+    method-application-type: WEB_SERVER
+    method-module-name: CHEROKEE
+  tags: tech,cherokee,webserver
+http:
+- method: GET
+  path:
+  - '{{BaseURL}}'
+  - '{{BaseURL}}/cherokee_themes/'
+  - '{{BaseURL}}/cherokee-admin/'
+  - '{{BaseURL}}/server-status'
+  - '{{BaseURL}}/server-info'
+  - '{{BaseURL}}/cherokee/'
+  - '{{BaseURL}}/admin/'
+  stop-at-first-match: true
+  matchers-condition: or
+  matchers:
+  - type: word
+    part: header
+    words:
+    - 'server: cherokee'
+    - 'x-powered-by: cherokee'
+    - 'x-served-by: cherokee'
+    case-insensitive: true
+  - type: regex
+    part: body
+    regex:
+    - (?i)cherokee.*?web.*?server.*?[0-9]+\.[0-9]+\.[0-9]+
+    - (?i)cherokee.*?[0-9]+\.[0-9]+\.[0-9]+
+    - (?i)cherokee.*?server.*?[0-9]+\.[0-9]+
+    - (?i)powered.*?by.*?cherokee
+    - (?i)cherokee.*?admin
+    - (?i)cherokee.*?configuration
+    condition: or

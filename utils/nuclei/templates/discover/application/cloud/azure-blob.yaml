@@ -1,0 +1,30 @@
+id: discover-azure-blob
+info:
+  name: Azure Blob Storage Discovery
+  author: method-security
+  severity: info
+  description: Detects Azure Blob Storage endpoints
+  metadata:
+    method-application-type: CLOUD_BUCKET
+    method-module-name: AZUREBLOB
+  tags: discovery,azure,blob,cloud,storage
+http:
+- method: GET
+  path:
+  - '{{BaseURL}}'
+  stop-at-first-match: true
+  matchers-condition: or
+  matchers:
+  - type: word
+    part: header
+    words:
+    - 'server: blob'
+    - x-ms-blob-type
+    - x-ms-version
+    case-insensitive: true
+  - type: word
+    part: body
+    words:
+    - blobnotfound
+    - microsoft azure blob storage
+    case-insensitive: true

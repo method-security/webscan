@@ -1,0 +1,30 @@
+id: sonicwall-vpn-detect
+info:
+  name: SonicWall VPN Detection
+  author: method-security
+  severity: info
+  description: Detects SonicWall VPN installations by analyzing response headers,
+    body content, and common paths
+  reference: https://www.sonicwall.com/
+  metadata:
+    method-application-type: REMOTE_ACCESS
+    method-module-name: SONICWALLVPN
+  tags: tech,sonicwall,vpn,remote-access,ssl-vpn
+http:
+- method: GET
+  path:
+  - '{{BaseURL}}'
+  - '{{BaseURL}}/cgi-bin/welcome'
+  - '{{BaseURL}}/cgi-bin/portal'
+  - '{{BaseURL}}/sslvpn.esp'
+  - '{{BaseURL}}/cgi-bin/cgisrv.cgi'
+  stop-at-first-match: true
+  matchers-condition: or
+  matchers:
+  - type: regex
+    part: body
+    regex:
+    - (?i)sonic(wall|os).*?[0-9]+\.[0-9]+\.[0-9]+
+    - (?i)netextender.*?[0-9]+\.[0-9]+
+    - (?i)sonicwall.*?(firewall|security|vpn)
+    condition: or

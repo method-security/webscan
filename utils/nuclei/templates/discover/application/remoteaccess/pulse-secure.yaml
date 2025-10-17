@@ -1,0 +1,34 @@
+id: pulse-secure-detect
+info:
+  name: Pulse Secure VPN Detection
+  author: method-security
+  severity: info
+  description: Detects Pulse Secure VPN installations by analyzing response headers,
+    body content, and common paths
+  reference: https://www.pulsesecure.net/
+  metadata:
+    method-application-type: REMOTE_ACCESS
+    method-module-name: PULSE_SECURE
+  tags: tech,pulse,secure,vpn,remote-access,juniper
+http:
+- method: GET
+  path:
+  - '{{BaseURL}}'
+  - '{{BaseURL}}/dana-na/auth/'
+  - '{{BaseURL}}/dana-na/auth/url_default/welcome.cgi'
+  - '{{BaseURL}}/dana/'
+  - '{{BaseURL}}/pulse/'
+  stop-at-first-match: true
+  matchers-condition: or
+  matchers:
+  - type: word
+    part: header
+    words:
+    - pulsesecure
+    case-insensitive: true
+  - type: regex
+    part: body
+    regex:
+    - (?i)pulse.*?secure.*?[0-9]+\.[0-9]+\.[0-9]+
+    - (?i)pulse.*?connect.*?secure
+    - (?i)ivanti.*?connect.*?secure

@@ -1,0 +1,53 @@
+id: graphql-detect
+info:
+  name: GraphQL API Detection
+  author: nkxxkn, elsfa7110, ofjaaah, exceed # updated by method.security
+  severity: info
+  description: |
+    Detects GraphQL endpoints by sending an introspection-style POST query to common
+    GraphQL paths and checking for typical GraphQL responses or headers.
+  reference:
+    - https://graphql.org/learn/introspection/
+  classification:
+    cpe: cpe:2.3:a:graphql:graphql:*:*:*:*:*:*:*:*
+  metadata:
+    method-application-type: API_APPLICATION
+    method-module-name: GRAPHQL
+    category: api
+    confidence: 90
+  tags: tech, graphql, api, introspection
+http:
+  - method: POST
+    path:
+      - "{{BaseURL}}{{paths}}"
+    headers:
+      Content-Type: application/json
+    body: '{"query":"query IntrospectionQuery{__schema { queryType { name } } }"}'
+    payloads:
+      paths:
+        - /graphql
+    stop-at-first-match: true
+    redirects: true
+    max-redirects: 2
+    matchers-condition: or
+    matchers:
+      - type: regex
+        part: header
+        name: graphql-powered-header
+        regex:
+          - '(?i)x-powered-by:\s*express-graphql'
+          - '(?i)x-powered-by:\s*apollo'
+          - '(?i)x-powered-by:\s*graphql'
+      - type: regex
+        part: body
+        name: graphql-introspection
+        regex:
+          - '__schema'
+          - '__type'
+      - type: regex
+        part: body
+        name: graphql-error-messages
+        regex:
+          - '(?i)Cannot query field'
+          - '(?i)operation .* not found'
+          - '(?i)Unknown argument'

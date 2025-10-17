@@ -1,0 +1,44 @@
+id: discover-kubernetes
+info:
+  name: Kubernetes Discovery
+  author: method-security
+  severity: info
+  description: Detects Kubernetes API server and dashboard
+  metadata:
+    method-application-type: KUBE
+    method-module-name: KUBE
+  tags: discovery,kubernetes,k8s,container
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/api"
+      - "{{BaseURL}}/api/v1"
+      - "{{BaseURL}}/version"
+      - "{{BaseURL}}/healthz"
+      - "{{BaseURL}}/metrics"
+      - "{{BaseURL}}/ui"
+      - "{{BaseURL}}/api/v1/namespaces"
+    stop-at-first-match: true
+    matchers-condition: or
+    matchers:
+      - type: word
+        part: header
+        words:
+          - "x-kubernetes-pf-flowschema-uid"
+          - "x-kubernetes-pf-prioritylevel-uid"
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - '"major": "'
+          - '"minor": "'
+          - '"gitVersion": "v'
+        condition: and
+      - type: word
+        part: body
+        words:
+          - "Kubernetes Dashboard"
+          - "k8s-app=kubernetes-dashboard"
+        case-insensitive: true
+

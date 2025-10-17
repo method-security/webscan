@@ -14,9 +14,9 @@ import (
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
-// All is the pentest templates
+// All is the templates (pentest and discover)
 //
-//go:embed pentest
+//go:embed pentest discover
 var All embed.FS
 
 // GetTemplateFileSystem returns filesystem views for templates based on the provided template paths.
@@ -39,8 +39,9 @@ func GetTemplateFileSystem(ctx context.Context, templatePaths []string) ([]fs.FS
 		// Clean the template path - remove utils/nuclei/templates/ prefix if present
 		cleanPath := templatePath
 		cleanPath = strings.TrimPrefix(cleanPath, "utils/nuclei/templates/")
-		// Also handle if it starts with just pentest/
-		if !strings.HasPrefix(cleanPath, "pentest/") {
+		// Handle both pentest/ and discover/ paths
+		if !strings.HasPrefix(cleanPath, "pentest/") && !strings.HasPrefix(cleanPath, "discover/") {
+			// Default to pentest for backward compatibility
 			cleanPath = filepath.Join("pentest", cleanPath)
 		}
 

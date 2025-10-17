@@ -1,0 +1,48 @@
+id: apache-detect
+info:
+  name: Apache Web Server Detection
+  author: philippedelteil # updated by method.security
+  severity: info
+  description: |
+    Detects web servers running Apache HTTPD by analyzing response headers and common
+    response patterns. Some Apache configurations expose version information in the
+    `Server` or `Via` headers. The OpenSSL module may also reveal version details.
+  reference:
+    - https://httpd.apache.org/
+    - https://nvd.nist.gov/vuln/detail/CVE-2021-41773
+  classification:
+    cpe: cpe:2.3:a:apache:http_server:*:*:*:*:*:*:*:*
+  metadata:
+    vendor: apache
+    product: httpd
+    category: web_server
+    method-application-type: WEB_SERVER
+    method-module-name: APACHE
+    shodan-query: product:"Apache httpd"
+    fofa-query: server="Apache"
+    confidence: 90
+  tags: tech, apache, web, server, detect, fingerprint
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+    redirects: true
+    max-redirects: 2
+    stop-at-first-match: true
+    matchers-condition: or
+    matchers:
+      - type: regex
+        name: apache-header
+        part: header
+        regex:
+          - '(?i)server:\s*apache'
+          - '(?i)server:\s*Apache/[\d.]+'
+          - '(?i)via:\s*apache'
+          - '(?i)x-powered-by:\s*apache'
+      - type: regex
+        name: apache-body
+        part: body
+        regex:
+          - '(?i)Apache Server at'
+          - '(?i)Apache/[\d.]+ \(Unix\)'
+          - '(?i)<address>Apache/[\d.]+'

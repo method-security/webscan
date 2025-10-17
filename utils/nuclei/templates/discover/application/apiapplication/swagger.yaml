@@ -1,0 +1,70 @@
+id: discover-swagger
+
+info:
+  name: Public Swagger / OpenAPI - Detect
+  author: pdteam, c-sh0, AmirHossein Raeisi, method-security
+  severity: info
+  description: >
+    Detects public Swagger / OpenAPI documentation and spec endpoints by probing
+    common UI and spec paths and checking for header/body fingerprints.
+  reference:
+    - https://swagger.io/
+  classification:
+    cvss-metrics: CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:N
+    cwe-id: CWE-200
+  metadata:
+    method-application-type: API_APPLICATION
+    method-module-name: SWAGGER
+    shodan-query: http.title:"swagger"
+    category: api
+    confidence: 85
+  tags:
+    - discovery
+    - exposure
+    - api
+    - swagger
+
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}{{paths}}"
+    payloads:
+      paths:
+        - /swagger-ui.html
+        - /swagger/index.html
+        - /swagger.json
+        - /swagger.yaml
+        - /swagger/v1/swagger.json
+        - /swagger/v1/swagger.yaml
+        - /api/swagger.json
+        - /api/swagger.yaml
+        - /api-docs/swagger.json
+        - /api-docs/swagger.yaml
+        - /docs
+        - /swagger
+    stop-at-first-match: true
+    redirects: true
+    matchers-condition: or
+    matchers:
+      - type: regex
+        name: swagger-header-fingerprints
+        part: header
+        regex:
+          - '(?i)^x-swagger-router-basepath:'
+          - '(?i)^x-swagger-router-controller:'
+          - '(?i)^x-powered-by:\s*swagger'
+          - '(?i)^x-generator:\s*(swagger codegen|openapi generator)'
+          - '(?i)^server:\s*swagger'
+      - type: regex
+        name: swagger-body-fingerprints
+        part: body
+        regex:
+          - '(?i)"openapi"\s*:\s*"[0-9\.]+'        # OpenAPI version in JSON
+          - '(?i)"swagger"\s*:\s*"[0-9\.]+'        # Swagger 2.0 in JSON
+          - '(?i)id="?swagger-ui'                  # swagger-ui id attribute
+          - '(?i)loadSwaggerUI|loadswaggerui'
+          - '(?i)swagger[\s-]*ui'
+          - '(?i)swagger[\s-]*editor'
+          - '(?i)swagger[-_\.]json|swagger[-_\.]yaml|openapi[-_\.]yaml|openapi[-_\.]json'
+          - '(?i)swagger-js|swagger-ui-bundle'
+          - '(?i)api-docs|api docs'

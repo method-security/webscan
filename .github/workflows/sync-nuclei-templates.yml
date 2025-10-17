@@ -1,4 +1,4 @@
-name: Sync Nuclei CVE Templates
+name: 🔄 Sync Nuclei CVE Templates
 
 permissions:
   contents: write
@@ -18,6 +18,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      id-token: write
 
     steps:
       - name: Checkout webscan repository
@@ -25,6 +26,12 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
+
+      - uses: tibdex/github-app-token@v1
+        id: generate-token
+        with:
+          app_id: ${{ secrets.APP_ID }}
+          private_key: ${{ secrets.APP_PRIVATE_KEY }}
 
       - name: Clone nuclei-templates repository
         run: |
@@ -76,7 +83,7 @@ jobs:
         if: steps.check_changes.outputs.changes == 'true'
         uses: peter-evans/create-pull-request@v6
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ steps.generate-token.outputs.token }}
           commit-message: |
             Weekly sync for CVEs
 

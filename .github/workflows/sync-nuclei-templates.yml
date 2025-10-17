@@ -5,15 +5,6 @@ on:
     # Run every Monday at 9:00 AM UTC
     - cron: '0 9 * * 1'
   workflow_dispatch:  # Allow manual trigger
-    inputs:
-      year:
-        description: 'CVE year to sync (e.g., 2025, 2026)'
-        required: false
-        default: '2025'
-        type: string
-
-env:
-  DEFAULT_YEAR: '2025'  # Update this when a new year starts
 
 jobs:
   sync-templates:
@@ -24,13 +15,6 @@ jobs:
       pull-requests: write
 
     steps:
-      - name: Set year variable
-        id: set_year
-        run: |
-          YEAR="${{ inputs.year || env.DEFAULT_YEAR }}"
-          echo "year=${YEAR}" >> $GITHUB_OUTPUT
-          echo "Syncing CVE templates for year: ${YEAR}"
-
       - name: Checkout webscan repository
         uses: actions/checkout@v4
         with:
@@ -44,35 +28,44 @@ jobs:
       - name: Sync CVE templates
         id: sync_templates
         run: |
-          YEAR="${{ steps.set_year.outputs.year }}"
-          TARGET_DIR="utils/nuclei/templates/pentest/scan/cve/${YEAR}"
-          SOURCE_DIR="/tmp/nuclei-templates/http/cves/${YEAR}"
+          TARGET_DIR="utils/nuclei/templates/pentest/scan/cve"
+          SOURCE_DIR="/tmp/nuclei-templates/http/cves"
 
           # Check if source directory exists
           if [ ! -d "${SOURCE_DIR}" ]; then
-            echo "Warning: Source directory ${SOURCE_DIR} does not exist in nuclei-templates repo"
-            exit 0
+            echo "Error: Source directory ${SOURCE_DIR} does not exist in nuclei-templates repo"
+            exit 1
           fi
-
-          # Create target directory if it doesn't exist
-          mkdir -p "${TARGET_DIR}"
 
           # Remove existing templates in the target directory
           rm -rf ${TARGET_DIR}/*
 
-          # Copy new templates from nuclei-templates repo
+          # Copy all CVE templates from nuclei-templates repo
           cp -r ${SOURCE_DIR}/* ${TARGET_DIR}/
 
-          # Count the number of templates synced
+          # Count the number of templates synced (all years)
           TEMPLATE_COUNT=$(find ${TARGET_DIR} -type f -name "*.yaml" | wc -l)
-          echo "Synced ${TEMPLATE_COUNT} CVE ${YEAR} templates"
+
+          # Count templates by year for reporting
+          YEAR_COUNTS=""
+          for year_dir in ${TARGET_DIR}/*/; do
+            if [ -d "$year_dir" ]; then
+              year=$(basename "$year_dir")
+              count=$(find "$year_dir" -type f -name "*.yaml" | wc -l)
+              YEAR_COUNTS="${YEAR_COUNTS}- ${year}: ${count} templates\n"
+            fi
+          done
+
+          echo "Synced ${TEMPLATE_COUNT} total CVE templates across all years"
           echo "template_count=${TEMPLATE_COUNT}" >> $GITHUB_OUTPUT
+          echo "year_counts<<EOF" >> $GITHUB_OUTPUT
+          echo -e "${YEAR_COUNTS}" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Check for changes
         id: check_changes
         run: |
-          YEAR="${{ steps.set_year.outputs.year }}"
-          git diff --quiet utils/nuclei/templates/pentest/scan/cve/${YEAR}/ || echo "changes=true" >> $GITHUB_OUTPUT
+          git diff --quiet utils/nuclei/templates/pentest/scan/cve/ || echo "changes=true" >> $GITHUB_OUTPUT
 
       - name: Create Pull Request
         if: steps.check_changes.outputs.changes == 'true'
@@ -80,27 +73,33 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: |
-            Update Nuclei CVE ${{ steps.set_year.outputs.year }} templates
+            Weekly sync for CVEs
 
-            Synced CVE ${{ steps.set_year.outputs.year }} templates from projectdiscovery/nuclei-templates
+            Synced all CVE templates from projectdiscovery/nuclei-templates
             Total templates: ${{ steps.sync_templates.outputs.template_count }}
-          branch: automated/sync-nuclei-cve-${{ steps.set_year.outputs.year }}-templates
+          branch: automated/sync-nuclei-cve-templates
           delete-branch: true
-          title: 'Update Nuclei CVE ${{ steps.set_year.outputs.year }} Templates'
+          title: 'Weekly Nuclei CVE Template Sync'
           body: |
-            ## Nuclei CVE ${{ steps.set_year.outputs.year }} Template Sync
+            ## Nuclei CVE Template Sync
 
-            This PR automatically syncs the latest CVE ${{ steps.set_year.outputs.year }} templates from the [projectdiscovery/nuclei-templates](https://github.com/projectdiscovery/nuclei-templates) repository.
+            This PR automatically syncs the latest CVE templates (all years) from the [projectdiscovery/nuclei-templates](https://github.com/projectdiscovery/nuclei-templates) repository.
 
             ### Changes
             - **Total templates synced:** ${{ steps.sync_templates.outputs.template_count }}
-            - **Source:** https://github.com/projectdiscovery/nuclei-templates/tree/main/http/cves/${{ steps.set_year.outputs.year }}
-            - **Target:** `utils/nuclei/templates/pentest/scan/cve/${{ steps.set_year.outputs.year }}/`
+            - **Source:** https://github.com/projectdiscovery/nuclei-templates/tree/main/http/cves
+            - **Target:** `utils/nuclei/templates/pentest/scan/cve/`
+
+            ### Templates by Year
+            ${{ steps.sync_templates.outputs.year_counts }}
 
             ### Review Checklist
-            - [ ] Review new CVE templates for relevance
+            - [ ] Review new/updated CVE templates for relevance
             - [ ] Verify template syntax is valid
             - [ ] Ensure no sensitive data in templates
+
+            ### Notes
+            This sync includes all CVE years to capture updates to older CVEs when new POCs become available.
 
             ---
             *This PR was automatically generated by the [sync-nuclei-templates](.github/workflows/sync-nuclei-templates.yml) workflow*

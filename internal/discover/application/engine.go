@@ -58,7 +58,7 @@ func createDiscoverApplicationNucleiConfig(ctx context.Context, config *discover
 	log := svc1log.FromContext(ctx)
 
 	// Get template paths based on resource type, modules, and request methods
-	templatePaths, err := getTemplatePaths(config.ResourceType, config.Modules)
+	templatePaths, err := getTemplatePaths(config.ResourceType)
 	if err != nil {
 		log.Error("Failed to get template paths", svc1log.SafeParam("error", err.Error()))
 		return nuclei.NucleiConfig{}, err

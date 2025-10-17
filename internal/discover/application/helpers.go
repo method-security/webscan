@@ -11,10 +11,11 @@ import (
 
 // getTemplatePaths creates template paths for Nuclei scanning based on resource type, modules, and request methods
 // This replaces the old fingerprints.json approach with direct template path selection
-func getTemplatePaths(resourceConfigType *discover.ApplicationResourceConfigType, modules []string) ([]string, error) {
+func getTemplatePaths(resourceConfigType *discover.ApplicationResourceConfigType) ([]string, error) {
 	// Get all supported resource types
 	supportedResourceTypes := []discover.ApplicationResourceType{
 		discover.ApplicationResourceTypeApiApplication,
+		discover.ApplicationResourceTypeCiCdPlatform,
 		discover.ApplicationResourceTypeCloudBucket,
 		discover.ApplicationResourceTypeContentManagementSystem,
 		discover.ApplicationResourceTypeKube,
@@ -25,6 +26,7 @@ func getTemplatePaths(resourceConfigType *discover.ApplicationResourceConfigType
 	// Map resource types to base template paths (without request method subdirectory)
 	resourceTypeToPath := map[discover.ApplicationResourceType]string{
 		discover.ApplicationResourceTypeApiApplication:          "apiapplication",
+		discover.ApplicationResourceTypeCiCdPlatform:            "cicd",
 		discover.ApplicationResourceTypeCloudBucket:             "cloud",
 		discover.ApplicationResourceTypeContentManagementSystem: "cms",
 		discover.ApplicationResourceTypeKube:                    "kube",

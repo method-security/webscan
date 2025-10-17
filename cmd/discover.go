@@ -38,11 +38,10 @@ func (a *WebScan) InitDiscoverCommand() {
 	}
 
 	// Application Command
-	// Subcommands: fingerprint
 	discoverApplicationCmd := &cobra.Command{
 		Use:   "application",
-		Short: "Perform application fingerprinting against targets",
-		Long:  `Perform application fingerprinting to identify web technologies, frameworks, and services running on target URLs.`,
+		Short: "Perform application discovery against targets",
+		Long:  `Perform application fingerprinting to identify web technologies, and services running on target URLs.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			defer a.OutputSignal.PanicHandler(cmd.Context())
 

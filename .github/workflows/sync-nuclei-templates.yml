@@ -1,5 +1,10 @@
 name: Sync Nuclei CVE Templates
 
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write
+
 on:
   schedule:
     # Run every Monday at 9:00 AM UTC

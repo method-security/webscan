@@ -6,13 +6,11 @@ import (
 	"strings"
 
 	// Generated
-
 	nuclei "github.com/Method-Security/webscan/generated/go/common/nuclei"
 	"github.com/Method-Security/webscan/generated/go/discover"
 
 	// Utils
 	nucleiutils "github.com/Method-Security/webscan/utils/nuclei"
-
 	// External
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )

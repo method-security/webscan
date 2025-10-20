@@ -7,9 +7,9 @@ info:
     response headers, body content, and common paths
   reference: https://www.citrix.com/products/citrix-gateway/
   metadata:
-    method-application-type: REMOTE_ACCESS
+    method-application-type: VDI_APPLICATION
     method-module-name: CITRIX_GATEWAY
-  tags: tech,citrix,gateway,netscaler,remote-access
+  tags: tech,citrix,gateway,netscaler,vdi
 http:
 - method: GET
   path:

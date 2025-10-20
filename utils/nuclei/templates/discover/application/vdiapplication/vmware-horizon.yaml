@@ -7,9 +7,9 @@ info:
     body content, and common paths
   reference: https://www.vmware.com/products/horizon.html
   metadata:
-    method-application-type: REMOTE_ACCESS
+    method-application-type: VDI_APPLICATION
     method-module-name: VMWARE_HORIZON
-  tags: tech,vmware,horizon,remote-access,vdi
+  tags: tech,vmware,horizon,vdi-application
 http:
 - method: GET
   path:

@@ -7,7 +7,7 @@ import (
 	"github.com/Method-Security/webscan/generated/go/discover"
 )
 
-// getTemplatePaths creates template paths for Nuclei scanning based on resource type, modules, and request methods
+// getTemplatePaths creates template paths for Nuclei scanning based on resource type
 // This replaces the old fingerprints.json approach with direct template path selection
 func getTemplatePaths(resourceConfigType *discover.ApplicationResourceConfigType) ([]string, error) {
 	// Get all supported resource types

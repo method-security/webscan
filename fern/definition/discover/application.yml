@@ -24,7 +24,6 @@ types:
     properties:
       targets: list<string>
       resourceType: ApplicationResourceConfigType
-      modules: optional<list<string>>
       timeout: integer
       threads: integer
       proxy: optional<string>

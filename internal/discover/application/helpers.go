@@ -3,9 +3,7 @@ package application
 import (
 	// Standard
 	"fmt"
-
 	// Generated
-
 	"github.com/Method-Security/webscan/generated/go/discover"
 )
 
@@ -19,7 +17,7 @@ func getTemplatePaths(resourceConfigType *discover.ApplicationResourceConfigType
 		discover.ApplicationResourceTypeCloudBucket,
 		discover.ApplicationResourceTypeContentManagementSystem,
 		discover.ApplicationResourceTypeKube,
-		discover.ApplicationResourceTypeRemoteAccess,
+		discover.ApplicationResourceTypeVdiApplication,
 		discover.ApplicationResourceTypeWebServer,
 	}
 
@@ -30,7 +28,7 @@ func getTemplatePaths(resourceConfigType *discover.ApplicationResourceConfigType
 		discover.ApplicationResourceTypeCloudBucket:             "cloud",
 		discover.ApplicationResourceTypeContentManagementSystem: "cms",
 		discover.ApplicationResourceTypeKube:                    "kube",
-		discover.ApplicationResourceTypeRemoteAccess:            "remoteaccess",
+		discover.ApplicationResourceTypeVdiApplication:          "vdiapplication",
 		discover.ApplicationResourceTypeWebServer:               "webserver",
 	}
 

@@ -12,7 +12,7 @@ types:
       - CLOUD_BUCKET
       - CONTENT_MANAGEMENT_SYSTEM
       - KUBE
-      - REMOTE_ACCESS
+      - VDI_APPLICATION
       - WEB_SERVER
   ApplicationResourceConfigType:
     discriminated: false

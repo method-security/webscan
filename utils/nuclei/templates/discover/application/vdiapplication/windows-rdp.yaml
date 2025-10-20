@@ -6,7 +6,7 @@ info:
   description: Detects Windows RDP Gateway and Remote Desktop Web Access installations
   reference: https://docs.microsoft.com/en-us/windows-server/remote/remote-desktop-services/
   metadata:
-    method-application-type: REMOTE_ACCESS
+    method-application-type: VDI_APPLICATION
     method-module-name: WINDOWS_RDP
   tags: tech,microsoft,rdp,remote-access,windows,rds
 http:

@@ -20,7 +20,9 @@ import (
 	discoversaashelpers "github.com/Method-Security/webscan/internal/discover/saas/active/helpers"
 
 	// Utils
+	nucleihelpers "github.com/Method-Security/webscan/utils/nuclei/helpers"
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
+
 	// External
 	cobra "github.com/spf13/cobra"
 )
@@ -36,11 +38,10 @@ func (a *WebScan) InitDiscoverCommand() {
 	}
 
 	// Application Command
-	// Subcommands: fingerprint
 	discoverApplicationCmd := &cobra.Command{
 		Use:   "application",
-		Short: "Perform application fingerprinting against targets",
-		Long:  `Perform application fingerprinting to identify web technologies, frameworks, and services running on target URLs.`,
+		Short: "Perform application discovery against targets",
+		Long:  `Perform application fingerprinting to identify web technologies, and services running on target URLs.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			defer a.OutputSignal.PanicHandler(cmd.Context())
 
@@ -52,42 +53,12 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Config flags
-			fingerprintFile, err := cmd.Flags().GetString("fingerprint-file")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			fingeprints, err := discoverapplication.LoadFingerprints(fingerprintFile)
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
 			resourceType, err := cmd.Flags().GetString("resource-type")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
 			modules, err := cmd.Flags().GetStringSlice("modules")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			resourceConfigType, err := getDiscoverApplicationResourceConfigTypeFromString(resourceType)
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			filteredFingerprints, err := discoverapplication.FilterFingerprints(fingeprints, &resourceConfigType, modules)
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			maxRedirects, err := cmd.Flags().GetInt("max-redirects")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			verifyTLS, err := cmd.Flags().GetBool("verify-tls")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -102,15 +73,29 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			proxy, err := cmd.Flags().GetString("proxy")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			if err := nucleihelpers.ValidateProxy(proxy); err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			verboseLogs, err := cmd.Flags().GetBool("verbose-logs")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
 
 			// Create config
-			config, err := getDiscoverApplicationConfig(targets, resourceType, modules, maxRedirects, verifyTLS, timeout, threads)
+			config, err := getDiscoverApplicationConfig(targets, resourceType, modules, timeout, threads, proxy, verboseLogs)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
 			// Generate report
-			report, err := discoverapplication.LaunchFingerprintEngine(cmd.Context(), config, filteredFingerprints)
+			report, err := discoverapplication.LaunchFingerprintEngine(cmd.Context(), config)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 			}
@@ -122,11 +107,10 @@ func (a *WebScan) InitDiscoverCommand() {
 	// Config Flags
 	discoverApplicationCmd.Flags().String("resource-type", "ALL", "Type of resource to fingerprint (e.g., web, api, cms)")
 	discoverApplicationCmd.Flags().StringSlice("modules", []string{}, "Specific fingerprinting modules to run")
-	discoverApplicationCmd.Flags().String("fingerprint-file", "/opt/method/webscan/var/conf/discover/application/fingerprints.json", "Path to the fingerprint definitions file")
-	discoverApplicationCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
-	discoverApplicationCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
 	discoverApplicationCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
-	discoverApplicationCmd.Flags().Int("threads", 0, "Number of concurrent threads for scanning")
+	discoverApplicationCmd.Flags().Int("threads", 25, "Number of concurrent threads for scanning")
+	discoverApplicationCmd.Flags().String("proxy", "", "Optional HTTP proxy URL")
+	discoverApplicationCmd.Flags().Bool("verbose-logs", false, "Verbose logs")
 
 	// Mark Required Flags
 	_ = discoverApplicationCmd.MarkFlagRequired("targets")
@@ -685,19 +669,20 @@ func (a *WebScan) InitDiscoverCommand() {
 }
 
 // getDiscoverApplicationConfig builds the config for application fingerprinting discovery.
-func getDiscoverApplicationConfig(targets []string, resource string, moduleEnums []string, maxRedirects int, verifyTLS bool, timeout int, threads int) (*discover.DiscoverApplicationConfig, error) {
+func getDiscoverApplicationConfig(targets []string, resource string, moduleEnums []string, timeout int, threads int, proxy string, verboseLogs bool) (*discover.DiscoverApplicationConfig, error) {
 	resourceEnum, err := getDiscoverApplicationResourceConfigTypeFromString(resource)
 	if err != nil {
 		return nil, fmt.Errorf("invalid resource type: %s", resource)
 	}
+
 	config := &discover.DiscoverApplicationConfig{
 		Targets:      targets,
 		ResourceType: &resourceEnum,
 		Modules:      moduleEnums,
-		MaxRedirects: maxRedirects,
-		VerifyTls:    verifyTLS,
 		Timeout:      max(timeout, 0),
 		Threads:      max(threads, 0),
+		Proxy:        &proxy,
+		VerboseLogs:  verboseLogs,
 	}
 	return config, nil
 }

@@ -1,0 +1,41 @@
+id: jetty-detect
+info:
+  name: Jetty Web Server Detection
+  author: method-security
+  severity: info
+  description: Detects Jetty Web Server installations by analyzing response headers,
+    body content, and common paths
+  reference: https://www.eclipse.org/jetty/
+  metadata:
+    method-application-type: WEB_SERVER
+    method-module-name: JETTY
+  tags: tech,jetty,webserver,java,eclipse
+http:
+- method: GET
+  path:
+  - '{{BaseURL}}'
+  - '{{BaseURL}}/stats'
+  - '{{BaseURL}}/dump'
+  - '{{BaseURL}}/jmx'
+  - '{{BaseURL}}/jolokia/'
+  - '{{BaseURL}}/admin/'
+  - '{{BaseURL}}/status/'
+  stop-at-first-match: true
+  matchers-condition: or
+  matchers:
+  - type: word
+    part: header
+    words:
+    - 'server: jetty'
+    - 'x-powered-by: jetty'
+    - 'x-served-by: jetty'
+    case-insensitive: true
+  - type: regex
+    part: body
+    regex:
+    - (?i)jetty.*?web.*?server.*?[0-9]+\.[0-9]+\.[0-9]+
+    - (?i)jetty.*?[0-9]+\.[0-9]+\.[0-9]+
+    - (?i)jetty.*?server.*?[0-9]+\.[0-9]+
+    - (?i)eclipse.*?jetty.*?[0-9]+\.[0-9]+
+    - (?i)powered.*?by.*?jetty
+    - (?i)mortbay.*?jetty

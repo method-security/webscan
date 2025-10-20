@@ -320,6 +320,17 @@ func (b *Builder) Consume(ev *nout.ResultEvent) {
 		softwareWeakness = ev.Info.Metadata["method-software-weakness-name"].(string)
 	}
 
+	// Extract template metadata if available
+	var metadata map[string]string
+	if ev.Info.Metadata != nil {
+		metadata = make(map[string]string)
+		for key, value := range ev.Info.Metadata {
+			if strValue, ok := value.(string); ok {
+				metadata[key] = strValue
+			}
+		}
+	}
+
 	attemptInfo.Finding = &nuclei.NucleiFindingInfo{
 		Name:             name,
 		SoftwareWeakness: &softwareWeakness,
@@ -331,6 +342,7 @@ func (b *Builder) Consume(ev *nout.ResultEvent) {
 		Severity:         &severity,
 		Finding:          ev.MatcherStatus,
 		Probe:            probe,
+		Metadata:         metadata,
 	}
 
 	// Always add the attempt to the report, even if there was an error parsing the request/response

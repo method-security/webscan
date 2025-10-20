@@ -1,0 +1,52 @@
+id: graphql-detect
+info:
+  name: GraphQL API Detection
+  author: method.security
+  severity: info
+  description: |
+    Detects GraphQL endpoints by sending an introspection-style POST query to common
+    GraphQL paths and checking for typical GraphQL responses.
+  reference:
+    - https://graphql.org/learn/introspection/
+  classification:
+    cpe: cpe:2.3:a:graphql:graphql:*:*:*:*:*:*:*:*
+  metadata:
+    method-application-type: API_APPLICATION
+    method-module-name: GRAPHQL
+    category: api
+    confidence: 90
+  tags: tech, graphql, api, introspection
+http:
+  - method: POST
+    path:
+      - "{{BaseURL}}/"
+      - "{{BaseURL}}/graphql"
+      - "{{BaseURL}}/api/graphql"
+      - "{{BaseURL}}/v1/graphql"
+      - "{{BaseURL}}/v2/graphql"
+      - "{{BaseURL}}/graphql/v1"
+      - "{{BaseURL}}/graphql/v2"
+      - "{{BaseURL}}/query"
+      - "{{BaseURL}}/api"
+      - "{{BaseURL}}/gql"
+      - "{{BaseURL}}/api/gql"
+      - "{{BaseURL}}/graphiql"
+      - "{{BaseURL}}/api/graphiql"
+      - "{{BaseURL}}/admin/graphql"
+      - "{{BaseURL}}/api/v1/graphql"
+      - "{{BaseURL}}/api/v2/graphql"
+    headers:
+      Content-Type: application/json
+    body: '{"query": "{ __schema { queryType { name } } }"}'
+    stop-at-first-match: true
+    redirects: true
+    max-redirects: 2
+    matchers-condition: or
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "__schema"
+          - "queryType"
+        condition: and
+        name: graphql-introspection

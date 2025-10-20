@@ -3,283 +3,148 @@ package application
 import (
 	// Standard
 	"context"
-	"runtime"
 	"strings"
-	"sync"
 
 	// Generated
-	common "github.com/Method-Security/webscan/generated/go/common"
+
+	nuclei "github.com/Method-Security/webscan/generated/go/common/nuclei"
 	"github.com/Method-Security/webscan/generated/go/discover"
 
 	// Utils
-	request "github.com/Method-Security/webscan/utils/request"
-	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
+	nucleiutils "github.com/Method-Security/webscan/utils/nuclei"
+
+	// External
+	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
-func createSendHTTPRequestConfig(baseURL, path string, method common.HttpMethod, requestParams common.HttpRequestParams, config *discover.DiscoverApplicationConfig) common.SendHttpRequestConfig {
-	request := common.HttpRequest{
-		BaseUrl: baseURL,
-		Path:    path,
-		Method:  method,
-		Params:  &requestParams,
+// convertNucleiAttemptToFingerprintAttemptStruct converts a Nuclei attempt to an application fingerprint attempt
+func convertNucleiAttemptToFingerprintAttemptStruct(nucleiAttempt *nuclei.NucleiAttemptInfo) *discover.ApplicationFingerprintAttempt {
+	if nucleiAttempt == nil || nucleiAttempt.TemplateId == "" {
+		return nil
 	}
-	return common.SendHttpRequestConfig{
-		Request:            &request,
-		MaxRedirects:       config.MaxRedirects,
-		VerifyTls:          config.VerifyTls,
-		Timeout:            config.Timeout,
-		RequestMethod:      common.RequestMethodStandard,
-		HeadlessConfig:     nil,
-		BrowserbaseConfig:  nil,
-		BrowserbaseSecrets: nil,
+
+	// Extract resource type and module from template metadata
+	var resourceTypeMetadata discover.ApplicationResourceType
+	var moduleNameFromMetadata string
+
+	// Parse metadata from the Nuclei finding if available
+	if nucleiAttempt.Finding != nil && nucleiAttempt.Finding.Metadata != nil {
+		// Check for method-application-type in metadata
+		if appTypeStr, exists := nucleiAttempt.Finding.Metadata["method-application-type"]; exists {
+			if appType, err := discover.NewApplicationResourceTypeFromString(appTypeStr); err == nil {
+				resourceTypeMetadata = appType
+			}
+		}
+
+		// Check for method-module-name in metadata
+		if moduleStr, exists := nucleiAttempt.Finding.Metadata["method-module-name"]; exists {
+			moduleNameFromMetadata = strings.ToUpper(moduleStr)
+		}
 	}
+
+	// Create the simplified fingerprint attempt using the new Fern structure
+	attempt := &discover.ApplicationFingerprintAttempt{
+		ResourceType: resourceTypeMetadata,
+		Module:       moduleNameFromMetadata,
+		Finding:      true,
+		Request:      nucleiAttempt.HttpRequestResponse,
+	}
+
+	return attempt
 }
 
-// run executes the fingerprinting process for a given target and configuration.
-// Returns a slice of ApplicationFingerprintAttempt and a slice of error messages.
-func run(ctx context.Context, target string, config *discover.DiscoverApplicationConfig, filteredFingerprints *discover.ApplicationResource) ([]*discover.ApplicationFingerprintAttempt, []string) {
-	if config == nil || filteredFingerprints == nil || len(filteredFingerprints.Modules) == 0 {
-		return []*discover.ApplicationFingerprintAttempt{}, []string{"invalid config: no resource types found"}
-	}
+// createDiscoverApplicationNucleiConfig builds the Nuclei config for application discovery
+func createDiscoverApplicationNucleiConfig(ctx context.Context, config *discover.DiscoverApplicationConfig) (nuclei.NucleiConfig, error) {
+	log := svc1log.FromContext(ctx)
 
-	// Get the resource type from the filtered config (could be a specific type or 'ALL')
-	resourceType := filteredFingerprints
-	if len(resourceType.Modules) == 0 {
-		return []*discover.ApplicationFingerprintAttempt{}, []string{"invalid config: no modules found for resource type"}
-	}
-
-	baseURL, parsedTargetPath, queryParams, err := requesthelpers.SplitTargetURL(target)
+	// Get template paths based on resource type, modules, and request methods
+	templatePaths, err := getTemplatePaths(config.ResourceType)
 	if err != nil {
-		return []*discover.ApplicationFingerprintAttempt{}, []string{err.Error()}
+		log.Error("Failed to get template paths", svc1log.SafeParam("error", err.Error()))
+		return nuclei.NucleiConfig{}, err
 	}
 
-	var attempts []*discover.ApplicationFingerprintAttempt
-	var errors []string
-	var mu sync.Mutex
-	var wg sync.WaitGroup
+	log.Info("Built Nuclei config for application discovery",
+		svc1log.SafeParam("templatePaths", templatePaths),
+		svc1log.SafeParam("targets", config.Targets),
+		svc1log.SafeParam("timeout", config.Timeout),
+		svc1log.SafeParam("threads", config.Threads))
 
-	// Process each module concurrently
-	for _, module := range resourceType.Modules {
-		wg.Add(1)
-		go func(module *discover.ApplicationFingerprintModule) {
-			defer wg.Done()
-
-			attempt := &discover.ApplicationFingerprintAttempt{
-				Name:    module.Name,
-				Finding: false,
-			}
-
-			var allRequests []*common.HttpRequestResponse
-			for _, path := range module.Paths {
-				// Check for context cancellation
-				select {
-				case <-ctx.Done():
-					mu.Lock()
-					errors = append(errors, "context cancelled")
-					mu.Unlock()
-					return
-				default:
-				}
-
-				// Request Configuration
-				fullPath := parsedTargetPath + path
-				var method = module.Method
-
-				var requestParams common.HttpRequestParams
-				if module.RequestParams != nil {
-					requestParams = *module.RequestParams
-				}
-				// Always set query parameters if they exist
-				if queryParams != nil {
-					requestParams.Query = queryParams
-				}
-
-				// set request config
-				requestConfig := createSendHTTPRequestConfig(baseURL, fullPath, method, requestParams, config)
-
-				// send request
-				request, err := request.SendRequest(ctx, requestConfig)
-				if err != nil {
-					mu.Lock()
-					errors = append(errors, err.Error())
-					mu.Unlock()
-					continue
-				}
-				allRequests = append(allRequests, request)
-
-				if AnalyzeResponse(request, module) {
-					attempt.Finding = true
-					attempt.Fingerprints = []*discover.ApplicationResource{
-						{
-							Name:    resourceType.Name,
-							Modules: []*discover.ApplicationFingerprintModule{module},
-						},
-					}
-					// Only include the successful request in the results
-					attempt.Requests = []*common.HttpRequestResponse{request}
-					mu.Lock()
-					attempts = append(attempts, attempt)
-					mu.Unlock()
-					return
-				}
-			}
-
-			// For unsuccessful attempts, include all requests made
-			if !attempt.Finding {
-				attempt.Requests = allRequests
-				mu.Lock()
-				attempts = append(attempts, attempt)
-				mu.Unlock()
-			}
-		}(module)
-	}
-
-	wg.Wait()
-	return attempts, errors
-}
-
-// AnalyzeResponse checks if the HTTP response matches the fingerprint module's indicators.
-// Returns true if a match is found, false otherwise.
-func AnalyzeResponse(httpRequestResponse *common.HttpRequestResponse, module *discover.ApplicationFingerprintModule) bool {
-	// Check if response is nil
-	if httpRequestResponse == nil || httpRequestResponse.Response == nil || httpRequestResponse.Response.StatusCode == nil {
-		return false
-	}
-
-	response := httpRequestResponse.Response
-
-	// Analysis Response Headers
-	headerIndicators := module.HeaderIndicators
-	if response.ResponseHeaders != nil && headerIndicators != nil {
-		// Loop through response headers
-		for responseHeader, responseHeaderValue := range response.ResponseHeaders {
-			// Loop through header indicators
-			for headerIndicator, headerIndicatorValues := range headerIndicators {
-				if strings.EqualFold(responseHeader, headerIndicator) {
-					if len(headerIndicatorValues) == 0 {
-						return true // If empty array, the header presence alone is an indicator
-					}
-					// Loop through header values
-					for _, headerIndicatorValue := range headerIndicatorValues {
-						// Check each header value in the array
-						for _, headerValue := range responseHeaderValue {
-							if strings.Contains(strings.ToLower(headerValue), strings.ToLower(headerIndicatorValue)) {
-								return true
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-
-	// Analysis Response Body
-	bodyIndicators := module.BodyIndicators
-	if response.ResponseBody != nil && bodyIndicators != nil {
-		bodyString := requesthelpers.GetResponseBodyStringFromBodyStruct(response.ResponseBody)
-		if bodyString != nil {
-			lowerBody := strings.ToLower(*bodyString)
-			for _, indicator := range bodyIndicators {
-				if strings.Contains(lowerBody, indicator) {
-					return true
-				}
-			}
-		}
-	}
-
-	return false
+	return nuclei.NucleiConfig{
+		Targets:       config.Targets,
+		TemplatePaths: templatePaths,
+		RunMode:       nuclei.NucleiRunModeScan,
+		Timeout:       config.Timeout,
+		Threads:       config.Threads,
+		Proxy:         config.Proxy,
+		VerboseLogs:   config.VerboseLogs,
+	}, nil
 }
 
 // LaunchFingerprintEngine runs the fingerprinting engine for all targets in the config and returns a report.
-func LaunchFingerprintEngine(ctx context.Context, config *discover.DiscoverApplicationConfig, filteredFingerprints *discover.ApplicationFingerprints) (*discover.DiscoverApplicationReport, error) {
+func LaunchFingerprintEngine(ctx context.Context, config *discover.DiscoverApplicationConfig) (*discover.DiscoverApplicationReport, error) {
+	log := svc1log.FromContext(ctx)
 	report := discover.DiscoverApplicationReport{Config: config}
 
-	// Determine number of concurrent goroutines
-	maxThreads := config.Threads
-	if maxThreads == 0 {
-		maxThreads = runtime.NumCPU()
+	log.Info("Starting application fingerprinting engine",
+		svc1log.SafeParam("targets", config.Targets),
+		svc1log.SafeParam("resourceType", config.ResourceType),
+		svc1log.SafeParam("modules", config.Modules))
+
+	// Create the nuclei config
+	nucleiConfig, err := createDiscoverApplicationNucleiConfig(ctx, config)
+	if err != nil {
+		log.Error("Failed to create Nuclei config", svc1log.SafeParam("error", err.Error()))
+		return &report, err
 	}
 
-	// Create a semaphore to limit concurrent goroutines
-	semaphore := make(chan struct{}, maxThreads)
-
-	var targets []*discover.ApplicationFingerprintTarget
-	var errors []string
-	var mu sync.Mutex
-	var wg sync.WaitGroup
-
-	// Process each target concurrently with thread limiting
-	for _, target := range config.Targets {
-		wg.Add(1)
-
-		// Acquire semaphore (blocks if maxThreads are running)
-		semaphore <- struct{}{}
-
-		go func(target string) {
-			defer wg.Done()
-			defer func() { <-semaphore }() // Release semaphore when done
-
-			// Check for context cancellation
-			select {
-			case <-ctx.Done():
-				mu.Lock()
-				errors = append(errors, "context cancelled")
-				mu.Unlock()
-				return
-			default:
-			}
-
-			var attempts []*discover.ApplicationFingerprintAttempt
-			var targetErrors []string
-			var targetMu sync.Mutex
-			var targetWg sync.WaitGroup
-
-			// Process each resource type concurrently for this target
-			for _, resourceType := range filteredFingerprints.Fingerprints {
-				targetWg.Add(1)
-				go func(resourceType *discover.ApplicationResource) {
-					defer targetWg.Done()
-
-					attempt, errs := run(ctx, target, config, resourceType)
-
-					targetMu.Lock()
-					attempts = append(attempts, attempt...)
-					targetErrors = append(targetErrors, errs...)
-					targetMu.Unlock()
-				}(resourceType)
-			}
-
-			targetWg.Wait()
-
-			// Filter to only include positive findings
-			filteredAttempts := []*discover.ApplicationFingerprintAttempt{}
-			for _, attempt := range attempts {
-				if attempt.Finding {
-					filteredAttempts = append(filteredAttempts, attempt)
-				}
-			}
-
-			// Only include targets that have positive findings (non-empty attempts list)
-			if len(filteredAttempts) > 0 {
-				targetResult := discover.ApplicationFingerprintTarget{
-					Target:   target,
-					Attempts: filteredAttempts,
-				}
-				mu.Lock()
-				targets = append(targets, &targetResult)
-				mu.Unlock()
-			}
-
-			// Add any errors from this target
-			if len(targetErrors) > 0 {
-				mu.Lock()
-				errors = append(errors, targetErrors...)
-				mu.Unlock()
-			}
-		}(target)
+	log.Info("Running Nuclei engine for application discovery")
+	// Run the nuclei engine
+	nucleiReport, err := nucleiutils.RunNucleiEngine(ctx, nucleiConfig)
+	if err != nil {
+		log.Error("Nuclei engine execution failed", svc1log.SafeParam("error", err.Error()))
+		return &report, err
 	}
 
-	wg.Wait()
+	// Process the nuclei results and convert to application fingerprint format
+	targets := []*discover.ApplicationFingerprintTarget{}
+	errors := []string{}
+
+	for _, nucleiTarget := range nucleiReport {
+		// Only process targets that have successful findings from Nuclei
+		if len(nucleiTarget.Attempts) == 0 {
+			continue
+		}
+
+		// Create application fingerprint target
+		fingerprintTarget := &discover.ApplicationFingerprintTarget{
+			Target:   nucleiTarget.Target,
+			Attempts: []*discover.ApplicationFingerprintAttempt{},
+		}
+
+		// Track seen template IDs to avoid duplicates
+		seenTemplateIds := make(map[string]bool)
+
+		// Process each nuclei attempt (these are already successful matches from Nuclei)
+		for _, nucleiAttempt := range nucleiTarget.Attempts {
+			// Only process attempts that have actual findings and haven't been seen before
+			if nucleiAttempt.Finding != nil && !seenTemplateIds[nucleiAttempt.TemplateId] {
+				// Mark this template as seen
+				seenTemplateIds[nucleiAttempt.TemplateId] = true
+
+				// Convert nuclei attempt to application fingerprint attempt
+				attempt := convertNucleiAttemptToFingerprintAttemptStruct(nucleiAttempt)
+				if attempt != nil {
+					fingerprintTarget.Attempts = append(fingerprintTarget.Attempts, attempt)
+				}
+			}
+		}
+
+		// Only include targets with successful findings
+		if len(fingerprintTarget.Attempts) > 0 {
+			targets = append(targets, fingerprintTarget)
+		}
+	}
 
 	// Marshal Report
 	report.Result = &discover.DiscoverApplicationResult{Targets: targets}

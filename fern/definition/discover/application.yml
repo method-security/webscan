@@ -12,7 +12,6 @@ types:
       - CLOUD_BUCKET
       - CONTENT_MANAGEMENT_SYSTEM
       - KUBE
-      - FRAMEWORK
       - REMOTE_ACCESS
       - WEB_SERVER
   ApplicationResourceConfigType:
@@ -26,32 +25,17 @@ types:
       targets: list<string>
       resourceType: ApplicationResourceConfigType
       modules: optional<list<string>>
-      maxRedirects: integer
-      verifyTls: boolean
       timeout: integer
       threads: integer
-  # Application Fingerprints File Struct
-  ApplicationFingerprintModule:
-    properties:
-      name: string
-      method: http.HttpMethod
-      paths: list<string>
-      requestParams: optional<http.HttpRequestParams>
-      headerIndicators: optional<map<string, optional<list<string>>>>
-      bodyIndicators: optional<list<string>>
-  ApplicationResource:
-    properties:
-      name: ApplicationResourceConfigType
-      modules: list<ApplicationFingerprintModule>
-  ApplicationFingerprints:
-    properties:
-      fingerprints: list<ApplicationResource>
+      proxy: optional<string>
+      verboseLogs: boolean
+  # Application Fingerprint Attempt Struct
   ApplicationFingerprintAttempt:
     properties:
-      name: string
-      requests: optional<list<http.HttpRequestResponse>>
+      resourceType: ApplicationResourceType
+      module: string
+      request: http.HttpRequestResponse
       finding: boolean
-      fingerprints: optional<list<ApplicationResource>>
   ApplicationFingerprintTarget:
     properties:
       target: string

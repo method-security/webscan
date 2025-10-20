@@ -1,0 +1,41 @@
+id: cisco-anyconnect-detect
+info:
+  name: Cisco AnyConnect VPN Detection
+  author: method-security
+  severity: info
+  description: Detects Cisco AnyConnect VPN installations by analyzing response headers,
+    body content, and common paths
+  reference: https://www.cisco.com/c/en/us/products/security/anyconnect-secure-mobility-client/index.html
+  metadata:
+    method-application-type: REMOTE_ACCESS
+    method-module-name: CISCO_ANYCONNECT
+  tags: tech,cisco,anyconnect,vpn,remote-access
+http:
+- method: GET
+  path:
+  - '{{BaseURL}}'
+  - '{{BaseURL}}/+webvpn+/index.html'
+  stop-at-first-match: true
+  matchers-condition: or
+  matchers:
+  - type: word
+    part: header
+    words:
+    - anyconnect
+    - 'server: cisco-asa'
+    - 'x-frame-options: cisco'
+    - 'x-powered-by: cisco'
+    case-insensitive: true
+  - type: word
+    part: body
+    words:
+    - cisco anyconnect
+    - csco_webvpn_
+    case-insensitive: true
+  - type: regex
+    part: body
+    regex:
+    - (?i)cisco.*?anyconnect.*?[0-9]+\.[0-9]+\.[0-9]+
+    - (?i)cisco.*?asa.*?[0-9]+\.[0-9]+\.[0-9]+
+    - (?i)\+CSCOE\+.*?\.html
+    - (?i)\+CSCOT\+.*?\.(css|js|html)

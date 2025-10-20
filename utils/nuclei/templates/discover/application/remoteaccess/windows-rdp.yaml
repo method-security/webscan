@@ -13,8 +13,6 @@ http:
 - method: GET
   path:
   - '{{BaseURL}}'
-  - '{{BaseURL}}/RDWeb/'
-  - '{{BaseURL}}/RDWeb/Pages/en-US/login.aspx'
   - '{{BaseURL}}/RemoteDesktop/'
   - '{{BaseURL}}/rpc/rpcproxy.dll'
   - '{{BaseURL}}/ts/'
@@ -25,17 +23,10 @@ http:
   - type: word
     part: header
     words:
-    - 'server: microsoft-httpapi'
-    - 'server: microsoft-iis'
-    - 'x-powered-by: asp.net'
-    case-insensitive: true
+      - "X-RDWeb"
+      - "X-Ms-Rdsh-Auth"
   - type: regex
     part: body
     regex:
-    - (?i)remote.*?desktop.*(gateway|services|web|access)
-    - (?i)rdp.*?gateway
-    - (?i)terminal.*?services.*?gateway
-    - (?i)rd.*?(gateway|web).*?access
-    - (?i)rds.*?(gateway|web)
-    - (?i)/RDWeb/.*?\.aspx
-    - (?i)microsoft.*?remote.*?desktop
+      - (?i)<form.*id=.*(loginForm|logonForm)
+      - (?i)RDWeb.*login\.aspx

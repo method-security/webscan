@@ -14,14 +14,12 @@ http:
 - method: GET
   path:
   - '{{BaseURL}}'
-  - '{{BaseURL}}/jetty/'
   - '{{BaseURL}}/stats'
   - '{{BaseURL}}/dump'
   - '{{BaseURL}}/jmx'
   - '{{BaseURL}}/jolokia/'
   - '{{BaseURL}}/admin/'
   - '{{BaseURL}}/status/'
-  - '{{BaseURL}}/jetty-dir.css'
   stop-at-first-match: true
   matchers-condition: or
   matchers:

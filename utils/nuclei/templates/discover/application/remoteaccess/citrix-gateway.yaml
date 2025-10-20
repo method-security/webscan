@@ -15,8 +15,8 @@ http:
   path:
   - '{{BaseURL}}'
   - '{{BaseURL}}/vpn/index.html'
-  - '{{BaseURL}}/citrix/xenapp/'
-  - '{{BaseURL}}/Citrix/XenDesktop/'
+  - '{{BaseURL}}/xenapp/'
+  - '{{BaseURL}}/XenDesktop/'
   - '{{BaseURL}}/vpns/'
   - '{{BaseURL}}/logon/LogonPoint/index.html'
   stop-at-first-match: true

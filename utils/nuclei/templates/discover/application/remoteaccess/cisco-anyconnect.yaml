@@ -14,13 +14,7 @@ http:
 - method: GET
   path:
   - '{{BaseURL}}'
-  - '{{BaseURL}}/+CSCOE+/logon.html'
-  - '{{BaseURL}}/+CSCOT+/translation-table'
   - '{{BaseURL}}/+webvpn+/index.html'
-  - '{{BaseURL}}/+CSCOE+/welcome.html'
-  - '{{BaseURL}}/+CSCOT+/customization.css'
-  - '{{BaseURL}}/+CSCOE+/portal_inc.lua'
-  - '{{BaseURL}}/+CSCOE+/session_password.html'
   stop-at-first-match: true
   matchers-condition: or
   matchers:

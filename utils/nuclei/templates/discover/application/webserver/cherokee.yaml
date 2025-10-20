@@ -14,11 +14,8 @@ http:
 - method: GET
   path:
   - '{{BaseURL}}'
-  - '{{BaseURL}}/cherokee_themes/'
-  - '{{BaseURL}}/cherokee-admin/'
   - '{{BaseURL}}/server-status'
   - '{{BaseURL}}/server-info'
-  - '{{BaseURL}}/cherokee/'
   - '{{BaseURL}}/admin/'
   stop-at-first-match: true
   matchers-condition: or
@@ -39,4 +36,3 @@ http:
     - (?i)powered.*?by.*?cherokee
     - (?i)cherokee.*?admin
     - (?i)cherokee.*?configuration
-    condition: or

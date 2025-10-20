@@ -21,7 +21,6 @@ http:
   - '{{BaseURL}}/examples/'
   - '{{BaseURL}}/server-status'
   - '{{BaseURL}}/server-info'
-  - '{{BaseURL}}/tomcat.css'
   - '{{BaseURL}}/favicon.ico'
   stop-at-first-match: true
   matchers-condition: or

@@ -1,0 +1,59 @@
+id: vmware-vsphere-detect
+
+info:
+  name: VMware vSphere Detect
+  author: method-security
+  severity: info
+  classification:
+    cpe: cpe:2.3:a:vmware:vcenter_server:*:*:*:*:*:*:*:*
+  metadata:
+    verified: true
+    vendor: vmware
+    product: vcenter_server
+    shodan-query:
+      - product:"VMware vCenter Server"
+      - "VMware vSphere"
+      - html:"vsphere-client"
+      - html:"ID_VC_Welcome"
+    category: virtual-compute-application
+    method-application-type: VIRTUAL_COMPUTE
+    method-module-name: VMWARE_VSPHERE
+  tags:
+    - tech
+    - vmware
+    - vsphere
+    - vcenter
+    - virtual-compute
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/vsphere-client/"
+      - "{{BaseURL}}/ui/"
+      - "{{BaseURL}}/folder"
+      - "{{BaseURL}}/mob/"
+    redirects: true
+    max-redirects: 3
+    stop-at-first-match: true
+    matchers-condition: or
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "VMware vSphere"
+          - "VMware vCenter Server"
+          - "ID_VC_Welcome"
+          - "VMware VirtualCenter"
+        case-insensitive: true
+      - type: word
+        part: header
+        words:
+          - "VMware vCenter Server"
+        case-insensitive: true
+      - type: regex
+        part: body
+        regex:
+          - '(?i)VMware\s+vSphere\s+\d+'
+          - '(?i)alt="VMware vSphere'
+          - '(?i)ID_LogInFlexClient'
+          - '(?i)BrowseVCDatacenters'

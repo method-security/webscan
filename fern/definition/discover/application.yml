@@ -11,8 +11,10 @@ types:
       - CI_CD_PLATFORM
       - CLOUD_BUCKET
       - CONTENT_MANAGEMENT_SYSTEM
+      - HYPERVISOR
       - KUBE
       - VDI_APPLICATION
+      - VIRTUAL_COMPUTE
       - WEB_SERVER
   ApplicationResourceConfigType:
     discriminated: false

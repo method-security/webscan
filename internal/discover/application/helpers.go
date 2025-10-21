@@ -16,8 +16,10 @@ func getTemplatePaths(resourceConfigType *discover.ApplicationResourceConfigType
 		discover.ApplicationResourceTypeCiCdPlatform,
 		discover.ApplicationResourceTypeCloudBucket,
 		discover.ApplicationResourceTypeContentManagementSystem,
+		discover.ApplicationResourceTypeHypervisor,
 		discover.ApplicationResourceTypeKube,
 		discover.ApplicationResourceTypeVdiApplication,
+		discover.ApplicationResourceTypeVirtualCompute,
 		discover.ApplicationResourceTypeWebServer,
 	}
 
@@ -27,8 +29,10 @@ func getTemplatePaths(resourceConfigType *discover.ApplicationResourceConfigType
 		discover.ApplicationResourceTypeCiCdPlatform:            "cicd",
 		discover.ApplicationResourceTypeCloudBucket:             "cloud",
 		discover.ApplicationResourceTypeContentManagementSystem: "cms",
+		discover.ApplicationResourceTypeHypervisor:              "hypervisor",
 		discover.ApplicationResourceTypeKube:                    "kube",
 		discover.ApplicationResourceTypeVdiApplication:          "vdiapplication",
+		discover.ApplicationResourceTypeVirtualCompute: "virutalcompute",
 		discover.ApplicationResourceTypeWebServer:               "webserver",
 	}
 

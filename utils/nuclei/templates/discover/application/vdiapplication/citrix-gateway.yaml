@@ -19,26 +19,29 @@ http:
   - '{{BaseURL}}/XenDesktop/'
   - '{{BaseURL}}/vpns/'
   - '{{BaseURL}}/logon/LogonPoint/index.html'
+  redirects: true
+  max-redirects: 5
   stop-at-first-match: true
   matchers-condition: or
   matchers:
-  - type: word
-    part: header
-    words:
-    - 'server: netscaler'
-    case-insensitive: true
-  - type: word
-    part: body
-    words:
-    - citrix gateway
-    - netscaler gateway
-    case-insensitive: true
-  - type: regex
-    part: body
-    regex:
-    - (?i)citrix.*?gateway.*?[0-9]+\.[0-9]+\.[0-9]+
-    - (?i)netscaler.*?[0-9]+\.[0-9]+\.[0-9]+
-    - (?i)logonpoint.*?index\.html
-    - (?i)vpns/portal.*?scripts
-    - (?i)NSGateway.*?[0-9]+\.[0-9]+
-    - (?i)ctxs_.*?[a-zA-Z0-9]{8,}
+    - type: word
+      part: header
+      words:
+        - "server: netscaler"
+        - "X-Citrix"
+      case-insensitive: true
+
+    - type: word
+      part: body
+      words:
+        - "Citrix Gateway"
+        - "NetScaler Gateway"
+      case-insensitive: true
+
+    - type: regex
+      part: body
+      regex:
+        - (?i)\bCitrix\s+(Access|NetScaler|ADC)?\s*Gateway\b
+        - (?i)\bNetScaler\s+(Access|ADC)?\s*Gateway\b
+        - (?i)\bNSGateway\b
+      condition: or

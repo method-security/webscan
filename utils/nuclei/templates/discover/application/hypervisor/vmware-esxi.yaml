@@ -10,11 +10,6 @@ info:
     verified: true
     vendor: vmware
     product: esxi
-    shodan-query:
-      - product:"VMware ESXi"
-      - "VMware ESXi"
-      - html:"VMware Host Client"
-      - html:"esxui"
     category: hypervisor
     method-application-type: HYPERVISOR
     method-module-name: VMWARE_ESXI

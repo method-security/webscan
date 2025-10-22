@@ -3,41 +3,38 @@ info:
   name: LiteSpeed Web Server Detection
   author: method-security
   severity: info
-  description: Detects LiteSpeed Web Server installations by analyzing response headers,
-    body content, and common paths
-  reference: https://www.litespeedtech.com/
+  description: Detects LiteSpeed Web Server installations by analyzing response headers, body content, and common paths
   metadata:
-    method-application-type: WEB_SERVER
+    method-application-type: WEBSERVER
     method-module-name: LITESPEED
-  tags: tech,litespeed,webserver,lsws
+  tags: discovery,litespeed,webserver
 http:
-- method: GET
-  path:
-  - '{{BaseURL}}'
-  - '{{BaseURL}}/lsws/'
-  - '{{BaseURL}}/lsws-admin/'
-  - '{{BaseURL}}/phpinfo.php'
-  - '{{BaseURL}}/server-status'
-  - '{{BaseURL}}/server-info'
-  - '{{BaseURL}}/docs/'
-  - '{{BaseURL}}/manual/'
-  stop-at-first-match: true
-  matchers-condition: or
-  matchers:
-  - type: word
-    part: header
-    words:
-    - 'server: litespeed'
-    - 'server: lsws'
-    - x-lsws-server
-    - 'x-powered-by: litespeed'
-    case-insensitive: true
-  - type: regex
-    part: body
-    regex:
-    - (?i)litespeed.*?web.*?server.*?[0-9]+\.[0-9]+\.[0-9]+
-    - (?i)litespeed.*?[0-9]+\.[0-9]+\.[0-9]+
-    - (?i)lsws.*?[0-9]+\.[0-9]+\.[0-9]+
-    - (?i)openlitespeed.*?[0-9]+\.[0-9]+
-    - (?i)powered.*?by.*?litespeed
-    - (?i)litespeed.*?(enterprise|cache|admin)
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/phpinfo.php"
+      - "{{BaseURL}}/server-status"
+      - "{{BaseURL}}/server-info"
+      - "{{BaseURL}}/docs/"
+      - "{{BaseURL}}/manual/"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: word
+        part: header
+        words:
+          - "server: litespeed"
+          - "server: lsws"
+          - "x-lsws-server"
+          - "x-powered-by: litespeed"
+        case-insensitive: true
+      - type: regex
+        part: body
+        regex:
+          - "(?i)litespeed.*?web.*?server.*?[0-9]+\\.[0-9]+\\.[0-9]+"
+          - "(?i)litespeed.*?[0-9]+\\.[0-9]+\\.[0-9]+"
+          - "(?i)lsws.*?[0-9]+\\.[0-9]+\\.[0-9]+"
+          - "(?i)openlitespeed.*?[0-9]+\\.[0-9]+"
+          - "(?i)powered.*?by.*?litespeed"
+          - "(?i)litespeed.*?(enterprise|cache|admin)"

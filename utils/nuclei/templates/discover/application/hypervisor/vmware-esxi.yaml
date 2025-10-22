@@ -3,22 +3,11 @@ info:
   name: VMware ESXi Detection
   author: method-security
   severity: info
-  description: Detects VMware ESXi web interfaces (including UI and MOB endpoints).
-  classification:
-    cpe: cpe:2.3:o:vmware:esxi:*:*:*:*:*:*:*:*
+  description: Detects VMware ESXi web interfaces (including UI and MOB endpoints)
   metadata:
-    verified: true
-    vendor: vmware
-    product: esxi
-    category: hypervisor
     method-application-type: HYPERVISOR
     method-module-name: VMWARE_ESXI
-  tags:
-    - tech
-    - vmware
-    - esxi
-    - hypervisor
-    - virtualization
+  tags: discovery,vmware,esxi,hypervisor
 http:
   - method: GET
     path:
@@ -28,9 +17,8 @@ http:
       - "{{BaseURL}}/folder"
       - "{{BaseURL}}/folder?dcPath=ha-datacenter"
     redirects: true
-    max-redirects: 3
+    max-redirects: 5
     stop-at-first-match: true
-    matchers-condition: or
     matchers:
       - type: word
         part: body

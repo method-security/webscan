@@ -1,24 +1,23 @@
 id: microsoft-iis-version
 info:
   name: Microsoft IIS version detect
-  author: Wlayzz # updated by method.security
+  author: method-security
   severity: info
-  description: Some Microsoft IIS servers have the version on the response header.
-    Useful when you need to find specific CVEs on your targets.
+  description: Detects Microsoft IIS web servers by analyzing response headers
   metadata:
-    method-application-type: WEB_SERVER
+    method-application-type: WEBSERVER
     method-module-name: IIS
-  tags: tech,microsoft,iis
+  tags: discovery,microsoft,iis,webserver
 http:
-- method: GET
-  path:
-  - '{{BaseURL}}'
-  host-redirects: true
-  max-redirects: 4
-  matchers-condition: and
-  matchers:
-  - type: word
-    part: header
-    words:
-    - iis
-    case-insensitive: true
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: word
+        part: header
+        words:
+          - "iis"
+        case-insensitive: true

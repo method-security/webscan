@@ -4,29 +4,30 @@ info:
   author: method-security
   severity: info
   description: Detects Windows RDP Gateway and Remote Desktop Web Access installations
-  reference: https://docs.microsoft.com/en-us/windows-server/remote/remote-desktop-services/
   metadata:
     method-application-type: VDI_APPLICATION
     method-module-name: WINDOWS_RDP
-  tags: tech,microsoft,rdp,remote-access,windows,rds
+  tags: discovery,microsoft,rdp,vdi
 http:
-- method: GET
-  path:
-  - '{{BaseURL}}'
-  - '{{BaseURL}}/RemoteDesktop/'
-  - '{{BaseURL}}/rpc/rpcproxy.dll'
-  - '{{BaseURL}}/ts/'
-  - '{{BaseURL}}/tsweb/'
-  stop-at-first-match: true
-  matchers-condition: or
-  matchers:
-  - type: word
-    part: header
-    words:
-      - "X-RDWeb"
-      - "X-Ms-Rdsh-Auth"
-  - type: regex
-    part: body
-    regex:
-      - (?i)<form.*id=.*(loginForm|logonForm)
-      - (?i)RDWeb.*login\.aspx
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/RemoteDesktop/"
+      - "{{BaseURL}}/rpc/rpcproxy.dll"
+      - "{{BaseURL}}/ts/"
+      - "{{BaseURL}}/tsweb/"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: word
+        part: header
+        words:
+          - "X-RDWeb"
+          - "X-Ms-Rdsh-Auth"
+        case-insensitive: true
+      - type: regex
+        part: body
+        regex:
+          - "(?i)<form.*id=.*(loginForm|logonForm)"
+          - "(?i)RDWeb.*login\\.aspx"

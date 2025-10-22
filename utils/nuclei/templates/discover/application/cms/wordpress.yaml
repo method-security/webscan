@@ -1,28 +1,13 @@
 id: wordpress-detect
-
 info:
   name: WordPress Detect
-  author: pdteam,daffainfo,ricardomaia,topscoder,AdamCrosser,method-security
+  author: method-security
   severity: info
-  classification:
-    cpe: cpe:2.3:a:wordpress:wordpress:*:*:*:*:*:*:*:*
+  description: Detects WordPress CMS installations by analyzing response headers and content patterns
   metadata:
-    verified: true
-    vendor: wordpress
-    product: wordpress
-    shodan-query:
-      - http.component:"WordPress"
-      - http.component:"wordpress"
-      - cpe:"cpe:2.3:a:wordpress:wordpress"
-    category: cms
-    method-application-type: CONTENT_MANAGEMENT_SYSTEM
+    method-application-type: CMS
     method-module-name: WORDPRESS
-  tags:
-    - tech
-    - wordpress
-    - cms
-    - wp
-
+  tags: discovery,wordpress,cms
 http:
   - method: GET
     path:
@@ -31,29 +16,32 @@ http:
       - "{{BaseURL}}/feed/"
       - "{{BaseURL}}/?feed=rss2"
     redirects: true
-    max-redirects: 2
+    max-redirects: 5
     stop-at-first-match: true
-    matchers-condition: or
     matchers:
-      - type: regex
+      - type: word
         part: header
-        regex:
-          - '(?i)x-powered-by:\s*wordpress'
-          - '(?i)link:\s*<https?:\/\/.*\/wp-json\/>'
-          - '(?i)x-redirect-by:\s*WordPress'
+        words:
+          - "wp engine"
+          - "wordpress"
+          - "xmlrpc.php"
+        case-insensitive: true
+      - type: word
+        part: header
+        words:
+          - "wp-json"
+          - "wp engine"
+          - "wordpress"
+        case-insensitive: true
       - type: word
         part: body
         words:
-          - wp-content
-          - wp-includes
-          - wp-login.php
-          - xmlrpc.php
-          - wp-json
+          - "\"generator\" content=\"wordpress"
+          - "/wp-admin/load-scripts.php"
+          - "/wp-admin/admin-ajax.php"
+          - "id=\"wp-admin-bar"
+          - "wp-emoji-release.min.js"
+          - "/wp-json/"
+          - "var wpApiSettings ="
+          - "window._wpemojisettings"
         case-insensitive: true
-      - type: regex
-        part: body
-        regex:
-          - '(?i)<generator>.*wordpress\.org.*</generator>'
-          - '(?i)<!--[^>]*(Yoast|WP-Super-Cache)[^>]*-->'
-          - '/wp-content/uploads/'
-          - '(?i)yoast\.com/wordpress/plugins/seo'

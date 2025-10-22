@@ -3,39 +3,35 @@ info:
   name: Yaws Web Server Detection
   author: method-security
   severity: info
-  description: Detects Yaws Web Server installations by analyzing response headers,
-    body content, and common paths
-  reference: http://yaws.hyber.org/
+  description: Detects Yaws Web Server installations by analyzing response headers, body content, and common paths
   metadata:
-    method-application-type: WEB_SERVER
+    method-application-type: WEBSERVER
     method-module-name: YAWS
-  tags: tech,yaws,webserver,erlang
+  tags: discovery,yaws,webserver
 http:
-- method: GET
-  path:
-  - '{{BaseURL}}'
-  - '{{BaseURL}}/stats'
-  - '{{BaseURL}}/status'
-  - '{{BaseURL}}/yaws/'
-  - '{{BaseURL}}/server-status'
-  - '{{BaseURL}}/server-info'
-  - '{{BaseURL}}/doc/'
-  stop-at-first-match: true
-  matchers-condition: or
-  matchers:
-  - type: word
-    part: header
-    words:
-    - 'server: yaws'
-    - 'x-powered-by: yaws'
-    - 'x-served-by: yaws'
-    case-insensitive: true
-  - type: regex
-    part: body
-    regex:
-    - (?i)yaws.*?web.*?server.*?[0-9]+\.[0-9]+\.[0-9]+
-    - (?i)yaws.*?[0-9]+\.[0-9]+\.[0-9]+
-    - (?i)yaws.*?http.*?server
-    - (?i)yet.*?another.*?web.*?server
-    - (?i)powered.*?by.*?yaws
-    - (?i)erlang.*?yaws
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/stats"
+      - "{{BaseURL}}/status"
+      - "{{BaseURL}}/server-status"
+      - "{{BaseURL}}/server-info"
+      - "{{BaseURL}}/doc/"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: word
+        part: header
+        words:
+          - "server: yaws"
+          - "x-powered-by: yaws"
+          - "x-served-by: yaws"
+        case-insensitive: true
+      - type: regex
+        part: body
+        regex:
+          - "(?i)yaws.*?web.*?server.*?[0-9]+\\.[0-9]+\\.[0-9]+"
+          - "(?i)yet.*?another.*?web.*?server"
+          - "(?i)powered.*?by.*?yaws"
+          - "(?i)erlang.*?yaws"

@@ -5,24 +5,25 @@ info:
   severity: info
   description: Detects AWS S3 bucket endpoints
   metadata:
-    method-application-type: CLOUD_BUCKET # Added by method-security
-    method-module-name: AWSS3 # Added by method-security
-  tags: discovery,aws,s3,cloud,bucket
+    method-application-type: CLOUD_BUCKET
+    method-module-name: AWSS3
+  tags: discovery,aws,s3,cloud
 http:
   - method: GET
     path:
       - "{{BaseURL}}"
+    redirects: true
+    max-redirects: 5
     stop-at-first-match: true
     matchers-condition: and
     matchers:
       - type: status
         status:
           - 200
+          - 403
       - type: word
         part: header
         words:
-          - "server: AmazonS3"
           - "x-amz-bucket-region"
+          - "Server: AmazonS3"
         case-insensitive: true
-
-

@@ -69,13 +69,14 @@ func createDiscoverApplicationNucleiConfig(ctx context.Context, config *discover
 		svc1log.SafeParam("threads", config.Threads))
 
 	return nuclei.NucleiConfig{
-		Targets:       config.Targets,
-		TemplatePaths: templatePaths,
-		RunMode:       nuclei.NucleiRunModeScan,
-		Timeout:       config.Timeout,
-		Threads:       config.Threads,
-		Proxy:         config.Proxy,
-		VerboseLogs:   config.VerboseLogs,
+		Targets:         config.Targets,
+		TemplatePaths:   templatePaths,
+		RunMode:         nuclei.NucleiRunModeScan,
+		Timeout:         config.Timeout,
+		Threads:         config.Threads,
+		Proxy:           config.Proxy,
+		VerboseLogs:     config.VerboseLogs,
+		GlobalRateLimit: config.GlobalRateLimit,
 	}, nil
 }
 

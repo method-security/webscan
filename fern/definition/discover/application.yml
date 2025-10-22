@@ -30,6 +30,7 @@ types:
       threads: integer
       proxy: optional<string>
       verboseLogs: boolean
+      globalRateLimit: integer
   # Application Fingerprint Attempt Struct
   ApplicationFingerprintAttempt:
     properties:

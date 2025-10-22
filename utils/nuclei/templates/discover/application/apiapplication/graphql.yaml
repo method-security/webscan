@@ -1,21 +1,13 @@
 id: graphql-detect
 info:
   name: GraphQL API Detection
-  author: method.security
+  author: method-security
   severity: info
-  description: |
-    Detects GraphQL endpoints by sending an introspection-style POST query to common
-    GraphQL paths and checking for typical GraphQL responses.
-  reference:
-    - https://graphql.org/learn/introspection/
-  classification:
-    cpe: cpe:2.3:a:graphql:graphql:*:*:*:*:*:*:*:*
+  description: Detects GraphQL endpoints by sending an introspection-style POST query to common GraphQL paths
   metadata:
     method-application-type: API_APPLICATION
     method-module-name: GRAPHQL
-    category: api
-    confidence: 90
-  tags: tech, graphql, api, introspection
+  tags: discovery,graphql,api
 http:
   - method: POST
     path:
@@ -38,10 +30,9 @@ http:
     headers:
       Content-Type: application/json
     body: '{"query": "{ __schema { queryType { name } } }"}'
-    stop-at-first-match: true
     redirects: true
-    max-redirects: 2
-    matchers-condition: or
+    max-redirects: 5
+    stop-at-first-match: true
     matchers:
       - type: word
         part: body
@@ -49,4 +40,4 @@ http:
           - "__schema"
           - "queryType"
         condition: and
-        name: graphql-introspection
+        case-insensitive: true

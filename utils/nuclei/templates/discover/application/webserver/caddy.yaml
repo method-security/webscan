@@ -3,40 +3,39 @@ info:
   name: Caddy Web Server Detection
   author: method-security
   severity: info
-  description: Detects Caddy Web Server installations by analyzing response headers,
-    body content, and common paths
-  reference: https://caddyserver.com/
+  description: Detects Caddy Web Server installations by analyzing response headers, body content, and common paths
   metadata:
-    method-application-type: WEB_SERVER
+    method-application-type: WEBSERVER
     method-module-name: CADDY
-  tags: tech,caddy,webserver,go,https
+  tags: discovery,caddy,webserver
 http:
-- method: GET
-  path:
-  - '{{BaseURL}}'
-  - '{{BaseURL}}/debug/vars'
-  - '{{BaseURL}}/metrics'
-  - '{{BaseURL}}/config/'
-  - '{{BaseURL}}/status'
-  - '{{BaseURL}}/health'
-  - '{{BaseURL}}/caddy/'
-  - '{{BaseURL}}/api/'
-  stop-at-first-match: true
-  matchers-condition: or
-  matchers:
-  - type: word
-    part: header
-    words:
-    - 'server: caddy'
-    - 'x-powered-by: caddy'
-    - 'x-served-by: caddy'
-    case-insensitive: true
-  - type: regex
-    part: body
-    regex:
-    - (?i)caddy.*?web.*?server.*?[0-9]+\.[0-9]+\.[0-9]+
-    - (?i)caddy.*?v[0-9]+\.[0-9]+
-    - (?i)caddy.*?server.*?[0-9]+\.[0-9]+
-    - (?i)powered.*?by.*?caddy
-    - (?i)caddyfile.*?config
-    - (?i)caddy.*?automatic.*?https
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/debug/vars"
+      - "{{BaseURL}}/metrics"
+      - "{{BaseURL}}/config/"
+      - "{{BaseURL}}/status"
+      - "{{BaseURL}}/health"
+      - "{{BaseURL}}/caddy/"
+      - "{{BaseURL}}/api/"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: word
+        part: header
+        words:
+          - "server: caddy"
+          - "x-powered-by: caddy"
+          - "x-served-by: caddy"
+        case-insensitive: true
+      - type: regex
+        part: body
+        regex:
+          - "(?i)caddy.*?web.*?server.*?[0-9]+\\.[0-9]+\\.[0-9]+"
+          - "(?i)caddy.*?v[0-9]+\\.[0-9]+"
+          - "(?i)caddy.*?server.*?[0-9]+\\.[0-9]+"
+          - "(?i)powered.*?by.*?caddy"
+          - "(?i)caddyfile.*?config"
+          - "(?i)caddy.*?automatic.*?https"

@@ -3,28 +3,32 @@ info:
   name: VMware Horizon Detection
   author: method-security
   severity: info
-  description: Detects VMware Horizon installations by analyzing response headers,
-    body content, and common paths
-  reference: https://www.vmware.com/products/horizon.html
+  description: Detects VMware Horizon installations by analyzing response headers, body content, and common paths
   metadata:
     method-application-type: VDI_APPLICATION
     method-module-name: VMWARE_HORIZON
-  tags: tech,vmware,horizon,vdi-application
+  tags: discovery,vmware,horizon,vdi
 http:
-- method: GET
-  path:
-  - '{{BaseURL}}'
-  - '{{BaseURL}}/portal/'
-  - '{{BaseURL}}/broker/'
-  - '{{BaseURL}}/admin/'
-  - '{{BaseURL}}/portal/webclient/index.html'
-  stop-at-first-match: true
-  matchers-condition: or
-  matchers:
-  - type: regex
-    part: body
-    regex:
-    - (?i)vmware.*?horizon
-    - (?i)horizon.*?view.*?[0-9]+\.[0-9]+
-    - (?i)horizon.*?(connection|workspace).*?server
-    - (?i)blast.*?secure.*?gateway
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/portal/"
+      - "{{BaseURL}}/broker/"
+      - "{{BaseURL}}/admin/"
+      - "{{BaseURL}}/portal/webclient/index.html"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "VMware Horizon"
+        case-insensitive: true
+      - type: regex
+        part: body
+        regex:
+          - "(?i)vmware.*?horizon"
+          - "(?i)horizon.*?view.*?[0-9]+\\.[0-9]+"
+          - "(?i)horizon.*?(connection|workspace).*?server"
+          - "(?i)blast.*?secure.*?gateway"

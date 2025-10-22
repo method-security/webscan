@@ -3,46 +3,45 @@ info:
   name: MODX CMS Detection
   author: method-security
   severity: info
-  description: Detects MODX CMS installations by analyzing response headers, body
-    content, and common paths
-  reference: https://modx.com/
+  description: Detects MODX CMS installations by analyzing response headers, body content, and common paths
   metadata:
-    method-application-type: CONTENT_MANAGEMENT_SYSTEM
+    method-application-type: CMS
     method-module-name: MODX
-  tags: tech,modx,cms
+  tags: discovery,modx,cms
 http:
-- method: GET
-  path:
-  - '{{BaseURL}}'
-  - '{{BaseURL}}/manager'
-  - '{{BaseURL}}/manager/index.php'
-  - '{{BaseURL}}/core/docs/changelog.txt'
-  - '{{BaseURL}}/assets/components/'
-  - '{{BaseURL}}/core/lexicon/'
-  - '{{BaseURL}}/connectors/'
-  - '{{BaseURL}}/setup/'
-  - '{{BaseURL}}/core/model/'
-  - '{{BaseURL}}/assets/templates/'
-  - '{{BaseURL}}/core/cache/'
-  stop-at-first-match: true
-  matchers-condition: or
-  matchers:
-  - type: word
-    part: header
-    words:
-    - 'x-powered-by: modx'
-    case-insensitive: true
-  - type: word
-    part: body
-    words:
-    - modx_assets_url
-    - modx_base_url
-    - modx_manager_url
-    - x-modx-version
-    case-insensitive: true
-  - type: regex
-    part: body
-    regex:
-    - (?i)modx.*?revolution.*?[0-9]+\.[0-9]+\.[0-9]+
-    - (?i)generator.*?modx.*?[0-9]+\.[0-9]+
-    - (?i)modx_[a-zA-Z0-9_]+_url
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/manager"
+      - "{{BaseURL}}/manager/index.php"
+      - "{{BaseURL}}/core/docs/changelog.txt"
+      - "{{BaseURL}}/assets/components/"
+      - "{{BaseURL}}/core/lexicon/"
+      - "{{BaseURL}}/connectors/"
+      - "{{BaseURL}}/setup/"
+      - "{{BaseURL}}/core/model/"
+      - "{{BaseURL}}/assets/templates/"
+      - "{{BaseURL}}/core/cache/"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: word
+        part: header
+        words:
+          - "x-powered-by: modx"
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "modx_assets_url"
+          - "modx_base_url"
+          - "modx_manager_url"
+          - "x-modx-version"
+        case-insensitive: true
+      - type: regex
+        part: body
+        regex:
+          - "(?i)modx.*?revolution.*?[0-9]+\\.[0-9]+\\.[0-9]+"
+          - "(?i)generator.*?modx.*?[0-9]+\\.[0-9]+"
+          - "(?i)modx_[a-zA-Z0-9_]+_url"

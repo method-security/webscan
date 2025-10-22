@@ -3,47 +3,44 @@ info:
   name: Abyss Web Server Detection
   author: method-security
   severity: info
-  description: Detects Abyss Web Server installations by analyzing response headers,
-    body content, and common paths
-  reference: https://www.aprelium.com/abyssws/
+  description: Detects Abyss Web Server installations by analyzing response headers, body content, and common paths
   metadata:
-    method-application-type: WEB_SERVER
+    method-application-type: WEBSERVER
     method-module-name: ABYSS
-  tags: tech,abyss,webserver,aprelium
+  tags: discovery,abyss,webserver
 http:
-- method: GET
-  path:
-  - '{{BaseURL}}'
-  - '{{BaseURL}}/console/'
-  - '{{BaseURL}}/~abyssws/'
-  - '{{BaseURL}}/server-status'
-  - '{{BaseURL}}/server-info'
-  - '{{BaseURL}}/docs/'
-  - '{{BaseURL}}/manual/'
-  stop-at-first-match: true
-  matchers-condition: or
-  matchers:
-  - type: word
-    part: header
-    words:
-    - 'server: abyss'
-    - 'server: abyssws'
-    - 'x-powered-by: abyss'
-    - 'x-served-by: abyss'
-    case-insensitive: true
-  - type: word
-    part: body
-    words:
-    - abyss console
-    - abyss web server
-    case-insensitive: true
-  - type: regex
-    part: body
-    regex:
-    - (?i)abyss.*?web.*?server.*?[0-9]+\.[0-9]+\.[0-9]+
-    - (?i)abyss.*?(x1|x2).*?[0-9]+\.[0-9]+
-    - (?i)aprelium.*?abyss
-    - (?i)abyss/x[0-9]+\.[0-9]+
-    - (?i)~abyssws/
-    - (?i)abyss.*?console
-    condition: or
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/console/"
+      - "{{BaseURL}}/server-status"
+      - "{{BaseURL}}/server-info"
+      - "{{BaseURL}}/docs/"
+      - "{{BaseURL}}/manual/"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: word
+        part: header
+        words:
+          - "server: abyss"
+          - "server: abyssws"
+          - "x-powered-by: abyss"
+          - "x-served-by: abyss"
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "abyss console"
+          - "abyss web server"
+        case-insensitive: true
+      - type: regex
+        part: body
+        regex:
+          - "(?i)abyss.*?web.*?server.*?[0-9]+\\.[0-9]+\\.[0-9]+"
+          - "(?i)abyss.*?(x1|x2).*?[0-9]+\\.[0-9]+"
+          - "(?i)aprelium.*?abyss"
+          - "(?i)abyss/x[0-9]+\\.[0-9]+"
+          - "(?i)~abyssws/"
+          - "(?i)abyss.*?console"

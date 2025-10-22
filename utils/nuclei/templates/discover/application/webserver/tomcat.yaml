@@ -3,42 +3,41 @@ info:
   name: Apache Tomcat Server Detection
   author: method-security
   severity: info
-  description: Detects Apache Tomcat Server installations by analyzing response headers,
-    body content, and common paths
-  reference: https://tomcat.apache.org/
+  description: Detects Apache Tomcat Server installations by analyzing response headers, body content, and common paths
   metadata:
-    method-application-type: WEB_SERVER
+    method-application-type: WEBSERVER
     method-module-name: TOMCAT
-  tags: tech,tomcat,webserver,java,apache
+  tags: discovery,tomcat,webserver
 http:
-- method: GET
-  path:
-  - '{{BaseURL}}'
-  - '{{BaseURL}}/manager/'
-  - '{{BaseURL}}/manager/html'
-  - '{{BaseURL}}/host-manager/'
-  - '{{BaseURL}}/docs/'
-  - '{{BaseURL}}/examples/'
-  - '{{BaseURL}}/server-status'
-  - '{{BaseURL}}/server-info'
-  - '{{BaseURL}}/favicon.ico'
-  stop-at-first-match: true
-  matchers-condition: or
-  matchers:
-  - type: word
-    part: header
-    words:
-    - 'server: apache tomcat'
-    - 'server: apache-coyote'
-    - 'server: tomcat'
-    - 'x-powered-by: tomcat'
-    case-insensitive: true
-  - type: regex
-    part: body
-    regex:
-    - (?i)apache.*?tomcat.*?[0-9]+\.[0-9]+\.[0-9]+
-    - (?i)tomcat.*?[0-9]+\.[0-9]+\.[0-9]+
-    - (?i)tomcat.*?web.*?server
-    - (?i)catalina.*?[0-9]+\.[0-9]+
-    - (?i)coyote.*?[0-9]+\.[0-9]+
-    - (?i)powered.*?by.*?tomcat
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/manager/"
+      - "{{BaseURL}}/manager/html"
+      - "{{BaseURL}}/host-manager/"
+      - "{{BaseURL}}/docs/"
+      - "{{BaseURL}}/examples/"
+      - "{{BaseURL}}/server-status"
+      - "{{BaseURL}}/server-info"
+      - "{{BaseURL}}/favicon.ico"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: word
+        part: header
+        words:
+          - "server: apache tomcat"
+          - "server: apache-coyote"
+          - "server: tomcat"
+          - "x-powered-by: tomcat"
+        case-insensitive: true
+      - type: regex
+        part: body
+        regex:
+          - "(?i)apache.*?tomcat.*?[0-9]+\\.[0-9]+\\.[0-9]+"
+          - "(?i)tomcat.*?[0-9]+\\.[0-9]+\\.[0-9]+"
+          - "(?i)tomcat.*?web.*?server"
+          - "(?i)catalina.*?[0-9]+\\.[0-9]+"
+          - "(?i)coyote.*?[0-9]+\\.[0-9]+"
+          - "(?i)powered.*?by.*?tomcat"

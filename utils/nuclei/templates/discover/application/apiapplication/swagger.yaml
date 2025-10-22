@@ -1,24 +1,13 @@
 id: discover-swagger
 info:
   name: Public Swagger / OpenAPI - Detect
-  author: pdteam, c-sh0, AmirHossein Raeisi, method.security
+  author: method-security
   severity: info
-  description: |
-    Detects public Swagger / OpenAPI documentation and specification endpoints by probing
-    common UI and spec paths and checking for header or body fingerprints that indicate
-    exposed Swagger or OpenAPI definitions.
-  reference:
-    - https://swagger.io/
-  classification:
-    cvss-metrics: CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:N
-    cwe-id: CWE-200
+  description: Detects public Swagger / OpenAPI documentation and specification endpoints
   metadata:
     method-application-type: API_APPLICATION
     method-module-name: SWAGGER
-    shodan-query: http.title:"swagger"
-    category: api
-    confidence: 85
-  tags: discovery, exposure, api, swagger, openapi
+  tags: discovery,swagger,openapi,api
 http:
   - method: GET
     path:
@@ -36,26 +25,23 @@ http:
       - "{{BaseURL}}/api-docs/swagger.yaml"
       - "{{BaseURL}}/docs"
       - "{{BaseURL}}/swagger"
-    stop-at-first-match: true
     redirects: true
-    max-redirects: 2
-    matchers-condition: or
+    max-redirects: 5
+    stop-at-first-match: true
     matchers:
       - type: regex
-        name: swagger-header-fingerprints
         part: header
         regex:
-          - '(?i)x-powered-by:\s*swagger'
-          - '(?i)x-generator:\s*(swagger codegen|openapi generator)'
-          - '(?i)server:\s*swagger'
+          - "(?i)x-powered-by:\\s*swagger"
+          - "(?i)x-generator:\\s*(swagger codegen|openapi generator)"
+          - "(?i)server:\\s*swagger"
       - type: word
-        name: swagger-body-fingerprints
         part: body
         words:
-          - '<div id="swagger-ui">'
-          - '<title>Swagger UI</title>'
-          - 'window.ui = SwaggerUIBundle'
-          - 'SwaggerUIBundle('
-          - 'swagger-ui-init.js'
-          - 'swagger-ui.css'
+          - "<div id=\"swagger-ui\">"
+          - "<title>Swagger UI</title>"
+          - "window.ui = SwaggerUIBundle"
+          - "SwaggerUIBundle("
+          - "swagger-ui-init.js"
+          - "swagger-ui.css"
         case-insensitive: true

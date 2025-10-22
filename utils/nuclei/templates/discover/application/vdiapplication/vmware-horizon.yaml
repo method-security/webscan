@@ -28,7 +28,7 @@ http:
       - type: regex
         part: body
         regex:
-          - "(?i)vmware.*?horizon"
-          - "(?i)horizon.*?view.*?[0-9]+\\.[0-9]+"
-          - "(?i)horizon.*?(connection|workspace).*?server"
-          - "(?i)blast.*?secure.*?gateway"
+          - "(?i)vmware\\s+horizon"
+          - "(?i)horizon\\s+view\\s+[0-9]+\\.[0-9]+"
+          - "(?i)horizon\\s+(connection|workspace)\\s+server"
+          - "(?i)blast\\s+secure\\s+gateway"

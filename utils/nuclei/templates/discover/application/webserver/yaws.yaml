@@ -31,7 +31,7 @@ http:
       - type: regex
         part: body
         regex:
-          - "(?i)yaws.*?web.*?server.*?[0-9]+\\.[0-9]+\\.[0-9]+"
-          - "(?i)yet.*?another.*?web.*?server"
-          - "(?i)powered.*?by.*?yaws"
-          - "(?i)erlang.*?yaws"
+          - "(?i)yaws\\s+web\\s+server\\s+[0-9]+\\.[0-9]+\\.[0-9]+"
+          - "(?i)yet\\s+another\\s+web\\s+server"
+          - "(?i)powered\\s+by\\s+yaws"
+          - "(?i)erlang[\\s/-]+yaws"

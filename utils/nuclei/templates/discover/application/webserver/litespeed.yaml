@@ -32,9 +32,9 @@ http:
       - type: regex
         part: body
         regex:
-          - "(?i)litespeed.*?web.*?server.*?[0-9]+\\.[0-9]+\\.[0-9]+"
-          - "(?i)litespeed.*?[0-9]+\\.[0-9]+\\.[0-9]+"
-          - "(?i)lsws.*?[0-9]+\\.[0-9]+\\.[0-9]+"
-          - "(?i)openlitespeed.*?[0-9]+\\.[0-9]+"
-          - "(?i)powered.*?by.*?litespeed"
-          - "(?i)litespeed.*?(enterprise|cache|admin)"
+          - "(?i)litespeed\\s+web\\s+server\\s+[0-9]+\\.[0-9]+\\.[0-9]+"
+          - "(?i)litespeed\\s*[0-9]+\\.[0-9]+\\.[0-9]+"
+          - "(?i)lsws\\s*[0-9]+\\.[0-9]+\\.[0-9]+"
+          - "(?i)openlitespeed\\s*[0-9]+\\.[0-9]+"
+          - "(?i)powered\\s+by\\s+litespeed"
+          - "(?i)litespeed\\s+(enterprise|cache|admin)"

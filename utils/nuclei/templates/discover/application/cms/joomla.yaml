@@ -42,5 +42,5 @@ http:
       - type: regex
         part: body
         regex:
-          - "(?i)joomla!?.*?[0-9]+\\.[0-9]+\\.[0-9]+"
-          - "(?i)generator.*?joomla!?\\s+[0-9]+\\.[0-9]+"
+          - "(?i)joomla!?\\s*[0-9]+\\.[0-9]+\\.[0-9]+"
+          - "(?i)generator\"\\s*content=\"joomla!?\\s+[0-9]+\\.[0-9]+"

@@ -33,9 +33,9 @@ http:
       - type: regex
         part: body
         regex:
-          - "(?i)caddy.*?web.*?server.*?[0-9]+\\.[0-9]+\\.[0-9]+"
-          - "(?i)caddy.*?v[0-9]+\\.[0-9]+"
-          - "(?i)caddy.*?server.*?[0-9]+\\.[0-9]+"
-          - "(?i)powered.*?by.*?caddy"
-          - "(?i)caddyfile.*?config"
-          - "(?i)caddy.*?automatic.*?https"
+          - "(?i)caddy\\s+web\\s+server\\s+[0-9]+\\.[0-9]+\\.[0-9]+"
+          - "(?i)caddy\\s*v[0-9]+\\.[0-9]+"
+          - "(?i)caddy\\s+server\\s+[0-9]+\\.[0-9]+"
+          - "(?i)powered\\s+by\\s+caddy"
+          - "(?i)caddyfile\\s+config"
+          - "(?i)caddy\\s+automatic\\s+https"

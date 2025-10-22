@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	// Generated
 	nuclei "github.com/Method-Security/webscan/generated/go/common/nuclei"
@@ -21,16 +22,17 @@ import (
 )
 
 type Config struct {
-	Targets        []string
-	RawRequests    []string // JSONL lines when fuzzing
-	TemplateFS     []fs.FS  // template sources
-	WorkflowFS     []fs.FS  // workflow sources
-	Threads        int
-	Proxy          string
-	RunMode        nuclei.NucleiRunMode
-	SuccessfulOnly *bool
-	VerboseLogs    bool
-	Timeout        int
+	Targets         []string
+	RawRequests     []string // JSONL lines when fuzzing
+	TemplateFS      []fs.FS  // template sources
+	WorkflowFS      []fs.FS  // workflow sources
+	Threads         int
+	Proxy           string
+	RunMode         nuclei.NucleiRunMode
+	SuccessfulOnly  *bool
+	VerboseLogs     bool
+	Timeout         int
+	GlobalRateLimit int
 }
 
 func validateConfig(cfg Config) error {
@@ -181,6 +183,14 @@ func buildNucleiOptions(cfg Config, templateDir, workflowDir string) []nucleilib
 			ProbeConcurrency:              cfg.Threads,
 		}),
 
+		// Set global rate limit if specified (0 means use default nuclei rate limit)
+		func() nucleilib.NucleiSDKOptions {
+			if cfg.GlobalRateLimit > 0 {
+				return nucleilib.WithGlobalRateLimit(cfg.GlobalRateLimit, time.Second)
+			}
+			return func(*nucleilib.NucleiEngine) error { return nil } // no-op, use default
+		}(),
+
 		// Explicitly set StopAtFirstMatch to false to ensure we get all requests
 		func(e *nucleilib.NucleiEngine) error {
 			e.Options().StopAtFirstMatch = false
@@ -253,14 +263,15 @@ func getProxy(config nuclei.NucleiConfig) string {
 // GetRunnerConfig returns a runner config from a nuclei config.
 func GetRunnerConfig(templateFileSystems, workflowFileSystems []fs.FS, config nuclei.NucleiConfig) Config {
 	rconfig := Config{
-		Targets:     config.Targets,
-		TemplateFS:  templateFileSystems,
-		WorkflowFS:  workflowFileSystems,
-		Threads:     config.Threads,
-		Proxy:       getProxy(config),
-		RunMode:     config.RunMode,
-		VerboseLogs: config.VerboseLogs,
-		Timeout:     config.Timeout,
+		Targets:         config.Targets,
+		TemplateFS:      templateFileSystems,
+		WorkflowFS:      workflowFileSystems,
+		Threads:         config.Threads,
+		Proxy:           getProxy(config),
+		RunMode:         config.RunMode,
+		VerboseLogs:     config.VerboseLogs,
+		Timeout:         config.Timeout,
+		GlobalRateLimit: config.GlobalRateLimit,
 	}
 	return rconfig
 }

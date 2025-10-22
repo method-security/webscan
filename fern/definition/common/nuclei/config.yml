@@ -22,4 +22,5 @@ types:
       threads: integer
       proxy: optional<string>
       verboseLogs: boolean
+      globalRateLimit: integer
 

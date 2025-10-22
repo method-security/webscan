@@ -82,9 +82,14 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			globalRateLimit, err := cmd.Flags().GetInt("global-rate-limit")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
 
 			// Create config
-			config, err := getDiscoverApplicationConfig(targets, resourceType, timeout, threads, proxy, verboseLogs)
+			config, err := getDiscoverApplicationConfig(targets, resourceType, timeout, threads, proxy, verboseLogs, globalRateLimit)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -105,6 +110,7 @@ func (a *WebScan) InitDiscoverCommand() {
 	discoverApplicationCmd.Flags().Int("threads", 25, "Number of concurrent threads for scanning")
 	discoverApplicationCmd.Flags().String("proxy", "", "Optional HTTP proxy URL")
 	discoverApplicationCmd.Flags().Bool("verbose-logs", false, "Verbose logs")
+	discoverApplicationCmd.Flags().Int("global-rate-limit", 0, "Global rate limit (requests per second, 0 = no limit)")
 
 	// Mark Required Flags
 	_ = discoverApplicationCmd.MarkFlagRequired("targets")
@@ -663,19 +669,20 @@ func (a *WebScan) InitDiscoverCommand() {
 }
 
 // getDiscoverApplicationConfig builds the config for application fingerprinting discovery.
-func getDiscoverApplicationConfig(targets []string, resource string, timeout int, threads int, proxy string, verboseLogs bool) (*discover.DiscoverApplicationConfig, error) {
+func getDiscoverApplicationConfig(targets []string, resource string, timeout int, threads int, proxy string, verboseLogs bool, globalRateLimit int) (*discover.DiscoverApplicationConfig, error) {
 	resourceEnum, err := getDiscoverApplicationResourceConfigTypeFromString(resource)
 	if err != nil {
 		return nil, fmt.Errorf("invalid resource type: %s", resource)
 	}
 
 	config := &discover.DiscoverApplicationConfig{
-		Targets:      targets,
-		ResourceType: &resourceEnum,
-		Timeout:      max(timeout, 0),
-		Threads:      max(threads, 0),
-		Proxy:        &proxy,
-		VerboseLogs:  verboseLogs,
+		Targets:         targets,
+		ResourceType:    &resourceEnum,
+		Timeout:         timeout,
+		Threads:         threads,
+		Proxy:           &proxy,
+		VerboseLogs:     verboseLogs,
+		GlobalRateLimit: max(0, globalRateLimit),
 	}
 	return config, nil
 }

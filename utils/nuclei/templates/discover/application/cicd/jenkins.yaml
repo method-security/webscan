@@ -42,4 +42,3 @@ http:
     regex:
       - '(?i)<title>Jenkins(?:\s+Dashboard)?</title>'
       - '(?i)Jenkins\s*(?:Login|Dashboard|User\s*Interface)'
-      - '(?i)href=.*?/jenkins(?:/|\\b)'

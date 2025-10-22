@@ -13,18 +13,15 @@ http:
   path:
   - '{{BaseURL}}'
   stop-at-first-match: true
-  matchers-condition: or
+  matchers-condition: and
   matchers:
+  - type: status
+    status:
+    - 200
   - type: word
     part: header
     words:
     - 'server: blob'
     - x-ms-blob-type
     - x-ms-version
-    case-insensitive: true
-  - type: word
-    part: body
-    words:
-    - blobnotfound
-    - microsoft azure blob storage
     case-insensitive: true

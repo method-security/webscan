@@ -32,9 +32,9 @@ http:
       - type: regex
         part: body
         regex:
-          - "(?i)openresty.*?[0-9]+\\.[0-9]+\\.[0-9]+"
-          - "(?i)openresty.*?web.*?platform"
-          - "(?i)nginx.*?openresty"
-          - "(?i)lua.*?resty"
-          - "(?i)ngx_lua.*?[0-9]+\\.[0-9]+"
-          - "(?i)luajit.*?[0-9]+\\.[0-9]+"
+          - "(?i)openresty\\s*[0-9]+\\.[0-9]+\\.[0-9]+"
+          - "(?i)openresty\\s+web\\s+platform"
+          - "(?i)nginx[\\s/-]+openresty"
+          - "(?i)lua[\\s_-]+resty"
+          - "(?i)ngx_lua\\s*[0-9]+\\.[0-9]+"
+          - "(?i)luajit\\s*[0-9]+\\.[0-9]+"

@@ -42,6 +42,6 @@ http:
       - type: regex
         part: body
         regex:
-          - "(?i)modx.*?revolution.*?[0-9]+\\.[0-9]+\\.[0-9]+"
-          - "(?i)generator.*?modx.*?[0-9]+\\.[0-9]+"
+          - "(?i)modx\\s+revolution\\s+[0-9]+\\.[0-9]+\\.[0-9]+"
+          - "(?i)generator\"\\s*content=\"modx\\s*[0-9]+\\.[0-9]+"
           - "(?i)modx_[a-zA-Z0-9_]+_url"

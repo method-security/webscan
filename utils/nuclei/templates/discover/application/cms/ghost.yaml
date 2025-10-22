@@ -32,5 +32,5 @@ http:
       - type: regex
         part: body
         regex:
-          - "(?i)ghost.*?version.*?[0-9]+\\.[0-9]+\\.[0-9]+"
+          - "(?i)ghost\\s+version\\s+[0-9]+\\.[0-9]+\\.[0-9]+"
           - "(?i)content=\"ghost\\s+[0-9]+\\.[0-9]+\""

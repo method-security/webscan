@@ -29,9 +29,9 @@ http:
       - type: regex
         part: body
         regex:
-          - "(?i)cherokee.*?web.*?server.*?[0-9]+\\.[0-9]+\\.[0-9]+"
-          - "(?i)cherokee.*?[0-9]+\\.[0-9]+\\.[0-9]+"
-          - "(?i)cherokee.*?server.*?[0-9]+\\.[0-9]+"
-          - "(?i)powered.*?by.*?cherokee"
-          - "(?i)cherokee.*?admin"
-          - "(?i)cherokee.*?configuration"
+          - "(?i)cherokee\\s+web\\s+server\\s+[0-9]+\\.[0-9]+\\.[0-9]+"
+          - "(?i)cherokee\\s*[0-9]+\\.[0-9]+\\.[0-9]+"
+          - "(?i)cherokee\\s+server\\s+[0-9]+\\.[0-9]+"
+          - "(?i)powered\\s+by\\s+cherokee"
+          - "(?i)cherokee\\s+admin"
+          - "(?i)cherokee\\s+configuration"

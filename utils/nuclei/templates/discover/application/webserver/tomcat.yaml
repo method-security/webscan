@@ -35,9 +35,9 @@ http:
       - type: regex
         part: body
         regex:
-          - "(?i)apache.*?tomcat.*?[0-9]+\\.[0-9]+\\.[0-9]+"
-          - "(?i)tomcat.*?[0-9]+\\.[0-9]+\\.[0-9]+"
-          - "(?i)tomcat.*?web.*?server"
-          - "(?i)catalina.*?[0-9]+\\.[0-9]+"
-          - "(?i)coyote.*?[0-9]+\\.[0-9]+"
-          - "(?i)powered.*?by.*?tomcat"
+          - "(?i)apache\\s+tomcat\\s*[0-9]+\\.[0-9]+\\.[0-9]+"
+          - "(?i)tomcat\\s*[0-9]+\\.[0-9]+\\.[0-9]+"
+          - "(?i)tomcat\\s+web\\s+server"
+          - "(?i)catalina\\s*[0-9]+\\.[0-9]+"
+          - "(?i)coyote\\s*[0-9]+\\.[0-9]+"
+          - "(?i)powered\\s+by\\s+tomcat"

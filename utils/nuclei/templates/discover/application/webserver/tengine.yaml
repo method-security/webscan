@@ -33,8 +33,8 @@ http:
       - type: regex
         part: body
         regex:
-          - "(?i)tengine.*?web.*?server"
-          - "(?i)tengine.*?nginx"
-          - "(?i)nginx.*?tengine"
-          - "(?i)tengine.*?taobao"
-          - "(?i)powered.*?by.*?tengine"
+          - "(?i)tengine\\s+web\\s+server"
+          - "(?i)tengine[\\s/-]+nginx"
+          - "(?i)nginx[\\s/-]+tengine"
+          - "(?i)tengine[\\s/-]+taobao"
+          - "(?i)powered\\s+by\\s+tengine"

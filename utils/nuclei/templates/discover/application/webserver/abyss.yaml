@@ -38,9 +38,9 @@ http:
       - type: regex
         part: body
         regex:
-          - "(?i)abyss.*?web.*?server.*?[0-9]+\\.[0-9]+\\.[0-9]+"
-          - "(?i)abyss.*?(x1|x2).*?[0-9]+\\.[0-9]+"
-          - "(?i)aprelium.*?abyss"
+          - "(?i)abyss\\s+web\\s+server\\s+[0-9]+\\.[0-9]+\\.[0-9]+"
+          - "(?i)abyss\\s+(x1|x2)\\s*[0-9]+\\.[0-9]+"
+          - "(?i)aprelium\\s+abyss"
           - "(?i)abyss/x[0-9]+\\.[0-9]+"
           - "(?i)~abyssws/"
-          - "(?i)abyss.*?console"
+          - "(?i)abyss\\s+console"

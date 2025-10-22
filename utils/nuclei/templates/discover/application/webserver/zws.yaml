@@ -33,8 +33,8 @@ http:
       - type: regex
         part: body
         regex:
-          - "(?i)zope.*?web.*?server.*?[0-9]+\\.[0-9]+\\.[0-9]+"
-          - "(?i)zope.*?[0-9]+\\.[0-9]+\\.[0-9]+"
-          - "(?i)zserver.*?[0-9]+\\.[0-9]+"
-          - "(?i)powered.*?by.*?zope"
-          - "(?i)zope.*?(management|application).*?server"
+          - "(?i)zope\\s+web\\s+server\\s+[0-9]+\\.[0-9]+\\.[0-9]+"
+          - "(?i)zope\\s*[0-9]+\\.[0-9]+\\.[0-9]+"
+          - "(?i)zserver\\s*[0-9]+\\.[0-9]+"
+          - "(?i)powered\\s+by\\s+zope"
+          - "(?i)zope\\s+(management|application)\\s+server"

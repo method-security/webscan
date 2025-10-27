@@ -1,0 +1,40 @@
+id: fortinet-fortigate-firewall-detect
+info:
+  name: Fortinet FortiGate Firewall Detection
+  author: method-security
+  severity: info
+  description: Detects Fortinet FortiGate (FortiOS) management interfaces by identifying unique titles, HTML structures, and FortiGate-specific web elements.
+  metadata:
+    method-application-type: MANAGEMENT_INTERFACE_FIREWALL
+    method-module-name: FORTINET_FORTIGATE
+  tags: discovery,fortinet,fortigate,fortios,firewall
+requests:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/login"
+      - "{{BaseURL}}/remote/login"
+      - "{{BaseURL}}/remote/fgt_lang"
+      - "{{BaseURL}}/ng/login"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers-condition: and
+    matchers:
+      - type: regex
+        part: body
+        regex:
+          - '(?i)<title[^>]*>\s*FortiGate\s*</title>'
+          - '(?i)<fos-root></fos-root>'
+          - '(?i)__fosLoginRedirect__'
+          - '(?i)FortiGate\s+Web\s+Management'
+          - '(?i)var\s+fortiToken'
+      - type: word
+        part: body
+        words:
+          - "FortiGate"
+          - "Fortinet"
+          - "FortiOS"
+          - "fgt_lang"
+          - "ng-login"
+        case-insensitive: true

@@ -16,24 +16,28 @@ func getTemplatePaths(resourceConfigType *discover.ApplicationResourceConfigType
 		discover.ApplicationResourceTypeCiCdPlatform,
 		discover.ApplicationResourceTypeCloudBucket,
 		discover.ApplicationResourceTypeContentManagementSystem,
-		discover.ApplicationResourceTypeHypervisor,
 		discover.ApplicationResourceTypeKube,
 		discover.ApplicationResourceTypeVdiApplication,
-		discover.ApplicationResourceTypeVirtualCompute,
+		discover.ApplicationResourceTypeManagementInterfaceFirewall,
+		discover.ApplicationResourceTypeManagementInterfaceGeneral,
+		discover.ApplicationResourceTypeManagementInterfaceHypervisor,
+		discover.ApplicationResourceTypeManagementInterfaceNetworkDevice,
 		discover.ApplicationResourceTypeWebServer,
 	}
 
 	// Map resource types to base template paths (without request method subdirectory)
 	resourceTypeToPath := map[discover.ApplicationResourceType]string{
-		discover.ApplicationResourceTypeApiApplication:          "apiapplication",
-		discover.ApplicationResourceTypeCiCdPlatform:            "cicd",
-		discover.ApplicationResourceTypeCloudBucket:             "cloud",
-		discover.ApplicationResourceTypeContentManagementSystem: "cms",
-		discover.ApplicationResourceTypeHypervisor:              "hypervisor",
-		discover.ApplicationResourceTypeKube:                    "kube",
-		discover.ApplicationResourceTypeVdiApplication:          "vdiapplication",
-		discover.ApplicationResourceTypeVirtualCompute: "virutalcompute",
-		discover.ApplicationResourceTypeWebServer:               "webserver",
+		discover.ApplicationResourceTypeApiApplication:                   "apiapplication",
+		discover.ApplicationResourceTypeCiCdPlatform:                     "cicd",
+		discover.ApplicationResourceTypeCloudBucket:                      "cloud",
+		discover.ApplicationResourceTypeContentManagementSystem:          "cms",
+		discover.ApplicationResourceTypeKube:                             "kube",
+		discover.ApplicationResourceTypeVdiApplication:                   "vdiapplication",
+		discover.ApplicationResourceTypeManagementInterfaceFirewall:      "managementinterface/firewall",
+		discover.ApplicationResourceTypeManagementInterfaceGeneral:       "managementinterface/general",
+		discover.ApplicationResourceTypeManagementInterfaceHypervisor:    "managementinterface/hypervisor",
+		discover.ApplicationResourceTypeManagementInterfaceNetworkDevice: "managementinterface/networkdevice",
+		discover.ApplicationResourceTypeWebServer:                        "webserver",
 	}
 
 	var templatePaths []string

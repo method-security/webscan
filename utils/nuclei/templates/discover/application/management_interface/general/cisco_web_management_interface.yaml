@@ -1,0 +1,46 @@
+id: cisco-web-management-interface-detect
+info:
+  name: Cisco Web Management Interface Detection
+  author: method-security
+  severity: info
+  description: Detects Cisco router, switch, and network device management interfaces by identifying Cisco branding, admin patterns, and interface elements common across Cisco network products.
+  metadata:
+    method-application-type: MANAGEMENT_INTERFACE_GENERAL
+    method-module-name: CISCO_WEB_MANAGEMENT
+  tags: discovery,cisco,web-management,general
+requests:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/login.html"
+      - "{{BaseURL}}/exec/show/log/CR"
+      - "{{BaseURL}}/level/15/exec/-"
+      - "{{BaseURL}}/cgi-bin/webcm"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers-condition: and
+    matchers:
+      - type: regex
+        part: body
+        regex:
+          - '(?i)<title[^>]*>.*Cisco.*(Management|Router|Switch|Web\s*Interface).*</title>'
+          - '(?i)cisco.*(web\s*management|router|switch)'
+          - '(?i)management.*interface.*cisco'
+          - '(?i)cisco.*(administrative|admin).*interface'
+          - '(?i)/exec/show/.*cisco'
+          - '(?i)/cgi-bin/webcm'
+          - '(?i)cisco.*(ios|nx-os|iosxr)'
+      - type: word
+        part: body
+        words:
+          - "Cisco"
+          - "Cisco IOS"
+          - "NX-OS"
+          - "IOS-XR"
+          - "IOS Software"
+          - "webcm"
+          - "cisco_logo"
+          - "/level/15/exec/"
+          - "show/log/CR"
+        case-insensitive: true

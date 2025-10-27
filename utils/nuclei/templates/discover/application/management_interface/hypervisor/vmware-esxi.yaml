@@ -5,7 +5,7 @@ info:
   severity: info
   description: Detects VMware ESXi web interfaces (including UI and MOB endpoints)
   metadata:
-    method-application-type: HYPERVISOR
+    method-application-type: MANAGEMENT_INTERFACE_HYPERVISOR
     method-module-name: VMWARE_ESXI
   tags: discovery,vmware,esxi,hypervisor
 http:

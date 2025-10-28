@@ -102,16 +102,21 @@ func getHTTPRequestResponse(ev *nout.ResultEvent) (*common.HttpRequestResponse, 
 	}
 
 	// Marshal Request Struct
-	baseURL, _, _, err := requesthelpers.SplitTargetURL(ev.URL)
+	// ev.URL contains the final destination URL after all redirects
+	finalURL, err := url.Parse(ev.URL)
 	if err != nil {
 		// If we can't parse the URL, still include what we can
 		request.BaseUrl = ev.URL
+		request.Path = "/"
 	} else {
-		request.BaseUrl = baseURL
+		request.BaseUrl = fmt.Sprintf("%s://%s", finalURL.Scheme, finalURL.Host)
+		request.Path = finalURL.Path
+		if request.Path == "" {
+			request.Path = "/"
+		}
 	}
 
-	method, path, requestHeaders, body := parseRawRequest(ev.Request)
-	request.Path = path
+	method, _, requestHeaders, body := parseRawRequest(ev.Request)
 	contentType := http.DetectContentType([]byte(body))
 	if m, err := common.NewHttpMethodFromString(strings.ToUpper(method)); err == nil {
 		request.Method = m
@@ -128,8 +133,9 @@ func getHTTPRequestResponse(ev *nout.ResultEvent) (*common.HttpRequestResponse, 
 	if body != "" {
 		params.Body = requesthelpers.CreateBodyFromBytes(contentType, []byte(body))
 	}
-	if u2, err := url.Parse(path); err == nil {
-		for k, vs := range u2.Query() {
+	// Parse query parameters from the final URL
+	if finalURL != nil && finalURL.RawQuery != "" {
+		for k, vs := range finalURL.Query() {
 			if len(vs) > 0 {
 				params.Query[k] = vs[0]
 			}
@@ -143,7 +149,13 @@ func getHTTPRequestResponse(ev *nout.ResultEvent) (*common.HttpRequestResponse, 
 		responseBody = ev.Response
 	}
 
-	response = requesthelpers.CreateHTTPResponse(statusCode, nil, singleToMulti(responseHeaders), responseBody)
+	// Create redirect chain with the final URL if it's different from base
+	var redirectChain []string
+	if finalURL != nil {
+		redirectChain = append(redirectChain, ev.URL) // ev.URL is the final destination
+	}
+
+	response = requesthelpers.CreateHTTPResponse(statusCode, redirectChain, singleToMulti(responseHeaders), responseBody)
 
 	// If there was an error in the response, add it to the response body
 	if ev.Error != "" {

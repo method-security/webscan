@@ -1,0 +1,31 @@
+id: cisco-asdm-service-detect
+info:
+  name: Cisco ASDM Service Detection
+  author: method-security
+  severity: info
+  description: >
+    Detects Cisco Adaptive Security Device Manager (ASDM) interfaces including
+    Java Web Start launchers, ASDM download pages, and admin portals using
+    ASDM-specific titles, JNLP indicators, paths, and content-type signatures.
+  metadata:
+    method-application-type: MANAGEMENT_INTERFACE_FIREWALL
+    method-module-name: CISCO_ASDM
+  tags: discovery,cisco,asdm,asa,firewall,webvpn
+requests:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/admin/"
+      - "{{BaseURL}}/+CSCOE+/logon.html"
+      - "{{BaseURL}}/asdm/"
+      - "{{BaseURL}}/asdm/asdm.jnlp"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: regex
+        part: body
+        regex:
+          - '(?i)<title[^>]*>.*(ASDM|Adaptive Security Device Manager).*<\/title>'
+          - '(?i)Adaptive\s+Security\s+Device\s+Manager'
+          - '(?i)\bASDM\b'

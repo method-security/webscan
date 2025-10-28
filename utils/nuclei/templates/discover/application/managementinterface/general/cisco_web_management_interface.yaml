@@ -29,7 +29,6 @@ requests:
           - '(?i)management.*interface.*cisco'
           - '(?i)cisco.*(administrative|admin).*interface'
           - '(?i)/exec/show/.*cisco'
-          - '(?i)/cgi-bin/webcm'
           - '(?i)cisco.*(ios|nx-os|iosxr)'
       - type: word
         part: body

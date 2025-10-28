@@ -5,7 +5,7 @@ info:
   severity: info
   description: Detects web servers running Apache HTTPD by analyzing response headers and common response patterns
   metadata:
-    method-application-type: WEBSERVER
+    method-application-type: WEB_SERVER
     method-module-name: APACHE
   tags: discovery,apache,webserver
 http:

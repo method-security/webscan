@@ -3,11 +3,15 @@ info:
   name: Cisco ASA Web Management Interface Detection
   author: method-security
   severity: info
-  description: Detects Cisco Adaptive Security Appliance (ASA) web management interfaces including ASDM, SSL VPN portals, and admin panels by matching unique ASA-specific assets, headers, and titles.
+  description: >
+    Detects Cisco Adaptive Security Appliance (ASA) web management interfaces
+    (ASDM / SSL VPN) by matching common ASA strings/paths/titles and expected
+    management HTTP status codes.
   metadata:
     method-application-type: MANAGEMENT_INTERFACE_FIREWALL
     method-module-name: CISCO_ASA
-  tags: discovery,cisco,asa,adaptive-security-appliance,asdm,firewall,vpn,webvpn
+  tags: discovery,cisco,asa,asdm,firewall,vpn,webvpn
+
 requests:
   - method: GET
     path:
@@ -18,22 +22,17 @@ requests:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
-    matchers-condition: and
     matchers:
+      # body must contain any one of these ASA indicators
       - type: regex
         part: body
         regex:
-          - '(?i)\+CSCOE\+\/logon\.html'
-          - '(?i)\+CSCOU\+\/csco_logo\.gif'
+          - '(?i)\+CSCOU\+/csco_logo\.gif'
           - '(?i)function\s+CSCO_Format\(fmt\)'
-          - '(?i)<title>(Cisco|Cisco ASA|Cisco Systems).*<\/title>'
+          - '(?i)<title[^>]*>(?:Cisco ASA|Adaptive Security Appliance)[^<]*</title>'
       - type: word
         part: header
         words:
-          - "CSCO_WEBVPN"
-          - "webvpn"
-        condition: or
+          - 'x-cisco-asdm'
+          - 'CSCO_WEBVPN'
         case-insensitive: true
-      - type: dsl
-        dsl:
-          - "favicon_hash == -1354931248"

@@ -1,0 +1,38 @@
+id: cisco-dcnm-detect
+info:
+  name: Cisco Data Center Network Manager (DCNM) Detection
+  author: method-security
+  severity: info
+  description: Detects Cisco DCNM web interfaces using simple title and keyword matches.
+  metadata:
+    method-application-type: MANAGEMENT_INTERFACE_NETWORK_CONTROLLER
+    method-module-name: CISCO_DCNM
+  tags: discovery,cisco,dcnm,network,management,web
+requests:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/login"
+      - "{{BaseURL}}/dcnm"
+      - "{{BaseURL}}/web"
+    redirects: true
+    max-redirects: 3
+    stop-at-first-match: true
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "Cisco DCNM"
+          - "Cisco Data Center Network Manager"
+        case-insensitive: true
+      - type: regex
+        part: body
+        regex:
+          - '(?i)<title[^>]*>.*(DCNM|Data\s*Center\s*Network\s*Manager).*?</title>'
+      - type: word
+        part: header
+        words:
+          - "dcnm"
+          - "cisco"
+        condition: and
+        case-insensitive: true

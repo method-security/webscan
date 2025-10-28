@@ -3,7 +3,7 @@ info:
   name: Cisco Firepower Device Manager (FDM) Detection
   author: method-security
   severity: info
-  description: Detects Cisco Firepower Device Manager (FDM) web interfaces by identifying unique titles, API paths, and Cisco-specific assets related to FDM login and management portals.
+  description: Detects Cisco Firepower Device Manager (FDM) web interfaces by identifying unique titles, API paths, and Cisco-specific headers or assets related to FDM login and management portals.
   metadata:
     method-application-type: MANAGEMENT_INTERFACE_FIREWALL
     method-module-name: CISCO_FIREPOWER_DEVICE_MANAGER
@@ -11,7 +11,7 @@ info:
 requests:
   - method: GET
     path:
-      - "{{BaseURL}}"
+      - "{{BaseURL}}/"
       - "{{BaseURL}}/ui/login"
       - "{{BaseURL}}/ui/"
       - "{{BaseURL}}/api/fdm/v1/auth/generatetoken"
@@ -19,22 +19,10 @@ requests:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
-    matchers-condition: and
     matchers:
-      - type: regex
-        part: body
-        regex:
-          - '(?i)<title[^>]*>.*(Firepower|FDM).*Device Manager.*</title>'
-          - '(?i)/api/fdm/v[0-9]+/'
-          - '(?i)firepower.*device.*manager'
-          - '(?i)fdm.*(api|interface|login)'
       - type: word
         part: body
         words:
-          - "Firepower Device Manager"
-          - "Cisco Firepower"
-          - "fdm-login"
-          - "/ui/login"
-          - "generatetoken"
-          - "firepower_logo"
+          - "Cisco FDM"
+          - "Cisco Firepower Device Manager"
         case-insensitive: true

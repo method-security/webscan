@@ -17,26 +17,12 @@ requests:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
-    matchers-condition: and
     matchers:
-      - type: regex
-        part: body
-        regex:
-          - '(?i)<title[^>]*>.*(Firepower|FMC|Defense Center|FireSIGHT).*</title>'
-          - '(?i)firepower.*management.*center'
-          - '(?i)(sourcefire|defense)\s*center'
-          - '(?i)fmc.*(login|ui|system)'
       - type: word
         part: body
         words:
           - "Firepower Management Center"
           - "Cisco Firepower Management Center"
-          - "FMC Login"
-          - "Firepower System"
-          - "Defense Center"
-          - "Sourcefire Defense Center"
-          - "FireSIGHT"
-          - "firepower-logo"
-          - "fmc-login"
-          - "login_fmc"
+          - "Cisco FMC Login"
+          - "Cisco Firepower System"
         case-insensitive: true

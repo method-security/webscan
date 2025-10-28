@@ -35,5 +35,4 @@ http:
           - "VMware vCenter"
           - "vCenter Server"
           - "ID_VC_Welcome"
-          - "VirtualCenter"
         case-insensitive: true

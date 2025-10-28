@@ -5,9 +5,9 @@ info:
   severity: info
   description: Detects VMware vSphere/vCenter Server installations
   metadata:
-    method-application-type: VIRTUAL_COMPUTE
+    method-application-type: HYPERVISOR
     method-module-name: VMWARE_VSPHERE
-  tags: discovery,vmware,vsphere,vcenter
+  tags: discovery,vmware,vsphere,vcenter,hypervisor
 http:
   - method: GET
     path:
@@ -34,6 +34,4 @@ http:
           - "vsphere-client"
           - "VMware vCenter"
           - "vCenter Server"
-          - "ID_VC_Welcome"
-          - "VirtualCenter"
         case-insensitive: true

@@ -1,0 +1,36 @@
+id: cisco-meraki-webmanagement-detect
+info:
+  name: Cisco Meraki Web Management Interface Detection
+  author: method-security
+  severity: info
+  description: >
+    Detects Cisco Meraki web management interfaces and dashboards by matching
+    specific management features, navigation elements, and Meraki-branded
+    application titles.
+  metadata:
+    method-application-type: NETWORK_CONTROLLER
+    method-module-name: CISCO_MERAKI
+  tags: discovery,cisco,meraki,dashboard,network-controller
+requests:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/login"
+      - "{{BaseURL}}/dashboard"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: regex
+        part: body
+        regex:
+          - '(?i)<title>\s*Cis[cC]o\\x20Meraki\s*</title>'
+          - '(?i)<title>\s*Cis[cC]o\s+Meraki\s*</title>'
+      - type: word
+        part: body
+        words:
+          - 'Cisco Meraki'
+          - 'Meraki Dashboard'
+          - 'Meraki Admin'
+          - 'Meraki Portal'
+        case-insensitive: true

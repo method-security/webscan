@@ -16,23 +16,27 @@ func getTemplatePaths(resourceConfigType *discover.ApplicationResourceConfigType
 		discover.ApplicationResourceTypeCiCdPlatform,
 		discover.ApplicationResourceTypeCloudBucket,
 		discover.ApplicationResourceTypeContentManagementSystem,
+		discover.ApplicationResourceTypeFirewall,
 		discover.ApplicationResourceTypeHypervisor,
 		discover.ApplicationResourceTypeKube,
+		discover.ApplicationResourceTypeNetworkController,
+		discover.ApplicationResourceTypeNetworkManagementSystem,
 		discover.ApplicationResourceTypeVdiApplication,
-		discover.ApplicationResourceTypeVirtualCompute,
 		discover.ApplicationResourceTypeWebServer,
 	}
 
 	// Map resource types to base template paths (without request method subdirectory)
 	resourceTypeToPath := map[discover.ApplicationResourceType]string{
 		discover.ApplicationResourceTypeApiApplication:          "apiapplication",
-		discover.ApplicationResourceTypeCiCdPlatform:            "cicd",
-		discover.ApplicationResourceTypeCloudBucket:             "cloud",
-		discover.ApplicationResourceTypeContentManagementSystem: "cms",
+		discover.ApplicationResourceTypeCiCdPlatform:            "cicdplatform",
+		discover.ApplicationResourceTypeCloudBucket:             "cloudbucket",
+		discover.ApplicationResourceTypeContentManagementSystem: "contentmanagementsystem",
+		discover.ApplicationResourceTypeFirewall:                "firewall",
 		discover.ApplicationResourceTypeHypervisor:              "hypervisor",
 		discover.ApplicationResourceTypeKube:                    "kube",
+		discover.ApplicationResourceTypeNetworkController:       "networkcontroller",
+		discover.ApplicationResourceTypeNetworkManagementSystem: "networkmanagementsystem",
 		discover.ApplicationResourceTypeVdiApplication:          "vdiapplication",
-		discover.ApplicationResourceTypeVirtualCompute: "virutalcompute",
 		discover.ApplicationResourceTypeWebServer:               "webserver",
 	}
 

@@ -1,4 +1,4 @@
-id: discover-forinet-fortigate-http09-banner
+id: discover-fortinet-fortigate-http09-banner
 
 info:
   name: Discover FortiGate HTTP/0.9 / Banner Disclosure
@@ -6,8 +6,8 @@ info:
   severity: info
   description: Detects Fortinet FortiGate devices responding over HTTP/0.9 or plaintext.
   metadata:
-    method-application-type: MANAGEMENT_INTERFACE_FIREWALL
-    method-module-name: FORINET_FORTIGATE
+    method-application-type: FIREWALL
+    method-module-name: FORTINET_FORTIGATE
   tags: fortinet, fortigate, network, banner, http0.9
 tcp:
   - host:

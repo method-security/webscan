@@ -8,7 +8,7 @@ info:
     (ASDM / SSL VPN) by matching common ASA strings/paths/titles and expected
     management HTTP status codes.
   metadata:
-    method-application-type: MANAGEMENT_INTERFACE_FIREWALL
+    method-application-type: FIREWALL
     method-module-name: CISCO_ASA
   tags: discovery,cisco,asa,asdm,firewall,vpn,webvpn
 

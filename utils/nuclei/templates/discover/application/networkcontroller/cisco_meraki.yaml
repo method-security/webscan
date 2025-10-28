@@ -8,9 +8,9 @@ info:
     specific management features, navigation elements, and Meraki-branded
     application titles.
   metadata:
-    method-application-type: MANAGEMENT_INTERFACE_NETWORK_CONTROLLER
+    method-application-type: NETWORK_CONTROLLER
     method-module-name: CISCO_MERAKI
-  tags: discovery,cisco,meraki,dashboard,web-management
+  tags: discovery,cisco,meraki,dashboard,network-controller
 requests:
   - method: GET
     path:

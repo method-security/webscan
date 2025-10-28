@@ -5,9 +5,9 @@ info:
   severity: info
   description: Detects Cisco router, switch, and network device management interfaces by identifying Cisco branding, admin patterns, and interface elements common across Cisco network products.
   metadata:
-    method-application-type: MANAGEMENT_INTERFACE_GENERAL
+    method-application-type: NETWORK_MANAGEMENT_SYSTEM
     method-module-name: CISCO_WEB_MANAGEMENT
-  tags: discovery,cisco,web-management,general
+  tags: discovery,cisco,web-management,network-management-system
 requests:
   - method: GET
     path:

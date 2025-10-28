@@ -5,7 +5,7 @@ info:
   severity: info
   description: Detects Cisco Firepower Device Manager (FDM) web interfaces by identifying unique titles, API paths, and Cisco-specific headers or assets related to FDM login and management portals.
   metadata:
-    method-application-type: MANAGEMENT_INTERFACE_FIREWALL
+    method-application-type: FIREWALL
     method-module-name: CISCO_FIREPOWER_DEVICE_MANAGER
   tags: discovery,cisco,firepower,fdm,device-manager,firewall
 requests:

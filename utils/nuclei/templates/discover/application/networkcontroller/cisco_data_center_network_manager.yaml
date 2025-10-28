@@ -5,9 +5,9 @@ info:
   severity: info
   description: Detects Cisco DCNM web interfaces using simple title and keyword matches.
   metadata:
-    method-application-type: MANAGEMENT_INTERFACE_NETWORK_CONTROLLER
+    method-application-type: NETWORK_CONTROLLER
     method-module-name: CISCO_DCNM
-  tags: discovery,cisco,dcnm,network,management,web
+  tags: discovery,cisco,dcnm,network-controller,network-management-system
 requests:
   - method: GET
     path:

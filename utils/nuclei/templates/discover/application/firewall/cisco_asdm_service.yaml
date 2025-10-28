@@ -8,7 +8,7 @@ info:
     Java Web Start launchers, ASDM download pages, and admin portals using
     ASDM-specific titles, JNLP indicators, paths, and content-type signatures.
   metadata:
-    method-application-type: MANAGEMENT_INTERFACE_FIREWALL
+    method-application-type: FIREWALL
     method-module-name: CISCO_ASDM
   tags: discovery,cisco,asdm,asa,firewall,webvpn
 requests:

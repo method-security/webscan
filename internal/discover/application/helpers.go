@@ -16,28 +16,28 @@ func getTemplatePaths(resourceConfigType *discover.ApplicationResourceConfigType
 		discover.ApplicationResourceTypeCiCdPlatform,
 		discover.ApplicationResourceTypeCloudBucket,
 		discover.ApplicationResourceTypeContentManagementSystem,
+		discover.ApplicationResourceTypeFirewall,
+		discover.ApplicationResourceTypeHypervisor,
 		discover.ApplicationResourceTypeKube,
+		discover.ApplicationResourceTypeNetworkController,
+		discover.ApplicationResourceTypeNetworkManagementSystem,
 		discover.ApplicationResourceTypeVdiApplication,
-		discover.ApplicationResourceTypeManagementInterfaceFirewall,
-		discover.ApplicationResourceTypeManagementInterfaceGeneral,
-		discover.ApplicationResourceTypeManagementInterfaceHypervisor,
-		discover.ApplicationResourceTypeManagementInterfaceNetworkController,
 		discover.ApplicationResourceTypeWebServer,
 	}
 
 	// Map resource types to base template paths (without request method subdirectory)
 	resourceTypeToPath := map[discover.ApplicationResourceType]string{
-		discover.ApplicationResourceTypeApiApplication:                       "apiapplication",
-		discover.ApplicationResourceTypeCiCdPlatform:                         "cicdplatform",
-		discover.ApplicationResourceTypeCloudBucket:                          "cloudbucket",
-		discover.ApplicationResourceTypeContentManagementSystem:              "contentmanagementsystem",
-		discover.ApplicationResourceTypeKube:                                 "kube",
-		discover.ApplicationResourceTypeVdiApplication:                       "vdiapplication",
-		discover.ApplicationResourceTypeManagementInterfaceFirewall:          "managementinterface/firewall",
-		discover.ApplicationResourceTypeManagementInterfaceGeneral:           "managementinterface/general",
-		discover.ApplicationResourceTypeManagementInterfaceHypervisor:        "managementinterface/hypervisor",
-		discover.ApplicationResourceTypeManagementInterfaceNetworkController: "managementinterface/networkcontroller",
-		discover.ApplicationResourceTypeWebServer:                            "webserver",
+		discover.ApplicationResourceTypeApiApplication:          "apiapplication",
+		discover.ApplicationResourceTypeCiCdPlatform:            "cicdplatform",
+		discover.ApplicationResourceTypeCloudBucket:             "cloudbucket",
+		discover.ApplicationResourceTypeContentManagementSystem: "contentmanagementsystem",
+		discover.ApplicationResourceTypeFirewall:                "firewall",
+		discover.ApplicationResourceTypeHypervisor:              "hypervisor",
+		discover.ApplicationResourceTypeKube:                    "kube",
+		discover.ApplicationResourceTypeNetworkController:       "networkcontroller",
+		discover.ApplicationResourceTypeNetworkManagementSystem: "networkmanagementsystem",
+		discover.ApplicationResourceTypeVdiApplication:          "vdiapplication",
+		discover.ApplicationResourceTypeWebServer:               "webserver",
 	}
 
 	var templatePaths []string

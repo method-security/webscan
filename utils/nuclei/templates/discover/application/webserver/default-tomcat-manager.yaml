@@ -1,0 +1,43 @@
+id: default-tomcat-manager-detect
+info:
+  name: Default Apache Tomcat Manager/Welcome Page Detection
+  author: method-security
+  severity: info
+  description: Detects default Apache Tomcat welcome page and accessible default manager interfaces that may indicate a default or misconfigured installation
+  metadata:
+    method-application-type: WEB_SERVER
+    method-module-name: DEFAULT_TOMCAT_MANAGER
+  tags: discovery,tomcat,default-page,manager,misconfiguration
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/manager/html"
+      - "{{BaseURL}}/manager/status"
+      - "{{BaseURL}}/host-manager/html"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "If you're seeing this, you've successfully installed Tomcat. Congratulations!"
+          - "Apache Tomcat"
+          - "Tomcat Web Application Manager"
+          - "Apache Tomcat/7.0 Documentation"
+          - "Apache Tomcat/8.0 Documentation"
+          - "Apache Tomcat/9.0 Documentation"
+          - "Apache Tomcat/10.0 Documentation"
+          - "Apache Tomcat/10.1 Documentation"
+        case-insensitive: true
+      - type: regex
+        part: body
+        regex:
+          - "(?i)<title>Apache\\s+Tomcat/[0-9]+\\.[0-9]+\\.[0-9]+</title>"
+          - "(?i)It works\\s*!.*Tomcat"
+          - "(?i)successful\\s+Tomcat\\s+installation"
+          - "(?i)<h3>Manager\\s+Application</h3>"
+          - "(?i)Tomcat\\s+Manager\\s+Application.*<h1>"
+          - "(?i)/manager/images/tomcat\\.gif"
+          - "(?i)/docs/.*index\\.html.*Apache\\s+Tomcat"

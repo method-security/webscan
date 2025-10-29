@@ -6,7 +6,7 @@ info:
   description: Detects Cisco DCNM web interfaces using simple title and keyword matches.
   metadata:
     method-application-type: NETWORK_CONTROLLER
-    method-module-name: CISCO_DCNM
+    method-module-name: CISCO_DATA_CENTER_NETWORK_MANAGER
   tags: discovery,cisco,dcnm,network-controller,network-management-system
 requests:
   - method: GET

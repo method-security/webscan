@@ -28,4 +28,3 @@ requests:
         regex:
           - '(?i)<title[^>]*>.*(ASDM|Adaptive Security Device Manager).*<\/title>'
           - '(?i)Adaptive\s+Security\s+Device\s+Manager'
-          - '(?i)\bASDM\b'

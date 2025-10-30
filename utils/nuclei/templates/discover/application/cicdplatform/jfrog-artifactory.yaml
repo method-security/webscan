@@ -1,0 +1,24 @@
+id: jfrog-artifactory-detect
+info:
+  name: JFrog Artifactory Detection
+  author: method-security
+  severity: info
+  description: Detects JFrog Artifactory installations by analyzing response headers, body content, and common paths
+  metadata:
+    method-application-type: CI_CD_PLATFORM
+    method-module-name: JFROG_ARTIFACTORY
+    cpe: cpe:2.3:a:jfrog:artifactory:*:*:*:*:*:*:*:*
+  tags: discovery,jfrog,artifactory,artifact-repository,cicd
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/ui/login/"
+      - "{{BaseURL}}/ui/favicon.ico"
+
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'status_code==200 && contains(body, "<title>JFrog")'
+          - 'status_code==200 && ("-595620639" == mmh3(base64_py(body)))'
+        condition: or

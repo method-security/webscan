@@ -48,6 +48,7 @@ types:
       resourceType: ApplicationResourceType
       module: string
       detectionState: optional<ApplicationDetectionState>
+      cpe: optional<string>
       request: http.HttpRequestResponse
       finding: boolean
   ApplicationFingerprintTarget:

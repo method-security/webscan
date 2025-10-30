@@ -27,8 +27,6 @@ requests:
       - type: regex
         part: body
         regex:
-          - '(?i)\+CSCOU\+/csco_logo\.gif'
-          - '(?i)function\s+CSCO_Format\(fmt\)'
           - '(?i)<title[^>]*>(?:Cisco ASA|Adaptive Security Appliance)[^<]*</title>'
       - type: word
         part: header

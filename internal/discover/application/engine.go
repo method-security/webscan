@@ -21,9 +21,10 @@ func convertNucleiAttemptToFingerprintAttemptStruct(nucleiAttempt *nuclei.Nuclei
 		return nil
 	}
 
-	// Extract resource type and module from template metadata
+	// Extract resource type, module, and detection state from template metadata
 	var resourceTypeMetadata discover.ApplicationResourceType
 	var moduleNameFromMetadata string
+	var detectionStateFromMetadata *discover.ApplicationDetectionState
 
 	// Parse metadata from the Nuclei finding if available
 	if nucleiAttempt.Finding != nil && nucleiAttempt.Finding.Metadata != nil {
@@ -38,14 +39,22 @@ func convertNucleiAttemptToFingerprintAttemptStruct(nucleiAttempt *nuclei.Nuclei
 		if moduleStr, exists := nucleiAttempt.Finding.Metadata["method-module-name"]; exists {
 			moduleNameFromMetadata = strings.ToUpper(moduleStr)
 		}
+
+		// Check for method-detection-state in metadata
+		if detectionStateStr, exists := nucleiAttempt.Finding.Metadata["method-detection-state"]; exists {
+			if detectionState, err := discover.NewApplicationDetectionStateFromString(detectionStateStr); err == nil {
+				detectionStateFromMetadata = &detectionState
+			}
+		}
 	}
 
 	// Create the simplified fingerprint attempt using the new Fern structure
 	attempt := &discover.ApplicationFingerprintAttempt{
-		ResourceType: resourceTypeMetadata,
-		Module:       moduleNameFromMetadata,
-		Finding:      true,
-		Request:      nucleiAttempt.HttpRequestResponse,
+		ResourceType:   resourceTypeMetadata,
+		Module:         moduleNameFromMetadata,
+		DetectionState: detectionStateFromMetadata,
+		Finding:        true,
+		Request:        nucleiAttempt.HttpRequestResponse,
 	}
 
 	return attempt

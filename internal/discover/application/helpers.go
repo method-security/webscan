@@ -28,18 +28,18 @@ func getTemplatePaths(resourceConfigType *discover.ApplicationResourceConfigType
 
 	// Map resource types to base template paths (without request method subdirectory)
 	resourceTypeToPath := map[discover.ApplicationResourceType]string{
-		discover.ApplicationResourceTypeApiApplication:          "apiapplication",
-		discover.ApplicationResourceTypeCiCdPlatform:            "cicdplatform",
-		discover.ApplicationResourceTypeCloudBucket:             "cloudbucket",
-		discover.ApplicationResourceTypeContentManagementSystem: "contentmanagementsystem",
-		discover.ApplicationResourceTypeFirewall:                "firewall",
+		discover.ApplicationResourceTypeApiApplication:           "apiapplication",
+		discover.ApplicationResourceTypeCiCdPlatform:             "cicdplatform",
+		discover.ApplicationResourceTypeCloudBucket:              "cloudbucket",
+		discover.ApplicationResourceTypeContentManagementSystem:  "contentmanagementsystem",
+		discover.ApplicationResourceTypeFirewall:                 "firewall",
 		discover.ApplicationResourceTypeHardwareManagementSystem: "hardwaremanagementsystem",
-		discover.ApplicationResourceTypeHypervisor:              "hypervisor",
-		discover.ApplicationResourceTypeKube:                    "kube",
-		discover.ApplicationResourceTypeNetworkController:       "networkcontroller",
-		discover.ApplicationResourceTypeNetworkManagementSystem: "networkmanagementsystem",
-		discover.ApplicationResourceTypeVdiApplication:          "vdiapplication",
-		discover.ApplicationResourceTypeWebServer:               "webserver",
+		discover.ApplicationResourceTypeHypervisor:               "hypervisor",
+		discover.ApplicationResourceTypeKube:                     "kube",
+		discover.ApplicationResourceTypeNetworkController:        "networkcontroller",
+		discover.ApplicationResourceTypeNetworkManagementSystem:  "networkmanagementsystem",
+		discover.ApplicationResourceTypeVdiApplication:           "vdiapplication",
+		discover.ApplicationResourceTypeWebServer:                "webserver",
 	}
 
 	var templatePaths []string

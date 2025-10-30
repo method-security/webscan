@@ -6,7 +6,9 @@ info:
   description: Detects default Apache Tomcat welcome page and accessible default manager interfaces that may indicate a default or misconfigured installation
   metadata:
     method-application-type: WEB_SERVER
-    method-module-name: DEFAULT_TOMCAT_MANAGER
+    method-module-name: TOMCAT_MANAGER
+    method-detection-state: DEFAULT_PAGE
+    cpe: cpe:2.3:a:apache:tomcat:*:*:*:*:*:*:*:*
   tags: discovery,tomcat,default-page,manager,misconfiguration
 http:
   - method: GET

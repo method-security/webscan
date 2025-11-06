@@ -7,6 +7,7 @@ info:
   metadata:
     method-application-type: CI_CD_PLATFORM
     method-module-name: JENKINS
+    cpe: cpe:2.3:a:jenkins:jenkins:*:*:*:*:*:*:*:*
   tags: discovery,jenkins,cicd
 http:
   - method: GET

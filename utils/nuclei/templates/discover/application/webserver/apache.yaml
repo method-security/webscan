@@ -7,6 +7,7 @@ info:
   metadata:
     method-application-type: WEB_SERVER
     method-module-name: APACHE
+    cpe: cpe:2.3:a:apache:http_server:*:*:*:*:*:*:*:*
   tags: discovery,apache,webserver
 http:
   - method: GET

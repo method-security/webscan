@@ -7,6 +7,7 @@ info:
   metadata:
     method-application-type: NETWORK_CONTROLLER
     method-module-name: CISCO_DATA_CENTER_NETWORK_MANAGER
+    cpe: cpe:2.3:a:cisco:data_center_network_manager:*:*:*:*:*:*:*:*
   tags: discovery,cisco,dcnm,network-controller,network-management-system
 requests:
   - method: GET

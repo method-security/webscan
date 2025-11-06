@@ -7,6 +7,7 @@ info:
   metadata:
     method-application-type: CONTENT_MANAGEMENT_SYSTEM
     method-module-name: MODX
+    cpe: cpe:2.3:a:modx:modx:*:*:*:*:*:*:*:*
   tags: discovery,modx,cms
 http:
   - method: GET

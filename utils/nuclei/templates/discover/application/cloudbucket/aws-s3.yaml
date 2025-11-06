@@ -7,6 +7,7 @@ info:
   metadata:
     method-application-type: CLOUD_BUCKET
     method-module-name: AWSS3
+    cpe: cpe:2.3:a:amazon:s3:*:*:*:*:*:*:*:*
   tags: discovery,aws,s3,cloud
 http:
   - method: GET

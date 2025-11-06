@@ -7,6 +7,7 @@ info:
   metadata:
     method-application-type: VDI_APPLICATION
     method-module-name: CITRIX_GATEWAY
+    cpe: cpe:2.3:a:citrix:gateway:*:*:*:*:*:*:*:*
   tags: discovery,citrix,gateway,vdi
 http:
   - method: GET

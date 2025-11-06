@@ -7,6 +7,7 @@ info:
   metadata:
     method-application-type: WEB_SERVER
     method-module-name: TENGINE
+    cpe: cpe:2.3:a:taobao:tengine:*:*:*:*:*:*:*:*
   tags: discovery,tengine,webserver
 http:
   - method: GET

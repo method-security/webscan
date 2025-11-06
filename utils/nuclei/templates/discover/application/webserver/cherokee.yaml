@@ -7,6 +7,7 @@ info:
   metadata:
     method-application-type: WEB_SERVER
     method-module-name: CHEROKEE
+    cpe: cpe:2.3:a:cherokee-project:cherokee:*:*:*:*:*:*:*:*
   tags: discovery,cherokee,webserver
 http:
   - method: GET

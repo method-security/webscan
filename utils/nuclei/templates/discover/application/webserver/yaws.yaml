@@ -7,6 +7,7 @@ info:
   metadata:
     method-application-type: WEB_SERVER
     method-module-name: YAWS
+    cpe: cpe:2.3:a:yaws:yaws:*:*:*:*:*:*:*:*
   tags: discovery,yaws,webserver
 http:
   - method: GET

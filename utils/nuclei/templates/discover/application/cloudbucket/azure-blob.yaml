@@ -7,6 +7,7 @@ info:
   metadata:
     method-application-type: CLOUD_BUCKET
     method-module-name: AZUREBLOB
+    cpe: cpe:2.3:a:microsoft:azure_blob_storage:*:*:*:*:*:*:*:*
   tags: discovery,azure,blob,cloud
 http:
   - method: GET

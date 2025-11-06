@@ -7,6 +7,7 @@ info:
   metadata:
     method-application-type: VDI_APPLICATION
     method-module-name: WINDOWS_RDP
+    cpe: cpe:2.3:a:microsoft:remote_desktop_gateway:*:*:*:*:*:*:*:*
   tags: discovery,microsoft,rdp,vdi
 http:
   - method: GET

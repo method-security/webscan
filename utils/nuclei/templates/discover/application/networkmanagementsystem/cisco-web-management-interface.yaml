@@ -7,6 +7,7 @@ info:
   metadata:
     method-application-type: NETWORK_MANAGEMENT_SYSTEM
     method-module-name: CISCO_WEB_INTERFACE
+    cpe: cpe:2.3:a:cisco:ios:*:*:*:*:*:*:*:*
   tags: discovery,cisco,web-management,network-management-system
 requests:
   - method: GET

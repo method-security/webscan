@@ -7,6 +7,7 @@ info:
   metadata:
     method-application-type: CONTENT_MANAGEMENT_SYSTEM
     method-module-name: DRUPAL
+    cpe: cpe:2.3:a:drupal:drupal:*:*:*:*:*:*:*:*
   tags: discovery,drupal,cms
 http:
   - method: GET

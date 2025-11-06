@@ -10,6 +10,7 @@ info:
   metadata:
     method-application-type: NETWORK_CONTROLLER
     method-module-name: CISCO_MERAKI
+    cpe: cpe:2.3:a:cisco:meraki_dashboard:*:*:*:*:*:*:*:*
   tags: discovery,cisco,meraki,dashboard,network-controller
 requests:
   - method: GET

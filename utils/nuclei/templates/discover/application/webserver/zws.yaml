@@ -7,6 +7,7 @@ info:
   metadata:
     method-application-type: WEB_SERVER
     method-module-name: ZWS
+    cpe: cpe:2.3:a:zope:zope:*:*:*:*:*:*:*:*
   tags: discovery,zws,zope,webserver
 http:
   - method: GET

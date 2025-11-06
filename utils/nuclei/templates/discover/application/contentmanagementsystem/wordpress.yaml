@@ -7,6 +7,7 @@ info:
   metadata:
     method-application-type: CONTENT_MANAGEMENT_SYSTEM
     method-module-name: WORDPRESS
+    cpe: cpe:2.3:a:wordpress:wordpress:*:*:*:*:*:*:*:*
   tags: discovery,wordpress,cms
 http:
   - method: GET

@@ -7,6 +7,7 @@ info:
   metadata:
     method-application-type: HYPERVISOR
     method-module-name: VMWARE_VSPHERE
+    cpe: cpe:2.3:a:vmware:vcenter_server:*:*:*:*:*:*:*:*
   tags: discovery,vmware,vsphere,vcenter,hypervisor
 http:
   - method: GET

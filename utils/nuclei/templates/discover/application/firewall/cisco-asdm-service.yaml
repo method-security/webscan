@@ -10,6 +10,7 @@ info:
   metadata:
     method-application-type: FIREWALL
     method-module-name: CISCO_ASDM
+    cpe: cpe:2.3:a:cisco:adaptive_security_device_manager:*:*:*:*:*:*:*:*
   tags: discovery,cisco,asdm,asa,firewall,webvpn
 requests:
   - method: GET

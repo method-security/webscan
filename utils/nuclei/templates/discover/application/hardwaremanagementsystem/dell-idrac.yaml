@@ -7,6 +7,7 @@ info:
   metadata:
     method-application-type: HARDWARE_MANAGEMENT_SYSTEM
     method-module-name: DELL_IDRAC
+    cpe: cpe:2.3:a:dell:idrac:*:*:*:*:*:*:*:*
   tags: discovery,dell,idrac,bmc,remote-management
 http:
   - method: GET

@@ -7,6 +7,7 @@ info:
   metadata:
     method-application-type: FIREWALL
     method-module-name: CISCO_FIREPOWER_MANAGEMENT_CENTER
+    cpe: cpe:2.3:a:cisco:firepower_management_center:*:*:*:*:*:*:*:*
   tags: discovery,cisco,firepower,fmc,management-center,firewall
 requests:
   - method: GET

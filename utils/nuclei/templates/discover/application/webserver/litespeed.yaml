@@ -7,6 +7,7 @@ info:
   metadata:
     method-application-type: WEB_SERVER
     method-module-name: LITESPEED
+    cpe: cpe:2.3:a:litespeedtech:litespeed_web_server:*:*:*:*:*:*:*:*
   tags: discovery,litespeed,webserver
 http:
   - method: GET

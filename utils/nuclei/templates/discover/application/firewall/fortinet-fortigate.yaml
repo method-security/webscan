@@ -11,6 +11,7 @@ info:
   metadata:
     method-application-type: FIREWALL
     method-module-name: FORTINET_FORTIGATE
+    cpe: cpe:2.3:a:fortinet:fortigate:*:*:*:*:*:*:*:*
   tags: discovery,fortinet,fortigate,firewall,ssl-vpn,webvpn,admin
 
 requests:

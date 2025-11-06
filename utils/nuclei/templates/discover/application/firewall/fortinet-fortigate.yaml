@@ -29,20 +29,20 @@ requests:
       - type: regex
         part: body
         regex:
-          - '(?i)<title>.*FortiGate.*</title>'
-          - '(?i)Fortinet Technologies'
-          - '(?i)FortiGate SSL VPN'
-          - '(?i)fgtauth'
+          - "(?i)<title>.*FortiGate.*</title>"
+          - "(?i)Fortinet Technologies"
+          - "(?i)FortiGate SSL VPN"
+          - "(?i)fgtauth"
           - '(?i)var\s+FORTIOS_LANG'
       - type: word
         part: header
         words:
-          - 'set-cookie: FGTLanguage'
-          - 'Fortinet'
+          - "set-cookie: FGTLanguage"
+          - "Fortinet"
         case-insensitive: true
       - type: word
         part: body
         words:
-          - '<title>FortiGate Login</title>'
-          - '<title>FortiGate</title>'
+          - "<title>FortiGate Login</title>"
+          - "<title>FortiGate</title>"
         case-insensitive: true

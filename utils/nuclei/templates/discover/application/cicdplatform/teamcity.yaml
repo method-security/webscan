@@ -1,0 +1,32 @@
+id: teamcity-detect
+info:
+  name: TeamCity Detection
+  author: method-security
+  severity: info
+  description: Detects JetBrains TeamCity instances by analyzing response headers and content
+  metadata:
+    method-application-type: CI_CD_PLATFORM
+    method-module-name: TEAMCITY
+  tags: discovery,teamcity,cicd
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/app/rest/server"
+      - "{{BaseURL}}/login.html"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: word
+        part: header
+        words:
+          - "teamcity"
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "<title>TeamCity"
+          - "Sign in to TeamCity"
+          - "TeamCity server"
+        case-insensitive: true

@@ -1,0 +1,35 @@
+id: clearpass-exposed-detect
+info:
+  name: ClearPass Policy Manager Detection
+  author: method-security
+  severity: info
+  description: Detects exposed Aruba/HPE ClearPass Policy Manager web interfaces by inspecting headers and page content
+  metadata:
+    method-application-type: NETWORK_CONTROLLER
+    method-module-name: CLEARPASS_POLICY_MANAGER
+  tags: discovery,clearpass,network-controller
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/admin"
+      - "{{BaseURL}}/login"
+      - "{{BaseURL}}/guest"
+      - "{{BaseURL}}/guestportal"
+      - "{{BaseURL}}/cppm"
+      - "{{BaseURL}}/portal"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: word
+        part: header
+        words:
+          - "clearpass"
+        case-insensitive: true
+      - type: regex
+        part: body
+        regex:
+          - "(?i)ClearPass\\s+Policy\\s+Manager"
+          - "(?i)<title>.*ClearPass"
+          - "(?i)ClearPass\\s+Guest"

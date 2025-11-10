@@ -22,33 +22,33 @@ http:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
+    matchers-condition: or
     matchers:
       - type: regex
         part: body
         regex:
-          - '(?i)<title[^>]*>.*SONiC.*</title>'
-          - '(?i)Enterprise\s+SONiC'
-          - '(?i)Dell.*SONiC'
-          - '(?i)sonic-mgmt-framework'
+          - '(?i)<title[^>]*>.*Dell\s+(Enterprise\s+)?SONiC.*</title>'
+          - '(?i)Enterprise\s+SONiC\s+(Distribution|OS|Operating\s+System)'
+          - '(?i)Dell\s+Enterprise\s+SONiC'
+          - '(?i)sonic-mgmt-framework.*restconf'
       - type: word
         part: body
         words:
-          - "SONiC"
           - "sonic-mgmt-framework"
           - "Enterprise SONiC"
+        case-insensitive: true
+        condition: and
+      - type: word
+        part: body
+        words:
           - "Dell SONiC"
           - "restconf/data"
-          - "ietf-yang-library"
-          - "ietf-restconf-monitoring"
         case-insensitive: true
+        condition: and
       - type: word
         part: header
         words:
           - "SONiC"
           - "sonic-mgmt"
         case-insensitive: true
-      - type: regex
-        part: header
-        regex:
-          - '(?i)sonic'
-          - '(?i)restconf'
+        condition: and

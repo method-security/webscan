@@ -19,33 +19,41 @@ http:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
+    matchers-condition: or
     matchers:
       - type: regex
         part: body
         regex:
-          - '(?i)<title[^>]*>.*BIG-IP.*</title>'
-          - '(?i)F5\s*BIG-IP\s*(Configuration\s*Utility|Login)'
-          - '(?i)BIG-IP\s*(Configuration|Management|Login)'
+          - '(?i)<title[^>]*>.*BIG-IP.*Configuration\s*Utility.*</title>'
+          - '(?i)F5\s*BIG-IP\s*(Configuration\s*Utility|Management\s*Console)'
+          - '(?i)BIG-IP.*Configuration\s*Utility.*Login'
       - type: word
         part: body
         words:
           - "BIG-IP"
-          - "F5 Networks"
           - "tmui/login"
-          - "Configuration Utility"
-          - "F5 BIG-IP"
-          - "/tmui/"
-          - "F5_LOGON_PAGE"
         case-insensitive: true
+        condition: and
+      - type: word
+        part: body
+        words:
+          - "F5 BIG-IP"
+          - "Configuration Utility"
+        case-insensitive: true
+        condition: and
+      - type: word
+        part: body
+        words:
+          - "F5_LOGON_PAGE"
+          - "/tmui/"
+        case-insensitive: true
+        condition: and
       - type: word
         part: header
         words:
-          - "BIG-IP"
           - "F5-TrafficShield"
-          - "BigIP"
         case-insensitive: true
       - type: regex
         part: header
         regex:
-          - '(?i)F5[-_]'
-          - '(?i)BigIP'
+          - '(?i)Server:\s*BigIP'

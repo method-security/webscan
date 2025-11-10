@@ -1,0 +1,51 @@
+id: f5-bigip-detect
+info:
+  name: F5 BIG-IP Configuration Utility Detection
+  author: method-security
+  severity: info
+  description: Detects F5 BIG-IP Configuration Utility web management interfaces by identifying login pages, authentication endpoints, and F5-specific branding elements.
+  metadata:
+    method-application-type: NETWORK_MANAGEMENT_SYSTEM
+    method-module-name: F5_BIGIP
+  tags: discovery,f5,bigip,load-balancer,adc,network-management
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/tmui/login.jsp"
+      - "{{BaseURL}}/tmui/tmui/login/welcome.jsp"
+      - "{{BaseURL}}/xui/"
+      - "{{BaseURL}}/my.policy"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: regex
+        part: body
+        regex:
+          - '(?i)<title[^>]*>.*BIG-IP.*</title>'
+          - '(?i)F5\s*BIG-IP\s*(Configuration\s*Utility|Login)'
+          - '(?i)BIG-IP\s*(Configuration|Management|Login)'
+      - type: word
+        part: body
+        words:
+          - "BIG-IP"
+          - "F5 Networks"
+          - "tmui/login"
+          - "Configuration Utility"
+          - "F5 BIG-IP"
+          - "/tmui/"
+          - "F5_LOGON_PAGE"
+        case-insensitive: true
+      - type: word
+        part: header
+        words:
+          - "BIG-IP"
+          - "F5-TrafficShield"
+          - "BigIP"
+        case-insensitive: true
+      - type: regex
+        part: header
+        regex:
+          - '(?i)F5[-_]'
+          - '(?i)BigIP'

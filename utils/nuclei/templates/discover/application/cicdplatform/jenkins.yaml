@@ -21,7 +21,7 @@ http:
       - type: word
         part: header
         words:
-          - "x-jenkins"
+          - "jenkins"
         case-insensitive: true
       - type: regex
         part: body

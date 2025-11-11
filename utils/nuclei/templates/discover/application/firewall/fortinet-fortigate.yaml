@@ -13,7 +13,6 @@ info:
     method-module-name: FORTINET_FORTIGATE
     cpe: cpe:2.3:a:fortinet:fortigate:*:*:*:*:*:*:*:*
   tags: discovery,fortinet,fortigate,firewall,ssl-vpn,webvpn,admin
-
 requests:
   - method: GET
     path:
@@ -35,12 +34,11 @@ requests:
           - '(?i)FortiGate SSL VPN'
           - '(?i)fgtauth'
           - '(?i)var\s+FORTIOS_LANG'
-            - type: word
+      - type: word
         part: header
         words:
           - 'set-cookie: FGTLanguage'
-          - 'Server: Fortinet'
-          - 'X-Frame-Options: SAMEORIGIN'
+          - 'Fortinet'
         case-insensitive: true
       - type: word
         part: body

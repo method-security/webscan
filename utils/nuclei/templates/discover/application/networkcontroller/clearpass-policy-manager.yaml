@@ -34,4 +34,4 @@ http:
           - "(?i)ClearPass\\s+Policy\\s+Manager"
           - "(?i)<title>.*ClearPass"
           - "(?i)ClearPass\\s+Guest"
-          - "(?i)(?=.*clearpass)(?=.*aruba)"
+          - "(?i)clearpass.*aruba|aruba.*clearpass"

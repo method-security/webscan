@@ -30,7 +30,7 @@ http:
           - '(?i)<title[^>]*>.*Dell\s+(Enterprise\s+)?SONiC.*</title>'
           - '(?i)Enterprise\s+SONiC\s+(Distribution|OS|Operating\s+System)'
           - '(?i)Dell\s+Enterprise\s+SONiC'
-          - '(?i)sonic-mgmt-framework.*restconf'
+          - "(?i)sonic-mgmt-framework.*restconf"
       - type: word
         part: body
         words:
@@ -48,7 +48,5 @@ http:
       - type: word
         part: header
         words:
-          - "SONiC"
           - "sonic-mgmt"
         case-insensitive: true
-        condition: and

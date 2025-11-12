@@ -1,0 +1,55 @@
+id: moveit-transfer-detect
+info:
+  name: MOVEit Transfer Application Detection
+  author: method-security
+  severity: info
+  description: Detects MOVEit Transfer managed file transfer application by identifying login pages, authentication endpoints, and MOVEit-specific branding elements.
+  metadata:
+    method-application-type: FILE_TRANSFER_APPLICATION
+    method-module-name: MOVEIT_TRANSFER
+  tags: discovery,moveit,file-transfer,mft
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/human.aspx"
+      - "{{BaseURL}}/login.aspx"
+      - "{{BaseURL}}/moveitisapi/moveitisapi.dll"
+      - "{{BaseURL}}/guestaccess.aspx"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: regex
+        part: body
+        regex:
+          - '(?i)<title[^>]*>.*MOVEit\s*Transfer.*</title>'
+          - '(?i)MOVEit\s*Transfer\s*(Login|Web\s*Access|Management\s*Console)'
+          - '(?i)Progress\s*Software.*MOVEit\s*Transfer'
+      - type: word
+        part: body
+        words:
+          - "MOVEit Transfer"
+          - "moveitisapi"
+        case-insensitive: true
+        condition: and
+      - type: word
+        part: body
+        words:
+          - "MOVEit"
+          - "human.aspx"
+          - ".aspx"
+        case-insensitive: true
+        condition: and
+      - type: word
+        part: body
+        words:
+          - "guestaccess.aspx"
+          - "MOVEit"
+        case-insensitive: true
+        condition: and
+      - type: word
+        part: header
+        words:
+          - "moveitisapi"
+        case-insensitive: true

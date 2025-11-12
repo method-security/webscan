@@ -1,0 +1,52 @@
+id: dell-sonic-detect
+info:
+  name: Dell Enterprise SONiC Detection
+  author: method-security
+  severity: info
+  description: Detects Dell Enterprise SONiC (Software for Open Networking in the Cloud) network operating system REST API and management interfaces
+  metadata:
+    method-application-type: NETWORK_MANAGEMENT_SYSTEM
+    method-module-name: DELL_SONIC
+  tags: discovery,dell,sonic,switch,network-os,restconf,rest-api
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/.well-known/host-meta"
+      - "{{BaseURL}}/restconf"
+      - "{{BaseURL}}/restconf/yang-library-version"
+      - "{{BaseURL}}/restconf/data/ietf-yang-library:modules-state"
+      - "{{BaseURL}}/restconf/data/ietf-restconf-monitoring:restconf-state/capabilities"
+      - "{{BaseURL}}/ui"
+      - "{{BaseURL}}/login"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers-condition: or
+    matchers:
+      - type: regex
+        part: body
+        regex:
+          - '(?i)<title[^>]*>.*Dell\s+(Enterprise\s+)?SONiC.*</title>'
+          - '(?i)Enterprise\s+SONiC\s+(Distribution|OS|Operating\s+System)'
+          - '(?i)Dell\s+Enterprise\s+SONiC'
+          - "(?i)sonic-mgmt-framework.*restconf"
+      - type: word
+        part: body
+        words:
+          - "sonic-mgmt-framework"
+          - "Enterprise SONiC"
+        case-insensitive: true
+        condition: and
+      - type: word
+        part: body
+        words:
+          - "Dell SONiC"
+          - "restconf/data"
+        case-insensitive: true
+        condition: and
+      - type: word
+        part: header
+        words:
+          - "sonic-mgmt"
+        case-insensitive: true

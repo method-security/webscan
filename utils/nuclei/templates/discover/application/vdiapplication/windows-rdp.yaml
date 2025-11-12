@@ -30,5 +30,4 @@ http:
       - type: regex
         part: body
         regex:
-          - "(?i)<form.*id=.*(loginForm|logonForm)"
           - "(?i)RDWeb.*login\\.aspx"

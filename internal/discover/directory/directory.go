@@ -302,8 +302,10 @@ func baseLine(ctx context.Context, baseURL string, path string, validCodes map[i
 		return nil, nil, nil, err
 	}
 
-	if request.Response == nil || !validCodes[*request.Response.StatusCode] {
-		return nil, nil, nil, errors.New("baseline request failed")
+	// For baseline, we accept any response as long as we get one - even 403, 404, etc.
+	// The baseline is used for comparison, so we need content regardless of status code
+	if request.Response == nil {
+		return nil, nil, nil, errors.New("baseline request failed - no response received")
 	}
 
 	bodySize := len(*requesthelpers.GetResponseBodyStringFromBodyStruct(request.Response.ResponseBody))

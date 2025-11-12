@@ -8,6 +8,7 @@ types:
       - FILES
   WordlistSize:
     enum:
+      - TINY
       - SMALL
       - MEDIUM
       - LARGE

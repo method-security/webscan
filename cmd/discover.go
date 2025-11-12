@@ -146,12 +146,15 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			wordlistType = strings.ToUpper(wordlistType)
+
 			// Wordlist Size flag
 			wordlistSize, err := cmd.Flags().GetString("wordlist-size")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			wordlistSize = strings.ToUpper(wordlistSize)
 
 			// Validation: at least one input method must be specified
 			if len(paths) == 0 && wordlistType == "" {
@@ -247,7 +250,7 @@ func (a *WebScan) InitDiscoverCommand() {
 	// Directory Discovery Flags
 	discoverDirectoryCmd.Flags().StringSlice("paths", []string{}, "Paths to scan")
 	discoverDirectoryCmd.Flags().String("wordlist-type", "", "Type of wordlist to use automatically (directories, files)")
-	discoverDirectoryCmd.Flags().String("wordlist-size", "", "Size of wordlist to use (small, medium, large)")
+	discoverDirectoryCmd.Flags().String("wordlist-size", "", "Size of wordlist to use (TINY, SMALL, MEDIUM, LARGE)")
 	discoverDirectoryCmd.Flags().StringSlice("http-methods", []string{"GET"}, "HTTP methods to use (e.g. GET,POST,PUT)")
 	// Config Flags
 	discoverDirectoryCmd.Flags().String("response-codes", "200-299", "Response codes to consider as valid responses")

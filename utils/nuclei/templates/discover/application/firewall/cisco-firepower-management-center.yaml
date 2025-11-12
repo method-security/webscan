@@ -22,7 +22,6 @@ requests:
       - type: word
         part: body
         words:
-          - "Firepower Management Center"
           - "Cisco Firepower Management Center"
           - "Cisco FMC Login"
           - "Cisco Firepower System"

@@ -14,7 +14,6 @@ http:
       - "{{BaseURL}}"
       - "{{BaseURL}}/human.aspx"
       - "{{BaseURL}}/login.aspx"
-      - "{{BaseURL}}/moveitisapi/moveitisapi.dll"
       - "{{BaseURL}}/guestaccess.aspx"
     redirects: true
     max-redirects: 5
@@ -32,22 +31,6 @@ http:
           - "MOVEit Transfer"
           - "moveitisapi"
         case-insensitive: true
-        condition: and
-      - type: word
-        part: body
-        words:
-          - "MOVEit"
-          - "human.aspx"
-          - ".aspx"
-        case-insensitive: true
-        condition: and
-      - type: word
-        part: body
-        words:
-          - "guestaccess.aspx"
-          - "MOVEit"
-        case-insensitive: true
-        condition: and
       - type: word
         part: header
         words:

@@ -1,0 +1,32 @@
+id: simple-xss-test
+
+info:
+  name: Simple XSS Test
+  author: method-security
+  severity: high
+  description: Fast XSS detection test
+  tags: xss,test
+
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}?q=<script>alert('XSS')</script>"
+      - "{{BaseURL}}?search=<img src=x onerror=alert('XSS')>"
+
+    matchers-condition: or
+    matchers:
+      - type: word
+        words:
+          - "<script>alert('XSS')</script>"
+          - "<img src=x onerror=alert('XSS')"
+        part: body
+
+      - type: word
+        words:
+          - "alert('XSS')"
+        part: body
+
+    extractors:
+      - type: regex
+        regex:
+          - '(alert\([^)]+\))'

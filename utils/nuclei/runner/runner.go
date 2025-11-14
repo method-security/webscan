@@ -152,7 +152,7 @@ func buildNucleiOptions(cfg Config, templateDir, workflowDir string) []nucleilib
 		nucleilib.DisableUpdateCheck(),
 		nucleilib.EnableHeadlessWithOpts(
 			&nucleilib.HeadlessOpts{
-				PageTimeout: 30,
+				PageTimeout: cfg.Timeout, // Use config timeout instead of fixed 30s
 				ShowBrowser: false,
 				UseChrome:   true,
 				HeadlessOptions: func() []string {
@@ -162,6 +162,9 @@ func buildNucleiOptions(cfg Config, templateDir, workflowDir string) []nucleilib
 						"--disable-gpu",           // GPU isn't available in headless Linux anyway
 						"--mute-audio",
 						"--disable-background-timer-throttling",
+						"--disable-web-security",                         // helps bypass some WAF restrictions
+						"--disable-features=VizDisplayCompositor",        // prevent hanging
+						"--timeout=" + fmt.Sprintf("%d000", cfg.Timeout), // JavaScript timeout in milliseconds
 					}
 					if cfg.Proxy != "" {
 						baseOptions = append(baseOptions, "--proxy-server="+cfg.Proxy)
@@ -194,6 +197,8 @@ func buildNucleiOptions(cfg Config, templateDir, workflowDir string) []nucleilib
 		// Explicitly set StopAtFirstMatch to false to ensure we get all requests
 		func(e *nucleilib.NucleiEngine) error {
 			e.Options().StopAtFirstMatch = false
+			// Add timeout configuration
+			e.Options().Timeout = cfg.Timeout
 			return nil
 		},
 	}
@@ -283,6 +288,13 @@ func Run(ctx context.Context, cfg Config, reportBuilder *report.Builder) ([]*nuc
 		return nil, err
 	}
 
+	// Add a maximum execution timeout for the entire scan to prevent hanging
+	maxScanTime := time.Duration(cfg.Timeout*20) * time.Second // 20x timeout for total scan time
+	scanCtx, cancel := context.WithTimeout(ctx, maxScanTime)
+	defer cancel()
+
+	log.Info("Scan will timeout after", svc1log.SafeParam("maxScanTime", maxScanTime))
+
 	log.Info("Copying templates and workflows to tmp dirs")
 	templateDir, workflowDir, err := copyFilesToTmpDirs(cfg)
 	if err != nil {
@@ -297,7 +309,7 @@ func Run(ctx context.Context, cfg Config, reportBuilder *report.Builder) ([]*nuc
 	opts := buildNucleiOptions(cfg, templateDir, workflowDir)
 
 	log.Info("Creating Nuclei engine")
-	eng, err := nucleilib.NewNucleiEngineCtx(ctx, opts...)
+	eng, err := nucleilib.NewNucleiEngineCtx(scanCtx, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -317,7 +329,7 @@ func Run(ctx context.Context, cfg Config, reportBuilder *report.Builder) ([]*nuc
 	}
 
 	log.Info("Executing Nuclei engine")
-	if err := eng.ExecuteCallbackWithCtx(ctx, reportBuilder.Consume); err != nil {
+	if err := eng.ExecuteCallbackWithCtx(scanCtx, reportBuilder.Consume); err != nil {
 		return nil, err
 	}
 

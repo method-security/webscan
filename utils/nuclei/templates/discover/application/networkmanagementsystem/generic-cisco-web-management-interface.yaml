@@ -1,6 +1,6 @@
-id: cisco-web-management-interface-detect
+id: generic-cisco-web-management-interface-detect
 info:
-  name: Cisco Web Management Interface Detection
+  name: Generic Cisco Web Management Interface Detection
   author: method-security
   severity: info
   description: Detects Cisco router, switch, and network device management interfaces by identifying Cisco branding, admin patterns, and interface elements common across Cisco network products.

@@ -19,7 +19,6 @@ http:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
-    matchers-condition: or
     matchers:
       - type: regex
         name: meraki-title

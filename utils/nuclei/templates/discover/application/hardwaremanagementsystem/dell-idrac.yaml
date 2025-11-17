@@ -3,7 +3,7 @@ info:
   name: Dell iDRAC Detection
   author: method-security
   severity: info
-  description: Detects Dell iDRAC (Integrated Dell Remote Access Controller) web interfaces
+  description: High-accuracy detection of Dell iDRAC (Integrated Dell Remote Access Controller) management interfaces
   metadata:
     method-application-type: HARDWARE_MANAGEMENT_SYSTEM
     method-module-name: DELL_IDRAC
@@ -14,31 +14,28 @@ http:
     path:
       - "{{BaseURL}}"
       - "{{BaseURL}}/login.html"
-      - "{{BaseURL}}/restgui/start.html"
-      - "{{BaseURL}}/restgui/index.html"
       - "{{BaseURL}}/sysmgmt/2012/server/login"
+      - "{{BaseURL}}/restgui/start.html"
       - "{{BaseURL}}/data/login"
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
     matchers:
-      - type: word
-        part: body
-        words:
-          - "iDRAC"
-          - "Integrated Dell Remote Access Controller"
-          - "Dell Remote Access Controller"
-          - "idracType"
-          - "idrac-"
-        case-insensitive: true
-      - type: word
-        part: header
-        words:
-          - "iDRAC"
-        case-insensitive: true
       - type: regex
+        name: idrac-title
         part: body
         regex:
-          - "(?i)iDRAC[0-9]+"
-          - "(?i)dell\\s+(?:idrac|remote\\s+access)"
           - "(?i)<title>.*iDRAC.*</title>"
+      - type: word
+        name: idrac-headers
+        part: header
+        words:
+          - "Set-Cookie: idrac" # precise enough to avoid noise
+          - "Server: iDRAC"
+        case-insensitive: true
+      - type: regex
+        name: idrac-json-api
+        part: body
+        regex:
+          - "(?i)\"idrac[^\"]+\":\"[0-9A-Za-z._-]+\""     # fwVersion/idracModel fields
+          - "(?i)\"oem\":\"Dell\""                      # Redfish OEM block

@@ -25,7 +25,6 @@ requests:
       - type: regex
         part: body
         regex:
-          - '(?i)/ui/js/[^"]*fmc'
           - '(?i)/ui/assets/fmc/'
       - type: word
         part: body

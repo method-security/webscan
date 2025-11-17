@@ -30,12 +30,11 @@ http:
         name: idrac-headers
         part: header
         words:
-          - "Set-Cookie: idrac" # precise enough to avoid noise
+          - "Set-Cookie: idrac"
           - "Server: iDRAC"
         case-insensitive: true
       - type: regex
         name: idrac-json-api
         part: body
         regex:
-          - "(?i)\"idrac[^\"]+\":\"[0-9A-Za-z._-]+\""     # fwVersion/idracModel fields
-          - "(?i)\"oem\":\"Dell\""                      # Redfish OEM block
+          - "(?i)\"idrac[^\"]+\":\"[0-9A-Za-z._-]+\""

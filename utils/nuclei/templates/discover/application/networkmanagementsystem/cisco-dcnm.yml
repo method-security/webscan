@@ -44,5 +44,5 @@ requests:
         regex:
           - '(?i)dcnm-logo'
           - '(?i)cisco-logo.*dcnm'
-        matchers-condition: AND
+        matchers-condition: and
 

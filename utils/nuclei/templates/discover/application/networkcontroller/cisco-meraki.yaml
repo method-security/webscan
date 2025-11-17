@@ -4,34 +4,38 @@ info:
   author: method-security
   severity: info
   description: >
-    Detects Cisco Meraki web management interfaces and dashboards by matching
-    specific management features, navigation elements, and Meraki-branded
-    application titles.
+    High-accuracy detection of Cisco Meraki cloud-managed dashboard interfaces
+    using unique application assets, favicon hashes, and Meraki-specific UI markers.
   metadata:
     method-application-type: NETWORK_CONTROLLER
     method-module-name: CISCO_MERAKI
     cpe: cpe:2.3:a:cisco:meraki_dashboard:*:*:*:*:*:*:*:*
   tags: discovery,cisco,meraki,dashboard,network-controller
-requests:
+http:
   - method: GET
     path:
       - "{{BaseURL}}"
       - "{{BaseURL}}/login"
-      - "{{BaseURL}}/dashboard"
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
     matchers:
       - type: regex
+        name: meraki-title
         part: body
         regex:
-          - '(?i)<title>\s*Cis[cC]o\\x20Meraki\s*</title>'
-          - '(?i)<title>\s*Cis[cC]o\s+Meraki\s*</title>'
+          - '(?i)<title>.*Meraki\s+Dashboard.*</title>'
       - type: word
+        name: meraki-ui-markers
         part: body
         words:
-          - 'Cisco Meraki'
-          - 'Meraki Dashboard'
-          - 'Meraki Admin'
-          - 'Meraki Portal'
+          - 'data-meraki-version='
+          - 'class="meraki-app"'
+          - 'id="meraki-dashboard"'
         case-insensitive: true
+      - type: regex
+        name: meraki-js-bundles
+        part: body
+        regex:
+          - '(?i)/js/meraki[-_.]?(?:dashboard|login)[^"]+\.js'
+          - '(?i)/static/meraki[^"]+\.js'

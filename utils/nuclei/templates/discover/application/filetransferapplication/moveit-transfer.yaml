@@ -30,9 +30,18 @@ http:
         words:
           - "MOVEit Transfer"
           - "moveitisapi"
+          - "stylesheet_MOVEit"
+          - "MOVEit Mobile"
+          - "com.progress.moveit.transfer"
         case-insensitive: true
       - type: word
         part: header
         words:
           - "moveitisapi"
         case-insensitive: true
+      - type: regex
+        part: body
+        regex:
+          - '(?i)stylesheet_MOVEit[^"]*\.css'
+          - '(?i)app-id=com\.progress\.moveit\.transfer'
+          - '(?i)author.*Progress\s+Software\s+Corporation'

@@ -1,0 +1,77 @@
+id: kubernetes-enterprise-manager-detect
+info:
+  name: Exposed Kubernetes Enterprise Manager Application Detection
+  author: method-security
+  severity: info
+  description: Detects exposed Kubernetes Enterprise Manager applications, dashboards, and management consoles that may provide administrative access to cluster resources
+  metadata:
+    method-application-type: KUBE
+    method-module-name: KUBE
+    method-detection-state: MANAGEMENT_CONSOLE
+    cpe: cpe:2.3:a:kubernetes:kubernetes:*:*:*:*:*:*:*:*
+  tags: discovery,kubernetes,k8s,dashboard,manager,enterprise,management-console
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/dashboard"
+      - "{{BaseURL}}/k8s/dashboard"
+      - "{{BaseURL}}/ui"
+      - "{{BaseURL}}/console"
+      - "{{BaseURL}}/manager"
+      - "{{BaseURL}}/admin"
+      - "{{BaseURL}}/cluster"
+      - "{{BaseURL}}/workloads"
+      - "{{BaseURL}}/namespaces"
+      - "{{BaseURL}}/services"
+      - "{{BaseURL}}/ingress"
+      - "{{BaseURL}}/api/v1"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "Kubernetes Dashboard"
+          - "Kubernetes Web UI" 
+          - "Kubernetes Management Console"
+          - "k8s-app=kubernetes-dashboard"
+          - "Kubernetes Cluster Manager"
+          - "Enterprise Kubernetes Manager"
+        case-insensitive: true
+      - type: regex
+        part: body
+        regex:
+          - '(?i)<title[^>]*>.*Kubernetes.*Dashboard.*</title>'
+          - '(?i)<title[^>]*>.*K8s.*Manager.*</title>'
+          - '(?i)kubernetes.*management.*console'
+          - '(?i)cluster.*administration.*interface'
+      - type: word
+        part: body
+        words:
+          - '"app":"kubernetes-dashboard"'
+          - '"kubernetes.io/managed-by"'
+          - 'data-ng-app="kubernetesDashboard"'
+          - 'ng-app="kubernetesDashboard"'
+          - 'kubernetes-dashboard-head'
+          - 'kubernetes-dashboard'
+        case-insensitive: true
+      - type: regex
+        part: body
+        regex:
+          - '(?i)kubectl.*proxy.*dashboard'
+      - type: word
+        part: header
+        words:
+          - "kubernetes-dashboard"
+        case-insensitive: true
+      - type: dsl
+        dsl:
+          - '(contains(tolower(body), "cluster overview") || contains(tolower(body), "node overview") || contains(tolower(body), "pod status") || contains(tolower(body), "deployment status") || contains(tolower(body), "service discovery") || contains(tolower(body), "workload management") || contains(tolower(body), "resource monitoring")) && (contains(tolower(body), "kubernetes") || contains(tolower(body), "k8s") || contains(tolower(body), "kubectl") || contains(tolower(body), "namespace") || contains(tolower(body), "pod") || contains(tolower(body), "deployment") || contains(tolower(body), "configmap") || contains(tolower(body), "secret"))'
+      - type: dsl
+        dsl:
+          - 'contains(tolower(header), "x-rancher-version") && (contains(tolower(body), "ember-basic-dropdown") || contains(tolower(body), "/assets/vendor.css") || contains(tolower(body), "/assets/ui-"))'
+      - type: dsl
+        dsl:
+          - 'contains(tolower(header), "pl=rancher") && contains(tolower(body), "ember-basic-dropdown")'

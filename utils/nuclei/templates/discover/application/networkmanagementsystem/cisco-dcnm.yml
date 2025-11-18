@@ -9,7 +9,7 @@ info:
     method-module-name: CISCO_DCNM
     cpe: cpe:2.3:a:cisco:data_center_network_manager:*:*:*:*:*:*:*:*
   tags: discovery,cisco,dcnm,network-management-system
-requests:
+http:
   - method: GET
     path:
       - "{{BaseURL}}/dcnm-rest/v1/"
@@ -44,5 +44,3 @@ requests:
         regex:
           - '(?i)dcnm-logo'
           - '(?i)cisco-logo.*dcnm'
-        matchers-condition: and
-

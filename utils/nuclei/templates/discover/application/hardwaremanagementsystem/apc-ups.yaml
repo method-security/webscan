@@ -1,0 +1,46 @@
+id: apc-ups-detect
+info:
+  name: APC UPS Device Detection
+  author: method-security
+  severity: info
+  description: Detects exposed APC UPS (Uninterruptible Power Supply) devices and PDUs (Power Distribution Units) by identifying web management interfaces, login pages, and device-specific branding elements.
+  metadata:
+    method-application-type: HARDWARE_MANAGEMENT_SYSTEM
+    method-module-name: APC_UPS
+    method-detection-state: MANAGEMENT_CONSOLE
+    cpe: cpe:2.3:h:apc:*:*:*:*:*:*:*:*:*
+  tags: discovery,apc,ups,pdu,power,hardware,management-console
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/logon.htm"
+      - "{{BaseURL}}/home.htm"
+      - "{{BaseURL}}/login.htm"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "APC | Log On"
+          - "APC UPS Web Interface"
+        case-insensitive: true
+      - type: regex
+        part: body
+        regex:
+          - '(?i)<title[^>]*>APC\s*\|\s*Log\s*On</title>'
+      - type: word
+        part: header
+        words:
+          - "Set-Cookie: C0=apc"
+        case-insensitive: true
+      - type: dsl
+        dsl:
+          - 'contains(tolower(body), "apc") && contains(tolower(body), "forms/login1") && (contains(tolower(body), "www.apc.com") || contains(tolower(body), "images/smapc.gif"))'
+      - type: regex
+        part: body
+        regex:
+          - '(?i)APC.*Web/SNMP.*Management.*Card'
+          - '(?i)American.*Power.*Conversion.*Corp'

@@ -22,3 +22,8 @@ http:
         words:
           - "nginx"
         case-insensitive: true
+      - type: regex
+        part: body
+        regex:
+          - "(?i)<center>nginx</center>"
+          - "(?i)Welcome to nginx"

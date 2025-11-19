@@ -1,0 +1,74 @@
+id: anyscale-ray-detect
+info:
+  name: Anyscale Ray Platform Detection
+  author: method-security
+  severity: info
+  description: Detects exposed Anyscale Ray distributed computing platform instances, including Ray clusters, dashboards, and management interfaces that provide access to distributed ML/AI workloads.
+  metadata:
+    method-application-type: DISTRIBUTED_COMPUTING_PLATFORM
+    method-module-name: ANYSCALE_RAY
+    cpe: cpe:2.3:a:anyscale:ray:*:*:*:*:*:*:*:*
+  tags: discovery,anyscale,ray,distributed-computing,machine-learning,ai
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/dashboard"
+      - "{{BaseURL}}/ray/dashboard"
+      - "{{BaseURL}}/cluster"
+      - "{{BaseURL}}/cluster_auth"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "Ray Dashboard"
+          - "Ray Cluster"
+          - "Anyscale Ray"
+          - "Ray Serve"
+          - "Ray Jobs"
+        case-insensitive: true
+      - type: regex
+        part: body
+        regex:
+          - '(?i)<title[^>]*>.*Ray.*Dashboard.*</title>'
+          - '(?i)<title[^>]*>.*Anyscale.*</title>'
+          - '(?i)Ray.*Cluster.*Dashboard'
+          - '(?i)Anyscale.*Ray.*Platform'
+      - type: word
+        part: body
+        words:
+          - "Redirecting to Anyscale to authenticate"
+          - "Ray cluster"
+        case-insensitive: true
+      - type: word
+        part: header
+        words:
+          - "X-Anyscale-Authentication-Status"
+          - "X-Anyscale-Api-Key"
+          - "X-Anyscale-Baseurl"
+        case-insensitive: true
+      - type: regex
+        part: body
+        regex:
+          - '(?i)ray.*serve.*dashboard'
+          - '(?i)ray.*jobs.*dashboard'
+          - '(?i)ray.*cluster.*status'
+          - '(?i)ray.*actor.*dashboard'
+      - type: word
+        part: body
+        words:
+          - "Ray Serve Dashboard"
+          - "Ray Jobs Dashboard"
+          - "Ray Actor Dashboard"
+          - "Ray Task Dashboard"
+          - "Ray Cluster Status"
+        case-insensitive: true
+      - type: dsl
+        dsl:
+          - 'contains(tolower(body), "anyscale") && (contains(tolower(body), "ray") || contains(tolower(body), "cluster") || contains(tolower(body), "dashboard")) && (contains(tolower(body), "authenticating") || contains(tolower(body), "redirecting"))'
+      - type: dsl
+        dsl:
+          - 'contains(tolower(header), "x-anyscale") && (contains(tolower(body), "api") || contains(tolower(body), "v1") || contains(tolower(body), "meta"))'

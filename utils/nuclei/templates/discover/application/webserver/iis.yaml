@@ -17,8 +17,16 @@ http:
     max-redirects: 5
     stop-at-first-match: true
     matchers:
-      - type: word
+      - type: regex
         part: header
-        words:
-          - "iis"
-        case-insensitive: true
+        regex:
+          - "(?i)server:\\s*microsoft-iis"
+          - "(?i)server:\\s*iis/[\\d.]+"
+          - "(?i)x-powered-by:\\s*asp\\.net"
+          - "(?i)x-aspnet-version:"
+      - type: regex
+        part: body
+        regex:
+          - "(?i)iis/[\\d.]+"
+          - "(?i)microsoft\\s+internet\\s+information\\s+services"
+          - "(?i)iis\\s+detailed\\s+error"

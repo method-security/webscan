@@ -1,0 +1,73 @@
+id: zyxel-device-detect
+info:
+  name: Zyxel Device Fingerprint Detection
+  author: method-security
+  severity: info
+  description: Detects exposed Zyxel network devices including firewalls, routers, gateways, and access points by identifying device-specific headers, authentication realms, and management interfaces.
+  metadata:
+    method-application-type: NETWORK_FIREWALL
+    method-module-name: ZYXEL_DEVICE
+    method-detection-state: MANAGEMENT_CONSOLE
+    cpe: cpe:2.3:h:zyxel:*:*:*:*:*:*:*:*:*
+  tags: discovery,zyxel,firewall,router,gateway,network-device,management-console
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/login.asp"
+      - "{{BaseURL}}/Main_Login.asp"
+      - "{{BaseURL}}/cgi-bin/luci"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers-condition: or
+    matchers:
+      - type: word
+        part: header
+        words:
+          - "Server: ZyXEL-RomPager"
+          - "Server: Zyxel"
+          - "Server: Zyxel USG"
+        case-insensitive: true
+      - type: regex
+        part: header
+        regex:
+          - '(?i)Server:\s*ZyXEL-RomPager\/[\d\.]+'
+          - '(?i)Server:\s*Zyxel\s+USG\s+FLEX\s+\d+'
+          - '(?i)Server:\s*Zyxel.*'
+      - type: regex
+        part: header
+        regex:
+          - '(?i)WWW-Authenticate:.*realm="ZyXEL.*"'
+          - '(?i)WWW-Authenticate:.*realm=".*Keenetic.*"'
+          - '(?i)WWW-Authenticate:.*realm=".*ZyWALL.*"'
+      - type: word
+        part: body
+        words:
+          - "ZyXEL Communications Corp."
+          - "ZyXEL Technology Corporation"
+          - "Zyxel Communications"
+          - "www.zyxel.com"
+        case-insensitive: true
+      - type: regex
+        part: body
+        regex:
+          - '(?i)zyxel.*keenetic'
+          - '(?i)zyxel.*usg.*flex'
+          - '(?i)zywall.*firewall'
+          - '(?i)zyxel.*vdsl.*router'
+      - type: dsl
+        dsl:
+          - '(contains(tolower(body), "keenetic") || contains(tolower(body), "zywall") || contains(tolower(body), "usg flex") || contains(tolower(body), "nebula")) && contains(tolower(body), "zyxel")'
+      - type: regex
+        part: body
+        regex:
+          - '(?i)<title[^>]*>.*zyxel.*</title>'
+          - '(?i)<title[^>]*>.*keenetic.*</title>'
+          - '(?i)<title[^>]*>.*zywall.*</title>'
+      - type: dsl
+        dsl:
+          - '(contains(tolower(body), "download master") || contains(tolower(body), "main_login.asp") || contains(tolower(body), "basic_operation_mode.asp")) && contains(tolower(header), "zyxel")'
+      - type: dsl
+        dsl:
+          - 'contains(tolower(header), "zyxel") || contains(tolower(header), "zyx") || contains(tolower(body), "zyxel") || contains(tolower(body), "keenetic") || contains(tolower(body), "zywall")'

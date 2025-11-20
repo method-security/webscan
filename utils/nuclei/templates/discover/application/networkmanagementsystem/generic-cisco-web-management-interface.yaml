@@ -6,7 +6,8 @@ info:
   description: Detects Cisco network device web management interfaces by identifying specific management paths, IOS references, and administrative interface indicators.
   metadata:
     method-application-type: NETWORK_MANAGEMENT_SYSTEM
-    method-module-name: CISCO_WEB_INTERFACE
+    method-module-name: CISCO
+    method-sub-module-name: MANAGEMENT_CONSOLE
     cpe: cpe:2.3:a:cisco:ios:*:*:*:*:*:*:*:*
   tags: discovery,cisco,web-management,network-management-system
 http:

@@ -7,7 +7,7 @@ info:
   metadata:
     method-application-type: KUBE
     method-module-name: KUBE
-    method-detection-state: MANAGEMENT_CONSOLE
+    method-sub-module-name: MANAGEMENT_CONSOLE
     cpe: cpe:2.3:a:kubernetes:kubernetes:*:*:*:*:*:*:*:*
   tags: discovery,kubernetes,k8s,dashboard,manager,enterprise,management-console
 http:

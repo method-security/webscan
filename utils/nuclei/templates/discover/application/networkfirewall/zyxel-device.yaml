@@ -7,7 +7,6 @@ info:
   metadata:
     method-application-type: NETWORK_FIREWALL
     method-module-name: ZYXEL_DEVICE
-    method-detection-state: MANAGEMENT_CONSOLE
     cpe: cpe:2.3:h:zyxel:*:*:*:*:*:*:*:*:*
   tags: discovery,zyxel,firewall,router,gateway,network-device,management-console
 http:
@@ -70,4 +69,4 @@ http:
           - '(contains(tolower(body), "download master") || contains(tolower(body), "main_login.asp") || contains(tolower(body), "basic_operation_mode.asp")) && contains(tolower(header), "zyxel")'
       - type: dsl
         dsl:
-          - 'contains(tolower(header), "zyxel") || contains(tolower(header), "zyx") || contains(tolower(body), "zyxel") || contains(tolower(body), "keenetic") || contains(tolower(body), "zywall")'
+          - '(contains(tolower(header), "server: zyxel") || contains(tolower(header), "www-authenticate") && contains(tolower(header), "zyxel")) && (contains(tolower(body), "login") || contains(tolower(body), "password"))'

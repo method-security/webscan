@@ -49,6 +49,7 @@ types:
     properties:
       resourceType: ApplicationResourceType
       module: string
+      subModule: optional<string>
       detectionState: optional<ApplicationDetectionState>
       cpe: optional<string>
       request: http.HttpRequestResponse

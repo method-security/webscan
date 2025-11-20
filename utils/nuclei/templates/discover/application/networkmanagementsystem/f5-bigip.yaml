@@ -3,7 +3,7 @@ info:
   name: F5 BIG-IP Configuration Utility Detection
   author: method-security
   severity: info
-  description: Detects F5 BIG-IP Configuration Utility web management interfaces by identifying login pages, authentication endpoints, and F5-specific branding elements.
+  description: Detects F5 BIG-IP Configuration Utility web management interfaces by identifying login pages and management-specific endpoints (not load balancer infrastructure).
   metadata:
     method-application-type: NETWORK_MANAGEMENT_SYSTEM
     method-module-name: F5_BIGIP
@@ -23,21 +23,14 @@ http:
       - type: regex
         part: body
         regex:
-          - '(?i)<title[^>]*>.*BIG-IP.*Configuration\s*Utility.*</title>'
+          - '(?i)<title[^>]*>.*F5.*BIG-IP.*Configuration\s*Utility.*</title>'
           - '(?i)F5\s*BIG-IP\s*(Configuration\s*Utility|Management\s*Console)'
           - '(?i)BIG-IP.*Configuration\s*Utility.*Login'
       - type: word
         part: body
         words:
-          - "BIG-IP"
-          - "tmui/login"
-        case-insensitive: true
-        condition: and
-      - type: word
-        part: body
-        words:
           - "F5 BIG-IP"
-          - "Configuration Utility"
+          - "tmui/login"
         case-insensitive: true
         condition: and
       - type: word
@@ -52,7 +45,6 @@ http:
         words:
           - "F5-TrafficShield"
         case-insensitive: true
-      - type: regex
-        part: header
-        regex:
-          - '(?i)Server:\s*BigIP'
+      - type: dsl
+        dsl:
+          - 'contains(tolower(header), "server: bigip") && (contains(tolower(body), "configuration") || contains(tolower(body), "tmui") || contains(tolower(body), "f5"))'

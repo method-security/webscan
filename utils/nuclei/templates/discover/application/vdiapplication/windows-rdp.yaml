@@ -31,5 +31,15 @@ http:
       - type: regex
         part: body
         regex:
-          - "(?i)RemoteDesktopGateway"
           - "(?i)login\\.aspx.*RDWeb"
+      - type: word
+        part: body
+        words:
+          - "RemoteApp and Desktop Connection"
+          - "/RDWeb/Pages/en-US/Default.aspx"
+        condition: and
+        case-insensitive: true
+      - type: regex
+        part: body
+        regex:
+          - "(?i)microsoft.*remote.*desktop.*gateway"

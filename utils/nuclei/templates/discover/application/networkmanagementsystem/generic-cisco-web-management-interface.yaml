@@ -3,13 +3,13 @@ info:
   name: Generic Cisco Web Management Interface Detection
   author: method-security
   severity: info
-  description: Detects Cisco router, switch, and network device management interfaces by identifying Cisco branding, admin patterns, and interface elements common across Cisco network products.
+  description: Detects Cisco network device web management interfaces by identifying specific management paths, IOS references, and administrative interface indicators.
   metadata:
     method-application-type: NETWORK_MANAGEMENT_SYSTEM
     method-module-name: CISCO_WEB_INTERFACE
     cpe: cpe:2.3:a:cisco:ios:*:*:*:*:*:*:*:*
   tags: discovery,cisco,web-management,network-management-system
-requests:
+http:
   - method: GET
     path:
       - "{{BaseURL}}"
@@ -20,27 +20,27 @@ requests:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
-    matchers-condition: and
     matchers:
       - type: regex
         part: body
         regex:
-          - '(?i)<title[^>]*>.*Cisco.*(Management|Router|Switch|Web\s*Interface).*</title>'
-          - '(?i)cisco.*(web\s*management|router|switch)'
-          - '(?i)management.*interface.*cisco'
-          - '(?i)cisco.*(administrative|admin).*interface'
-          - '(?i)/exec/show/.*cisco'
-          - '(?i)cisco.*(ios|nx-os|iosxr)'
+          - '(?i)<title[^>]*>.*Cisco.*(Management|Configuration|Administration).*Interface.*</title>'
+          - '(?i)Cisco\s+(IOS|NX-OS|IOSXR)\s+(Configuration|Management)'
+          - '(?i)Cisco\s+(Router|Switch)\s+(Management|Configuration)\s+Interface'
       - type: word
         part: body
         words:
-          - "Cisco"
+          - "/exec/show/"
           - "Cisco IOS"
-          - "NX-OS"
-          - "IOS-XR"
-          - "IOS Software"
-          - "webcm"
-          - "cisco_logo"
-          - "/level/15/exec/"
-          - "show/log/CR"
         case-insensitive: true
+        condition: and
+      - type: word
+        part: body
+        words:
+          - "cisco_logo"
+          - "management"
+        case-insensitive: true
+        condition: and
+      - type: dsl
+        dsl:
+          - 'contains(tolower(body), "cisco") && (contains(tolower(body), "/level/15/") || contains(tolower(body), "cgi-bin/webcm") || contains(tolower(body), "exec/show"))'

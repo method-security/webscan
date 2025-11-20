@@ -13,11 +13,6 @@ http:
   - method: GET
     path:
       - "{{BaseURL}}"
-      - "{{BaseURL}}/RDWeb/"
-      - "{{BaseURL}}/RDWeb/Pages/en-US/login.aspx"
-      - "{{BaseURL}}/rpc/rpcproxy.dll"
-      - "{{BaseURL}}/RemoteDesktop/"
-      - "{{BaseURL}}/ts/"
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
@@ -37,9 +32,11 @@ http:
         words:
           - "RemoteApp and Desktop Connection"
           - "/RDWeb/Pages/en-US/Default.aspx"
-        condition: and
+        matchers-condition: and
         case-insensitive: true
-      - type: regex
+      - type: word
         part: body
-        regex:
-          - "(?i)microsoft.*remote.*desktop.*gateway"
+        words:
+          - "Microsoft Remote Desktop Gateway"
+          - "Remote Desktop Gateway Manager"
+        case-insensitive: true

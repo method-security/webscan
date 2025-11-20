@@ -24,6 +24,7 @@ func convertNucleiAttemptToFingerprintAttemptStruct(nucleiAttempt *nuclei.Nuclei
 	// Extract resource type, module, detection state, and CPE from template metadata
 	var resourceTypeMetadata discover.ApplicationResourceType
 	var moduleNameFromMetadata string
+	var subModuleNameFromMetadata *string
 	var detectionStateFromMetadata *discover.ApplicationDetectionState
 	var cpeFromMetadata *string
 
@@ -39,6 +40,11 @@ func convertNucleiAttemptToFingerprintAttemptStruct(nucleiAttempt *nuclei.Nuclei
 		// Check for method-module-name in metadata
 		if moduleStr, exists := nucleiAttempt.Finding.Metadata["method-module-name"]; exists {
 			moduleNameFromMetadata = strings.ToUpper(moduleStr)
+		}
+
+		// Check for method-sub-module-name in metadata
+		if subModuleStr, exists := nucleiAttempt.Finding.Metadata["method-sub-module-name"]; exists {
+			subModuleNameFromMetadata = &subModuleStr
 		}
 
 		// Check for method-detection-state in metadata
@@ -58,6 +64,7 @@ func convertNucleiAttemptToFingerprintAttemptStruct(nucleiAttempt *nuclei.Nuclei
 	attempt := &discover.ApplicationFingerprintAttempt{
 		ResourceType:   resourceTypeMetadata,
 		Module:         moduleNameFromMetadata,
+		SubModule:      subModuleNameFromMetadata,
 		DetectionState: detectionStateFromMetadata,
 		Cpe:            cpeFromMetadata,
 		Finding:        true,

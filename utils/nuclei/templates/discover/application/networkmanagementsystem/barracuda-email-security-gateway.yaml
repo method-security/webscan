@@ -7,7 +7,6 @@ info:
   metadata:
     method-application-type: NETWORK_MANAGEMENT_SYSTEM
     method-module-name: BARRACUDA_EMAIL_SECURITY_GATEWAY
-    method-detection-state: MANAGEMENT_CONSOLE
     cpe: cpe:2.3:h:barracuda:email_security_gateway:*:*:*:*:*:*:*:*
   tags: discovery,barracuda,email,security,gateway,spam,firewall,management-console
 http:

@@ -7,7 +7,8 @@ info:
   metadata:
     method-application-type: WEB_SERVER
     method-module-name: TOMCAT
-    method-detection-state: MANAGER_PAGE
+    method-sub-module-name: MANAGEMENT_CONSOLE
+    method-detection-state: DEFAULT
     cpe: cpe:2.3:a:apache:tomcat:*:*:*:*:*:*:*:*
   tags: discovery,tomcat,default-page,manager,misconfiguration
 http:

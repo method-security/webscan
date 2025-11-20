@@ -7,7 +7,6 @@ info:
   metadata:
     method-application-type: HARDWARE_MANAGEMENT_SYSTEM
     method-module-name: APC_UPS
-    method-detection-state: MANAGEMENT_CONSOLE
     cpe: cpe:2.3:h:apc:*:*:*:*:*:*:*:*:*
   tags: discovery,apc,ups,pdu,power,hardware,management-console
 http:

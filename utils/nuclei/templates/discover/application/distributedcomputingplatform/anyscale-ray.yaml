@@ -34,14 +34,13 @@ http:
         part: body
         regex:
           - '(?i)<title[^>]*>.*Ray.*Dashboard.*</title>'
-          - '(?i)<title[^>]*>.*Anyscale.*</title>'
+          - '(?i)<title[^>]*>.*Anyscale.*(Dashboard|Console|Platform).*</title>'
           - '(?i)Ray.*Cluster.*Dashboard'
           - '(?i)Anyscale.*Ray.*Platform'
       - type: word
         part: body
         words:
           - "Redirecting to Anyscale to authenticate"
-          - "Ray cluster"
         case-insensitive: true
       - type: word
         part: header
@@ -53,10 +52,8 @@ http:
       - type: regex
         part: body
         regex:
-          - '(?i)ray.*serve.*dashboard'
-          - '(?i)ray.*jobs.*dashboard'
-          - '(?i)ray.*cluster.*status'
-          - '(?i)ray.*actor.*dashboard'
+          - '(?i)ray\\s+(serve|jobs|actor)\\s+dashboard'
+          - '(?i)ray\\s+cluster\\s+(status|dashboard)'
       - type: word
         part: body
         words:
@@ -68,7 +65,7 @@ http:
         case-insensitive: true
       - type: dsl
         dsl:
-          - 'contains(tolower(body), "anyscale") && (contains(tolower(body), "ray") || contains(tolower(body), "cluster") || contains(tolower(body), "dashboard")) && (contains(tolower(body), "authenticating") || contains(tolower(body), "redirecting"))'
+          - 'contains(tolower(body), "anyscale") && contains(tolower(body), "ray") && (contains(tolower(body), "dashboard") || contains(tolower(body), "cluster")) && (contains(tolower(body), "authenticating") || contains(tolower(body), "redirecting") || contains(tolower(body), "login"))'
       - type: dsl
         dsl:
-          - 'contains(tolower(header), "x-anyscale") && (contains(tolower(body), "api") || contains(tolower(body), "v1") || contains(tolower(body), "meta"))'
+          - 'contains(tolower(header), "x-anyscale") && (contains(tolower(body), "ray") || contains(tolower(body), "cluster") || contains(tolower(body), "dashboard"))'

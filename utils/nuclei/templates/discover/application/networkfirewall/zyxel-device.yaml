@@ -33,7 +33,7 @@ http:
         regex:
           - '(?i)Server:\s*ZyXEL-RomPager\/[\d\.]+'
           - '(?i)Server:\s*Zyxel\s+USG\s+FLEX\s+\d+'
-          - '(?i)Server:\s*Zyxel.*'
+          - '(?i)Server:\s*Zyxel\s+(USG|ZyWALL|Keenetic)'
       - type: regex
         part: header
         regex:
@@ -45,8 +45,6 @@ http:
         words:
           - "ZyXEL Communications Corp."
           - "ZyXEL Technology Corporation"
-          - "Zyxel Communications"
-          - "www.zyxel.com"
         case-insensitive: true
       - type: regex
         part: body
@@ -57,13 +55,11 @@ http:
           - '(?i)zyxel.*vdsl.*router'
       - type: dsl
         dsl:
-          - '(contains(tolower(body), "keenetic") || contains(tolower(body), "zywall") || contains(tolower(body), "usg flex") || contains(tolower(body), "nebula")) && contains(tolower(body), "zyxel")'
+          - '(contains(tolower(body), "keenetic") || contains(tolower(body), "zywall") || contains(tolower(body), "usg flex")) && contains(tolower(body), "zyxel") && (contains(tolower(body), "login") || contains(tolower(body), "management") || contains(tolower(body), "configuration"))'
       - type: regex
         part: body
         regex:
-          - '(?i)<title[^>]*>.*zyxel.*</title>'
-          - '(?i)<title[^>]*>.*keenetic.*</title>'
-          - '(?i)<title[^>]*>.*zywall.*</title>'
+          - '(?i)<title[^>]*>.*(Zyxel|ZyWALL).*(Login|Management|Configuration).*</title>'
       - type: dsl
         dsl:
           - '(contains(tolower(body), "download master") || contains(tolower(body), "main_login.asp") || contains(tolower(body), "basic_operation_mode.asp")) && contains(tolower(header), "zyxel")'

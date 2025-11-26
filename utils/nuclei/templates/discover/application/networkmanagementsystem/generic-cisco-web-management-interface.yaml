@@ -21,13 +21,14 @@ http:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
+    matchers-condition: or
     matchers:
       - type: regex
         part: body
         regex:
-          - '(?i)<title[^>]*>.*Cisco.*(Management|Configuration|Administration).*Interface.*</title>'
-          - '(?i)Cisco\s+(IOS|NX-OS|IOSXR)\s+(Configuration|Management)'
-          - '(?i)Cisco\s+(Router|Switch)\s+(Management|Configuration)\s+Interface'
+          - '(?i)<title[^>]*>.*Cisco.*(IOS|NX-OS|IOSXR).*(Management|Configuration|Administration).*Interface.*</title>'
+          - '(?i)Cisco\s+(IOS|NX-OS|IOSXR)\s+(Configuration|Management|Web\s+Interface)'
+          - '(?i)Cisco\s+(Router|Switch)\s+(IOS|NX-OS)\s+(Management|Configuration)\s+Interface'
       - type: word
         part: body
         words:
@@ -35,13 +36,6 @@ http:
           - "Cisco IOS"
         case-insensitive: true
         condition: and
-      - type: word
-        part: body
-        words:
-          - "cisco_logo"
-          - "management"
-        case-insensitive: true
-        condition: and
       - type: dsl
         dsl:
-          - 'contains(tolower(body), "cisco") && (contains(tolower(body), "/level/15/") || contains(tolower(body), "cgi-bin/webcm") || contains(tolower(body), "exec/show"))'
+          - '(contains(tolower(body), "cisco ios") || contains(tolower(body), "cisco nx-os") || contains(tolower(body), "cisco iosxr")) && (contains(tolower(body), "/level/15/") || contains(tolower(body), "cgi-bin/webcm") || contains(tolower(body), "exec/show"))'

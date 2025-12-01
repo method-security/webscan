@@ -22,50 +22,23 @@ http:
     stop-at-first-match: true
     matchers:
       - type: word
-        part: body
-        words:
-          - "Ray Dashboard"
-          - "Ray Cluster"
-          - "Anyscale Ray"
-          - "Ray Serve"
-          - "Ray Jobs"
-        case-insensitive: true
-      - type: regex
-        part: body
-        regex:
-          - '(?i)<title[^>]*>.*Ray.*Dashboard.*</title>'
-          - '(?i)<title[^>]*>.*Anyscale.*(Dashboard|Console|Platform).*</title>'
-          - '(?i)Ray.*Cluster.*Dashboard'
-          - '(?i)Anyscale.*Ray.*Platform'
-      - type: word
-        part: body
-        words:
-          - "Redirecting to Anyscale to authenticate"
-        case-insensitive: true
-      - type: word
         part: header
         words:
           - "X-Anyscale-Authentication-Status"
           - "X-Anyscale-Api-Key"
           - "X-Anyscale-Baseurl"
         case-insensitive: true
-      - type: regex
-        part: body
-        regex:
-          - '(?i)ray\\s+(serve|jobs|actor)\\s+dashboard'
-          - '(?i)ray\\s+cluster\\s+(status|dashboard)'
       - type: word
         part: body
         words:
+          - "Redirecting to Anyscale to authenticate"
           - "Ray Serve Dashboard"
           - "Ray Jobs Dashboard"
           - "Ray Actor Dashboard"
           - "Ray Task Dashboard"
           - "Ray Cluster Status"
-        case-insensitive: true
-      - type: dsl
-        dsl:
-          - 'contains(tolower(body), "anyscale") && contains(tolower(body), "ray") && (contains(tolower(body), "dashboard") || contains(tolower(body), "cluster")) && (contains(tolower(body), "authenticating") || contains(tolower(body), "redirecting") || contains(tolower(body), "login"))'
-      - type: dsl
-        dsl:
-          - 'contains(tolower(header), "x-anyscale") && (contains(tolower(body), "ray") || contains(tolower(body), "cluster") || contains(tolower(body), "dashboard"))'
+      - type: regex
+        part: body
+        regex:
+          - '(?i)<title[^>]*>.*Anyscale.*Ray.*(Dashboard|Console|Platform).*</title>'
+          - '(?i)Anyscale.*Ray.*(Serve|Jobs|Actor|Task).*Dashboard'

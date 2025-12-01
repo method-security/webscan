@@ -25,18 +25,12 @@ http:
       - type: word
         part: body
         words:
-          - "If you're seeing this, you've successfully installed Tomcat. Congratulations!"
-          - "Apache Tomcat"
           - "Tomcat Web Application Manager"
         case-insensitive: true
       - type: regex
         part: body
         regex:
-          - "(?i)Apache\\s+Tomcat/[0-9]+\\.[0-9]+\\s+Documentation"
           - "(?i)<title>Apache\\s+Tomcat/[0-9]+\\.[0-9]+\\.[0-9]+</title>"
-          - "(?i)It works\\s*!.*Tomcat"
-          - "(?i)successful\\s+Tomcat\\s+installation"
           - "(?i)<h3>Manager\\s+Application</h3>"
           - "(?i)Tomcat\\s+Manager\\s+Application.*<h1>"
           - "(?i)/manager/images/tomcat\\.gif"
-          - "(?i)/docs/.*index\\.html.*Apache\\s+Tomcat"

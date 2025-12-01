@@ -32,6 +32,15 @@ http:
           - "server: apache-coyote"
           - "server: tomcat"
           - "x-powered-by: tomcat"
+      - type: word
+        part: body
+        words:
+          - "Apache Tomcat"
+          - "Tomcat Web Application Manager"
+          - "Tomcat Web Server"
+          - "Tomcat Catalina"
+          - "Tomcat Coyote"
+          - "Powered by Tomcat"
         case-insensitive: true
       - type: regex
         part: body

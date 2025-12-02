@@ -20,6 +20,17 @@ Flags:
   -v, --verbose              Verbose output
 ```
 
+## Available Commands
+
+webscan provides the following main commands:
+
+- **discover**: Perform various discovery scans to identify web applications, directories, routes, and static assets
+- **enumerate**: Perform various enumeration scans to identify and analyze web application components, APIs, and security controls
+- **pentest**: Perform various pentest scans to identify vulnerabilities and security issues
+- **completion**: Generate autocompletion scripts for various shells
+- **help**: Get help about any command
+- **version**: Display version information
+
 ## Version Command
 
 Run `webscan version` to get the exact version information for your binary

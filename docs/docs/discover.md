@@ -8,35 +8,43 @@ The `webscan discover` command performs scanning tasks that locate web applicati
 webscan discover [command]
 ```
 
+## Available Commands
+
+- **application**: Perform application fingerprinting and technology detection
+- **directory**: Directory and file bruteforce discovery
+- **page**: Web page capture and analysis
+- **probe**: Probe targets for web application existence
+- **route**: Route discovery and analysis
+- **saas**: SaaS application discovery by organization name
+
 ## Commands
 
 ### Application
 
-Identify technologies running on a set of targets.
+Identify technologies and services running on a set of targets.
 
 #### Usage
 ```bash
-webscan discover application --resource-type ALL --modules GRAPHQL --targets https://example.com
+webscan discover application --resource-type ALL --targets https://example.com --threads 10 --verbose-logs
 ```
 
 #### Help Text
 ```bash
 webscan discover application -h
-Perform application fingerprinting against targets
+Perform application fingerprinting to identify web technologies, and services running on target URLs.
 
 Usage:
   webscan discover application [flags]
 
 Flags:
-      --fingerprint-file string   Path to the fingerprint definitions file (default "/opt/method/webscan/var/conf/discover/application/fingerprints.json")
-  -h, --help                      help for application
-      --max-redirects int         Maximum number of redirects to follow (default 10)
-      --modules strings           Specific fingerprinting modules to run
-      --resource-type string      Type of resource to fingerprint (e.g., web, api, cms) (default "ALL")
-      --targets strings           URL targets to perform fingerprinting against
-      --threads int               Number of concurrent threads for scanning (default 0)
-      --timeout int               Timeout per request in seconds (default 30)
-      --verify-tls                Verify TLS certificates when making HTTPS requests
+      --global-rate-limit int   Global rate limit (requests per second, 0 = no limit)
+  -h, --help                    help for application
+      --proxy string            Optional HTTP proxy URL
+      --resource-type string    Type of resource to fingerprint (e.g., web, api, cms) (default "ALL")
+      --targets strings         URL targets to perform fingerprinting against
+      --threads int             Number of concurrent threads for scanning (default 25)
+      --timeout int             Timeout per request in seconds (default 30)
+      --verbose-logs            Verbose logs
 
 Global Flags:
   -o, --output string        Output format (signal, json, yaml). Default value is signal (default "signal")
@@ -64,7 +72,7 @@ Usage:
 
 Flags:
   -h, --help                                 help for directory
-      --http-methods strings                 HTTP methods to use (e.g. GET,POST,PUT) (default ["GET"])
+      --http-methods strings                 HTTP methods to use (e.g. GET,POST,PUT) (default [GET])
       --ignore-base-content-match            Ignores valid responses with identical size and word length to the base path, typically signifying a web backend redirect (default true)
       --max-redirects-baseline-request int   Maximum number of redirects to follow for the baseline request (default 10)
       --max-runtime int                      Maximum time to run the engagement (seconds) (Default is 0, which will run indefinitely)
@@ -77,7 +85,7 @@ Flags:
       --threshold float                      Threshold for successful results (default 0.25)
       --timeout int                          Timeout per request in seconds (default 30)
       --verify-tls                           Verify TLS certificates when making HTTPS requests
-      --wordlist-size string                 Size of wordlist to use (small, medium, large)
+      --wordlist-size string                 Size of wordlist to use (TINY, SMALL, MEDIUM, LARGE)
       --wordlist-type string                 Type of wordlist to use automatically (directories, files)
 
 Global Flags:

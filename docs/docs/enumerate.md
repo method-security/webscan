@@ -1,11 +1,18 @@
 # Enumerate
 
-The `webscan enumerate` command discovers APIs, CMS components, web servers and other application details.
+The `webscan enumerate` command performs various enumeration scans to identify and analyze web application components, APIs, and security controls.
 
 ## Usage
 ```bash
 webscan enumerate [command]
 ```
+
+## Available Commands
+
+- **api-application**: Enumerate API applications including GraphQL and Swagger endpoints
+- **cms**: Enumerate content management systems like WordPress plugins
+- **general**: Perform general enumeration tasks like rate limit testing
+- **kube**: Enumerate Kubernetes resources and configurations
 
 ## Commands
 
@@ -20,7 +27,7 @@ webscan enumerate api-application graphql --target https://example.com
 ##### Help Text
 ```bash
 webscan enumerate api-application graphql -h
-Enumerate GraphQL endpoints.
+Discover and analyze GraphQL endpoints, including introspection queries and potential security issues.
 
 Usage:
   webscan enumerate api-application graphql [flags]
@@ -86,11 +93,15 @@ Global Flags:
   -v, --verbose              Verbose output
 ```
 
-### CMS WordPress Plugins
+### CMS
+
+Enumerate content management systems.
+
+#### WordPress Plugins
 ```bash
 webscan enumerate cms wordpress plugins --targets https://example.com
 ```
-#### Help Text
+##### Help Text
 ```bash
 webscan enumerate cms wordpress plugins -h
 Discover and analyze WordPress plugins to identify installed components and potential security issues.
@@ -116,11 +127,15 @@ Global Flags:
 ```
 
 
-### General Ratelimit
+### General
+
+Perform general enumeration tasks.
+
+#### Ratelimit
 ```bash
 webscan enumerate general ratelimit --targets https://example.com
 ```
-#### Help Text
+##### Help Text
 ```bash
 webscan enumerate general ratelimit -h
 Analyze and test rate limiting controls to identify potential bypasses or misconfigurations.

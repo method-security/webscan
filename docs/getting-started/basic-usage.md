@@ -4,10 +4,17 @@
 
 Running as a binary allows you to skip dealing with any container related networking issues and leverage the same network interface that the host machine is using.
 
-You can validate that the binary is working by scanning the publicly available `scanme.sh`.
+You can validate that the binary is working by running a simple discovery scan:
 
 ```bash
+# Basic application discovery
+webscan discover application --targets https://example.com
+
+# Page capture and analysis
 webscan discover page --target https://example.com
+
+# Directory discovery
+webscan discover directory --targets https://example.com --wordlist-size small
 ```
 
 ## Docker
@@ -17,5 +24,9 @@ Running webscan within a Docker container should typically work similarly to run
 If you're running on a Docker container on a MacOS machine and you are trying to scan a locally running service, you can leverage the `host.docker.internal` address as mentioned in the Docker documentation [here](https://docs.docker.com/desktop/networking/#i-want-to-connect-from-a-container-to-a-service-on-the-host).
 
 ```bash
+# Application discovery via Docker
+docker run ghcr.io/method-security/webscan discover application --targets https://example.com
+
+# Page capture via Docker
 docker run ghcr.io/method-security/webscan discover page --target https://example.com
 ```

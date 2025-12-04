@@ -27,11 +27,6 @@ http:
           - "Apache2 Ubuntu Default Page"
           - "Apache2 Debian Default Page"
         case-insensitive: true
-      - type: regex
-        part: body
-        regex:
-          - "(?i)It works!.*Apache.*Server"
-          - "(?i)If you can see this, it means that the installation of Apache.*server software on this system was successful"
       - type: word
         part: body
         words:
@@ -44,3 +39,4 @@ http:
         regex:
           - "(?i)<address>Apache.*Server"
           - "(?i)Apache Server Information"
+          - "(?i)If you can see this, it means that the installation of Apache.*server software on this system was successful"

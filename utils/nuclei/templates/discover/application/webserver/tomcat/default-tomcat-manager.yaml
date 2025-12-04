@@ -36,3 +36,10 @@ http:
           - "(?i)/manager/images/tomcat\\.gif"
           - "(?i)/host-manager/images/tomcat\\.png"
           - "(?i)<h1>\\s*Tomcat\\s+Virtual\\s+Host\\s+Manager\\s*</h1>"
+      - type: word
+        part: body
+        words:
+          - "tomcat-users"
+          - "manager-gui"
+        case-insensitive: true
+        condition: and

@@ -1,0 +1,42 @@
+id: default-apache-page-detect
+info:
+  name: Default Apache HTTP Server Page Detection
+  author: method-security
+  severity: info
+  description: Detects the default Apache HTTP Server welcome page that indicates a default installation.
+  metadata:
+    method-application-type: WEB_SERVER
+    method-module-name: APACHE
+    method-sub-module-name: DEFAULT_PAGE
+    method-detection-state: DEFAULT_PAGE
+    cpe:
+      - cpe:2.3:a:apache:http_server:*:*:*:*:*:*:*:*
+  tags: discovery,apache,httpd,default-page,misconfiguration
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/server-status"
+      - "{{BaseURL}}/server-info"
+    redirects: true
+    max-redirects: 3
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "Apache2 Ubuntu Default Page"
+          - "Apache2 Debian Default Page"
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "It works!"
+          - "Apache Server"
+        condition: and
+        case-insensitive: true
+      - type: regex
+        part: body
+        regex:
+          - "(?i)<address>Apache.*Server"
+          - "(?i)Apache Server Information"
+          - "(?i)If you can see this, it means that the installation of Apache.*server software on this system was successful"

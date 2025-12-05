@@ -16,17 +16,30 @@ http:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
+    matchers-condition: and
     matchers:
       - type: regex
-        part: header
+        part: all
         regex:
           - "(?i)server:\\s*apache"
           - "(?i)server:\\s*Apache/[\\d.]+"
           - "(?i)via:\\s*apache"
           - "(?i)x-powered-by:\\s*apache"
-      - type: regex
-        part: body
-        regex:
           - "(?i)Apache Server at"
           - "(?i)Apache/[\\d.]+ \\(Unix\\)"
           - "(?i)<address>Apache/[\\d.]+"
+      - type: word
+        words:
+          - "tomcat"
+          - "apache tomcat"
+          - "apache-coyote"
+          - "coyote" 
+          - "catalina"
+          - "Apache Tomcat"
+          - "Tomcat Web Application Manager"
+          - "Tomcat Web Server"
+          - "Tomcat Catalina"
+          - "Tomcat Coyote"
+          - "Powered by Tomcat"
+        case-insensitive: true
+        negative: true

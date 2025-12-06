@@ -1,0 +1,40 @@
+id: jenkins-unauthenticated-console
+info:
+  name: Jenkins Unauthenticated Management Console Detection
+  author: method-security
+  severity: critical
+  description: Detects unauthenticated access to Jenkins CI/CD management consoles.
+  metadata:
+    method-application-type: CI_CD_PLATFORM
+    method-module-name: JENKINS
+    method-sub-module-name: MANAGEMENT_CONSOLE
+    method-detection-state: UNAUTHENTICATED
+    cpe: cpe:2.3:a:jenkins:jenkins:*:*:*:*:*:*:*:*
+  tags: jenkins,unauth,management,cicd,exposure
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/"
+      - "{{BaseURL}}/manage"
+    matchers-condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+      - type: word
+        part: header
+        words:
+          - "jenkins"
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "<title>Manage Jenkins</title>"
+          - "<h1>Manage Jenkins</h1>"
+          - "Jenkins Management Console"
+      - type: word
+        negative: true
+        part: body
+        words:
+          - "Sign in to Jenkins"
+        case-insensitive: true

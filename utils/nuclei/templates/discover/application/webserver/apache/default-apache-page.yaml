@@ -19,24 +19,24 @@ http:
       - "{{BaseURL}}/server-status"
       - "{{BaseURL}}/server-info"
     redirects: true
-    max-redirects: 3
+    max-redirects: 5
+    stop-at-first-match: true
     matchers:
       - type: word
         part: body
         words:
-          - "Apache2 Ubuntu Default Page"
-          - "Apache2 Debian Default Page"
+          - "If you can see this, it means the installation of the Apache web server software"
+          - "It works!"
         case-insensitive: true
+        condition: and
       - type: word
         part: body
         words:
-          - "It works!"
-          - "Apache Server"
-        condition: and
-        case-insensitive: true
-      - type: regex
+          - "Apache2 Debian Default Page"
+          - "Apache2 Ubuntu Default Page"
+          - "Apache HTTP Server Test Page"
+      - type: word
         part: body
-        regex:
-          - "(?i)<address>Apache.*Server"
-          - "(?i)Apache Server Information"
-          - "(?i)If you can see this, it means that the installation of Apache.*server software on this system was successful"
+        words:
+          - "This page is used to test the proper operation of the Apache HTTP server."
+        case-insensitive: true

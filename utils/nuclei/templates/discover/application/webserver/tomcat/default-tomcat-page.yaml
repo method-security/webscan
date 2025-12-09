@@ -17,7 +17,8 @@ http:
     path:
       - "{{BaseURL}}"
     redirects: true
-    max-redirects: 3
+    max-redirects: 5
+    stop-at-first-match: true
     matchers-condition: and
     matchers:
       - type: regex

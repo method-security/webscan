@@ -21,25 +21,14 @@ http:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
-    matchers-condition: or
+    matchers-condition: and
     matchers:
+      - type: status
+        status:
+          - 200
       - type: word
         part: body
         words:
           - "Tomcat Web Application Manager"
           - "Tomcat Host Manager Application"
         case-insensitive: true
-      - type: regex
-        part: body
-        regex:
-          - "(?i)Tomcat\\s+Manager\\s+Application.*<h1>"
-          - "(?i)/manager/images/tomcat\\.gif"
-          - "(?i)/host-manager/images/tomcat\\.png"
-          - "(?i)<h1>\\s*Tomcat\\s+Virtual\\s+Host\\s+Manager\\s*</h1>"
-      - type: word
-        part: body
-        words:
-          - "tomcat-users"
-          - "manager-gui"
-        case-insensitive: true
-        condition: and

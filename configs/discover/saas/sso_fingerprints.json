@@ -26,6 +26,18 @@
                     "login.microsoftonline.com"
                 ]
             }
+        },
+        "duo": {
+            "fingerprintProfile": {
+                "headers": {
+                    "X-Duo-Sc": [],
+                    "Duo-Sc": []
+                },
+                "body": [
+                    "Secured by Duo",
+                    "sso.duosecurity.com"
+                ]
+            }
         }
     }
 }

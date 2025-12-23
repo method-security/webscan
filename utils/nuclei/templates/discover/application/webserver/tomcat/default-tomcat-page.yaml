@@ -3,7 +3,7 @@ info:
   name: Default Apache Tomcat Welcome Page Detection
   author: method-security
   severity: info
-  description: Detects the default Apache Tomcat welcome page that indicates a default installation.
+  description: Detects Apache Tomcat default pages including welcome page and documentation that indicate a default installation.
   metadata:
     method-application-type: WEB_SERVER
     method-module-name: TOMCAT
@@ -19,14 +19,16 @@ http:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
-    matchers-condition: and
     matchers:
       - type: regex
         part: body
         regex:
+          - "(?i)<title>.*Apache\\s+Tomcat\\s+[0-9]+\\.[0-9]+.*</title>"
           - "(?i)<title>Apache\\s+Tomcat/[0-9]+\\.[0-9]+\\.[0-9]+</title>"
       - type: word
         part: body
         words:
           - "If you're seeing this, you've successfully installed Tomcat. Congratulations!"
+          - "If you're seeing this page via a web browser, it means you've setup Tomcat successfully"
+          - "As you may have guessed by now, this is the default Tomcat home page"
         case-insensitive: true

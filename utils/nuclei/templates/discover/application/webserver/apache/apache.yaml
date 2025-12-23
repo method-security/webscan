@@ -29,17 +29,24 @@ http:
           - "(?i)Apache/[\\d.]+ \\(Unix\\)"
           - "(?i)<address>Apache/[\\d.]+"
       - type: word
+        part: header
         words:
           - "tomcat"
-          - "apache tomcat"
-          - "apache-coyote"
           - "coyote" 
           - "catalina"
+        case-insensitive: true
+        negative: true
+      - type: word
+        part: body
+        words:
           - "Apache Tomcat"
+          - "Apache-Tomcat"
+          - "Apache Coyote"
+          - "Apache-Coyote"
+          - "Powered by Tomcat"
           - "Tomcat Web Application Manager"
           - "Tomcat Web Server"
           - "Tomcat Catalina"
           - "Tomcat Coyote"
-          - "Powered by Tomcat"
         case-insensitive: true
         negative: true

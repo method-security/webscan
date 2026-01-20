@@ -3,7 +3,7 @@ info:
   name: Default Apache Tomcat Manager/Welcome Page Detection
   author: method-security
   severity: info
-  description: Detects default Apache Tomcat welcome page and accessible default manager interfaces that may indicate a default or misconfigured installation
+  description: Detects default Apache Tomcat manager pages, these pages are protected by a basic authentication mechanism.
   metadata:
     method-application-type: WEB_SERVER
     method-module-name: TOMCAT

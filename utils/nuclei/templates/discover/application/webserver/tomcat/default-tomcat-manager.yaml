@@ -26,9 +26,10 @@ http:
       - type: status
         status:
           - 200
+          - 401
       - type: word
-        part: body
+        part: header
         words:
           - "Tomcat Web Application Manager"
-          - "Tomcat Host Manager Application"
+          - "Tomcat Manager Application"
         case-insensitive: true

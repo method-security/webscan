@@ -25,7 +25,6 @@ http:
     matchers:
       - type: status
         status:
-          - 200
           - 401
       - type: word
         part: header

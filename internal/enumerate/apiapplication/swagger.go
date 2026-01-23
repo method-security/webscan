@@ -62,77 +62,53 @@ func isSwaggerUIPage(htmlContent string) bool {
 		strings.Contains(content, "swaggerui")
 }
 
-// Common Swagger/OpenAPI endpoint paths to check
-var commonSpecPaths = []string{
-	// JSON endpoints
-	"/swagger.json",
-	"/api-docs/swagger.json",
-	"/api/swagger.json",
-	"/api/v1/swagger.json",
-	"/api/v2/swagger.json",
-	"/api/v3/swagger.json",
-	"/swagger/v1/swagger.json",
-	"/swagger/v2/swagger.json",
-	"/swagger/v3/swagger.json",
-	"/openapi.json",
-	"/api-docs/openapi.json",
-	"/api/openapi.json",
-	"/api/v1/openapi.json",
-	"/api/v2/openapi.json",
-	"/api/v3/openapi.json",
-	"/v1/swagger.json",
-	"/v2/swagger.json",
-	"/v3/swagger.json",
-	"/docs/swagger.json",
-	"/docs/openapi.json",
-	"/swagger-ui/swagger.json",
-	"/swagger-ui/openapi.json",
-	// YAML endpoints
-	"/static/openapi.yaml",
-	"/swagger.yaml",
-	"/swagger.yml",
-	"/api-docs/swagger.yaml",
-	"/api-docs/swagger.yml",
-	"/api/swagger.yaml",
-	"/api/swagger.yml",
-	"/api/v1/swagger.yaml",
-	"/api/v1/swagger.yml",
-	"/api/v2/swagger.yaml",
-	"/api/v2/swagger.yml",
-	"/api/v3/swagger.yaml",
-	"/api/v3/swagger.yml",
-	"/swagger/v1/swagger.yaml",
-	"/swagger/v1/swagger.yml",
-	"/swagger/v2/swagger.yaml",
-	"/swagger/v2/swagger.yml",
-	"/swagger/v3/swagger.yaml",
-	"/swagger/v3/swagger.yml",
-	"/openapi.yaml",
-	"/openapi.yml",
-	"/api-docs/openapi.yaml",
-	"/api-docs/openapi.yml",
-	"/api/openapi.yaml",
-	"/api/openapi.yml",
-	"/api/v1/openapi.yaml",
-	"/api/v1/openapi.yml",
-	"/api/v2/openapi.yaml",
-	"/api/v2/openapi.yml",
-	"/api/v3/openapi.yaml",
-	"/api/v3/openapi.yml",
-	"/v1/swagger.yaml",
-	"/v1/swagger.yml",
-	"/v2/swagger.yaml",
-	"/v2/swagger.yml",
-	"/v3/swagger.yaml",
-	"/v3/swagger.yml",
-	"/docs/swagger.yaml",
-	"/docs/swagger.yml",
-	"/docs/openapi.yaml",
-	"/docs/openapi.yml",
-	"/swagger-ui/swagger.yaml",
-	"/swagger-ui/swagger.yml",
-	"/swagger-ui/openapi.yaml",
-	"/swagger-ui/openapi.yml",
+// Base spec paths without extensions - extensions will be added dynamically
+var baseSpecPaths = []string{
+	"/swagger",
+	"/api-docs",
+	"/api/swagger",
+	"/api/v1/swagger",
+	"/api/v2/swagger",
+	"/api/v3/swagger",
+	"/swagger/v1",
+	"/swagger/v2",
+	"/swagger/v3",
+	"/openapi",
+	"/api/openapi",
+	"/api/v1/openapi",
+	"/api/v2/openapi",
+	"/api/v3/openapi",
+	"/v1/swagger",
+	"/v2/swagger",
+	"/v3/swagger",
+	"/docs/swagger",
+	"/docs/openapi",
+	"/swagger-ui/swagger",
+	"/swagger-ui/openapi",
+	"/static/openapi",
+}
+
+// Spec file extensions to try (in order of preference)
+var specExtensions = []string{"", ".json", ".yaml", ".yml"}
+
+// generateSpecPaths creates all possible spec paths by combining base paths with extensions
+func generateSpecPaths() []string {
+	var paths []string
+
+	// Generate paths with each extension for each base path
+	for _, extension := range specExtensions {
+		for _, basePath := range baseSpecPaths {
+			if extension == "" {
+				// Extensionless path
+				paths = append(paths, basePath)
+			} else {
+				// Path with extension
+				paths = append(paths, basePath+extension)
+			}
+		}
+	}
+
+	return paths
 }
 
 func createSendHTTPRequestConfig(baseURL, path string, timeout int, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig) common.SendHttpRequestConfig {
@@ -181,7 +157,8 @@ func extractSpecURLFromRenderedContent(htmlContent, baseURL string) []string {
 	}
 
 	// Also look for URLs in the span content (like <span class="url"> /static/openapi.yaml</span>)
-	spanRegex := regexp.MustCompile(`<span[^>]*class\s*=\s*["']url["'][^>]*>\s*([^<]*\.(?:json|yaml|yml))[^<]*</span>`)
+	// Updated regex to capture both extensioned and extensionless spec URLs
+	spanRegex := regexp.MustCompile(`<span[^>]*class\s*=\s*["']url["'][^>]*>\s*([^<]*(?:\.(?:json|yaml|yml)|(?:swagger|openapi|api-docs|spec|schema|docs|api)[^<]*?))[^<]*</span>`)
 	spanMatches := spanRegex.FindAllStringSubmatch(htmlContent, -1)
 
 	for _, match := range spanMatches {
@@ -213,23 +190,22 @@ func isLikelySpecURL(url string) bool {
 		strings.HasSuffix(url, ".yaml") ||
 		strings.HasSuffix(url, ".yml")
 
-	if !hasSpecExtension {
-		return false
-	}
-
 	// Check for spec-related keywords
 	specKeywords := []string{
 		"swagger", "openapi", "api-docs", "spec", "schema",
 		"docs", "api", "v1", "v2", "v3",
 	}
 
+	hasSpecKeyword := false
 	for _, keyword := range specKeywords {
 		if strings.Contains(url, keyword) {
-			return true
+			hasSpecKeyword = true
+			break
 		}
 	}
 
-	return false
+	// URL is likely a spec if it has both extension and keywords, or just keywords (for extensionless endpoints)
+	return hasSpecExtension && hasSpecKeyword || hasSpecKeyword
 }
 
 // findOpenAPISpec attempts to locate a valid OpenAPI/Swagger specification
@@ -311,7 +287,7 @@ func findOpenAPISpec(ctx context.Context, target string, timeout int, headlessPa
 						}
 
 						// If no extracted URLs worked, try common paths as fallback
-						for _, path := range commonSpecPaths {
+						for _, path := range generateSpecPaths() {
 							specRequestConfig := createSendHTTPRequestConfig(baseURL, path, timeout, common.RequestMethodStandard, nil)
 							specResponse, err := request.SendRequest(ctx, specRequestConfig)
 							if err != nil {
@@ -342,7 +318,7 @@ func findOpenAPISpec(ctx context.Context, target string, timeout int, headlessPa
 	}
 
 	// STEP 3: Fall back to trying common spec paths directly
-	for _, path := range commonSpecPaths {
+	for _, path := range generateSpecPaths() {
 		if dl, ok := ctx.Deadline(); ok {
 			timeout = int(time.Until(dl).Seconds())
 		}

@@ -234,7 +234,8 @@ func (b *Builder) Consume(ev *nout.ResultEvent) {
 	baseURL := getBaseURL(ev)
 	targetInfo, ok := b.targetIdx[baseURL]
 	if !ok {
-		targetInfo = &nuclei.NucleiTargetInfo{Target: baseURL}
+		// Use the full URL (including path) for the Target field
+		targetInfo = &nuclei.NucleiTargetInfo{Target: ev.URL}
 		b.targetIdx[baseURL] = targetInfo
 		b.targets = append(b.targets, targetInfo)
 	}

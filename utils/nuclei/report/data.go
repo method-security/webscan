@@ -16,13 +16,17 @@ import (
 	nout "github.com/projectdiscovery/nuclei/v3/pkg/output"
 )
 
-// getBaseURL extracts the base URL from a ResultEvent.
-func getBaseURL(ev *nout.ResultEvent) string {
+// getTargetURL extracts the target URL from a ResultEvent.
+// excludes query parameters and fragment ie. https://example.com/path?query#fragment -> https://example.com/path
+func getTargetURL(ev *nout.ResultEvent) string {
 	parsedURL, err := url.Parse(ev.URL)
 	if err != nil {
 		return ev.URL
 	}
-	return fmt.Sprintf("%s://%s", parsedURL.Scheme, parsedURL.Host)
+	parsedURL.RawQuery = ""
+	parsedURL.Fragment = ""
+	parsedURL.RawFragment = ""
+	return parsedURL.String()
 }
 
 // parseRawRequest parses a raw HTTP request string into its components.

@@ -231,11 +231,11 @@ func (b *Builder) Consume(ev *nout.ResultEvent) {
 	}
 
 	// Get or create target
-	baseURL := getBaseURL(ev)
-	targetInfo, ok := b.targetIdx[baseURL]
+	targetURL := getTargetURL(ev)
+	targetInfo, ok := b.targetIdx[targetURL]
 	if !ok {
-		targetInfo = &nuclei.NucleiTargetInfo{Target: baseURL}
-		b.targetIdx[baseURL] = targetInfo
+		targetInfo = &nuclei.NucleiTargetInfo{Target: targetURL}
+		b.targetIdx[targetURL] = targetInfo
 		b.targets = append(b.targets, targetInfo)
 	}
 

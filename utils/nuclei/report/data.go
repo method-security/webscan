@@ -26,6 +26,7 @@ func getBaseURL(ev *nout.ResultEvent) string {
 }
 
 // getTargetURL extracts the target URL from a ResultEvent.
+// excludes query parameters and fragment ie. https://example.com/path?query#fragment -> https://example.com/path
 func getTargetURL(ev *nout.ResultEvent) string {
 	parsedURL, err := url.Parse(ev.URL)
 	if err != nil {

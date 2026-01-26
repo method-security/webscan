@@ -25,6 +25,17 @@ func getBaseURL(ev *nout.ResultEvent) string {
 	return fmt.Sprintf("%s://%s", parsedURL.Scheme, parsedURL.Host)
 }
 
+// getTargetURL extracts the target URL from a ResultEvent.
+func getTargetURL(ev *nout.ResultEvent) string {
+	parsedURL, err := url.Parse(ev.URL)
+	if err != nil {
+		return ev.URL
+	}
+	parsedURL.RawQuery = ""
+	parsedURL.Fragment = ""
+	return parsedURL.String()
+}
+
 // parseRawRequest parses a raw HTTP request string into its components.
 // Returns method, path, headers, and body.
 func parseRawRequest(raw string) (method, path string, headers map[string]string, body string) {

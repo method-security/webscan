@@ -3,6 +3,7 @@ package nuclei
 import (
 	// Generated
 	"fmt"
+	"net/url"
 	"regexp"
 	"strings"
 
@@ -234,8 +235,14 @@ func (b *Builder) Consume(ev *nout.ResultEvent) {
 	baseURL := getBaseURL(ev)
 	targetInfo, ok := b.targetIdx[baseURL]
 	if !ok {
-		// Use the full URL (including path) for the Target field
-		targetInfo = &nuclei.NucleiTargetInfo{Target: ev.URL}
+		// Use the full URL (including path) but strip query parameters
+		targetURL := ev.URL
+		if parsedURL, err := url.Parse(ev.URL); err == nil {
+			parsedURL.RawQuery = ""
+			parsedURL.Fragment = ""
+			targetURL = parsedURL.String()
+		}
+		targetInfo = &nuclei.NucleiTargetInfo{Target: targetURL}
 		b.targetIdx[baseURL] = targetInfo
 		b.targets = append(b.targets, targetInfo)
 	}

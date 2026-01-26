@@ -25,6 +25,7 @@ func getTargetURL(ev *nout.ResultEvent) string {
 	}
 	parsedURL.RawQuery = ""
 	parsedURL.Fragment = ""
+	parsedURL.RawFragment = ""
 	return parsedURL.String()
 }
 

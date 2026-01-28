@@ -30,7 +30,11 @@ func getTargetURL(ev *nout.ResultEvent) string {
 	if ev.Request != "" {
 		_, requestPath, _, _ := parseRawRequest(ev.Request)
 		// Only use the parsed path if it's non-empty and looks like a valid path (starts with /)
-		if requestPath != "" && strings.HasPrefix(requestPath, "/") {
+		if requestPath != "" {
+			// Clean the request path by removing the leading / if it exists and adding it back
+			requestPath = strings.TrimPrefix(requestPath, "/")
+			requestPath = "/" + requestPath
+
 			// The requestPath may include query string (e.g., /api/users?query=test)
 			// We need to split it to avoid URL encoding the ? character
 			if idx := strings.Index(requestPath, "?"); idx != -1 {
@@ -146,7 +150,10 @@ func getHTTPRequestResponse(ev *nout.ResultEvent) (*common.HttpRequestResponse, 
 	// Use the path from the raw request if available and valid
 	// Only use the parsed path if it's non-empty and looks like a valid path (starts with /)
 	var rawRequestQueryString string
-	if requestPath != "" && strings.HasPrefix(requestPath, "/") {
+	if requestPath != "" {
+		requestPath = strings.TrimPrefix(requestPath, "/")
+		requestPath = "/" + requestPath
+
 		// The requestPath may include query string (e.g., /api/users?query=test)
 		// We need to split it properly
 		if idx := strings.Index(requestPath, "?"); idx != -1 {
@@ -172,13 +179,13 @@ func getHTTPRequestResponse(ev *nout.ResultEvent) (*common.HttpRequestResponse, 
 	if body != "" {
 		params.Body = requesthelpers.CreateBodyFromBytes(contentType, []byte(body))
 	}
-	
+
 	// Parse query parameters - prefer raw request query string if available, otherwise use finalURL
 	queryStringToParse := rawRequestQueryString
 	if queryStringToParse == "" && finalURL != nil && finalURL.RawQuery != "" {
 		queryStringToParse = finalURL.RawQuery
 	}
-	
+
 	if queryStringToParse != "" {
 		if parsedQuery, err := url.ParseQuery(queryStringToParse); err == nil {
 			for k, vs := range parsedQuery {

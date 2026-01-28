@@ -33,7 +33,12 @@ func getTargetURL(ev *nout.ResultEvent) string {
 		if requestPath != "" && strings.HasPrefix(requestPath, "/") {
 			// Strip query string and fragment if present to avoid URL encoding issues
 			if idx := strings.IndexAny(requestPath, "?#"); idx != -1 {
-				parsedURL.Path = requestPath[:idx]
+				requestPath = requestPath[:idx]
+			}
+			// Decode the path since it comes URL-encoded from the HTTP request
+			// This prevents double-encoding when parsedURL.String() re-encodes it
+			if decodedPath, err := url.PathUnescape(requestPath); err == nil {
+				parsedURL.Path = decodedPath
 			} else {
 				parsedURL.Path = requestPath
 			}
@@ -145,7 +150,12 @@ func getHTTPRequestResponse(ev *nout.ResultEvent) (*common.HttpRequestResponse, 
 	if requestPath != "" && strings.HasPrefix(requestPath, "/") {
 		// Strip query string and fragment if present
 		if idx := strings.IndexAny(requestPath, "?#"); idx != -1 {
-			request.Path = requestPath[:idx]
+			requestPath = requestPath[:idx]
+		}
+		// Decode the path since it comes URL-encoded from the HTTP request
+		// This prevents double-encoding issues
+		if decodedPath, err := url.PathUnescape(requestPath); err == nil {
+			request.Path = decodedPath
 		} else {
 			request.Path = requestPath
 		}

@@ -8,21 +8,26 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"strings"
 
 	// Generated
 	enumerateapiapplicationfern "github.com/Method-Security/webscan/generated/go/enumerate/apiapplication"
+
+	// External
+	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
 // PerformAppEnumerateGraphQL performs a GraphQL scan against a target URL and returns the report.
 func PerformAppEnumerateGraphQL(ctx context.Context, target string) enumerateapiapplicationfern.EnumerateGraphqlReport {
+	log := svc1log.FromContext(ctx)
+	log.Info("Performing GraphQL scan", svc1log.SafeParam("target", target))
+
 	report := enumerateapiapplicationfern.EnumerateGraphqlReport{Config: &enumerateapiapplicationfern.EnumerateGraphqlConfig{Target: target}}
 	report.Result = &enumerateapiapplicationfern.EnumerateGraphqlResult{}
 	data := &enumerateapiapplicationfern.EnumerateGraphqlData{}
 
-	body, err := fetchGraphQLSchema(target)
+	body, err := fetchGraphQLSchema(ctx, target)
 	if err != nil {
 		report.Errors = append(report.Errors, err.Error())
 		return report
@@ -57,15 +62,18 @@ func PerformAppEnumerateGraphQL(ctx context.Context, target string) enumerateapi
 	return report
 }
 
-func fetchGraphQLSchema(target string) ([]byte, error) {
+func fetchGraphQLSchema(ctx context.Context, target string) ([]byte, error) {
+	log := svc1log.FromContext(ctx)
+
 	query := `{"query":"{ __schema { types { name kind description fields { name } } } }"}`
 	resp, err := http.Post(target, "application/json", bytes.NewBuffer([]byte(query)))
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch GraphQL schema: %v", err)
+		log.Error("Failed to fetch GraphQL schema", svc1log.SafeParam("error", err))
+		return nil, err
 	}
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
-			log.Println("Error closing response body:", err)
+			log.Error("Error closing response body", svc1log.SafeParam("error", err))
 		}
 	}()
 

@@ -30,7 +30,11 @@ func getTargetURL(ev *nout.ResultEvent) string {
 	if ev.Request != "" {
 		_, requestPath, _, _ := parseRawRequest(ev.Request)
 		// Only use the parsed path if it's non-empty and looks like a valid path (starts with /)
-		if requestPath != "" && strings.HasPrefix(requestPath, "/") {
+		if requestPath != "" {
+			// Clean Request Path
+			requestPath = strings.TrimPrefix(requestPath, "/")
+			requestPath = "/" + requestPath
+
 			// Strip query string if present to avoid URL encoding issues
 			if idx := strings.Index(requestPath, "?"); idx != -1 {
 				parsedURL.Path = requestPath[:idx]
@@ -142,7 +146,11 @@ func getHTTPRequestResponse(ev *nout.ResultEvent) (*common.HttpRequestResponse, 
 	method, requestPath, requestHeaders, body := parseRawRequest(ev.Request)
 
 	// Use the path from the raw request if available and valid
-	if requestPath != "" && strings.HasPrefix(requestPath, "/") {
+	if requestPath != "" {
+		// Clean Request Path
+		requestPath = strings.TrimPrefix(requestPath, "/")
+		requestPath = "/" + requestPath
+
 		// Strip query string if present
 		if idx := strings.Index(requestPath, "?"); idx != -1 {
 			request.Path = requestPath[:idx]

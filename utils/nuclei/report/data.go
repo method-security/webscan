@@ -29,8 +29,16 @@ func getTargetURL(ev *nout.ResultEvent) string {
 	// This is necessary because ev.URL might not contain the tested path when using path fuzzing
 	if ev.Request != "" {
 		_, requestPath, _, _ := parseRawRequest(ev.Request)
-		if requestPath != "" {
-			parsedURL.Path = requestPath
+		// Only use the parsed path if it's non-empty and looks like a valid path (starts with /)
+		if requestPath != "" && strings.HasPrefix(requestPath, "/") {
+			// The requestPath may include query string (e.g., /api/users?query=test)
+			// We need to split it to avoid URL encoding the ? character
+			if idx := strings.Index(requestPath, "?"); idx != -1 {
+				parsedURL.Path = requestPath[:idx]
+				parsedURL.RawQuery = requestPath[idx+1:]
+			} else {
+				parsedURL.Path = requestPath
+			}
 		}
 	}
 
@@ -135,9 +143,18 @@ func getHTTPRequestResponse(ev *nout.ResultEvent) (*common.HttpRequestResponse, 
 	// The path from the raw request is the actual tested path, not from ev.URL
 	method, requestPath, requestHeaders, body := parseRawRequest(ev.Request)
 
-	// Use the path from the raw request if available
-	if requestPath != "" {
-		request.Path = requestPath
+	// Use the path from the raw request if available and valid
+	// Only use the parsed path if it's non-empty and looks like a valid path (starts with /)
+	var rawRequestQueryString string
+	if requestPath != "" && strings.HasPrefix(requestPath, "/") {
+		// The requestPath may include query string (e.g., /api/users?query=test)
+		// We need to split it properly
+		if idx := strings.Index(requestPath, "?"); idx != -1 {
+			request.Path = requestPath[:idx]
+			rawRequestQueryString = requestPath[idx+1:]
+		} else {
+			request.Path = requestPath
+		}
 	}
 	contentType := http.DetectContentType([]byte(body))
 	if m, err := common.NewHttpMethodFromString(strings.ToUpper(method)); err == nil {
@@ -155,11 +172,19 @@ func getHTTPRequestResponse(ev *nout.ResultEvent) (*common.HttpRequestResponse, 
 	if body != "" {
 		params.Body = requesthelpers.CreateBodyFromBytes(contentType, []byte(body))
 	}
-	// Parse query parameters from the final URL
-	if finalURL != nil && finalURL.RawQuery != "" {
-		for k, vs := range finalURL.Query() {
-			if len(vs) > 0 {
-				params.Query[k] = vs[0]
+	
+	// Parse query parameters - prefer raw request query string if available, otherwise use finalURL
+	queryStringToParse := rawRequestQueryString
+	if queryStringToParse == "" && finalURL != nil && finalURL.RawQuery != "" {
+		queryStringToParse = finalURL.RawQuery
+	}
+	
+	if queryStringToParse != "" {
+		if parsedQuery, err := url.ParseQuery(queryStringToParse); err == nil {
+			for k, vs := range parsedQuery {
+				if len(vs) > 0 {
+					params.Query[k] = vs[0]
+				}
 			}
 		}
 	}

@@ -30,16 +30,10 @@ func getTargetURL(ev *nout.ResultEvent) string {
 	if ev.Request != "" {
 		_, requestPath, _, _ := parseRawRequest(ev.Request)
 		// Only use the parsed path if it's non-empty and looks like a valid path (starts with /)
-		if requestPath != "" {
-			// Clean the request path by removing the leading / if it exists and adding it back
-			requestPath = strings.TrimPrefix(requestPath, "/")
-			requestPath = "/" + requestPath
-
-			// The requestPath may include query string (e.g., /api/users?query=test)
-			// We need to split it to avoid URL encoding the ? character
+		if requestPath != "" && strings.HasPrefix(requestPath, "/") {
+			// Strip query string if present to avoid URL encoding issues
 			if idx := strings.Index(requestPath, "?"); idx != -1 {
 				parsedURL.Path = requestPath[:idx]
-				parsedURL.RawQuery = requestPath[idx+1:]
 			} else {
 				parsedURL.Path = requestPath
 			}
@@ -148,17 +142,10 @@ func getHTTPRequestResponse(ev *nout.ResultEvent) (*common.HttpRequestResponse, 
 	method, requestPath, requestHeaders, body := parseRawRequest(ev.Request)
 
 	// Use the path from the raw request if available and valid
-	// Only use the parsed path if it's non-empty and looks like a valid path (starts with /)
-	var rawRequestQueryString string
-	if requestPath != "" {
-		requestPath = strings.TrimPrefix(requestPath, "/")
-		requestPath = "/" + requestPath
-
-		// The requestPath may include query string (e.g., /api/users?query=test)
-		// We need to split it properly
+	if requestPath != "" && strings.HasPrefix(requestPath, "/") {
+		// Strip query string if present
 		if idx := strings.Index(requestPath, "?"); idx != -1 {
 			request.Path = requestPath[:idx]
-			rawRequestQueryString = requestPath[idx+1:]
 		} else {
 			request.Path = requestPath
 		}
@@ -179,19 +166,11 @@ func getHTTPRequestResponse(ev *nout.ResultEvent) (*common.HttpRequestResponse, 
 	if body != "" {
 		params.Body = requesthelpers.CreateBodyFromBytes(contentType, []byte(body))
 	}
-
-	// Parse query parameters - prefer raw request query string if available, otherwise use finalURL
-	queryStringToParse := rawRequestQueryString
-	if queryStringToParse == "" && finalURL != nil && finalURL.RawQuery != "" {
-		queryStringToParse = finalURL.RawQuery
-	}
-
-	if queryStringToParse != "" {
-		if parsedQuery, err := url.ParseQuery(queryStringToParse); err == nil {
-			for k, vs := range parsedQuery {
-				if len(vs) > 0 {
-					params.Query[k] = vs[0]
-				}
+	// Parse query parameters from the final URL
+	if finalURL != nil && finalURL.RawQuery != "" {
+		for k, vs := range finalURL.Query() {
+			if len(vs) > 0 {
+				params.Query[k] = vs[0]
 			}
 		}
 	}

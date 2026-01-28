@@ -18,11 +18,33 @@ import (
 
 // getTargetURL extracts the target URL from a ResultEvent.
 // excludes query parameters and fragment ie. https://example.com/path?query#fragment -> https://example.com/path
+// Uses the path from the raw HTTP request if available, as ev.URL may not contain the tested path
 func getTargetURL(ev *nout.ResultEvent) string {
 	parsedURL, err := url.Parse(ev.URL)
 	if err != nil {
 		return ev.URL
 	}
+
+	// Extract the actual path from the raw HTTP request
+	// This is necessary because ev.URL might not contain the tested path when using path fuzzing
+	if ev.Request != "" {
+		_, requestPath, _, _ := parseRawRequest(ev.Request)
+		// Only use the parsed path if it's non-empty and looks like a valid path (starts with /)
+		if requestPath != "" && strings.HasPrefix(requestPath, "/") {
+			// Strip query string and fragment if present to avoid URL encoding issues
+			if idx := strings.IndexAny(requestPath, "?#"); idx != -1 {
+				requestPath = requestPath[:idx]
+			}
+			// Decode the path since it comes URL-encoded from the HTTP request
+			// This prevents double-encoding when parsedURL.String() re-encodes it
+			if decodedPath, err := url.PathUnescape(requestPath); err == nil {
+				parsedURL.Path = decodedPath
+			} else {
+				parsedURL.Path = requestPath
+			}
+		}
+	}
+
 	parsedURL.RawQuery = ""
 	parsedURL.Fragment = ""
 	parsedURL.RawFragment = ""
@@ -120,7 +142,24 @@ func getHTTPRequestResponse(ev *nout.ResultEvent) (*common.HttpRequestResponse, 
 		}
 	}
 
-	method, _, requestHeaders, body := parseRawRequest(ev.Request)
+	// Parse the raw request to get the actual method, path, headers, and body
+	// The path from the raw request is the actual tested path, not from ev.URL
+	method, requestPath, requestHeaders, body := parseRawRequest(ev.Request)
+
+	// Use the path from the raw request if available and valid
+	if requestPath != "" && strings.HasPrefix(requestPath, "/") {
+		// Strip query string and fragment if present
+		if idx := strings.IndexAny(requestPath, "?#"); idx != -1 {
+			requestPath = requestPath[:idx]
+		}
+		// Decode the path since it comes URL-encoded from the HTTP request
+		// This prevents double-encoding issues
+		if decodedPath, err := url.PathUnescape(requestPath); err == nil {
+			request.Path = decodedPath
+		} else {
+			request.Path = requestPath
+		}
+	}
 	contentType := http.DetectContentType([]byte(body))
 	if m, err := common.NewHttpMethodFromString(strings.ToUpper(method)); err == nil {
 		request.Method = m

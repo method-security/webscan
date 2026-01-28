@@ -1,11 +1,12 @@
 package nuclei
 
 import (
-	// Generated
+	// Standard
 	"fmt"
 	"regexp"
 	"strings"
 
+	// Generated
 	nuclei "github.com/Method-Security/webscan/generated/go/common/nuclei"
 
 	// External

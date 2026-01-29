@@ -41,6 +41,5 @@ http:
       - type: word
         part: body
         words:
-          - "Kubernetes Dashboard"
           - "k8s-app=kubernetes-dashboard"
         case-insensitive: true

@@ -146,9 +146,21 @@ func getHTTPRequestResponse(ev *nout.ResultEvent) (*common.HttpRequestResponse, 
 	// The path from the raw request is the actual tested path, not from ev.URL
 	method, requestPath, requestHeaders, body := parseRawRequest(ev.Request)
 
-	// Use the path from the raw request if available and valid
+	// Extract query string from raw request path if present
+	var rawRequestQueryString string
 	if requestPath != "" && strings.HasPrefix(requestPath, "/") {
-		// Strip query string and fragment if present
+		// Check for query string before stripping
+		if qIdx := strings.Index(requestPath, "?"); qIdx != -1 {
+			// Find the end of query string (before fragment if present)
+			endIdx := strings.Index(requestPath[qIdx:], "#")
+			if endIdx != -1 {
+				rawRequestQueryString = requestPath[qIdx+1 : qIdx+endIdx]
+			} else {
+				rawRequestQueryString = requestPath[qIdx+1:]
+			}
+		}
+
+		// Strip query string and fragment to get clean path
 		if idx := strings.IndexAny(requestPath, "?#"); idx != -1 {
 			requestPath = requestPath[:idx]
 		}
@@ -176,11 +188,19 @@ func getHTTPRequestResponse(ev *nout.ResultEvent) (*common.HttpRequestResponse, 
 	if body != "" {
 		params.Body = requesthelpers.CreateBodyFromBytes(contentType, []byte(body))
 	}
-	// Parse query parameters from the final URL
-	if finalURL != nil && finalURL.RawQuery != "" {
-		for k, vs := range finalURL.Query() {
-			if len(vs) > 0 {
-				params.Query[k] = vs[0]
+
+	// Parse query parameters - prefer raw request query string, fall back to finalURL
+	queryStringToParse := rawRequestQueryString
+	if queryStringToParse == "" && finalURL != nil && finalURL.RawQuery != "" {
+		queryStringToParse = finalURL.RawQuery
+	}
+
+	if queryStringToParse != "" {
+		if parsedQuery, err := url.ParseQuery(queryStringToParse); err == nil {
+			for k, vs := range parsedQuery {
+				if len(vs) > 0 {
+					params.Query[k] = vs[0]
+				}
 			}
 		}
 	}
@@ -194,8 +214,9 @@ func getHTTPRequestResponse(ev *nout.ResultEvent) (*common.HttpRequestResponse, 
 
 	// Create redirect chain with the final URL if it's different from base
 	var redirectChain []string
+	fullURL := request.GetBaseUrl() + request.GetPath()
 	if finalURL != nil {
-		redirectChain = append(redirectChain, ev.URL) // ev.URL is the final destination
+		redirectChain = append(redirectChain, fullURL)
 	}
 
 	response = requesthelpers.CreateHTTPResponse(statusCode, redirectChain, singleToMulti(responseHeaders), responseBody)

@@ -214,8 +214,9 @@ func getHTTPRequestResponse(ev *nout.ResultEvent) (*common.HttpRequestResponse, 
 
 	// Create redirect chain with the final URL if it's different from base
 	var redirectChain []string
+	fullURL := request.GetBaseUrl() + request.GetPath()
 	if finalURL != nil {
-		redirectChain = append(redirectChain, ev.URL) // ev.URL is the final destination
+		redirectChain = append(redirectChain, fullURL)
 	}
 
 	response = requesthelpers.CreateHTTPResponse(statusCode, redirectChain, singleToMulti(responseHeaders), responseBody)

@@ -30,9 +30,6 @@ http:
     max-redirects: 5
     stop-at-first-match: true
     matchers:
-      - type: status
-        status:
-          - 200
       - type: dsl
         dsl:
           - 'contains(tolower(body), "\"app\":\"kubernetes-dashboard\"") || contains(tolower(body), "data-ng-app=\"kubernetesdashboard\"") || contains(tolower(body), "ng-app=\"kubernetesdashboard\"") || contains(tolower(body), "kubernetes-dashboard-head") || contains(tolower(header), "kubernetes-dashboard") || (contains(tolower(header), "x-rancher-version") && contains(tolower(body), "ember-basic-dropdown")) || (contains(tolower(header), "pl=rancher") && contains(tolower(body), "ember-basic-dropdown"))'

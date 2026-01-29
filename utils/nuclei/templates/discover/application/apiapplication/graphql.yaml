@@ -31,10 +31,13 @@ http:
     headers:
       Content-Type: application/json
     body: '{"query": "{ __schema { queryType { name } } }"}'
-    redirects: true
-    max-redirects: 5
+    redirects: false
     stop-at-first-match: true
+    matchers-condition: and
     matchers:
+      - type: status
+        status:
+          - 200
       - type: word
         part: body
         words:

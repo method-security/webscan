@@ -36,4 +36,9 @@ http:
           - 200
       - type: dsl
         dsl:
-          - 'body matches "(?i)<title[^>]*>.*[Kk]ubernetes.*[Dd]ashboard.*</title>" || body matches "(?i)<title[^>]*>.*[Kk]8s.*[Mm]anager.*</title>" || contains(tolower(body), "\"app\":\"kubernetes-dashboard\"") || contains(tolower(body), "data-ng-app=\"kubernetesdashboard\"") || contains(tolower(body), "ng-app=\"kubernetesdashboard\"") || contains(tolower(body), "kubernetes-dashboard-head") || contains(tolower(header), "kubernetes-dashboard") || (contains(tolower(header), "x-rancher-version") && contains(tolower(body), "ember-basic-dropdown")) || (contains(tolower(header), "pl=rancher") && contains(tolower(body), "ember-basic-dropdown"))'
+          - 'contains(tolower(body), "\"app\":\"kubernetes-dashboard\"") || contains(tolower(body), "data-ng-app=\"kubernetesdashboard\"") || contains(tolower(body), "ng-app=\"kubernetesdashboard\"") || contains(tolower(body), "kubernetes-dashboard-head") || contains(tolower(header), "kubernetes-dashboard") || (contains(tolower(header), "x-rancher-version") && contains(tolower(body), "ember-basic-dropdown")) || (contains(tolower(header), "pl=rancher") && contains(tolower(body), "ember-basic-dropdown"))'
+      - type: regex
+        part: body
+        regex:
+          - '(?i)<title[^>]*>.*Kubernetes.*Dashboard.*</title>'
+          - '(?i)<title[^>]*>.*K8s.*Manager.*</title>'

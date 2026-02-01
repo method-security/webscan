@@ -138,7 +138,7 @@ requestLoop:
 			defer func() { <-semaphore }() // Release semaphore when done
 
 			// Print request number to console
-			log.Warn("Sending ratelimit request", svc1log.SafeParam("requestNumber", reqNum), svc1log.SafeParam("target", target))
+			log.Info("Sending ratelimit request", svc1log.SafeParam("requestNumber", reqNum), svc1log.SafeParam("target", target))
 
 			// Create Request Config
 			requestConfig := createRateLimitRequestConfig(baseURL, parsedTargetPath, queryParams, config)

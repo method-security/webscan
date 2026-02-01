@@ -224,6 +224,13 @@ func (b *Builder) Consume(ev *nout.ResultEvent) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
+	// Safety check: Skip events where matchers didn't actually match
+	// This should not happen if MatcherStatus is set correctly during engine initialization,
+	// but we check here as a defensive measure
+	if !ev.MatcherStatus {
+		return
+	}
+
 	// Get or create probe
 	probe, ok := b.probeIdx[ev.TemplateID]
 	if !ok {

@@ -195,8 +195,10 @@ func buildNucleiOptions(cfg Config, templateDir, workflowDir string) []nucleilib
 		}(),
 
 		// Explicitly set StopAtFirstMatch to false to ensure we get all requests
+		// Set MatcherStatus to false to only report actual matches (not all template executions)
 		func(e *nucleilib.NucleiEngine) error {
 			e.Options().StopAtFirstMatch = false
+			e.Options().MatcherStatus = false
 			// Add timeout configuration
 			e.Options().Timeout = cfg.Timeout
 			return nil
@@ -314,9 +316,6 @@ func Run(ctx context.Context, cfg Config, reportBuilder *report.Builder) ([]*nuc
 		return nil, err
 	}
 	defer eng.Close()
-
-	eng.Options().MatcherStatus = false
-	log.Info("Set matcher status", svc1log.SafeParam("status", eng.Options().MatcherStatus))
 
 	log.Info("Loading targets")
 	if err := loadTargets(eng, cfg); err != nil {

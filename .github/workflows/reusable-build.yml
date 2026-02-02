@@ -20,6 +20,14 @@ jobs:
     name: Prepare Linux (arm64)
     runs-on: public-ubuntu-latest-l-arm
     steps:
+      - name: Maximize build space
+        uses: easimon/maximize-build-space@v10
+        with:
+          root-reserve-mb: 32768
+          remove-android: "true"
+          remove-docker-images: "true"
+          remove-dotnet: "true"
+          remove-haskell: "true"
       - uses: actions/checkout@v4.1.6
         with:
           fetch-depth: 0
@@ -56,10 +64,17 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
+      - name: Free up disk space
+        run: |
+          df -h
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          df -h
       - uses: goreleaser/goreleaser-action@v4
         with:
           distribution: goreleaser-pro
-          version: latest
+          version: v2.13.3
           args: >-
             build --single-target --clean --snapshot --timeout 60m
             -f .goreleaser/goreleaser-build.yml ${{ inputs.goreleaser_options }}
@@ -80,6 +95,14 @@ jobs:
     env:
       DOCKER_CLI_EXPERIMENTAL: "enabled"
     steps:
+      - name: Maximize build space
+        uses: easimon/maximize-build-space@v10
+        with:
+          root-reserve-mb: 32768
+          remove-android: "true"
+          remove-docker-images: "true"
+          remove-dotnet: "true"
+          remove-haskell: "true"
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
@@ -125,6 +148,13 @@ jobs:
           fern generate --group local
         env:
           FERN_TOKEN: ${{ secrets.FERN_TOKEN }}
+      - name: Free up disk space
+        run: |
+          df -h
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          df -h
       - name: Build AMD64 Builder Image
         run: docker buildx build . --platform linux/amd64 --load --tag amdbuilder -f Dockerfile.builder
       - name: Build AMD64 Image
@@ -152,6 +182,15 @@ jobs:
       DOCKER_CLI_EXPERIMENTAL: "enabled"
       flags: ""
     steps:
+      - name: Maximize build space
+        uses: easimon/maximize-build-space@v10
+        with:
+          root-reserve-mb: 32768
+          remove-android: "true"
+          remove-docker-images: "true"
+          remove-dotnet: "true"
+          remove-haskell: "true"
+        if: matrix.os != 'macos-latest'
       - name: Install Dependencies
         run: |
           brew update
@@ -192,10 +231,18 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
+      - name: Free up disk space
+        run: |
+          df -h
+          rm -rf /usr/share/dotnet
+          rm -rf /usr/local/lib/android
+          rm -rf /opt/ghc
+          df -h
+        if: matrix.os != 'macos-latest'
       - uses: goreleaser/goreleaser-action@v4
         with:
           distribution: goreleaser-pro
-          version: latest
+          version: v2.13.3
           args: build --single-target -f=.goreleaser/goreleaser-build.yml ${{ inputs.goreleaser_options }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -338,12 +385,17 @@ jobs:
 
       - name: View Output
         run: ls -al output output/*
+      - name: Free up disk space before final release
+        run: |
+          df -h
+          sudo rm -rf artifacts
+          sudo docker system prune -af
+          df -h
       - uses: goreleaser/goreleaser-action@v4
-        if: steps.cache.outputs.cache-hit != 'true'
         with:
           distribution: goreleaser-pro
-          version: latest
-          args: release -f=.goreleaser/goreleaser-publish.yml ${{ inputs.goreleaser_options }}
+          version: v2.13.3
+          args: release -f=.goreleaser/goreleaser-publish.yml ${{ inputs.goreleaser_options }} --timeout 90m
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}

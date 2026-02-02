@@ -84,7 +84,7 @@ jobs:
         env:
           FERN_TOKEN: ${{ secrets.FERN_TOKEN }}
       - name: Build AMD64 Builder Image
-        run: docker build --tag amdbuilder -f Dockerfile.builder .
+        run: docker build --target amd64 --tag amdbuilder -f Dockerfile.builder .
       - name: Build AMD64 Image
         run: |
           docker run -v $PWD:/app/webscan \

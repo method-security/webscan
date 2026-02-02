@@ -2,10 +2,30 @@ imports:
   http: ../common/http.yml
   method: ../common/method.yml
 types:
+  # Enums
+  TokenConfidenceLevel:
+    enum:
+      - HIGH
+      - MEDIUM
+      - LOW
+  # Token Structs
+  TokenFingerprint:
+    properties:
+      type: string
+      pattern: string
+      confidence: TokenConfidenceLevel
+  TokenFingerprints:
+    properties:
+      fingerprints: list<TokenFingerprint>
+  ExposedToken:
+    properties:
+      value: string
+      fingerprint: TokenFingerprint
   # Function Config Struct
   DiscoverPageConfig:
     properties:
       target: string
+      tokenDetection: boolean
       responseCodes: string
       screenshot: boolean
       maxRedirects: integer
@@ -18,6 +38,7 @@ types:
     properties:
       request: optional<http.HttpRequestResponse>
       screenshot: optional<base64>
+      exposedTokens: optional<list<ExposedToken>>
   # Report Struct
   DiscoverPageReport:
     properties:

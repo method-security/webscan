@@ -3,6 +3,7 @@ package discoverpage
 import (
 	// Standard
 	"context"
+
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
 	"github.com/Method-Security/webscan/generated/go/discover"
@@ -87,12 +88,34 @@ func PerformPageCapture(
 	}
 
 	// Only add request if response code is in the allowed list
-	if httpRequestResponse != nil &&
-		httpRequestResponse.Response != nil &&
-		httpRequestResponse.Response.StatusCode != nil {
-		if _, exists := validCodes[*httpRequestResponse.Response.StatusCode]; exists {
-			result.Request = httpRequestResponse
-			return &report
+	if config.TokenDetection {
+		if httpRequestResponse != nil &&
+			httpRequestResponse.Response != nil &&
+			httpRequestResponse.Response.StatusCode != nil {
+			if _, exists := validCodes[*httpRequestResponse.Response.StatusCode]; exists {
+				result.Request = httpRequestResponse
+
+				// Extract tokens from the response body if available
+				if httpRequestResponse.Response.ResponseBody != nil {
+					// Use helper function to get response body content
+					responseContentPtr := requesthelpers.GetResponseBodyStringFromBodyStruct(httpRequestResponse.Response.ResponseBody)
+
+					if responseContentPtr != nil {
+						discoveredTokens := pagehelpers.ExtractTokensFromWebContent(*responseContentPtr)
+
+						// Convert to slice of pointers for Fern type
+						if len(discoveredTokens) > 0 {
+							var tokenPointers []*discover.ExposedToken
+							for _, token := range discoveredTokens {
+								tokenPointers = append(tokenPointers, &token)
+							}
+							result.ExposedTokens = tokenPointers
+						}
+					}
+				}
+
+				return &report
+			}
 		}
 	}
 

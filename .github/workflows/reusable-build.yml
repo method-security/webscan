@@ -90,6 +90,8 @@ jobs:
           fern generate --group local
         env:
           FERN_TOKEN: ${{ secrets.FERN_TOKEN }}
+      - name: Clean buildx cache
+        run: docker buildx prune -af
       - name: Build AMD64 Builder Image
         run: docker buildx build . --platform linux/amd64 --load --tag amdbuilder -f Dockerfile.builder
       - name: Build AMD64 Image
@@ -254,11 +256,12 @@ jobs:
           echo "Disk space before cleanup:"
           df -h
           sudo docker system prune -af --volumes
+          docker buildx prune -af
           echo "Disk space after cleanup:"
           df -h
 
       - name: Build Docker Image (AMD64)
-        run: docker buildx build . --platform linux/amd64 --tag methodsecurity/webscan:latest-amd64
+        run: docker buildx build . --platform linux/amd64 --load --tag methodsecurity/webscan:latest-amd64
 
       - name: View Output
         run: ls -al output output/*

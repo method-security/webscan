@@ -1,46 +1,8 @@
-# Git
-.git
-.gitignore
-.github
+# Exclude everything by default
+*
 
-# Documentation
-*.md
-docs/
-fern/
-SECURITY.md
-
-# Build artifacts
-dist/
-output/
-artifacts/
-*.tar.gz
-*.zip
-
-# Go
-vendor/
-*.test
-*.out
-go.sum
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# CI/CD
-.goreleaser/
-scripts/
-
-# Development
-godel/
-internal/
-cmd/
-*.go
-
-# Only include what we need:
-# - configs/ (copied in Dockerfile)
-# - webscan binary (copied in Dockerfile)
+# Only include what's needed for the Docker build
 !configs/
+!configs/**
 !webscan
+!Dockerfile

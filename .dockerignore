@@ -1,0 +1,53 @@
+# Large directories that don't need to be in Docker context
+vendor/
+utils/
+internal/
+cmd/
+dist/
+output/
+artifacts/
+generated/
+godel/
+
+# Documentation
+docs/
+fern/
+*.md
+README*
+LICENSE
+SECURITY.md
+CLAUDE.md
+
+# Git and CI
+.git/
+.gitignore
+.gitattributes
+.github/
+.goreleaser/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Go files
+*.go
+go.mod
+go.sum
+main.go
+
+# Build artifacts
+*.exe
+*.dll
+*.so
+*.dylib
+*.tar.gz
+*.zip
+
+# Scripts
+scripts/
+godelw
+
+# Only webscan binary and configs/ will be included

@@ -363,36 +363,11 @@ jobs:
           df -h
         shell: bash
 
-      - name: Aggressive disk cleanup before Docker build
-        run: |
-          df -h
-          df -i
-          echo "Cleaning up artifacts directory..."
-          rm -rf artifacts
-          echo "Pruning Docker aggressively..."
-          sudo docker system prune -af --volumes
-          echo "Clearing buildx cache..."
-          docker buildx prune -af --force
-          echo "Removing unnecessary packages..."
-          sudo apt-get clean
-          sudo rm -rf /var/lib/apt/lists/*
-          echo "Cleaning up old Go cache..."
-          sudo rm -rf /home/runner/.cache/go-build
-          sudo rm -rf /root/.cache/go-build
-          echo "Final disk status:"
-          df -h
-          df -i
-      
-      - name: Copy AMD64 binary to Docker context
+      - name: Copy AMD64 binary for goreleaser
         run: |
           cp output/build-linux_amd64/webscan ./webscan
           ls -lh webscan
-          echo "Checking what's in Docker context:"
-          du -sh . vendor/ utils/ 2>/dev/null || true
       
-      - name: Build Docker Image (AMD64)
-        run: docker buildx build . --platform linux/amd64 --tag methodsecurity/webscan:latest-amd64 --load
-
       - name: View Output
         run: ls -al output output/*
       - name: Free up disk space before final release

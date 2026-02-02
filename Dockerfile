@@ -6,13 +6,12 @@ RUN ln -s /headless-shell/headless-shell /usr/bin/chrome
 ARG CLI_NAME="webscan"
 ARG TARGETARCH
 
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends ca-certificates git && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y ca-certificates git
 
 # Setup Method Directory Structure
 RUN \
+  mkdir -p /opt/method/${CLI_NAME}/ && \
+  mkdir -p /opt/method/${CLI_NAME}/var/data && \
   mkdir -p /opt/method/${CLI_NAME}/var/data/tmp && \
   mkdir -p /opt/method/${CLI_NAME}/var/conf && \
   mkdir -p /opt/method/${CLI_NAME}/var/log && \

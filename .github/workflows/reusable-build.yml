@@ -20,17 +20,6 @@ jobs:
     name: Prepare Linux (arm64)
     runs-on: public-ubuntu-latest-l-arm
     steps:
-      - name: Free up disk space
-        run: |
-          df -h
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
-          sudo rm -rf /usr/local/share/boost
-          sudo rm -rf /usr/share/swift
-          sudo docker system prune -af
-          df -h
       - uses: actions/checkout@v4.1.6
         with:
           fetch-depth: 0
@@ -91,17 +80,6 @@ jobs:
     env:
       DOCKER_CLI_EXPERIMENTAL: "enabled"
     steps:
-      - name: Free up disk space
-        run: |
-          df -h
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
-          sudo rm -rf /usr/local/share/boost
-          sudo rm -rf /usr/share/swift
-          sudo docker system prune -af
-          df -h
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
@@ -275,16 +253,8 @@ jobs:
       - name: Set up Docker Buildx
         id: buildx
         uses: docker/setup-buildx-action@v3
-        with:
-          driver-opts: |
-            image=moby/buildkit:latest
-            network=host
       - name: Show available Docker Buildx platforms
         run: echo ${{ steps.buildx.outputs.platforms }}
-      - name: Configure Docker for space optimization
-        run: |
-          docker info
-          df -h
       - name: Install cosign
         uses: sigstore/cosign-installer@v3.5.0
       - name: Install Syft
@@ -358,28 +328,22 @@ jobs:
           mv artifacts/linux-amd64-dist/linux_amd64/build-linux_linux_amd64_v1/* output/build-linux_amd64/
           mv artifacts/windows-latest-dist/windows_amd64/build-windows_windows_amd64_v1/* output/build-windows_amd64/
           mv artifacts/macos-latest-dist/darwin_arm64/build-macos_darwin_arm64_v8.0/* output/build-darwin_arm64/
-          echo "Cleaning up artifacts directory to save space..."
-          rm -rf artifacts
-          df -h
         shell: bash
 
-      - name: Copy AMD64 binary for goreleaser
-        run: |
-          cp output/build-linux_amd64/webscan ./webscan
-          ls -lh webscan
-      
+      - name: Copy AMD64 binary to Docker context
+        run: cp output/build-linux_amd64/webscan ./webscan
+
+      - name: Build Docker Image (AMD64)
+        run: docker buildx build . --platform linux/amd64 --tag methodsecurity/webscan:latest-amd64
+
       - name: View Output
         run: ls -al output output/*
-      - name: Free up disk space before final release
-        run: |
-          df -h
-          sudo docker system prune -af
-          df -h
       - uses: goreleaser/goreleaser-action@v4
+        if: steps.cache.outputs.cache-hit != 'true'
         with:
           distribution: goreleaser-pro
           version: latest
-          args: release -f=.goreleaser/goreleaser-publish.yml ${{ inputs.goreleaser_options }} --timeout 90m
+          args: release -f=.goreleaser/goreleaser-publish.yml ${{ inputs.goreleaser_options }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}

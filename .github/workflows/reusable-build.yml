@@ -57,6 +57,17 @@ jobs:
     env:
       DOCKER_CLI_EXPERIMENTAL: "enabled"
     steps:
+      - name: Free Disk Space
+        run: |
+          echo "Disk space before cleanup:"
+          df -h
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/local/share/boost
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          sudo docker system prune -af --volumes
+          echo "Disk space after cleanup:"
+          df -h
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
@@ -237,6 +248,14 @@ jobs:
 
       - name: Copy AMD64 binary to Docker context
         run: cp output/build-linux_amd64/webscan ./webscan
+
+      - name: Free Disk Space Before Docker Build
+        run: |
+          echo "Disk space before cleanup:"
+          df -h
+          sudo docker system prune -af --volumes
+          echo "Disk space after cleanup:"
+          df -h
 
       - name: Build Docker Image (AMD64)
         run: docker buildx build . --platform linux/amd64 --tag methodsecurity/webscan:latest-amd64

@@ -1,0 +1,46 @@
+# Git
+.git
+.gitignore
+.github
+
+# Documentation
+*.md
+docs/
+fern/
+SECURITY.md
+
+# Build artifacts
+dist/
+output/
+artifacts/
+*.tar.gz
+*.zip
+
+# Go
+vendor/
+*.test
+*.out
+go.sum
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# CI/CD
+.goreleaser/
+scripts/
+
+# Development
+godel/
+internal/
+cmd/
+*.go
+
+# Only include what we need:
+# - configs/ (copied in Dockerfile)
+# - webscan binary (copied in Dockerfile)
+!configs/
+!webscan

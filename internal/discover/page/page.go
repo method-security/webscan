@@ -11,6 +11,7 @@ import (
 
 	// Internal
 	pagehelpers "github.com/Method-Security/webscan/internal/discover/page/helpers"
+
 	//Utils
 	headless "github.com/Method-Security/webscan/utils/request/headless"
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
@@ -87,39 +88,26 @@ func PerformPageCapture(
 		return &report
 	}
 
-	// Only add request if response code is in the allowed list
-	if config.TokenDetection {
-		if httpRequestResponse != nil &&
-			httpRequestResponse.Response != nil &&
-			httpRequestResponse.Response.StatusCode != nil {
-			if _, exists := validCodes[*httpRequestResponse.Response.StatusCode]; exists {
-				result.Request = httpRequestResponse
+	// Check if response is valid and add request if status code is allowed
+	if httpRequestResponse != nil && httpRequestResponse.Response != nil && httpRequestResponse.Response.StatusCode != nil {
+		if _, exists := validCodes[*httpRequestResponse.Response.StatusCode]; exists {
+			result.Request = httpRequestResponse
 
-				// Extract tokens from the response body if available
-				if httpRequestResponse.Response.ResponseBody != nil {
-					// Use helper function to get response body content
-					responseContentPtr := requesthelpers.GetResponseBodyStringFromBodyStruct(httpRequestResponse.Response.ResponseBody)
+			// If token detection is enabled, extract tokens from response body
+			if config.TokenDetection && httpRequestResponse.Response.ResponseBody != nil {
+				// Use helper function to get response body content
+				responseContentPtr := requesthelpers.GetResponseBodyStringFromBodyStruct(httpRequestResponse.Response.ResponseBody)
 
-					if responseContentPtr != nil {
-						discoveredTokens := pagehelpers.ExtractTokensFromWebContent(*responseContentPtr)
-
-						// Convert to slice of pointers for Fern type
-						if len(discoveredTokens) > 0 {
-							var tokenPointers []*discover.ExposedToken
-							for _, token := range discoveredTokens {
-								tokenPointers = append(tokenPointers, &token)
-							}
-							result.ExposedTokens = tokenPointers
-						}
-					}
+				if responseContentPtr != nil {
+					discoveredTokens, errors := pagehelpers.ExtractTokensFromWebContent(ctx, *responseContentPtr)
+					errors = append(errors, errors...)
+					result.ExposedTokens = discoveredTokens
 				}
-
-				return &report
 			}
 		}
 	}
 
-	// Return report
+	// Set final errors and return report
 	report.Errors = errors
 	return &report
 }

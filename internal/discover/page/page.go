@@ -43,7 +43,7 @@ func getHTTPRequestConfig(baseURL string, path string, queryParams map[string]st
 func PerformPageCapture(
 	ctx context.Context,
 	config discover.DiscoverPageConfig,
-	sensitiveContentFingerprints *discover.SensitiveContextFingerprints,
+	sensitiveContentFingerprints *discover.SensitiveContentFingerprints,
 	browserbaseSecrets *common.BrowserbaseRequestSecrets,
 ) *discover.DiscoverPageReport {
 	log := svc1log.FromContext(ctx)
@@ -100,16 +100,16 @@ func PerformPageCapture(
 		if _, exists := validCodes[*httpRequestResponse.Response.StatusCode]; exists {
 			result.Request = httpRequestResponse
 
-			// If sensitive context detection is enabled, extract sensitive contexts from response body
-			if config.SensitiveContextDetection && httpRequestResponse.Response.ResponseBody != nil {
-				log.Info("Extracting sensitive contexts from response body", svc1log.SafeParam("target", config.Target))
+			// If sensitive content detection is enabled, extract sensitive content from response body
+			if config.SensitiveContentDetection && httpRequestResponse.Response.ResponseBody != nil {
+				log.Info("Extracting sensitive contents from response body", svc1log.SafeParam("target", config.Target))
 				// Use helper function to get response body content
 				responseContentPtr := requesthelpers.GetResponseBodyStringFromBodyStruct(httpRequestResponse.Response.ResponseBody)
 
 				if responseContentPtr != nil {
-					discoveredSensitiveContexts, errs := pagehelpers.ExtractSensitiveContextsFromWebContent(ctx, *responseContentPtr, sensitiveContentFingerprints)
+					discoveredSensitiveContents, errs := pagehelpers.ExtractSensitiveContentsFromWebContent(ctx, *responseContentPtr, sensitiveContentFingerprints)
 					errors = append(errors, errs...)
-					result.SensitiveContexts = discoveredSensitiveContexts
+					result.SensitiveContents = discoveredSensitiveContents
 				}
 			}
 		}

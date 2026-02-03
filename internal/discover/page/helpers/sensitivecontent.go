@@ -13,7 +13,7 @@ import (
 )
 
 // LoadSensitiveConentFingerprints loads fingerprints from the JSON configuration file
-func LoadSensitiveConentFingerprints(ctx context.Context, configPath *string) (*discover.SensitiveContextFingerprints, error) {
+func LoadSensitiveConentFingerprints(ctx context.Context, configPath *string) (*discover.SensitiveContentFingerprints, error) {
 	log := svc1log.FromContext(ctx)
 
 	// Read the JSON file
@@ -23,21 +23,21 @@ func LoadSensitiveConentFingerprints(ctx context.Context, configPath *string) (*
 	}
 
 	// Unmarshal JSON directly into Fern-generated type
-	var fingerprints discover.SensitiveContextFingerprints
+	var fingerprints discover.SensitiveContentFingerprints
 	if err := json.Unmarshal(data, &fingerprints); err != nil {
 		return nil, err
 	}
 
-	log.Info("Loaded sensitive context fingerprints", svc1log.SafeParam("fingerprint count", len(fingerprints.Fingerprints)))
+	log.Info("Loaded sensitive content fingerprints", svc1log.SafeParam("fingerprint count", len(fingerprints.Fingerprints)))
 
 	return &fingerprints, nil
 }
 
-// ExtractSensitiveContextsFromWebContent searches for sensitive contexts in web content
-func ExtractSensitiveContextsFromWebContent(ctx context.Context, content string, fingerprints *discover.SensitiveContextFingerprints) ([]*discover.SensitiveContext, []string) {
+// ExtractSensitiveContentsFromWebContent searches for sensitive content in web content
+func ExtractSensitiveContentsFromWebContent(ctx context.Context, content string, fingerprints *discover.SensitiveContentFingerprints) ([]*discover.SensitiveContent, []string) {
 	log := svc1log.FromContext(ctx)
 
-	var sensitiveContextValues []*discover.SensitiveContext
+	var sensitiveContentValues []*discover.SensitiveContent
 	var errors []string
 	seen := make(map[string]bool) // Track unique credential values
 
@@ -65,15 +65,15 @@ func ExtractSensitiveContextsFromWebContent(ctx context.Context, content string,
 				log.Info("Found token", svc1log.SafeParam("type", fingerprint.Type))
 				seen[value] = true
 
-				sensitiveContext := discover.SensitiveContext{
+				sensitiveContent := discover.SensitiveContent{
 					Value:       value,
 					Fingerprint: fingerprint,
 				}
 
-				sensitiveContextValues = append(sensitiveContextValues, &sensitiveContext)
+				sensitiveContentValues = append(sensitiveContentValues, &sensitiveContent)
 			}
 		}
 	}
 
-	return sensitiveContextValues, errors
+	return sensitiveContentValues, errors
 }

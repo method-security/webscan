@@ -290,14 +290,14 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Config flags
-			var sensitiveContextFingerprintsPath string
-			sensitiveContextDetection, err := cmd.Flags().GetBool("sensitive-context-detection")
+			var sensitiveContentFingerprintsPath string
+			sensitiveContentDetection, err := cmd.Flags().GetBool("sensitive-content-detection")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			if sensitiveContextDetection {
-				sensitiveContextFingerprintsPath, err = cmd.Flags().GetString("sensitive-context-fingerprints-path")
+			if sensitiveContentDetection {
+				sensitiveContentFingerprintsPath, err = cmd.Flags().GetString("sensitive-content-fingerprints-path")
 				if err != nil {
 					a.OutputSignal.AddError(err)
 					return
@@ -344,17 +344,17 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Set Config
-			config := getDiscoverPageConfig(target, sensitiveContextDetection, sensitiveContextFingerprintsPath, responseCodes, maxRedirects, verifyTLS, timeout, takeScreenshot, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
+			config := getDiscoverPageConfig(target, sensitiveContentDetection, sensitiveContentFingerprintsPath, responseCodes, maxRedirects, verifyTLS, timeout, takeScreenshot, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
 
 			// Load sensitive content fingerprints
-			sensitiveContentFingerprints, err := discoverpagehelpers.LoadSensitiveConentFingerprints(ctx, config.SensitiveContextFingerprintsPath)
+			sensitiveContentFingerprints, err := discoverpagehelpers.LoadSensitiveConentFingerprints(ctx, config.SensitiveContentFingerprintsPath)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
 
-			// If sensitive context detection is enabled and no fingerprints are found, return an error
-			if config.SensitiveContextDetection && sensitiveContentFingerprints == nil {
+			// If sensitive content detection is enabled and no fingerprints are found, return an error
+			if config.SensitiveContentDetection && sensitiveContentFingerprints == nil {
 				a.OutputSignal.AddError(errors.New("no sensitive content fingerprints found"))
 				return
 			}
@@ -367,8 +367,8 @@ func (a *WebScan) InitDiscoverCommand() {
 	// Target Flags
 	discoverPageCmd.Flags().String("target", "", "URL target to capture and analyze")
 	// Config Flags
-	discoverPageCmd.Flags().Bool("sensitive-context-detection", false, "Enable sensitive context detection")
-	discoverPageCmd.Flags().String("sensitive-context-fingerprints-path", "configs/discover/page/sensitive_content_fingerprints.json", "Path to the sensitive context fingerprints file")
+	discoverPageCmd.Flags().Bool("sensitive-content-detection", false, "Enable sensitive content detection")
+	discoverPageCmd.Flags().String("sensitive-content-fingerprints-path", "configs/discover/page/sensitive_content_fingerprints.json", "Path to the sensitive content fingerprints file")
 	discoverPageCmd.Flags().String("response-codes", "200-299", "Response codes to consider as valid responses")
 	discoverPageCmd.Flags().Bool("screenshot", false, "Capture a screenshot of the page")
 	discoverPageCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
@@ -722,11 +722,11 @@ func getDiscoverApplicationConfig(targets []string, resource string, timeout int
 }
 
 // getDiscoverPageConfig builds the config for page capture and analysis.
-func getDiscoverPageConfig(target string, sensitiveContextDetection bool, sensitiveContextFingerprintsPath string, responseCodes string, maxRedirects int, verifyTLS bool, timeout int, takeScreenshot bool, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) discover.DiscoverPageConfig {
+func getDiscoverPageConfig(target string, sensitiveContentDetection bool, sensitiveContentFingerprintsPath string, responseCodes string, maxRedirects int, verifyTLS bool, timeout int, takeScreenshot bool, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) discover.DiscoverPageConfig {
 	config := discover.DiscoverPageConfig{
 		Target:                    target,
 		ResponseCodes:             responseCodes,
-		SensitiveContextDetection: sensitiveContextDetection,
+		SensitiveContentDetection: sensitiveContentDetection,
 		MaxRedirects:              maxRedirects,
 		VerifyTls:                 verifyTLS,
 		Timeout:                   max(timeout, 0),
@@ -735,8 +735,8 @@ func getDiscoverPageConfig(target string, sensitiveContextDetection bool, sensit
 		HeadlessConfig:            headlessConfig,
 		BrowserbaseConfig:         browserbaseConfig,
 	}
-	if sensitiveContextFingerprintsPath != "" {
-		config.SensitiveContextFingerprintsPath = &sensitiveContextFingerprintsPath
+	if sensitiveContentFingerprintsPath != "" {
+		config.SensitiveContentFingerprintsPath = &sensitiveContentFingerprintsPath
 	}
 	return config
 }

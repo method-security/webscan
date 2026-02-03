@@ -3,35 +3,35 @@ imports:
   method: ../common/method.yml
 types:
   # Enums
-  SensitiveContextType:
+  SensitiveContentType:
     enum:
       - CREDENTIAL
       - PII_DATA
-  SensitiveContextConfidenceLevel:
+  SensitiveContentConfidenceLevel:
     enum:
       - HIGH
       - MEDIUM
       - LOW
   # Sensitive Context Structs
-  SensitiveContextFingerprint:
+  SensitiveContentFingerprint:
     properties:
       name: string
-      type: SensitiveContextType
+      type: SensitiveContentType
       pattern: string
-      confidence: SensitiveContextConfidenceLevel
-  SensitiveContextFingerprints:
+      confidence: SensitiveContentConfidenceLevel
+  SensitiveContentFingerprints:
     properties:
-      fingerprints: list<SensitiveContextFingerprint>
-  SensitiveContext:
+      fingerprints: list<SensitiveContentFingerprint>
+  SensitiveContent:
     properties:
       value: string
-      fingerprint: SensitiveContextFingerprint
+      fingerprint: SensitiveContentFingerprint
   # Function Config Struct
   DiscoverPageConfig:
     properties:
       target: string
-      sensitiveContextDetection: boolean
-      sensitiveContextFingerprintsPath: optional<string>
+      sensitiveContentDetection: boolean
+      sensitiveContentFingerprintsPath: optional<string>
       responseCodes: string
       screenshot: boolean
       maxRedirects: integer
@@ -44,7 +44,7 @@ types:
     properties:
       request: optional<http.HttpRequestResponse>
       screenshot: optional<base64>
-      sensitiveContexts: optional<list<SensitiveContext>>
+      sensitiveContents: optional<list<SensitiveContent>>
   # Report Struct
   DiscoverPageReport:
     properties:

@@ -240,45 +240,29 @@ jobs:
     env:
       DOCKER_CLI_EXPERIMENTAL: "enabled"
     steps:
-      - name: Maximize build space
-        uses: easimon/maximize-build-space@v10
-        with:
-          root-reserve-mb: 32768
-          remove-android: "true"
-          remove-docker-images: "true"
-          remove-dotnet: "true"
-          remove-haskell: "true"
-          remove-codeql: "true"
-          remove-swapfile: "true"
-
       - name: Free up disk space and install dependencies
         run: |
           echo "=== Initial disk usage ==="
           df -h
 
-          # Aggressive cleanup first
+          # Aggressive cleanup
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache
+          sudo rm -rf /usr/local/share/boost
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
           sudo apt-get autoremove -y
           sudo apt-get autoclean
+          sudo apt-get clean
           sudo rm -rf /var/lib/apt/lists/*
           sudo rm -rf /tmp/* /var/tmp/*
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache /usr/local/share/boost || true
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY" || true
-          sudo docker system prune -af || true
+          sudo docker system prune -af
 
-          # Move Docker data directory to the larger buildlv volume
-          echo "=== Moving Docker to buildlv volume ==="
-          sudo systemctl stop docker
-          sudo mkdir -p /home/runner/work/webscan/docker-data
-          sudo mv /var/lib/docker/* /home/runner/work/webscan/docker-data/ || true
-          sudo rm -rf /var/lib/docker
-          sudo ln -s /home/runner/work/webscan/docker-data /var/lib/docker
-          sudo systemctl start docker
-
-          echo "=== After cleanup and Docker move ==="
+          echo "=== After cleanup ==="
           df -h
 
           # Minimal install
-          sudo apt-get clean
           sudo apt-get update --fix-missing
           sudo apt-get install -y --no-install-recommends gcc libc6-dev libpcap-dev
       - name: Set up QEMU

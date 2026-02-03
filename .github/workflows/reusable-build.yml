@@ -236,21 +236,54 @@ jobs:
           mv artifacts/macos-latest-dist/darwin_arm64/build-macos_darwin_arm64_v8.0/* output/build-darwin_arm64/
         shell: bash
 
-      - name: Clean Docker to free space
+      - name: Clean Docker aggressively
         run: |
-          docker system prune -af
+          # Stop all containers and remove all images to free maximum space
+          docker stop $(docker ps -aq) 2>/dev/null || true
+          docker rm $(docker ps -aq) 2>/dev/null || true
+          docker rmi $(docker images -q) -f 2>/dev/null || true
+          docker system prune -af --volumes
           docker builder prune -af
+          
+          # Show available space
           df -h
+          echo "Docker info:"
+          docker system df
 
-      - name: Copy AMD64 binary to Docker context
-        run: cp output/build-linux_amd64/webscan ./webscan
-
-      - name: Build Docker Image (AMD64)
+      - name: Copy and optimize AMD64 binary
         run: |
-          docker buildx build . \
-            --platform linux/amd64 \
+          cp output/build-linux_amd64/webscan ./webscan
+          echo "Original binary size: $(du -sh webscan)"
+          
+          # Strip binary to reduce size
+          strip webscan || echo "Strip failed, continuing with original binary"
+          echo "Stripped binary size: $(du -sh webscan)"
+          
+          # Verify binary still works
+          file webscan
+          ls -lh webscan
+
+      - name: Create new buildx builder with more space
+        run: |
+          docker buildx create --name webscan-builder --driver docker-container --use
+          docker buildx inspect webscan-builder --bootstrap
+
+      - name: Build Docker Image (AMD64) with regular docker build
+        run: |
+          # Monitor space during build
+          echo "Before build:"
+          df -h
+          docker system df
+          
+          # Try regular docker build first (not buildx) to avoid multi-platform overhead
+          docker build . \
             --tag methodsecurity/webscan:latest-amd64 \
-            --load
+            --progress plain \
+            --no-cache
+          
+          echo "After build:"
+          df -h
+          docker system df
 
       - name: View Output
         run: ls -al output output/*

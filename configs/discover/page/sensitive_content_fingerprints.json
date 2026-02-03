@@ -1,0 +1,148 @@
+{
+    "fingerprints": [
+        {
+            "name": "anthropic_key",
+            "type": "CREDENTIAL",
+            "pattern": "(sk-ant-[a-zA-Z0-9]{6,8}-[\\w\\-]{90,95}[A-Z]{2})",
+            "confidence": "HIGH"
+        },
+        {
+            "name": "aws_access_key",
+            "type": "CREDENTIAL",
+            "pattern": "\\b(AKIA[0-9A-Z]{16})\\b",
+            "confidence": "HIGH"
+        },
+        {
+            "name": "aws_session_key",
+            "type": "CREDENTIAL",
+            "pattern": "\\b(ASIA[0-9A-Z]{16})\\b",
+            "confidence": "HIGH"
+        },
+        {
+            "name": "databricks_token",
+            "type": "CREDENTIAL",
+            "pattern": "\\b(dapi[0-9a-f]{32})\\b",
+            "confidence": "HIGH"
+        },
+        {
+            "name": "figma_token",
+            "type": "CREDENTIAL",
+            "pattern": "\\b(fig(?:d|(?:u|o)(?:r|h)?)_[a-z0-9A-Z_-]{40})\\b",
+            "confidence": "HIGH"
+        },
+        {
+            "name": "github_pat",
+            "type": "CREDENTIAL",
+            "pattern": "\\b(ghp_[A-Za-z0-9]{36})\\b",
+            "confidence": "HIGH"
+        },
+        {
+            "name": "github_token",
+            "type": "CREDENTIAL",
+            "pattern": "\\b(gh[pousr]_[A-Za-z0-9]{36})\\b",
+            "confidence": "HIGH"
+        },
+        {
+            "name": "grafana_service_token",
+            "type": "CREDENTIAL",
+            "pattern": "\\b(glsa_[0-9a-zA-Z_]{41})\\b",
+            "confidence": "HIGH"
+        },
+        {
+            "name": "linear_key",
+            "type": "CREDENTIAL",
+            "pattern": "\\b(lin_api_[0-9A-Za-z]{40})\\b",
+            "confidence": "HIGH"
+        },
+        {
+            "name": "mailgun_key",
+            "type": "CREDENTIAL",
+            "pattern": "\\b(key-[0-9a-f]{32})\\b",
+            "confidence": "HIGH"
+        },
+        {
+            "name": "notion_token",
+            "type": "CREDENTIAL",
+            "pattern": "\\b(secret_[A-Za-z0-9]{43})\\b",
+            "confidence": "HIGH"
+        },
+        {
+            "name": "openai_api_key",
+            "type": "CREDENTIAL",
+            "pattern": "\\b(sk-[a-zA-Z0-9]{48})\\b",
+            "confidence": "HIGH"
+        },
+        {
+            "name": "sendgrid_key",
+            "type": "CREDENTIAL",
+            "pattern": "(SG\\.[0-9A-Za-z\\-_]{22}\\.[0-9A-Za-z\\-_]{43})",
+            "confidence": "HIGH"
+        },
+        {
+            "name": "shopify_token",
+            "type": "CREDENTIAL",
+            "pattern": "\\b(shp[a-z]{2}_[a-fA-F0-9]{32})\\b",
+            "confidence": "HIGH"
+        },
+        {
+            "name": "square_token",
+            "type": "CREDENTIAL",
+            "pattern": "\\b(sq0idp-[0-9A-Za-z]{22})\\b",
+            "confidence": "HIGH"
+        },
+        {
+            "name": "stripe_key",
+            "type": "CREDENTIAL",
+            "pattern": "(sk_live_[0-9a-zA-Z]{24}|pk_live_[0-9a-zA-Z]{24})",
+            "confidence": "HIGH"
+        },
+        {
+            "name": "twilio_api_key",
+            "type": "CREDENTIAL",
+            "pattern": "\\b(SK[0-9a-f]{32})\\b",
+            "confidence": "HIGH"
+        },
+        {
+            "name": "mongodb_uri",
+            "type": "CREDENTIAL",
+            "pattern": "(mongodb(?:\\+srv)?://[^/\\s:]+:[^/\\s@]+@[^\\s'\"/?]+)",
+            "confidence": "MEDIUM"
+        },
+        {
+            "name": "mysql_uri",
+            "type": "CREDENTIAL",
+            "pattern": "(mysql://[^/\\s:]+:[^/\\s@]+@[^\\s'\"/?]+)",
+            "confidence": "MEDIUM"
+        },
+        {
+            "name": "postgres_uri",
+            "type": "CREDENTIAL",
+            "pattern": "(postgres(?:ql)?://[^/\\s:]+:[^/\\s@]+@[^\\s'\"/?]+)",
+            "confidence": "MEDIUM"
+        },
+        {
+            "name": "private_key",
+            "type": "CREDENTIAL",
+            "pattern": "(-----BEGIN[A-Z ]+PRIVATE KEY-----[\\s\\S]*?-----END[A-Z ]+PRIVATE KEY-----)",
+            "confidence": "MEDIUM"
+        },
+        {
+            "name": "redis_uri",
+            "type": "CREDENTIAL",
+            "pattern": "(redis[s]?://[^/\\s:]*:[^/\\s@]+@[^\\s'\"/?]+)",
+            "confidence": "MEDIUM"
+        },
+        {
+            "name": "slack_token",
+            "type": "CREDENTIAL",
+            "pattern": "(xox[baprs]-[0-9a-zA-Z\\-]{20,})",
+            "confidence": "MEDIUM"
+        },
+        {
+            "name": "slack_webhook",
+            "type": "CREDENTIAL",
+            "pattern": "(https://hooks\\.slack\\.com/services/T[A-Z0-9]+/B[A-Z0-9]+/[A-Za-z0-9]{20,})",
+            "confidence": "MEDIUM"
+        }
+    ]
+}

@@ -13,6 +13,9 @@ import (
 	//Utils
 	headless "github.com/Method-Security/webscan/utils/request/headless"
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
+
+	// External
+	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
 func getHTTPRequestConfig(baseURL string, path string, queryParams map[string]string, config discover.DiscoverPageConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) common.SendHttpRequestConfig {
@@ -40,8 +43,11 @@ func getHTTPRequestConfig(baseURL string, path string, queryParams map[string]st
 func PerformPageCapture(
 	ctx context.Context,
 	config discover.DiscoverPageConfig,
+	sensitiveContentFingerprints *discover.SensitiveContextFingerprints,
 	browserbaseSecrets *common.BrowserbaseRequestSecrets,
 ) *discover.DiscoverPageReport {
+	log := svc1log.FromContext(ctx)
+
 	// Initialize report
 	result := discover.DiscoverPageResult{}
 	errors := []string{}
@@ -60,6 +66,7 @@ func PerformPageCapture(
 
 	// Perform screenshot capture if enabled
 	if config.Screenshot {
+		log.Info("Performing screenshot capture", svc1log.SafeParam("target", config.Target))
 		requester := headless.NewRequester(config.Timeout, config.HeadlessConfig)
 		img, err := pagehelpers.CaptureScreenshot(ctx, requester, &requestConfig)
 		if err != nil {
@@ -71,6 +78,7 @@ func PerformPageCapture(
 	}
 
 	// Perform HTML capture
+	log.Info("Performing HTML capture", svc1log.SafeParam("target", config.Target))
 	httpRequestResponse, err := pagehelpers.PerformHTMLPageCapture(ctx, &requestConfig)
 	if err != nil {
 		errors = append(errors, err.Error())
@@ -79,6 +87,7 @@ func PerformPageCapture(
 	}
 
 	// Check if response code is in the allowed list
+	log.Info("Checking response code", svc1log.SafeParam("target", config.Target))
 	validCodes, err := utils.ParseResponseCodes(config.ResponseCodes)
 	if err != nil {
 		errors = append(errors, err.Error())
@@ -93,11 +102,12 @@ func PerformPageCapture(
 
 			// If sensitive context detection is enabled, extract sensitive contexts from response body
 			if config.SensitiveContextDetection && httpRequestResponse.Response.ResponseBody != nil {
+				log.Info("Extracting sensitive contexts from response body", svc1log.SafeParam("target", config.Target))
 				// Use helper function to get response body content
 				responseContentPtr := requesthelpers.GetResponseBodyStringFromBodyStruct(httpRequestResponse.Response.ResponseBody)
 
 				if responseContentPtr != nil {
-					discoveredSensitiveContexts, errs := pagehelpers.ExtractSensitiveContextsFromWebContent(ctx, *responseContentPtr)
+					discoveredSensitiveContexts, errs := pagehelpers.ExtractSensitiveContextsFromWebContent(ctx, *responseContentPtr, sensitiveContentFingerprints)
 					errors = append(errors, errs...)
 					result.SensitiveContexts = discoveredSensitiveContexts
 				}

@@ -346,16 +346,21 @@ func (a *WebScan) InitDiscoverCommand() {
 			// Set Config
 			config := getDiscoverPageConfig(target, sensitiveContentDetection, sensitiveContentFingerprintsPath, responseCodes, maxRedirects, verifyTLS, timeout, takeScreenshot, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
 
-			// Load sensitive content fingerprints
-			sensitiveContentFingerprints, err := discoverpagehelpers.LoadSensitiveConentFingerprints(ctx, config.SensitiveContentFingerprintsPath)
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
+			// Load sensitive content fingerprints if sensitive content detection is enabled and no fingerprints are found, return an error
+			var sensitiveContentFingerprints *discover.SensitiveContentFingerprints
+			if config.SensitiveContentDetection {
+				// Load sensitive content fingerprints
+				sensitiveContentFingerprints, err = discoverpagehelpers.LoadSensitiveConentFingerprints(ctx, config.SensitiveContentFingerprintsPath)
+				if err != nil {
+					a.OutputSignal.AddError(err)
+					return
+				}
 
-			// If sensitive content detection is enabled and no fingerprints are found, return an error
-			if config.SensitiveContentDetection && sensitiveContentFingerprints == nil {
-				a.OutputSignal.AddError(errors.New("no sensitive content fingerprints found"))
+				// If no fingerprints are found, return an error
+				if sensitiveContentFingerprints == nil || len(sensitiveContentFingerprints.Fingerprints) == 0 {
+					a.OutputSignal.AddError(errors.New("no sensitive content fingerprints found"))
+					return
+				}
 				return
 			}
 

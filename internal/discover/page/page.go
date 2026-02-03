@@ -9,7 +9,7 @@ import (
 	"github.com/Method-Security/webscan/utils"
 
 	// Internal
-	pagehelpers "github.com/Method-Security/webscan/internal/discover/page/helpers"
+	discoverpagehelpers "github.com/Method-Security/webscan/internal/discover/page/helpers"
 	//Utils
 	headless "github.com/Method-Security/webscan/utils/request/headless"
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
@@ -68,7 +68,7 @@ func PerformPageCapture(
 	if config.Screenshot {
 		log.Info("Performing screenshot capture", svc1log.SafeParam("target", config.Target))
 		requester := headless.NewRequester(config.Timeout, config.HeadlessConfig)
-		img, err := pagehelpers.CaptureScreenshot(ctx, requester, &requestConfig)
+		img, err := discoverpagehelpers.CaptureScreenshot(ctx, requester, &requestConfig)
 		if err != nil {
 			errors = append(errors, err.Error())
 			report.Errors = errors
@@ -79,7 +79,7 @@ func PerformPageCapture(
 
 	// Perform HTML capture
 	log.Info("Performing HTML capture", svc1log.SafeParam("target", config.Target))
-	httpRequestResponse, err := pagehelpers.PerformHTMLPageCapture(ctx, &requestConfig)
+	httpRequestResponse, err := discoverpagehelpers.PerformHTMLPageCapture(ctx, &requestConfig)
 	if err != nil {
 		errors = append(errors, err.Error())
 		report.Errors = errors
@@ -107,7 +107,7 @@ func PerformPageCapture(
 				responseContentPtr := requesthelpers.GetResponseBodyStringFromBodyStruct(httpRequestResponse.Response.ResponseBody)
 
 				if responseContentPtr != nil {
-					discoveredSensitiveContents, errs := pagehelpers.ExtractSensitiveContentsFromWebContent(ctx, *responseContentPtr, sensitiveContentFingerprints)
+					discoveredSensitiveContents, errs := discoverpagehelpers.ExtractSensitiveContentsFromWebContent(ctx, *responseContentPtr, sensitiveContentFingerprints)
 					errors = append(errors, errs...)
 					result.SensitiveContents = discoveredSensitiveContents
 				}

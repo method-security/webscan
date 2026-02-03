@@ -41,6 +41,12 @@ func ExtractSensitiveContentsFromWebContent(ctx context.Context, content string,
 	var errors []string
 	seen := make(map[string]bool) // Track unique credential values
 
+	// Should never happen, but defensive programming
+	if fingerprints == nil || len(fingerprints.Fingerprints) == 0 {
+		errors = append(errors, "no sensitive content fingerprints found")
+		return sensitiveContentValues, errors
+	}
+
 	// Load fingerprints from JSON file
 	for _, fingerprint := range fingerprints.Fingerprints {
 		// Compile the pattern string into a regex

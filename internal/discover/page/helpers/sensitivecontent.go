@@ -55,6 +55,7 @@ func ExtractSensitiveContextsFromWebContent(ctx context.Context, content string)
 
 	var sensitiveContextValues []*discover.SensitiveContext
 	var errors []string
+	seen := make(map[string]bool) // Track unique credential values
 
 	for _, fingerprint := range SensitiveContextFingerprints.Fingerprints {
 		// Compile the pattern string into a regex
@@ -68,8 +69,16 @@ func ExtractSensitiveContextsFromWebContent(ctx context.Context, content string)
 		matches := compiledPattern.FindAllStringSubmatch(content, -1)
 		for _, match := range matches {
 			if len(match) > 1 && match[1] != "" {
-				log.Info("Found token", svc1log.SafeParam("type", fingerprint.Type))
 				value := match[1]
+
+				// Skip if we've already seen this credential value
+				if seen[value] {
+					log.Info("Skipping duplicate token", svc1log.SafeParam("type", fingerprint.Type))
+					continue
+				}
+
+				log.Info("Found token", svc1log.SafeParam("type", fingerprint.Type))
+				seen[value] = true
 
 				sensitiveContext := discover.SensitiveContext{
 					Value:       value,

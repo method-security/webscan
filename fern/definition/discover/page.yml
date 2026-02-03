@@ -12,7 +12,7 @@ types:
       - HIGH
       - MEDIUM
       - LOW
-  # Sensitive Context Structs
+  # Sensitive Content Structs
   SensitiveContentFingerprint:
     properties:
       name: string

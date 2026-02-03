@@ -27,17 +27,18 @@ jobs:
         run: |
           echo "=== Initial disk usage ==="
           df -h
-          
+
           # Aggressive cleanup of pre-installed packages
           sudo apt-get autoremove -y || true
           sudo apt-get autoclean || true
           sudo rm -rf /var/lib/apt/lists/*
           sudo rm -rf /tmp/* /var/tmp/* || true
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc || true
-          
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/boost || true
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY" || true
+
           echo "=== After cleanup ==="
           df -h
-          
+
           # Minimal update and install
           sudo apt-get clean
           sudo apt-get update --fix-missing
@@ -100,17 +101,19 @@ jobs:
         run: |
           echo "=== Initial disk usage ==="
           df -h
-          
+
           # Aggressive cleanup
           sudo apt-get autoremove -y || true
           sudo apt-get autoclean || true
           sudo rm -rf /var/lib/apt/lists/*
           sudo rm -rf /tmp/* /var/tmp/* || true
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc || true
-          
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/boost || true
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY" || true
+          sudo docker system prune -af || true
+
           echo "=== After cleanup ==="
           df -h
-          
+
           # Minimal install
           sudo apt-get clean
           sudo apt-get update --fix-missing
@@ -135,6 +138,12 @@ jobs:
             -e GORELEASER_KEY=${{ secrets.GORELEASER_KEY }} \
             --rm amdbuilder goreleaser build --single-target \
             -f .goreleaser/goreleaser-build.yml ${{ inputs.goreleaser_options }}
+
+      - name: Cleanup Docker images
+        run: |
+          docker rmi amdbuilder || true
+          docker system prune -f
+
       - uses: actions/upload-artifact@v4
         with:
           name: linux-amd64-dist
@@ -229,21 +238,23 @@ jobs:
           
       # Skip maximize-build-space action for custom larger runners
       # Custom runners should have 150GB+ native disk space
-      - name: Free up disk space and install dependencies  
+      - name: Free up disk space and install dependencies
         run: |
           echo "=== Initial disk usage ==="
           df -h
-          
+
           # Aggressive cleanup first
           sudo apt-get autoremove -y
-          sudo apt-get autoclean  
+          sudo apt-get autoclean
           sudo rm -rf /var/lib/apt/lists/*
           sudo rm -rf /tmp/* /var/tmp/*
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache || true
-          
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache /usr/local/share/boost || true
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY" || true
+          sudo docker system prune -af || true
+
           echo "=== After cleanup ==="
           df -h
-          
+
           # Minimal install
           sudo apt-get clean
           sudo apt-get update --fix-missing
@@ -277,25 +288,6 @@ jobs:
         uses: actions/checkout@v4.1.6
         with:
           fetch-depth: 0
-      - name: Free up disk space and install build dependencies
-        run: |
-          echo "=== Initial disk usage ==="
-          df -h
-          
-          # Aggressive cleanup
-          sudo apt-get autoremove -y || true
-          sudo apt-get autoclean || true
-          sudo rm -rf /var/lib/apt/lists/*
-          sudo rm -rf /tmp/* /var/tmp/* || true
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc || true
-          
-          echo "=== After cleanup ==="
-          df -h
-          
-          # Minimal install
-          sudo apt-get clean
-          sudo apt-get update --fix-missing
-          sudo apt-get install -y --no-install-recommends gcc libc6-dev
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -335,6 +327,11 @@ jobs:
 
       - name: Build Docker Image (AMD64)
         run: docker buildx build . --platform linux/amd64 --tag methodsecurity/webscan:latest-amd64
+
+      - name: Cleanup Docker build cache
+        run: |
+          docker system prune -f
+          df -h
 
       - name: View Output
         run: ls -al output output/*

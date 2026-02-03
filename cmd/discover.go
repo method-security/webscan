@@ -361,7 +361,6 @@ func (a *WebScan) InitDiscoverCommand() {
 					a.OutputSignal.AddError(errors.New("no sensitive content fingerprints found"))
 					return
 				}
-				return
 			}
 
 			// Generate a report

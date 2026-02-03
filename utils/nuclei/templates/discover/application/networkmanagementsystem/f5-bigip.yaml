@@ -47,4 +47,4 @@ http:
         case-insensitive: true
       - type: dsl
         dsl:
-          - 'contains(tolower(header), "server: bigip") && (contains(tolower(body), "configuration") || contains(tolower(body), "tmui") || contains(tolower(body), "f5"))'
+          - 'contains(tolower(header), "server: bigip") && (contains(tolower(body), "configuration") || contains(tolower(body), "tmui") || contains(tolower(body), "f5 big-ip") || contains(tolower(body), "bigip"))'

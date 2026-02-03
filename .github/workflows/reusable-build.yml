@@ -166,14 +166,6 @@ jobs:
     env:
       DOCKER_CLI_EXPERIMENTAL: "enabled"
     steps:
-      - name: Maximize build space
-        uses: easimon/maximize-build-space@v10
-        with:
-          root-reserve-mb: 32768
-          remove-android: "true"
-          remove-docker-images: "true"
-          remove-dotnet: "true"
-          remove-haskell: "true"
       - name: Install Dependences
         run: sudo apt install libpcap-dev
       - name: Set up QEMU

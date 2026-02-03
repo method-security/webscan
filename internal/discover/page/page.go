@@ -93,15 +93,15 @@ func PerformPageCapture(
 		if _, exists := validCodes[*httpRequestResponse.Response.StatusCode]; exists {
 			result.Request = httpRequestResponse
 
-			// If token detection is enabled, extract tokens from response body
-			if config.TokenDetection && httpRequestResponse.Response.ResponseBody != nil {
+			// If sensitive context detection is enabled, extract sensitive contexts from response body
+			if config.SensitiveContextDetection && httpRequestResponse.Response.ResponseBody != nil {
 				// Use helper function to get response body content
 				responseContentPtr := requesthelpers.GetResponseBodyStringFromBodyStruct(httpRequestResponse.Response.ResponseBody)
 
 				if responseContentPtr != nil {
-					discoveredTokens, errs := pagehelpers.ExtractTokensFromWebContent(ctx, *responseContentPtr)
+					discoveredSensitiveContexts, errs := pagehelpers.ExtractSensitiveContextsFromWebContent(ctx, *responseContentPtr)
 					errors = append(errors, errs...)
-					result.ExposedTokens = discoveredTokens
+					result.SensitiveContexts = discoveredSensitiveContexts
 				}
 			}
 		}

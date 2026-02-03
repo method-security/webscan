@@ -3,29 +3,29 @@ imports:
   method: ../common/method.yml
 types:
   # Enums
-  TokenConfidenceLevel:
+  SensitiveContextConfidenceLevel:
     enum:
       - HIGH
       - MEDIUM
-      - LOW
-  # Token Structs
-  TokenFingerprint:
+      - LOW 
+  # Sensitive Context Structs
+  SensitiveContextFingerprint:
     properties:
       type: string
       pattern: string
-      confidence: TokenConfidenceLevel
-  TokenFingerprints:
+      confidence: SensitiveContextConfidenceLevel
+  SensitiveContextFingerprints:
     properties:
-      fingerprints: list<TokenFingerprint>
-  ExposedToken:
+      fingerprints: list<SensitiveContextFingerprint>
+  SensitiveContext:
     properties:
       value: string
-      fingerprint: TokenFingerprint
+      fingerprint: SensitiveContextFingerprint
   # Function Config Struct
   DiscoverPageConfig:
     properties:
       target: string
-      tokenDetection: boolean
+      sensitiveContextDetection: boolean
       responseCodes: string
       screenshot: boolean
       maxRedirects: integer
@@ -38,7 +38,7 @@ types:
     properties:
       request: optional<http.HttpRequestResponse>
       screenshot: optional<base64>
-      exposedTokens: optional<list<ExposedToken>>
+      sensitiveContexts: optional<list<SensitiveContext>>
   # Report Struct
   DiscoverPageReport:
     properties:

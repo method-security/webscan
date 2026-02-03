@@ -287,7 +287,7 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Config flags
-			tokenDetection, err := cmd.Flags().GetBool("token-detection")
+			sensitiveContextDetection, err := cmd.Flags().GetBool("sensitive-context-detection")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -333,7 +333,7 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Set Config
-			config := getDiscoverPageConfig(target, tokenDetection, responseCodes, maxRedirects, verifyTLS, timeout, takeScreenshot, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
+			config := getDiscoverPageConfig(target, sensitiveContextDetection, responseCodes, maxRedirects, verifyTLS, timeout, takeScreenshot, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
 
 			// Generate a report
 			report := discoverpage.PerformPageCapture(cmd.Context(), config, requestMethodConfig.BrowserbaseSecrets)
@@ -343,7 +343,7 @@ func (a *WebScan) InitDiscoverCommand() {
 	// Target Flags
 	discoverPageCmd.Flags().String("target", "", "URL target to capture and analyze")
 	// Config Flags
-	discoverPageCmd.Flags().Bool("token-detection", false, "Enable token detection")
+	discoverPageCmd.Flags().Bool("sensitive-context-detection", false, "Enable sensitive context detection")
 	discoverPageCmd.Flags().String("response-codes", "200-299", "Response codes to consider as valid responses")
 	discoverPageCmd.Flags().Bool("screenshot", false, "Capture a screenshot of the page")
 	discoverPageCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
@@ -697,18 +697,18 @@ func getDiscoverApplicationConfig(targets []string, resource string, timeout int
 }
 
 // getDiscoverPageConfig builds the config for page capture and analysis.
-func getDiscoverPageConfig(target string, tokenDetection bool, responseCodes string, maxRedirects int, verifyTLS bool, timeout int, takeScreenshot bool, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) discover.DiscoverPageConfig {
+func getDiscoverPageConfig(target string, sensitiveContextDetection bool, responseCodes string, maxRedirects int, verifyTLS bool, timeout int, takeScreenshot bool, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) discover.DiscoverPageConfig {
 	config := discover.DiscoverPageConfig{
-		Target:            target,
-		ResponseCodes:     responseCodes,
-		TokenDetection:    tokenDetection,
-		MaxRedirects:      maxRedirects,
-		VerifyTls:         verifyTLS,
-		Timeout:           max(timeout, 0),
-		Screenshot:        takeScreenshot,
-		RequestMethod:     requestMethod,
-		HeadlessConfig:    headlessConfig,
-		BrowserbaseConfig: browserbaseConfig,
+		Target:                    target,
+		ResponseCodes:             responseCodes,
+		SensitiveContextDetection: sensitiveContextDetection,
+		MaxRedirects:              maxRedirects,
+		VerifyTls:                 verifyTLS,
+		Timeout:                   max(timeout, 0),
+		Screenshot:                takeScreenshot,
+		RequestMethod:             requestMethod,
+		HeadlessConfig:            headlessConfig,
+		BrowserbaseConfig:         browserbaseConfig,
 	}
 	return config
 }

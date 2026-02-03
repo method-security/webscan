@@ -65,7 +65,7 @@ func ExtractTokensFromWebContent(ctx context.Context, content string) ([]*discov
 		matches := compiledPattern.FindAllStringSubmatch(content, -1)
 		for _, match := range matches {
 			if len(match) > 1 && match[1] != "" {
-				log.Info("Found token", svc1log.SafeParam("token", match[1]))
+				log.Info("Found token", svc1log.SafeParam("type", fingerprint.Type))
 				value := match[1]
 
 				token := discover.ExposedToken{

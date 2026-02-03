@@ -23,10 +23,25 @@ jobs:
       - uses: actions/checkout@v4.1.6
         with:
           fetch-depth: 0
-      - name: Install build dependencies
+      - name: Free up disk space and install build dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential gcc
+          echo "=== Initial disk usage ==="
+          df -h
+          
+          # Aggressive cleanup of pre-installed packages
+          sudo apt-get autoremove -y || true
+          sudo apt-get autoclean || true
+          sudo rm -rf /var/lib/apt/lists/*
+          sudo rm -rf /tmp/* /var/tmp/* || true
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc || true
+          
+          echo "=== After cleanup ==="
+          df -h
+          
+          # Minimal update and install
+          sudo apt-get clean
+          sudo apt-get update --fix-missing
+          sudo apt-get install -y --no-install-recommends gcc libc6-dev
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -81,10 +96,25 @@ jobs:
         uses: actions/checkout@v4.1.6
         with:
           fetch-depth: 0
-      - name: Install build dependencies
+      - name: Free up disk space and install build dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential gcc
+          echo "=== Initial disk usage ==="
+          df -h
+          
+          # Aggressive cleanup
+          sudo apt-get autoremove -y || true
+          sudo apt-get autoclean || true
+          sudo rm -rf /var/lib/apt/lists/*
+          sudo rm -rf /tmp/* /var/tmp/* || true
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc || true
+          
+          echo "=== After cleanup ==="
+          df -h
+          
+          # Minimal install
+          sudo apt-get clean
+          sudo apt-get update --fix-missing
+          sudo apt-get install -y --no-install-recommends gcc libc6-dev
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -186,18 +216,38 @@ jobs:
     env:
       DOCKER_CLI_EXPERIMENTAL: "enabled"
     steps:
-      - name: Maximize build space
-        uses: easimon/maximize-build-space@v10
-        with:
-          root-reserve-mb: 32768
-          remove-android: "true"
-          remove-docker-images: "true"
-          remove-dotnet: "true"
-          remove-haskell: "true"
-      - name: Install dependencies
+      - name: Check initial disk space on larger runner
         run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential gcc libpcap-dev
+          echo "=== RUNNER DISK SPACE ANALYSIS ==="
+          df -h
+          echo ""
+          echo "=== DISK USAGE BY DIRECTORY ==="
+          sudo du -sh /* 2>/dev/null | sort -hr | head -10
+          echo ""
+          echo "=== AVAILABLE INODES ==="
+          df -i
+          
+      # Skip maximize-build-space action for custom larger runners
+      # Custom runners should have 150GB+ native disk space
+      - name: Free up disk space and install dependencies  
+        run: |
+          echo "=== Initial disk usage ==="
+          df -h
+          
+          # Aggressive cleanup first
+          sudo apt-get autoremove -y
+          sudo apt-get autoclean  
+          sudo rm -rf /var/lib/apt/lists/*
+          sudo rm -rf /tmp/* /var/tmp/*
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache || true
+          
+          echo "=== After cleanup ==="
+          df -h
+          
+          # Minimal install
+          sudo apt-get clean
+          sudo apt-get update --fix-missing
+          sudo apt-get install -y --no-install-recommends gcc libc6-dev libpcap-dev
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
@@ -227,10 +277,25 @@ jobs:
         uses: actions/checkout@v4.1.6
         with:
           fetch-depth: 0
-      - name: Install build dependencies
+      - name: Free up disk space and install build dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential gcc
+          echo "=== Initial disk usage ==="
+          df -h
+          
+          # Aggressive cleanup
+          sudo apt-get autoremove -y || true
+          sudo apt-get autoclean || true
+          sudo rm -rf /var/lib/apt/lists/*
+          sudo rm -rf /tmp/* /var/tmp/* || true
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc || true
+          
+          echo "=== After cleanup ==="
+          df -h
+          
+          # Minimal install
+          sudo apt-get clean
+          sudo apt-get update --fix-missing
+          sudo apt-get install -y --no-install-recommends gcc libc6-dev
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:

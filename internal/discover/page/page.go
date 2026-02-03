@@ -99,8 +99,8 @@ func PerformPageCapture(
 				responseContentPtr := requesthelpers.GetResponseBodyStringFromBodyStruct(httpRequestResponse.Response.ResponseBody)
 
 				if responseContentPtr != nil {
-					discoveredTokens, errors := pagehelpers.ExtractTokensFromWebContent(ctx, *responseContentPtr)
-					errors = append(errors, errors...)
+					discoveredTokens, errs := pagehelpers.ExtractTokensFromWebContent(ctx, *responseContentPtr)
+					errors = append(errors, errs...)
 					result.ExposedTokens = discoveredTokens
 				}
 			}

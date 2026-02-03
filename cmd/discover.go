@@ -347,7 +347,7 @@ func (a *WebScan) InitDiscoverCommand() {
 			config := getDiscoverPageConfig(target, sensitiveContextDetection, sensitiveContextFingerprintsPath, responseCodes, maxRedirects, verifyTLS, timeout, takeScreenshot, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
 
 			// Load sensitive content fingerprints
-			sensitiveContentFingerprints, err := discoverpagehelpers.LoadSensitiveContextFingerprints(ctx, config.SensitiveContextFingerprintsPath)
+			sensitiveContentFingerprints, err := discoverpagehelpers.LoadSensitiveConentFingerprints(ctx, config.SensitiveContextFingerprintsPath)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return

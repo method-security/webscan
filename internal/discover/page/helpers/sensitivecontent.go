@@ -12,8 +12,8 @@ import (
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
-// LoadSensitiveContextFingerprints loads fingerprints from the JSON configuration file
-func LoadSensitiveContextFingerprints(ctx context.Context, configPath *string) (*discover.SensitiveContextFingerprints, error) {
+// LoadSensitiveConentFingerprints loads fingerprints from the JSON configuration file
+func LoadSensitiveConentFingerprints(ctx context.Context, configPath *string) (*discover.SensitiveContextFingerprints, error) {
 	log := svc1log.FromContext(ctx)
 
 	// Read the JSON file

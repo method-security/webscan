@@ -3,7 +3,6 @@ package discoverpage
 import (
 	// Standard
 	"context"
-
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
 	"github.com/Method-Security/webscan/generated/go/discover"
@@ -11,7 +10,6 @@ import (
 
 	// Internal
 	pagehelpers "github.com/Method-Security/webscan/internal/discover/page/helpers"
-
 	//Utils
 	headless "github.com/Method-Security/webscan/utils/request/headless"
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"

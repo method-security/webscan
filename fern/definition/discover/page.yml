@@ -3,15 +3,20 @@ imports:
   method: ../common/method.yml
 types:
   # Enums
+  SensitiveContextType:
+    enum:
+      - CREDENTIAL
+      - PII_DATA
   SensitiveContextConfidenceLevel:
     enum:
       - HIGH
       - MEDIUM
-      - LOW 
+      - LOW
   # Sensitive Context Structs
   SensitiveContextFingerprint:
     properties:
-      type: string
+      name: string
+      type: SensitiveContextType
       pattern: string
       confidence: SensitiveContextConfidenceLevel
   SensitiveContextFingerprints:

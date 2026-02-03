@@ -9,7 +9,22 @@ partial:
   by: target
 
 builds:
-  - id: build-linux
+  - id: build-linux-amd64
+    main: .
+    binary: webscan
+    ldflags:
+      - -s -w
+      - "-extldflags '-static -lm -ldl -lpthread'"
+      - -X github.com/method-security/webscan/main.version={{.Version}}
+    env:
+      - CGO_ENABLED=1
+    goos:
+      - linux
+    goarch:
+      - amd64
+    goarm:
+      - "7"
+  - id: build-linux-arm64
     main: .
     binary: webscan
     ldflags:
@@ -22,7 +37,6 @@ builds:
       - linux
     goarch:
       - arm64
-      - amd64
     goarm:
       - "7"
   - id: build-macos

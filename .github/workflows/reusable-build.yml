@@ -65,7 +65,7 @@ jobs:
             -e GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }} \
             -e GORELEASER_KEY=${{ secrets.GORELEASER_KEY }} \
             --rm armbuilder \
-            goreleaser build --single-target --clean --snapshot --timeout 60m \
+            goreleaser build --single-target --timeout 60m \
             -f .goreleaser/goreleaser-build.yml ${{ inputs.goreleaser_options }}
 
       - name: Cleanup Docker images
@@ -146,7 +146,7 @@ jobs:
             -e GOARCH=amd64 -e GOOS=linux \
             -e GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }} \
             -e GORELEASER_KEY=${{ secrets.GORELEASER_KEY }} \
-            --rm amdbuilder goreleaser build --single-target \
+            --rm amdbuilder goreleaser build --single-target --timeout 60m \
             -f .goreleaser/goreleaser-build.yml ${{ inputs.goreleaser_options }}
 
       - name: Cleanup Docker images

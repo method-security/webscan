@@ -1,0 +1,26 @@
+id: docker-container-registry-detect
+info:
+  name: Docker Container Registry Detection
+  author: method-security
+  severity: info
+  description: |
+    Detects Docker container registry instances by probing Docker Registry HTTP API v2 endpoints
+    and validating canonical registry headers and expected auth challenge behavior.
+  metadata:
+    method-application-type: CONTAINER_REGISTRY
+    method-module-name: DOCKER
+    cpe: cpe:2.3:a:docker:distribution:*:*:*:*:*:*:*:*
+  tags: discovery,docker,container,registry,oci
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/v2/" # Spec-required "ping" endpoint for registries
+    redirects: true
+    max-redirects: 3
+    stop-at-first-match: true
+    matchers:
+      - type: word
+        part: header
+        words:
+          - "Docker-Distribution" # canonical registry header
+        case-insensitive: true

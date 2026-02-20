@@ -224,6 +224,7 @@ func enumerateTarget(ctx context.Context, targetURL string, verifyTLS bool, time
 		errors = append(errors, fmt.Sprintf("Failed to enumerate repositories: %v", err))
 		successVal := false
 		return &enumeratedockerfern.EnumerateDockerResult{
+			Target:   targetURL,
 			Requests: allRequests,
 			Success:  &successVal,
 		}, errors
@@ -233,6 +234,7 @@ func enumerateTarget(ctx context.Context, targetURL string, verifyTLS bool, time
 		log.Info("Registry did not return repositories (possibly requires authentication)")
 		successVal := false
 		return &enumeratedockerfern.EnumerateDockerResult{
+			Target:   targetURL,
 			Requests: allRequests,
 			Success:  &successVal,
 		}, errors
@@ -242,6 +244,7 @@ func enumerateTarget(ctx context.Context, targetURL string, verifyTLS bool, time
 		log.Info("No repositories found in registry")
 		successVal := true
 		return &enumeratedockerfern.EnumerateDockerResult{
+			Target:   targetURL,
 			Requests: allRequests,
 			Success:  &successVal,
 		}, errors
@@ -334,20 +337,24 @@ func enumerateTarget(ctx context.Context, targetURL string, verifyTLS bool, time
 
 // PerformAppEnumerateContainerRegistryDocker performs comprehensive enumeration of Docker container registries.
 func PerformAppEnumerateContainerRegistryDocker(ctx context.Context, config *enumeratedockerfern.EnumerateDockerConfig) *enumeratedockerfern.EnumerateDockerReport {
+	// Initialize logger
 	log := svc1log.FromContext(ctx)
-	report := &enumeratedockerfern.EnumerateDockerReport{Config: config, Result: &enumeratedockerfern.EnumerateDockerResults{}}
-
 	log.Info("Starting Docker registry enumeration", svc1log.SafeParam("targets", config.Targets), svc1log.SafeParam("timeout", config.Timeout))
 
+	// Initialize report
+	report := &enumeratedockerfern.EnumerateDockerReport{Config: config, Result: &enumeratedockerfern.EnumerateDockerResults{}}
 	targets := []*enumeratedockerfern.EnumerateDockerResult{}
 	errors := []string{}
 
 	for _, targetURL := range config.Targets {
 		result, errs := enumerateTarget(ctx, targetURL, config.VerifyTls, config.Timeout)
-		targets = append(targets, result)
+		if result != nil {
+			targets = append(targets, result)
+		}
 		errors = append(errors, errs...)
 	}
 
+	// Populate report
 	report.Result.Targets = targets
 	report.Errors = errors
 

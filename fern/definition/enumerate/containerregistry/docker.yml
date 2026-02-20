@@ -1,0 +1,51 @@
+imports:
+  http: ../../common/http.yml
+types:
+  # Config Struct
+  EnumerateDockerConfig:
+    properties:
+      targets: list<string>
+      verifyTls: boolean
+      timeout: integer
+  # Docker Registry V2 API Response Objects
+  DockerManifestDescriptor:
+    properties:
+      size: optional<integer>
+  DockerManifestV2:
+    properties:
+      config: optional<DockerManifestDescriptor>
+      layers: optional<list<DockerManifestDescriptor>>
+  DockerCatalogResponse:
+    properties:
+      repositories: optional<list<string>>
+  DockerTagsResponse:
+    properties:
+      name: optional<string>
+      tags: optional<list<string>>
+  # Container Registry Objects
+  ContainerImage:
+    properties:
+      digest: string
+      tags: optional<list<string>>
+      size: optional<integer>
+      manifest: optional<string>
+  ContainerRepository:
+    properties:
+      name: string
+      images: optional<list<ContainerImage>>
+  # Result Struct
+  EnumerateDockerResult:
+    properties:
+      target: string
+      requests: optional<list<http.HttpRequestResponse>>
+      repositories: optional<list<ContainerRepository>>
+      success: optional<boolean>
+  EnumerateDockerResults:
+    properties:
+      targets: optional<list<EnumerateDockerResult>>
+  # Report Struct
+  EnumerateDockerReport:
+    properties:
+      config: EnumerateDockerConfig
+      result: EnumerateDockerResults
+      errors: optional<list<string>>

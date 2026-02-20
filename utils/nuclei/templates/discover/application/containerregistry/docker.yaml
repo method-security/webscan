@@ -8,7 +8,7 @@ info:
     and validating canonical registry headers and expected auth challenge behavior.
   metadata:
     method-application-type: CONTAINER_REGISTRY
-    method-module-name: DOCKER
+    method-module-name: DOCKER_DISTRIBUTION
     cpe: cpe:2.3:a:docker:distribution:*:*:*:*:*:*:*:*
   tags: discovery,docker,container,registry,oci
 http:

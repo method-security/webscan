@@ -6,12 +6,14 @@ import (
 	// Generated
 	enumerateapiapplicationfern "github.com/Method-Security/webscan/generated/go/enumerate/apiapplication"
 	enumeratecmswordpressfern "github.com/Method-Security/webscan/generated/go/enumerate/cms/wordpress"
+	enumeratedockerfern "github.com/Method-Security/webscan/generated/go/enumerate/containerregistry"
 	enumerategeneralfern "github.com/Method-Security/webscan/generated/go/enumerate/general"
 	enumeratekubefern "github.com/Method-Security/webscan/generated/go/enumerate/kube"
 
 	// Internal
 	enumerateapiapplication "github.com/Method-Security/webscan/internal/enumerate/apiapplication"
 	enumeratecms "github.com/Method-Security/webscan/internal/enumerate/cms"
+	enumeratedocker "github.com/Method-Security/webscan/internal/enumerate/containerregistry"
 	enumerategeneral "github.com/Method-Security/webscan/internal/enumerate/general"
 	enumeratekube "github.com/Method-Security/webscan/internal/enumerate/kube"
 
@@ -374,6 +376,64 @@ func (a *WebScan) InitEnumerateCommand() {
 	// Add Command to 'Enumerate' Command
 	enumerateCmd.AddCommand(enumerateGeneralCmd)
 
+	// Container Registry Command
+	// Subcommands: graphql, swagger
+	enumerateContainerRegistryCmd := &cobra.Command{
+		Use:   "container-registry",
+		Short: "Enumerate container registries",
+		Long:  `Discover and analyze container registries, including repositories, images, and their manifest data.`,
+	}
+
+	// Docker Registry Command
+	enumerateContainerRegistryDockerCmd := &cobra.Command{
+		Use:   "docker",
+		Short: "Enumerate Docker container registries",
+		Long:  `Discover and analyze Docker container registries, including repositories, images, and their manifest data.`,
+		Run: func(cmd *cobra.Command, args []string) {
+			defer a.OutputSignal.PanicHandler(cmd.Context())
+
+			// Get Target flags
+			targets, err := cmd.Flags().GetStringSlice("targets")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Get config flags
+			verifyTLS, err := cmd.Flags().GetBool("verify-tls")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			timeout, err := cmd.Flags().GetInt("timeout")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Generate config
+			config := getEnumerateDockerConfig(targets, verifyTLS, timeout)
+
+			// Generate report
+			report := enumeratedocker.PerformAppEnumerateContainerRegistryDocker(cmd.Context(), &config)
+			a.OutputSignal.Content = report
+		},
+	}
+	// Target Flags
+	enumerateContainerRegistryDockerCmd.Flags().StringSlice("targets", []string{}, "URLs of Docker Container Registries to enumerate")
+	// Config Flags
+	enumerateContainerRegistryDockerCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
+	enumerateContainerRegistryDockerCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
+
+	// Mark required flags
+	_ = enumerateContainerRegistryDockerCmd.MarkFlagRequired("targets")
+
+	// Add Command to 'Enumerate Container Registry' Command
+	enumerateContainerRegistryCmd.AddCommand(enumerateContainerRegistryDockerCmd)
+
+	// Add Command to 'Enumerate' Command
+	enumerateCmd.AddCommand(enumerateContainerRegistryCmd)
+
 	// Add Command to Root Command
 	a.RootCmd.AddCommand(enumerateCmd)
 }
@@ -410,6 +470,16 @@ func getEnumerateGeneralRateLimitConfig(targets []string, maxRequests int, sleep
 		VerifyTls:   verifyTLS,
 		Timeout:     max(timeout, 0),
 		Threads:     max(threads, 0),
+	}
+	return config
+}
+
+// getEnumerateDockerConfig builds the config for Docker registry enumeration.
+func getEnumerateDockerConfig(targets []string, verifyTLS bool, timeout int) enumeratedockerfern.EnumerateDockerConfig {
+	config := enumeratedockerfern.EnumerateDockerConfig{
+		Targets:   targets,
+		VerifyTls: verifyTLS,
+		Timeout:   max(timeout, 0),
 	}
 	return config
 }

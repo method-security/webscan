@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
@@ -18,6 +19,106 @@ import (
 	// External
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
+
+func computeSizeFromV2Manifest(manifestJSON string) *int {
+	var parsed map[string]interface{}
+	if err := json.Unmarshal([]byte(manifestJSON), &parsed); err != nil {
+		return nil
+	}
+	size := 0
+	if config, ok := parsed["config"].(map[string]interface{}); ok {
+		if s, ok := config["size"].(float64); ok {
+			size += int(s)
+		}
+	}
+	if layers, ok := parsed["layers"].([]interface{}); ok {
+		for _, l := range layers {
+			if layer, ok := l.(map[string]interface{}); ok {
+				if s, ok := layer["size"].(float64); ok {
+					size += int(s)
+				}
+			}
+		}
+	}
+	if size == 0 {
+		return nil
+	}
+	return &size
+}
+
+// selectPlatformDigest picks the best platform from a manifest list.
+// Prefers linux/amd64, then any linux platform, then the first entry.
+func selectPlatformDigest(manifests []interface{}) string {
+	getEntry := func(m interface{}) (string, string, string) {
+		entry, ok := m.(map[string]interface{})
+		if !ok {
+			return "", "", ""
+		}
+		digest, _ := entry["digest"].(string)
+		platform, _ := entry["platform"].(map[string]interface{})
+		if platform == nil {
+			return digest, "", ""
+		}
+		os, _ := platform["os"].(string)
+		arch, _ := platform["architecture"].(string)
+		return digest, os, arch
+	}
+	for _, m := range manifests {
+		digest, os, arch := getEntry(m)
+		if os == "linux" && arch == "amd64" {
+			return digest
+		}
+	}
+	for _, m := range manifests {
+		digest, os, _ := getEntry(m)
+		if os == "linux" {
+			return digest
+		}
+	}
+	if len(manifests) > 0 {
+		digest, _, _ := getEntry(manifests[0])
+		return digest
+	}
+	return ""
+}
+
+// fetchPlatformManifestSize resolves a manifest list entry by fetching the
+// platform-specific v2 manifest and computing total size from config + layers.
+func fetchPlatformManifestSize(ctx context.Context, targetURL, repository, platformDigest string, verifyTLS bool, timeout int) *int {
+	log := svc1log.FromContext(ctx)
+
+	manifestURL := strings.TrimSuffix(targetURL, "/") + "/v2/" + repository + "/manifests/" + platformDigest
+	baseURL, path, queryParams, err := requesthelpers.SplitTargetURL(manifestURL)
+	if err != nil {
+		log.Error("Failed to parse platform manifest URL", svc1log.SafeParam("error", err.Error()))
+		return nil
+	}
+
+	acceptHeaders := []string{
+		"application/vnd.docker.distribution.manifest.v2+json",
+		"application/vnd.oci.image.manifest.v1+json",
+	}
+	requestConfig := createSendHTTPRequestConfig(baseURL, path, queryParams, verifyTLS, timeout, acceptHeaders)
+
+	httpReqResp, err := standard.SendStandardRequest(ctx, requestConfig)
+	if err != nil {
+		log.Error("Failed to fetch platform manifest", svc1log.SafeParam("error", err.Error()))
+		return nil
+	}
+
+	if httpReqResp.Response == nil || httpReqResp.Response.StatusCode == nil || *httpReqResp.Response.StatusCode != 200 {
+		return nil
+	}
+
+	if httpReqResp.Response.ResponseBody != nil {
+		bodyStr := requesthelpers.GetResponseBodyStringFromBodyStruct(httpReqResp.Response.ResponseBody)
+		if bodyStr != nil {
+			return computeSizeFromV2Manifest(*bodyStr)
+		}
+	}
+
+	return nil
+}
 
 func createSendHTTPRequestConfig(baseURL, path string, queryParams map[string]string, verifyTLS bool, timeout int, acceptHeaders []string) common.SendHttpRequestConfig {
 	// Base Headers
@@ -51,16 +152,15 @@ func createSendHTTPRequestConfig(baseURL, path string, queryParams map[string]st
 }
 
 // enumerateRepositories gets the list of repositories from the registry
-func enumerateRepositories(ctx context.Context, targetURL string, verifyTLS bool, timeout int) ([]string, []*common.HttpRequestResponse, error) {
+func enumerateRepositories(ctx context.Context, targetURL string, verifyTLS bool, timeout int) ([]string, *common.HttpRequestResponse, error) {
 	log := svc1log.FromContext(ctx)
-	var requests []*common.HttpRequestResponse
 
 	catalogURL := strings.TrimSuffix(targetURL, "/") + "/v2/_catalog"
 
 	baseURL, path, queryParams, err := requesthelpers.SplitTargetURL(catalogURL)
 	if err != nil {
 		log.Error("Failed to parse catalog URL", svc1log.SafeParam("error", err.Error()))
-		return nil, requests, err
+		return nil, nil, err
 	}
 
 	requestConfig := createSendHTTPRequestConfig(baseURL, path, queryParams, verifyTLS, timeout, nil)
@@ -68,13 +168,12 @@ func enumerateRepositories(ctx context.Context, targetURL string, verifyTLS bool
 	httpReqResp, err := standard.SendStandardRequest(ctx, requestConfig)
 	if err != nil {
 		log.Error("Failed to send request", svc1log.SafeParam("error", err.Error()))
-		return nil, requests, err
+		return nil, nil, err
 	}
-	requests = append(requests, &httpReqResp)
 
 	if httpReqResp.Response == nil || httpReqResp.Response.StatusCode == nil || *httpReqResp.Response.StatusCode != 200 {
 		log.Warn("Catalog endpoint returned non-200 status")
-		return nil, requests, nil
+		return nil, &httpReqResp, nil
 	}
 
 	var allRepositories []string
@@ -84,14 +183,14 @@ func enumerateRepositories(ctx context.Context, targetURL string, verifyTLS bool
 			var catalogResp enumeratedockerfern.DockerCatalogResponse
 			if err := json.Unmarshal([]byte(*bodyStr), &catalogResp); err != nil {
 				log.Error("Failed to decode catalog response", svc1log.SafeParam("error", err.Error()))
-				return nil, requests, err
+				return nil, &httpReqResp, err
 			}
 			allRepositories = catalogResp.Repositories
 			log.Info("Found repositories", svc1log.SafeParam("count", len(allRepositories)))
 		}
 	}
 
-	return allRepositories, requests, nil
+	return allRepositories, &httpReqResp, nil
 }
 
 // getImageTags retrieves tags for a specific image repository
@@ -183,22 +282,21 @@ func getImageManifest(ctx context.Context, targetURL, repository, tag string, ve
 		if bodyStr != nil {
 			manifestContent = *bodyStr
 
-			var manifest enumeratedockerfern.DockerManifestV2
-			if err := json.Unmarshal([]byte(manifestContent), &manifest); err == nil {
-				hasSize := false
-				size := 0
-				if manifest.Config != nil && manifest.Config.Size != nil {
-					size += *manifest.Config.Size
-					hasSize = true
-				}
-				for _, layer := range manifest.Layers {
-					if layer != nil && layer.Size != nil {
-						size += *layer.Size
-						hasSize = true
+			totalSize = computeSizeFromV2Manifest(manifestContent)
+
+			if totalSize == nil {
+				var parsed map[string]interface{}
+				if err := json.Unmarshal([]byte(manifestContent), &parsed); err == nil {
+					if manifests, ok := parsed["manifests"].([]interface{}); ok && len(manifests) > 0 {
+						platformDigest := selectPlatformDigest(manifests)
+						if platformDigest != "" {
+							log.Info("Manifest is an index, fetching platform manifest for size",
+								svc1log.SafeParam("repository", repository),
+								svc1log.SafeParam("tag", tag),
+								svc1log.SafeParam("platformDigest", platformDigest))
+							totalSize = fetchPlatformManifestSize(ctx, targetURL, repository, platformDigest, verifyTLS, timeout)
+						}
 					}
-				}
-				if hasSize {
-					totalSize = &size
 				}
 			}
 		}
@@ -212,126 +310,136 @@ func getImageManifest(ctx context.Context, targetURL, repository, tag string, ve
 // Step 2: For each repository, hit /v2/{repo}/tags/list to retrieve available tags.
 // Step 3: For each tag, hit /v2/{repo}/manifests/{tag} to fetch the manifest and digest.
 // Step 4: Group images by digest so tags pointing to the same image are consolidated.
-func enumerateTarget(ctx context.Context, targetURL string, verifyTLS bool, timeout int) (*enumeratedockerfern.EnumerateDockerResult, []string) {
+func enumerateTarget(ctx context.Context, targetURL string, verifyTLS bool, timeout int, threads int) (*enumeratedockerfern.EnumerateDockerResult, []string) {
 	log := svc1log.FromContext(ctx)
-	var allRequests []*common.HttpRequestResponse
 	var errors []string
 
 	// Step 1: Hit /v2/_catalog to list all repositories
-	repositories, repoRequests, err := enumerateRepositories(ctx, targetURL, verifyTLS, timeout)
-	allRequests = append(allRequests, repoRequests...)
+	repositories, catalogRequest, err := enumerateRepositories(ctx, targetURL, verifyTLS, timeout)
 	if err != nil {
 		errors = append(errors, fmt.Sprintf("Failed to enumerate repositories: %v", err))
-		successVal := false
-		return &enumeratedockerfern.EnumerateDockerResult{
-			Target:   targetURL,
-			Requests: allRequests,
-			Success:  &successVal,
-		}, errors
+		return nil, errors
 	}
 
 	if repositories == nil {
 		log.Info("Registry did not return repositories (possibly requires authentication)")
-		successVal := false
 		return &enumeratedockerfern.EnumerateDockerResult{
-			Target:   targetURL,
-			Requests: allRequests,
-			Success:  &successVal,
+			Target:         targetURL,
+			CatalogRequest: catalogRequest,
+			Success:        false,
 		}, errors
 	}
 
 	if len(repositories) == 0 {
 		log.Info("No repositories found in registry")
-		successVal := true
 		return &enumeratedockerfern.EnumerateDockerResult{
-			Target:   targetURL,
-			Requests: allRequests,
-			Success:  &successVal,
+			Target:         targetURL,
+			CatalogRequest: catalogRequest,
+			Success:        true,
 		}, errors
 	}
 
-	var containerRepos []*enumeratedockerfern.ContainerRepository
+	containerRepos := make([]*enumeratedockerfern.ContainerRepository, len(repositories))
+	repoErrors := make([][]string, len(repositories))
 
-	for _, repoName := range repositories {
-		log.Info("Processing repository", svc1log.SafeParam("repository", repoName))
+	sem := make(chan struct{}, threads)
+	var wg sync.WaitGroup
+	for i, repoName := range repositories {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(idx int, repo string) {
+			defer wg.Done()
+			defer func() { <-sem }()
 
-		// Step 2: For each repository, retrieve available tags
-		tags, tagRequests, err := getImageTags(ctx, targetURL, repoName, verifyTLS, timeout)
-		allRequests = append(allRequests, tagRequests...)
-		if err != nil {
-			errors = append(errors, fmt.Sprintf("Failed to get tags for repository %s: %v", repoName, err))
-			continue
-		}
+			log.Info("Processing repository", svc1log.SafeParam("repository", repo))
 
-		if len(tags) == 0 {
-			log.Warn("No tags found for repository", svc1log.SafeParam("repository", repoName))
-			containerRepos = append(containerRepos, &enumeratedockerfern.ContainerRepository{
-				Name:   repoName,
-				Images: []*enumeratedockerfern.ContainerImage{},
-			})
-			continue
-		}
-
-		imageMap := make(map[string]*enumeratedockerfern.ContainerImage)
-
-		// Step 3: For each tag, fetch the manifest and digest
-		for _, tag := range tags {
-			digest, manifestContent, size, manifestRequests, err := getImageManifest(ctx, targetURL, repoName, tag, verifyTLS, timeout)
-			allRequests = append(allRequests, manifestRequests...)
+			// Step 2: For each repository, retrieve available tags
+			tags, _, err := getImageTags(ctx, targetURL, repo, verifyTLS, timeout)
 			if err != nil {
-				errors = append(errors, fmt.Sprintf("Failed to get manifest for %s:%s: %v", repoName, tag, err))
-				continue
+				repoErrors[idx] = append(repoErrors[idx], fmt.Sprintf("Failed to get tags for repository %s: %v", repo, err))
+				return
 			}
 
-			if digest == "" {
-				digest = repoName + ":" + tag
+			if len(tags) == 0 {
+				log.Warn("No tags found for repository", svc1log.SafeParam("repository", repo))
+				containerRepos[idx] = &enumeratedockerfern.ContainerRepository{
+					Name:   repo,
+					Images: []*enumeratedockerfern.ContainerImage{},
+				}
+				return
 			}
 
-			// Compact the manifest into a single-line JSON string
-			var manifestStr *string
-			if manifestContent != "" {
-				var raw json.RawMessage
-				if err := json.Unmarshal([]byte(manifestContent), &raw); err == nil {
-					compacted, err := json.Marshal(raw)
-					if err == nil {
-						s := string(compacted)
-						manifestStr = &s
+			imageMap := make(map[string]*enumeratedockerfern.ContainerImage)
+
+			// Step 3: For each tag, fetch the manifest and digest
+			for _, tag := range tags {
+				digest, manifestContent, size, _, err := getImageManifest(ctx, targetURL, repo, tag, verifyTLS, timeout)
+				if err != nil {
+					repoErrors[idx] = append(repoErrors[idx], fmt.Sprintf("Failed to get manifest for %s:%s: %v", repo, tag, err))
+					continue
+				}
+
+				if digest == "" {
+					digest = repo + ":" + tag
+				}
+
+				var manifestStr *string
+				if manifestContent != "" {
+					var raw json.RawMessage
+					if err := json.Unmarshal([]byte(manifestContent), &raw); err == nil {
+						compacted, err := json.Marshal(raw)
+						if err == nil {
+							s := string(compacted)
+							manifestStr = &s
+						}
+					}
+				}
+
+				// Step 4: Group images by digest so tags pointing to the same image are consolidated
+				if existing, ok := imageMap[digest]; ok {
+					existing.Tags = append(existing.Tags, tag)
+				} else {
+					imageMap[digest] = &enumeratedockerfern.ContainerImage{
+						Digest:   digest,
+						Tags:     []string{tag},
+						Size:     size,
+						Manifest: manifestStr,
 					}
 				}
 			}
 
-			// Step 4: Group images by digest so tags pointing to the same image are consolidated
-			if existing, ok := imageMap[digest]; ok {
-				existing.Tags = append(existing.Tags, tag)
-			} else {
-				imageMap[digest] = &enumeratedockerfern.ContainerImage{
-					Digest:   digest,
-					Tags:     []string{tag},
-					Size:     size,
-					Manifest: manifestStr,
-				}
+			images := make([]*enumeratedockerfern.ContainerImage, 0, len(imageMap))
+			for _, image := range imageMap {
+				images = append(images, image)
 			}
-		}
 
-		images := make([]*enumeratedockerfern.ContainerImage, 0, len(imageMap))
-		for _, image := range imageMap {
-			images = append(images, image)
-		}
+			containerRepos[idx] = &enumeratedockerfern.ContainerRepository{
+				Name:   repo,
+				Images: images,
+			}
 
-		containerRepos = append(containerRepos, &enumeratedockerfern.ContainerRepository{
-			Name:   repoName,
-			Images: images,
-		})
-
-		log.Info("Processed repository", svc1log.SafeParam("repository", repoName), svc1log.SafeParam("imageCount", len(images)), svc1log.SafeParam("totalTags", len(tags)))
+			log.Info("Processed repository", svc1log.SafeParam("repository", repo), svc1log.SafeParam("imageCount", len(images)), svc1log.SafeParam("totalTags", len(tags)))
+		}(i, repoName)
 	}
+	wg.Wait()
 
-	successVal := true
+	// Collect errors and filter nil repos (from failed tag fetches)
+	for _, errs := range repoErrors {
+		errors = append(errors, errs...)
+	}
+	filtered := make([]*enumeratedockerfern.ContainerRepository, 0, len(containerRepos))
+	for _, repo := range containerRepos {
+		if repo != nil {
+			filtered = append(filtered, repo)
+		}
+	}
+	containerRepos = filtered
+
 	return &enumeratedockerfern.EnumerateDockerResult{
-		Target:       targetURL,
-		Requests:     allRequests,
-		Repositories: containerRepos,
-		Success:      &successVal,
+		Target:         targetURL,
+		CatalogRequest: catalogRequest,
+		Repositories:   containerRepos,
+		Success:        true,
 	}, errors
 }
 
@@ -347,7 +455,7 @@ func PerformAppEnumerateContainerRegistryDocker(ctx context.Context, config *enu
 	errors := []string{}
 
 	for _, targetURL := range config.Targets {
-		result, errs := enumerateTarget(ctx, targetURL, config.VerifyTls, config.Timeout)
+		result, errs := enumerateTarget(ctx, targetURL, config.VerifyTls, config.Timeout, config.Threads)
 		if result != nil {
 			targets = append(targets, result)
 		}

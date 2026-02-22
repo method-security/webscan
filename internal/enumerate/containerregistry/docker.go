@@ -428,21 +428,31 @@ func enumerateTarget(ctx context.Context, targetURL string, verifyTLS bool, time
 		}(repoName)
 	}
 
-	// Wait for all goroutines to complete then close channels
-	wg.Wait()
-	close(results)
-	close(errorsChan)
+	// Close channels once all goroutines finish, while draining concurrently
+	// to avoid deadlock when tag-level errors exceed the channel buffer.
+	go func() {
+		wg.Wait()
+		close(results)
+		close(errorsChan)
+	}()
 
-	// Collect results
 	containerRepos := make([]*enumeratedockerfern.ContainerRepository, 0, len(repositories))
-	for repo := range results {
-		containerRepos = append(containerRepos, repo)
-	}
-
-	// Collect errors
 	var errors []string
-	for err := range errorsChan {
-		errors = append(errors, err)
+	for results != nil || errorsChan != nil {
+		select {
+		case repo, ok := <-results:
+			if !ok {
+				results = nil
+				continue
+			}
+			containerRepos = append(containerRepos, repo)
+		case errMsg, ok := <-errorsChan:
+			if !ok {
+				errorsChan = nil
+				continue
+			}
+			errors = append(errors, errMsg)
+		}
 	}
 
 	return &enumeratedockerfern.EnumerateDockerResult{

@@ -305,6 +305,80 @@ func getImageManifest(ctx context.Context, targetURL, repository, tag string, ve
 	return digest, manifestContent, totalSize, requests, nil
 }
 
+// processRepository handles enumeration for a single repository: fetching tags, manifests, and computing sizes.
+func processRepository(ctx context.Context, targetURL, repoName string, verifyTLS bool, timeout int, wg *sync.WaitGroup, results chan<- *enumeratedockerfern.ContainerRepository, errors chan<- string) {
+	defer wg.Done()
+	log := svc1log.FromContext(ctx)
+	log.Info("Processing repository", svc1log.SafeParam("repository", repoName))
+
+	// Step 2: Retrieve available tags
+	tags, _, err := getImageTags(ctx, targetURL, repoName, verifyTLS, timeout)
+	if err != nil {
+		errors <- fmt.Sprintf("Failed to get tags for repository %s: %v", repoName, err)
+		return
+	}
+
+	if len(tags) == 0 {
+		log.Warn("No tags found for repository", svc1log.SafeParam("repository", repoName))
+		results <- &enumeratedockerfern.ContainerRepository{
+			Name:   repoName,
+			Images: []*enumeratedockerfern.ContainerImage{},
+		}
+		return
+	}
+
+	imageMap := make(map[string]*enumeratedockerfern.ContainerImage)
+
+	// Step 3: For each tag, fetch the manifest and digest
+	for _, tag := range tags {
+		digest, manifestContent, size, _, err := getImageManifest(ctx, targetURL, repoName, tag, verifyTLS, timeout)
+		if err != nil {
+			errors <- fmt.Sprintf("Failed to get manifest for %s:%s: %v", repoName, tag, err)
+			continue
+		}
+
+		if digest == "" {
+			digest = repoName + ":" + tag
+		}
+
+		var manifestStr *string
+		if manifestContent != "" {
+			var raw json.RawMessage
+			if err := json.Unmarshal([]byte(manifestContent), &raw); err == nil {
+				compacted, err := json.Marshal(raw)
+				if err == nil {
+					s := string(compacted)
+					manifestStr = &s
+				}
+			}
+		}
+
+		// Step 4: Group images by digest so tags pointing to the same image are consolidated
+		if existing, ok := imageMap[digest]; ok {
+			existing.Tags = append(existing.Tags, tag)
+		} else {
+			imageMap[digest] = &enumeratedockerfern.ContainerImage{
+				Digest:   digest,
+				Tags:     []string{tag},
+				Size:     size,
+				Manifest: manifestStr,
+			}
+		}
+	}
+
+	images := make([]*enumeratedockerfern.ContainerImage, 0, len(imageMap))
+	for _, image := range imageMap {
+		images = append(images, image)
+	}
+
+	results <- &enumeratedockerfern.ContainerRepository{
+		Name:   repoName,
+		Images: images,
+	}
+
+	log.Info("Processed repository", svc1log.SafeParam("repository", repoName), svc1log.SafeParam("imageCount", len(images)), svc1log.SafeParam("totalTags", len(tags)))
+}
+
 // enumerateTarget performs enumeration against a single registry target and returns a per-target result.
 // Step 1: Hit /v2/_catalog to list all repositories. Returns success=false if inaccessible.
 // Step 2: For each repository, hit /v2/{repo}/tags/list to retrieve available tags.
@@ -312,13 +386,11 @@ func getImageManifest(ctx context.Context, targetURL, repository, tag string, ve
 // Step 4: Group images by digest so tags pointing to the same image are consolidated.
 func enumerateTarget(ctx context.Context, targetURL string, verifyTLS bool, timeout int, threads int) (*enumeratedockerfern.EnumerateDockerResult, []string) {
 	log := svc1log.FromContext(ctx)
-	var errors []string
 
 	// Step 1: Hit /v2/_catalog to list all repositories
 	repositories, catalogRequest, err := enumerateRepositories(ctx, targetURL, verifyTLS, timeout)
 	if err != nil {
-		errors = append(errors, fmt.Sprintf("Failed to enumerate repositories: %v", err))
-		return nil, errors
+		return nil, []string{fmt.Sprintf("Failed to enumerate repositories: %v", err)}
 	}
 
 	if repositories == nil {
@@ -327,7 +399,7 @@ func enumerateTarget(ctx context.Context, targetURL string, verifyTLS bool, time
 			Target:         targetURL,
 			CatalogRequest: catalogRequest,
 			Success:        false,
-		}, errors
+		}, nil
 	}
 
 	if len(repositories) == 0 {
@@ -336,104 +408,42 @@ func enumerateTarget(ctx context.Context, targetURL string, verifyTLS bool, time
 			Target:         targetURL,
 			CatalogRequest: catalogRequest,
 			Success:        true,
-		}, errors
+		}, nil
 	}
 
-	containerRepos := make([]*enumeratedockerfern.ContainerRepository, len(repositories))
-	repoErrors := make([][]string, len(repositories))
+	// Create channels for results and errors
+	results := make(chan *enumeratedockerfern.ContainerRepository, len(repositories))
+	errorsChan := make(chan string, len(repositories))
 
-	sem := make(chan struct{}, threads)
+	// Create semaphore to limit concurrent repository processing
+	semaphore := make(chan struct{}, threads)
+
 	var wg sync.WaitGroup
-	for i, repoName := range repositories {
+	for _, repoName := range repositories {
 		wg.Add(1)
-		sem <- struct{}{}
-		go func(idx int, repo string) {
-			defer wg.Done()
-			defer func() { <-sem }()
-
-			log.Info("Processing repository", svc1log.SafeParam("repository", repo))
-
-			// Step 2: For each repository, retrieve available tags
-			tags, _, err := getImageTags(ctx, targetURL, repo, verifyTLS, timeout)
-			if err != nil {
-				repoErrors[idx] = append(repoErrors[idx], fmt.Sprintf("Failed to get tags for repository %s: %v", repo, err))
-				return
-			}
-
-			if len(tags) == 0 {
-				log.Warn("No tags found for repository", svc1log.SafeParam("repository", repo))
-				containerRepos[idx] = &enumeratedockerfern.ContainerRepository{
-					Name:   repo,
-					Images: []*enumeratedockerfern.ContainerImage{},
-				}
-				return
-			}
-
-			imageMap := make(map[string]*enumeratedockerfern.ContainerImage)
-
-			// Step 3: For each tag, fetch the manifest and digest
-			for _, tag := range tags {
-				digest, manifestContent, size, _, err := getImageManifest(ctx, targetURL, repo, tag, verifyTLS, timeout)
-				if err != nil {
-					repoErrors[idx] = append(repoErrors[idx], fmt.Sprintf("Failed to get manifest for %s:%s: %v", repo, tag, err))
-					continue
-				}
-
-				if digest == "" {
-					digest = repo + ":" + tag
-				}
-
-				var manifestStr *string
-				if manifestContent != "" {
-					var raw json.RawMessage
-					if err := json.Unmarshal([]byte(manifestContent), &raw); err == nil {
-						compacted, err := json.Marshal(raw)
-						if err == nil {
-							s := string(compacted)
-							manifestStr = &s
-						}
-					}
-				}
-
-				// Step 4: Group images by digest so tags pointing to the same image are consolidated
-				if existing, ok := imageMap[digest]; ok {
-					existing.Tags = append(existing.Tags, tag)
-				} else {
-					imageMap[digest] = &enumeratedockerfern.ContainerImage{
-						Digest:   digest,
-						Tags:     []string{tag},
-						Size:     size,
-						Manifest: manifestStr,
-					}
-				}
-			}
-
-			images := make([]*enumeratedockerfern.ContainerImage, 0, len(imageMap))
-			for _, image := range imageMap {
-				images = append(images, image)
-			}
-
-			containerRepos[idx] = &enumeratedockerfern.ContainerRepository{
-				Name:   repo,
-				Images: images,
-			}
-
-			log.Info("Processed repository", svc1log.SafeParam("repository", repo), svc1log.SafeParam("imageCount", len(images)), svc1log.SafeParam("totalTags", len(tags)))
-		}(i, repoName)
+		semaphore <- struct{}{}
+		go func(repo string) {
+			defer func() { <-semaphore }()
+			processRepository(ctx, targetURL, repo, verifyTLS, timeout, &wg, results, errorsChan)
+		}(repoName)
 	}
+
+	// Wait for all goroutines to complete then close channels
 	wg.Wait()
+	close(results)
+	close(errorsChan)
 
-	// Collect errors and filter nil repos (from failed tag fetches)
-	for _, errs := range repoErrors {
-		errors = append(errors, errs...)
+	// Collect results
+	containerRepos := make([]*enumeratedockerfern.ContainerRepository, 0, len(repositories))
+	for repo := range results {
+		containerRepos = append(containerRepos, repo)
 	}
-	filtered := make([]*enumeratedockerfern.ContainerRepository, 0, len(containerRepos))
-	for _, repo := range containerRepos {
-		if repo != nil {
-			filtered = append(filtered, repo)
-		}
+
+	// Collect errors
+	var errors []string
+	for err := range errorsChan {
+		errors = append(errors, err)
 	}
-	containerRepos = filtered
 
 	return &enumeratedockerfern.EnumerateDockerResult{
 		Target:         targetURL,

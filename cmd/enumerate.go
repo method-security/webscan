@@ -410,9 +410,14 @@ func (a *WebScan) InitEnumerateCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			threads, err := cmd.Flags().GetInt("threads")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
 
 			// Generate config
-			config := getEnumerateDockerConfig(targets, verifyTLS, timeout)
+			config := getEnumerateDockerConfig(targets, verifyTLS, timeout, threads)
 
 			// Generate report
 			report := enumeratedocker.PerformAppEnumerateContainerRegistryDocker(cmd.Context(), &config)
@@ -424,6 +429,7 @@ func (a *WebScan) InitEnumerateCommand() {
 	// Config Flags
 	enumerateContainerRegistryDockerCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
 	enumerateContainerRegistryDockerCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
+	enumerateContainerRegistryDockerCmd.Flags().Int("threads", 25, "Number of concurrent manifest requests per repository")
 
 	// Mark required flags
 	_ = enumerateContainerRegistryDockerCmd.MarkFlagRequired("targets")
@@ -475,11 +481,12 @@ func getEnumerateGeneralRateLimitConfig(targets []string, maxRequests int, sleep
 }
 
 // getEnumerateDockerConfig builds the config for Docker registry enumeration.
-func getEnumerateDockerConfig(targets []string, verifyTLS bool, timeout int) enumeratedockerfern.EnumerateDockerConfig {
+func getEnumerateDockerConfig(targets []string, verifyTLS bool, timeout int, threads int) enumeratedockerfern.EnumerateDockerConfig {
 	config := enumeratedockerfern.EnumerateDockerConfig{
 		Targets:   targets,
 		VerifyTls: verifyTLS,
 		Timeout:   max(timeout, 0),
+		Threads:   max(threads, 1),
 	}
 	return config
 }

@@ -7,6 +7,7 @@ types:
       targets: list<string>
       verifyTls: boolean
       timeout: integer
+      threads: integer
   # Docker Registry V2 API Response Objects
   DockerManifestDescriptor:
     properties:
@@ -37,9 +38,9 @@ types:
   EnumerateDockerResult:
     properties:
       target: string
-      requests: optional<list<http.HttpRequestResponse>>
+      catalogRequest: http.HttpRequestResponse
       repositories: optional<list<ContainerRepository>>
-      success: optional<boolean>
+      success: boolean
   EnumerateDockerResults:
     properties:
       targets: optional<list<EnumerateDockerResult>>

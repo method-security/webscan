@@ -1,0 +1,46 @@
+types:
+    # Enums
+    ModulesFileSize:
+        enum:
+            - SMALL
+            - LARGE
+    DetectionSource:
+        enum:
+            - CHANGELOG
+            - HTML
+            - CSS_REFERENCE
+            - JS_REFERENCE
+            - INFO_YML
+            - README
+            - LICENSE
+    # Common Objects
+    DrupalModuleDetails:
+        properties:
+            name: string
+            version: optional<string>
+            description: optional<string>
+            source: list<DetectionSource>
+    DrupalModulesTarget:
+        properties:
+            target: string
+            drupalVersion: optional<string>
+            modules: optional<list<DrupalModuleDetails>>
+    # Config
+    EnumerateDrupalModulesConfig:
+        properties:
+            targets: list<string>
+            modules: optional<list<string>>
+            modulesFileSize: optional<ModulesFileSize>
+            verifyTls: boolean
+            timeout: integer
+            threads: integer
+    # Result
+    EnumerateDrupalModulesResult:
+        properties:
+            targets: optional<list<DrupalModulesTarget>>
+    # Report
+    EnumerateDrupalModulesReport:
+        properties:
+            config: EnumerateDrupalModulesConfig
+            result: EnumerateDrupalModulesResult
+            errors: optional<list<string>>

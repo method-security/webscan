@@ -10,7 +10,7 @@ webscan enumerate [command]
 ## Available Commands
 
 - **api-application**: Enumerate API applications including GraphQL and Swagger endpoints
-- **cms**: Enumerate content management systems like WordPress plugins
+- **cms**: Enumerate content management systems like WordPress plugins and Drupal modules
 - **general**: Perform general enumeration tasks like rate limit testing
 - **kube**: Enumerate Kubernetes resources and configurations
 
@@ -118,6 +118,35 @@ Flags:
       --threads int                 Number of concurrent threads for scanning
       --timeout int                 Timeout per request in seconds (default 30)
       --verify-tls                  Verify TLS certificates when making HTTPS requests
+
+Global Flags:
+  -o, --output string        Output format (signal, json, yaml). Default value is signal (default "signal")
+  -f, --output-file string   Path to output file. If blank, will output to STDOUT
+  -q, --quiet                Suppress output
+  -v, --verbose              Verbose output
+```
+
+#### Drupal Modules
+```bash
+webscan enumerate cms drupal modules --targets https://example.com
+```
+##### Help Text
+```bash
+webscan enumerate cms drupal modules -h
+Discover and analyze Drupal modules to identify installed components and potential security issues.
+
+Usage:
+  webscan enumerate cms drupal modules [flags]
+
+Flags:
+  -h, --help                         help for modules
+      --modules strings              Specific Drupal modules to check for
+      --modules-file-paths strings   Paths to files containing Drupal module lists
+      --modules-file-size string     Size of the Drupal module list to use (default "SMALL")
+      --targets strings              URL targets to perform Drupal module enumeration against
+      --threads int                  Number of concurrent threads for scanning
+      --timeout int                  Timeout per request in seconds (default 30)
+      --verify-tls                   Verify TLS certificates when making HTTPS requests
 
 Global Flags:
   -o, --output string        Output format (signal, json, yaml). Default value is signal (default "signal")

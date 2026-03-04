@@ -5,6 +5,7 @@ import (
 	"errors"
 	// Generated
 	enumerateapiapplicationfern "github.com/Method-Security/webscan/generated/go/enumerate/apiapplication"
+	enumeratecmsdrupalfern "github.com/Method-Security/webscan/generated/go/enumerate/cms/drupal"
 	enumeratecmswordpressfern "github.com/Method-Security/webscan/generated/go/enumerate/cms/wordpress"
 	enumeratedockerfern "github.com/Method-Security/webscan/generated/go/enumerate/containerregistry"
 	enumerategeneralfern "github.com/Method-Security/webscan/generated/go/enumerate/general"
@@ -297,6 +298,119 @@ func (a *WebScan) InitEnumerateCommand() {
 	// Add Command to 'Enumerate CMS' Command
 	enumerateCMSCmd.AddCommand(enumerateCMSWordpressCmd)
 
+	// Drupal Command
+	// Subcommands: modules
+	enumerateCMSDrupalCmd := &cobra.Command{
+		Use:   "drupal",
+		Short: "Enumerate Drupal installations",
+		Long:  `Discover and analyze Drupal installations, including modules and potential vulnerabilities.`,
+	}
+
+	// Drupal Modules Command
+	enumerateCMSDrupalModulesCmd := &cobra.Command{
+		Use:   "modules",
+		Short: "Enumerate Drupal modules",
+		Long:  `Discover and analyze Drupal modules to identify installed components and potential security issues.`,
+		Run: func(cmd *cobra.Command, args []string) {
+			defer a.OutputSignal.PanicHandler(cmd.Context())
+
+			// Get Target flag
+			targets, err := cmd.Flags().GetStringSlice("targets")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Get config flags
+			// Add manually provided modules
+			modules, err := cmd.Flags().GetStringSlice("modules")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			// Default to using set wordlist path if no modules-file-paths are provided
+			modulesFiles, err := cmd.Flags().GetStringSlice("modules-file-paths")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			var modulesFileSizeEnum enumeratecmsdrupalfern.ModulesFileSize
+			if len(modulesFiles) > 0 {
+				entries, err := utils.GetEntriesFromTXTFiles(modulesFiles)
+				if err != nil {
+					a.OutputSignal.AddError(err)
+					return
+				}
+				modules = append(modules, entries...)
+				// If no modules-file-paths are provided, use the provided wordlist path (Toggled on size Default: Small)
+			} else {
+				modulesFileSize, err := cmd.Flags().GetString("modules-file-size")
+				if err != nil {
+					a.OutputSignal.AddError(err)
+					return
+				}
+				modulesFileSizeEnum, err = enumeratecmsdrupalfern.NewModulesFileSizeFromString(modulesFileSize)
+				if err != nil {
+					a.OutputSignal.AddError(err)
+					return
+				}
+				moduleFile := enumeratecms.GetEnumerateDrupalModuleWordlistPath(modulesFileSizeEnum)
+				entries, err := utils.GetEntriesFromTXTFiles([]string{moduleFile})
+				if err != nil {
+					a.OutputSignal.AddError(err)
+					return
+				}
+				modules = append(modules, entries...)
+			}
+			// Check to ensure at least one module is provided
+			if len(modules) == 0 {
+				a.OutputSignal.AddError(errors.New("no modules provided"))
+				return
+			}
+			// Other config flags
+			verifyTLS, err := cmd.Flags().GetBool("verify-tls")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			timeout, err := cmd.Flags().GetInt("timeout")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			threads, err := cmd.Flags().GetInt("threads")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Generate config
+			config := getEnumerateDrupalModulesConfig(targets, modules, modulesFileSizeEnum, verifyTLS, timeout, threads)
+
+			// Generate report
+			report := enumeratecms.PerformAppEnumerateCMSDrupalModules(cmd.Context(), config)
+			a.OutputSignal.Content = report
+		},
+	}
+	// Target Flags
+	enumerateCMSDrupalModulesCmd.Flags().StringSlice("targets", []string{}, "URL targets to perform Drupal module enumeration against")
+	// Config Flags
+	enumerateCMSDrupalModulesCmd.Flags().StringSlice("modules", []string{}, "Specific Drupal modules to check for")
+	enumerateCMSDrupalModulesCmd.Flags().StringSlice("modules-file-paths", []string{}, "Paths to files containing Drupal module lists")
+	enumerateCMSDrupalModulesCmd.Flags().String("modules-file-size", string(enumeratecmsdrupalfern.ModulesFileSizeSmall), "Size of the Drupal module list to use")
+	enumerateCMSDrupalModulesCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
+	enumerateCMSDrupalModulesCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
+	enumerateCMSDrupalModulesCmd.Flags().Int("threads", 0, "Number of concurrent threads for scanning")
+
+	// Mark required flags
+	_ = enumerateCMSDrupalModulesCmd.MarkFlagRequired("targets")
+
+	// Add Command to 'Enumerate CMS Drupal' Command
+	enumerateCMSDrupalCmd.AddCommand(enumerateCMSDrupalModulesCmd)
+
+	// Add Command to 'Enumerate CMS' Command
+	enumerateCMSCmd.AddCommand(enumerateCMSDrupalCmd)
+
 	// Add Command to 'Enumerate' Command
 	enumerateCmd.AddCommand(enumerateCMSCmd)
 
@@ -487,6 +601,19 @@ func getEnumerateDockerConfig(targets []string, verifyTLS bool, timeout int, thr
 		VerifyTls: verifyTLS,
 		Timeout:   max(timeout, 0),
 		Threads:   max(threads, 1),
+	}
+	return config
+}
+
+// getEnumerateDrupalModulesConfig builds the config for Drupal module enumeration.
+func getEnumerateDrupalModulesConfig(targets []string, modules []string, modulesFileSizeEnum enumeratecmsdrupalfern.ModulesFileSize, verifyTLS bool, timeout int, threads int) enumeratecmsdrupalfern.EnumerateDrupalModulesConfig {
+	config := enumeratecmsdrupalfern.EnumerateDrupalModulesConfig{
+		Targets:         targets,
+		Modules:         modules,
+		ModulesFileSize: &modulesFileSizeEnum,
+		VerifyTls:       verifyTLS,
+		Timeout:         max(timeout, 0),
+		Threads:         max(threads, 0),
 	}
 	return config
 }

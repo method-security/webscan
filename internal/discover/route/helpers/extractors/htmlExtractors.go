@@ -98,7 +98,7 @@ func ExtractFormRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig
 		routes = append(routes, &routeVar)
 	})
 
-	return discoverroutehelpers.MergeWebRoutes(routes), discoverroutehelpers.SetToListString(urls), []string{}
+	return discoverroutehelpers.MergeWebRoutes(routes), discoverroutehelpers.SetToListString(urls), errors
 }
 
 // ExtractAnchorRoutes extracts WebRoutes from anchor (<a>) elements in the HTML document.

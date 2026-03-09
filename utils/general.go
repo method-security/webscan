@@ -28,6 +28,10 @@ func GetEntriesFromTXTFiles(paths []string) ([]string, error) {
 		for scanner.Scan() {
 			lines = append(lines, scanner.Text())
 		}
+		if err := scanner.Err(); err != nil {
+			_ = file.Close()
+			return nil, err
+		}
 		err = file.Close()
 		if err != nil {
 			return nil, err

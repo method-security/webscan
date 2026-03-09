@@ -209,7 +209,9 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 						if err != nil {
 							// Don't add errors if context was cancelled
 							if ctx.Err() == nil {
+								attemptsMutex.Lock()
 								errors = append(errors, fmt.Sprintf("failed to send request: %v", err))
+								attemptsMutex.Unlock()
 							}
 							return
 						}
@@ -273,12 +275,16 @@ func AnalyzeResponse(ctx context.Context, request common.HttpRequestResponse, va
 		return false
 	}
 
-	bodySize := len(*requesthelpers.GetResponseBodyStringFromBodyStruct(request.Response.ResponseBody))
+	bodyStr := requesthelpers.GetResponseBodyStringFromBodyStruct(request.Response.ResponseBody)
+	if bodyStr == nil {
+		return false
+	}
+	bodySize := len(*bodyStr)
 	if bodySize == 0 {
 		return false
 	}
 
-	wordCount := len(strings.Fields(*requesthelpers.GetResponseBodyStringFromBodyStruct(request.Response.ResponseBody)))
+	wordCount := len(strings.Fields(*bodyStr))
 	// If the response is similar to the baseline or the baseline random path, then it is not a valid finding
 	// This is to prevent false positives from remote configurations that dont redirect but give blanket responses on all paths
 	if checkBaseContentMatch {
@@ -308,8 +314,12 @@ func baseLine(ctx context.Context, baseURL string, path string, validCodes map[i
 		return nil, nil, nil, errors.New("baseline request failed - no response received")
 	}
 
-	bodySize := len(*requesthelpers.GetResponseBodyStringFromBodyStruct(request.Response.ResponseBody))
-	wordCount := len(strings.Fields(*requesthelpers.GetResponseBodyStringFromBodyStruct(request.Response.ResponseBody)))
+	baseBodyStr := requesthelpers.GetResponseBodyStringFromBodyStruct(request.Response.ResponseBody)
+	if baseBodyStr == nil {
+		return nil, nil, nil, errors.New("baseline request failed - no response body received")
+	}
+	bodySize := len(*baseBodyStr)
+	wordCount := len(strings.Fields(*baseBodyStr))
 
 	return request, &bodySize, &wordCount, nil
 }
@@ -370,6 +380,9 @@ func getWordlistPath(wordlistType discover.WordlistType, wordlistSize discover.W
 // 1.00 is 100% difference
 // 2.00 is 200% difference
 func areSimilar(value, baseline int, tolerance float64) bool {
+	if baseline == 0 {
+		return value == 0
+	}
 	difference := math.Abs(float64(value - baseline))
 	percent := difference / float64(baseline)
 	return percent <= tolerance

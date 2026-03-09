@@ -19,8 +19,8 @@ func AnalyzeSaasRequest(ctx context.Context, request *discover.SaasActiveRequest
 	log := svc1log.FromContext(ctx)
 	// Initial validation
 	// Note: If no response body or headers, or status code is not 200, return false
-	if (request.Request == nil && request.Request.Response == nil && request.Request.Response.ResponseHeaders == nil) ||
-		(request.Request == nil || request.Request.Response == nil || request.Request.Response.StatusCode == nil || *request.Request.Response.StatusCode != 200) {
+	if (request.Request == nil || request.Request.Response == nil || request.Request.Response.ResponseHeaders == nil) ||
+		(request.Request.Response.StatusCode == nil || *request.Request.Response.StatusCode != 200) {
 		return nil
 	}
 

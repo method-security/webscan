@@ -281,18 +281,22 @@ func checkWordPressAPI(ctx context.Context, url string, config *enumeratecmsword
 		}
 
 		// Check routes for plugin endpoints
+		fetchedFromRoute := false
 		for route := range apiResponse.Routes {
 			if strings.Contains(route, "/wp/v2/plugins") {
 				// Try to fetch plugin list directly if available
 				pluginsFromRoutes := fetchPluginsFromAPI(ctx, url, "/wp-json/wp/v2/plugins", config)
 				pluginsList = append(pluginsList, pluginsFromRoutes...)
+				fetchedFromRoute = true
 				break
 			}
 		}
-	}
 
-	// Also check the older /wp-json/wp/v2/ endpoint
-	pluginsList = append(pluginsList, fetchPluginsFromAPI(ctx, url, "/wp-json/wp/v2/plugins", config)...)
+		// Fallback: also try the plugins endpoint even if not listed in routes
+		if !fetchedFromRoute {
+			pluginsList = append(pluginsList, fetchPluginsFromAPI(ctx, url, "/wp-json/wp/v2/plugins", config)...)
+		}
+	}
 
 	return pluginsList, errors
 }
@@ -312,6 +316,9 @@ func fetchPluginsFromAPI(ctx context.Context, baseURL string, path string, confi
 	// Try to parse as JSON array of plugins
 	var pluginList []map[string]interface{}
 	responseBody := requesthelpers.GetResponseBodyStringFromBodyStruct(apiRequest.Response.ResponseBody)
+	if responseBody == nil {
+		return plugins
+	}
 	if err := json.Unmarshal([]byte(*responseBody), &pluginList); err == nil {
 		for _, pluginData := range pluginList {
 			name, _ := pluginData["name"].(string)

@@ -136,10 +136,12 @@ func ExtractNetworkRoutes(ctx context.Context, browser *headless.Requester, targ
 
 		// Capture body parameters (if any)
 		if request.HasPostData {
-			webRoute.BodyParams, err = discoverroutehelpers.ParseBodyParams(request.PostData)
-		}
-		if err != nil {
-			errors = append(errors, err.Error())
+			bodyParams, bodyErr := discoverroutehelpers.ParseBodyParams(request.PostData)
+			if bodyErr != nil {
+				errors = append(errors, bodyErr.Error())
+			} else {
+				webRoute.BodyParams = bodyParams
+			}
 		}
 
 		// Add the WebRoute to the list

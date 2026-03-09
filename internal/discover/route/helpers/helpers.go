@@ -4,6 +4,7 @@ import (
 	// Standard
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/url"
 	"strings"
 
@@ -106,8 +107,7 @@ func MergeQueryParams(params1 []*discover.RouteQueryParam, params2 []*discover.R
 		paramMap[param.Name] = param
 	}
 	for _, param := range params2 {
-		if _, exists := paramMap[param.Name]; exists {
-			existingParam := paramMap[param.Name]
+		if existingParam, exists := paramMap[param.Name]; exists {
 			if existingParam.ExampleValues != nil && param.ExampleValues != nil {
 				// Use a set to deduplicate example values
 				valueSet := make(map[string]struct{})
@@ -127,6 +127,8 @@ func MergeQueryParams(params1 []*discover.RouteQueryParam, params2 []*discover.R
 				existingParam.ExampleValues = param.ExampleValues
 			} // else existingParam.ExampleValues is already set
 			paramMap[param.Name] = existingParam
+		} else {
+			paramMap[param.Name] = param
 		}
 	}
 
@@ -155,8 +157,7 @@ func MergeBodyParams(params1 []*discover.RouteBodyParam, params2 []*discover.Rou
 		paramMap[param.Name] = param
 	}
 	for _, param := range params2 {
-		if _, exists := paramMap[param.Name]; exists {
-			existingParam := paramMap[param.Name]
+		if existingParam, exists := paramMap[param.Name]; exists {
 			if existingParam.ExampleValues != nil && param.ExampleValues != nil {
 				// Use a set to deduplicate example values
 				valueSet := make(map[string]struct{})
@@ -176,6 +177,8 @@ func MergeBodyParams(params1 []*discover.RouteBodyParam, params2 []*discover.Rou
 				existingParam.ExampleValues = param.ExampleValues
 			}
 			paramMap[param.Name] = existingParam
+		} else {
+			paramMap[param.Name] = param
 		}
 	}
 
@@ -290,6 +293,11 @@ func ExtractDomain(rawURL string, maxDomainLevel int) string {
 	}
 	domain := u.Hostname()
 
+	// IPv6 addresses use colons, not dots — return as-is without domain level splitting
+	if net.ParseIP(domain) != nil {
+		return domain
+	}
+
 	if maxDomainLevel > 0 {
 		parts := strings.Split(domain, ".")
 		if len(parts) > maxDomainLevel {
@@ -308,6 +316,12 @@ func IsSubdomain(baseURL string, targetURL string) bool {
 	if baseDomain == "" || targetDomain == "" {
 		return false
 	}
+
+	// For IP addresses (IPv4 or IPv6), require an exact match — IPs don't have subdomains
+	if net.ParseIP(baseDomain) != nil || net.ParseIP(targetDomain) != nil {
+		return baseDomain == targetDomain
+	}
+
 	return targetDomain == baseDomain || strings.HasSuffix(targetDomain, "."+baseDomain)
 }
 

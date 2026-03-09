@@ -89,7 +89,10 @@ func (b *Client) CloseSession(ctx context.Context, sessionID string) error {
 		return err
 	}
 
-	request, _ := http.NewRequest("POST", b.URL+"/v1/sessions/"+sessionID, bytes.NewBuffer(payloadBytes))
+	request, err := http.NewRequest("POST", b.URL+"/v1/sessions/"+sessionID, bytes.NewBuffer(payloadBytes))
+	if err != nil {
+		return err
+	}
 	request.Header.Add("X-BB-API-Key", b.APIKey)
 	request.Header.Add("Content-Type", "application/json")
 
@@ -167,7 +170,10 @@ func (b *Client) createSession(ctx context.Context, createSessionRequest *Create
 
 	log.Debug(fmt.Sprintf("Creating session with payload: %s", string(payloadBytes)))
 
-	request, _ := http.NewRequest("POST", fmt.Sprintf("%s/v1/sessions", b.URL), bytes.NewBuffer(payloadBytes))
+	request, err := http.NewRequest("POST", fmt.Sprintf("%s/v1/sessions", b.URL), bytes.NewBuffer(payloadBytes))
+	if err != nil {
+		return nil, err
+	}
 	request.Header.Add("Content-Type", "application/json")
 	request.Header.Add("X-BB-API-Key", b.APIKey)
 

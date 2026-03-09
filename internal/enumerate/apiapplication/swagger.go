@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/url"
 	"regexp"
 	"strconv"
@@ -381,14 +382,24 @@ func PerformAppEnumerateSwagger(ctx context.Context, config enumerateapiapplicat
 
 	// Use the already-parsed docType from the detection phase
 
-	if version, ok := docType["swagger"]; ok && strings.HasPrefix(version.(string), "2") {
-		versionStr := version.(string)
-		result.Version = &versionStr
-		err = handleSwaggerV2(document, &report, target)
-	} else if version, ok := docType["openapi"]; ok && strings.HasPrefix(version.(string), "3") {
-		versionStr := version.(string)
-		result.Version = &versionStr
-		err = handleOpenAPIV3(document, &report, target)
+	if version, ok := docType["swagger"]; ok {
+		versionStr := fmt.Sprintf("%v", version)
+		if strings.HasPrefix(versionStr, "2") {
+			result.Version = &versionStr
+			err = handleSwaggerV2(document, &report, target)
+		} else {
+			report.Errors = append(report.Errors, fmt.Sprintf("unsupported Swagger version: %s", versionStr))
+			return report
+		}
+	} else if version, ok := docType["openapi"]; ok {
+		versionStr := fmt.Sprintf("%v", version)
+		if strings.HasPrefix(versionStr, "3") {
+			result.Version = &versionStr
+			err = handleOpenAPIV3(document, &report, target)
+		} else {
+			report.Errors = append(report.Errors, fmt.Sprintf("unsupported OpenAPI version: %s", versionStr))
+			return report
+		}
 	} else {
 		report.Errors = append(report.Errors, "unsupported OpenAPI version")
 		return report
@@ -436,7 +447,18 @@ func handleSwaggerV2(document libopenapi.Document, report *enumerateapiapplicati
 		if basePath == "" {
 			basePath = ""
 		}
-		baseEndpointURL = fmt.Sprintf("%s://%s%s", scheme, model.Host, basePath)
+		// Wrap IPv6 addresses in brackets for valid URL construction
+		host := model.Host
+		if hostOnly, _, splitErr := net.SplitHostPort(host); splitErr == nil {
+			// host:port form — check if host part is IPv6
+			if net.ParseIP(hostOnly) != nil && strings.Contains(hostOnly, ":") {
+				host = fmt.Sprintf("[%s]:%s", hostOnly, host[strings.LastIndex(host, ":")+1:])
+			}
+		} else if net.ParseIP(host) != nil && strings.Contains(host, ":") {
+			// bare IPv6 address without port
+			host = fmt.Sprintf("[%s]", host)
+		}
+		baseEndpointURL = fmt.Sprintf("%s://%s%s", scheme, host, basePath)
 	} else {
 		// No host specified, use the target's base URL
 		parsedURL, err := url.Parse(target)
@@ -472,6 +494,9 @@ func handleSwaggerV2(document libopenapi.Document, report *enumerateapiapplicati
 	}
 
 	// Iterate over paths and methods to populate the report
+	if model.Paths == nil || model.Paths.PathItems == nil {
+		return nil
+	}
 	for pair := model.Paths.PathItems.Oldest(); pair != nil; pair = pair.Next() {
 		path := pair.Key
 		pathItem := pair.Value
@@ -569,8 +594,10 @@ func handleOpenAPIV3(document libopenapi.Document, report *enumerateapiapplicati
 
 	// Extract security definitions
 	securityDefinitions := make(map[string]*v3.SecurityScheme)
-	for pair := model.Components.SecuritySchemes.Oldest(); pair != nil; pair = pair.Next() {
-		securityDefinitions[pair.Key] = pair.Value
+	if model.Components != nil && model.Components.SecuritySchemes != nil {
+		for pair := model.Components.SecuritySchemes.Oldest(); pair != nil; pair = pair.Next() {
+			securityDefinitions[pair.Key] = pair.Value
+		}
 	}
 
 	// Add security schemes to the report
@@ -583,6 +610,9 @@ func handleOpenAPIV3(document libopenapi.Document, report *enumerateapiapplicati
 	}
 
 	// Iterate over paths and methods to populate the report
+	if model.Paths == nil || model.Paths.PathItems == nil {
+		return nil
+	}
 	for pair := model.Paths.PathItems.Oldest(); pair != nil; pair = pair.Next() {
 		path := pair.Key
 		pathItem := pair.Value

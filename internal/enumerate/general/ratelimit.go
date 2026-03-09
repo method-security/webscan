@@ -369,8 +369,11 @@ func RateLimitDetected(request *common.HttpRequestResponse, hasSeen200 bool) boo
 
 	// Check response body for common rate limit messages
 	if response.ResponseBody != nil {
-		body := *requesthelpers.GetResponseBodyStringFromBodyStruct(response.ResponseBody)
-		body = strings.ToLower(body)
+		bodyPtr := requesthelpers.GetResponseBodyStringFromBodyStruct(response.ResponseBody)
+		if bodyPtr == nil {
+			return false
+		}
+		body := strings.ToLower(*bodyPtr)
 		rateLimitPhrases := []string{
 			"rate limit exceeded",
 			"too many requests",

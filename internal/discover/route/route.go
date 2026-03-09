@@ -146,7 +146,16 @@ func extractRoutes(ctx context.Context, httpRequestResponse *common.HttpRequestR
 	errors := []string{}
 
 	log.Info("Parsing HTML content using goquery")
-	htmlContent := *requesthelpers.GetResponseBodyStringFromBodyStruct(httpRequestResponse.Response.ResponseBody)
+	htmlContentPtr := requesthelpers.GetResponseBodyStringFromBodyStruct(httpRequestResponse.Response.ResponseBody)
+	if htmlContentPtr == nil {
+		errors = append(errors, "No response body content available")
+		return routes, discoverroutehelpers.SetToListString(urls), errors
+	}
+	if httpRequestResponse.Response.RedirectChain == nil || len(httpRequestResponse.Response.RedirectChain) == 0 {
+		errors = append(errors, "No redirect chain available")
+		return routes, discoverroutehelpers.SetToListString(urls), errors
+	}
+	htmlContent := *htmlContentPtr
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlContent))
 	if err != nil {
 		errorMsg := fmt.Sprintf("Failed to parse HTML content from %s: %s", httpRequestResponse.Response.RedirectChain[len(httpRequestResponse.Response.RedirectChain)-1], err)
@@ -429,6 +438,6 @@ func PerformRouteCapture(ctx context.Context, config discover.DiscoverRouteConfi
 	// Remove duplicate Routes and Static Assets
 	report.Result.Routes = discoverroutehelpers.MergeWebRoutes(allRoutes)
 	report.Result.StaticAssets = discoverroutehelpers.MergeStaticAssets(allStaticAssets)
-	report.Errors = errors
+	report.Errors = append(report.Errors, errors...)
 	return report
 }

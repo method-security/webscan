@@ -99,6 +99,7 @@ func (a *WebScan) InitDiscoverCommand() {
 			report, err := discoverapplication.LaunchFingerprintEngine(cmd.Context(), config)
 			if err != nil {
 				a.OutputSignal.AddError(err)
+				return
 			}
 			a.OutputSignal.Content = report
 		},
@@ -242,6 +243,7 @@ func (a *WebScan) InitDiscoverCommand() {
 			rep, err := discoverdirectory.RunDirectoryDiscovery(cmd.Context(), config)
 			if err != nil {
 				a.OutputSignal.AddError(err)
+				return
 			}
 			a.OutputSignal.Content = rep
 		},
@@ -570,6 +572,8 @@ func (a *WebScan) InitDiscoverCommand() {
 		Short: "Gather SaaS information given an organization name",
 		Long:  `Gather SaaS information given an organization name`,
 		Run: func(cmd *cobra.Command, args []string) {
+			defer a.OutputSignal.PanicHandler(cmd.Context())
+
 			// Get the Orgs
 			orgs, err := cmd.Flags().GetStringSlice("orgs")
 			if err != nil {
@@ -831,14 +835,19 @@ func getDiscoverDirectoryConfig(targets []string, paths []string, wordlistType s
 	// Set wordlist type and size if provided
 	if wordlistType != "" {
 		wordlistTypeEnum, err := discover.NewWordlistTypeFromString(wordlistType)
-		if err == nil {
+		if err != nil {
+			// Log warning but continue - the caller already validated that wordlist-type is required
+			config.WordlistType = nil
+		} else {
 			config.WordlistType = &wordlistTypeEnum
 		}
 	}
 
 	if wordlistSize != "" {
 		wordlistSizeEnum, err := discover.NewWordlistSizeFromString(wordlistSize)
-		if err == nil {
+		if err != nil {
+			config.WordlistSize = nil
+		} else {
 			config.WordlistSize = &wordlistSizeEnum
 		}
 	}

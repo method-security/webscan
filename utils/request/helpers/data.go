@@ -144,7 +144,7 @@ func CreateBodyFromBytes(contentType string, bodyData []byte) *common.Body {
 		fields := make(map[string]string)
 		bodyStr := string(bodyData)
 		for _, pair := range strings.Split(bodyStr, "&") {
-			kv := strings.Split(pair, "=")
+			kv := strings.SplitN(pair, "=", 2)
 			if len(kv) == 2 {
 				fields[kv[0]] = kv[1]
 			}

@@ -35,7 +35,11 @@ func NewBrowserbaseRequester(
 		return nil
 	}
 
-	websocket := NewWebSocket(ctx, browserbaseClient.ConnectionString(*session))
+	websocket, err := NewWebSocket(ctx, browserbaseClient.ConnectionString(*session))
+	if err != nil {
+		svc1log.FromContext(ctx).Error("Failed to create websocket connection", svc1log.SafeParam("error", err.Error()))
+		return nil
+	}
 	client := cdp.New().Start(websocket)
 	return &Requester{
 		Requester: headless.NewRequesterWithClient(client, timeout, minDOMStabalizeTime),

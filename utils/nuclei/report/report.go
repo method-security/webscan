@@ -316,8 +316,8 @@ func (b *Builder) Consume(ev *nout.ResultEvent) {
 		reference = ev.Info.Reference.ToSlice()
 	}
 	var softwareWeakness string
-	if ev.Info.Metadata["method-software-weakness-name"] != nil {
-		softwareWeakness = ev.Info.Metadata["method-software-weakness-name"].(string)
+	if v, ok := ev.Info.Metadata["method-software-weakness-name"].(string); ok {
+		softwareWeakness = v
 	}
 
 	// Extract template metadata if available

@@ -35,7 +35,7 @@ type Config struct {
 	GlobalRateLimit int
 }
 
-func validateConfig(cfg Config) error {
+func validateConfig(cfg *Config) error {
 	if cfg.RunMode == nuclei.NucleiRunModeDast {
 		if len(cfg.RawRequests) == 0 {
 			return fmt.Errorf("runner: no RawRequests provided for dast mode")
@@ -67,7 +67,7 @@ func copyFilesToTmpDirs(cfg Config) (templateDir, workflowDir string, err error)
 
 	// Copy templates
 	for _, src := range cfg.TemplateFS {
-		_ = fs.WalkDir(src, ".", func(p string, d fs.DirEntry, walkErr error) error {
+		if walkErr := fs.WalkDir(src, ".", func(p string, d fs.DirEntry, walkErr error) error {
 			if walkErr != nil {
 				return walkErr
 			}
@@ -84,7 +84,9 @@ func copyFilesToTmpDirs(cfg Config) (templateDir, workflowDir string, err error)
 			}
 			dst := filepath.Join(templateDir, filepath.Base(p))
 			return os.WriteFile(dst, data, 0o600)
-		})
+		}); walkErr != nil {
+			return "", "", fmt.Errorf("failed to copy templates: %w", walkErr)
+		}
 	}
 
 	// Copy workflows with subtemplates structure
@@ -94,7 +96,7 @@ func copyFilesToTmpDirs(cfg Config) (templateDir, workflowDir string, err error)
 	}
 
 	for _, src := range cfg.WorkflowFS {
-		_ = fs.WalkDir(src, ".", func(p string, d fs.DirEntry, walkErr error) error {
+		if walkErr := fs.WalkDir(src, ".", func(p string, d fs.DirEntry, walkErr error) error {
 			if walkErr != nil {
 				return walkErr
 			}
@@ -121,7 +123,9 @@ func copyFilesToTmpDirs(cfg Config) (templateDir, workflowDir string, err error)
 				dst = filepath.Join(subtemplatesDir, filename)
 			}
 			return os.WriteFile(dst, data, 0o600)
-		})
+		}); walkErr != nil {
+			return "", "", fmt.Errorf("failed to copy workflows: %w", walkErr)
+		}
 	}
 
 	return templateDir, workflowDir, nil
@@ -236,18 +240,22 @@ func loadTargets(eng *nucleilib.NucleiEngine, cfg Config) error {
 		if err != nil {
 			return err
 		}
+		tmpName := f.Name()
 		defer func() {
-			_ = os.Remove(f.Name())
+			_ = os.Remove(tmpName)
 		}()
 		for _, line := range cfg.RawRequests {
 			if _, err := f.WriteString(line + "\n"); err != nil {
+				_ = f.Close()
 				return err
 			}
 		}
-		_ = f.Sync()
+		if err := f.Close(); err != nil {
+			return err
+		}
 
 		// tell Nuclei to parse JSONL
-		if err := eng.LoadTargetsWithHttpData(f.Name(), "jsonl"); err != nil {
+		if err := eng.LoadTargetsWithHttpData(tmpName, "jsonl"); err != nil {
 			return err
 		}
 	} else {
@@ -284,7 +292,7 @@ func GetRunnerConfig(templateFileSystems, workflowFileSystems []fs.FS, config nu
 func Run(ctx context.Context, cfg Config, reportBuilder *report.Builder) ([]*nuclei.NucleiTargetInfo, error) {
 	log := svc1log.FromContext(ctx)
 	log.Info("Validating config")
-	if err := validateConfig(cfg); err != nil {
+	if err := validateConfig(&cfg); err != nil {
 		return nil, err
 	}
 

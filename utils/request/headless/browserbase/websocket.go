@@ -3,7 +3,7 @@ package browserbase
 import (
 	// Standard
 	"context"
-	"log"
+	"fmt"
 	"net"
 
 	// External
@@ -15,12 +15,12 @@ type WebSocket struct {
 	conn net.Conn
 }
 
-func NewWebSocket(ctx context.Context, url string) *WebSocket {
-	conn, _, _, err := ws.Dial(context.Background(), url)
+func NewWebSocket(ctx context.Context, url string) (*WebSocket, error) {
+	conn, _, _, err := ws.Dial(ctx, url)
 	if err != nil {
-		log.Fatal(err)
+		return nil, fmt.Errorf("failed to dial websocket: %w", err)
 	}
-	return &WebSocket{conn}
+	return &WebSocket{conn}, nil
 }
 
 func (w *WebSocket) Send(b []byte) error {

@@ -59,7 +59,7 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 	log.Info("Starting Directory Discovery with multi-threading")
 
 	// Initialize report
-	report := discover.DiscoverDirectoryReport{}
+	report := discover.DiscoverDirectoryReport{Config: &config}
 	errors := []string{}
 	result := discover.DiscoverDirectoryResult{}
 
@@ -263,7 +263,6 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 	result.Targets = targets
 
 	report.Result = &result
-	report.Config = &config
 	report.Errors = errors
 	return &report, nil
 }

@@ -6,12 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"os"
 	"runtime"
 	"strings"
 	"sync"
 	"time"
 
+	// Configs
+	"github.com/Method-Security/webscan/configs"
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
 	discover "github.com/Method-Security/webscan/generated/go/discover"
@@ -332,14 +333,11 @@ func gatherPaths(paths []string, wordlistType *discover.WordlistType, wordlistSi
 
 	// Add paths from automatic wordlist selection
 	if wordlistType != nil && wordlistSize != nil {
-		wordlistPath, err := getWordlistPath(*wordlistType, *wordlistSize)
-		if err != nil {
-			return nil, err
-		}
+		embeddedPath := getWordlistEmbeddedPath(*wordlistType, *wordlistSize)
 
-		wordlistPaths, err := utils.GetEntriesFromTXTFiles([]string{wordlistPath})
+		wordlistPaths, err := configs.ReadLines(embeddedPath)
 		if err != nil {
-			return nil, fmt.Errorf("failed to load wordlist %s: %v", wordlistPath, err)
+			return nil, fmt.Errorf("failed to load embedded wordlist %s: %v", embeddedPath, err)
 		}
 		allPaths = append(allPaths, wordlistPaths...)
 	}
@@ -347,29 +345,11 @@ func gatherPaths(paths []string, wordlistType *discover.WordlistType, wordlistSi
 	return allPaths, nil
 }
 
-// getWordlistPath constructs the path to the appropriate wordlist file
-func getWordlistPath(wordlistType discover.WordlistType, wordlistSize discover.WordlistSize) (string, error) {
-	// Convert enums to strings
+// getWordlistEmbeddedPath returns the embedded config path for a directory wordlist.
+func getWordlistEmbeddedPath(wordlistType discover.WordlistType, wordlistSize discover.WordlistSize) string {
 	typeStr := strings.ToLower(string(wordlistType))
 	sizeStr := strings.ToLower(string(wordlistSize))
-
-	// Construct filename following the pattern: raft-{size}-{type}-lowercase.txt
-	filename := fmt.Sprintf("raft-%s-%s-lowercase.txt", sizeStr, typeStr)
-
-	// Try container path first (for Docker deployment)
-	containerPath := fmt.Sprintf("var/conf/discover/directory/%s", filename)
-	if _, err := os.Stat(containerPath); err == nil {
-		return containerPath, nil
-	}
-
-	// Fallback to local development path
-	localPath := fmt.Sprintf("configs/discover/directory/%s", filename)
-	if _, err := os.Stat(localPath); err == nil {
-		return localPath, nil
-	}
-
-	// If neither path exists, return an error with both attempted paths
-	return "", fmt.Errorf("wordlist file not found at %s or %s", containerPath, localPath)
+	return fmt.Sprintf("discover/directory/raft-%s-%s-lowercase.txt", sizeStr, typeStr)
 }
 
 // areSimilar is a function that checks if the value is similar to the baseline with a given tolerance

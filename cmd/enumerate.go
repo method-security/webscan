@@ -18,6 +18,8 @@ import (
 	enumerategeneral "github.com/Method-Security/webscan/internal/enumerate/general"
 	enumeratekube "github.com/Method-Security/webscan/internal/enumerate/kube"
 
+	// Configs
+	"github.com/Method-Security/webscan/configs"
 	// Utils
 	utils "github.com/Method-Security/webscan/utils"
 	// External
@@ -241,8 +243,8 @@ func (a *WebScan) InitEnumerateCommand() {
 					a.OutputSignal.AddError(err)
 					return
 				}
-				pluginFile := enumeratecms.GetEnumerateWordpressPluginWordlistPath(PluginsFileSizeEnum)
-				entries, err := utils.GetEntriesFromTXTFiles([]string{pluginFile})
+				pluginFile := enumeratecms.GetEnumerateWordpressPluginEmbeddedPath(PluginsFileSizeEnum)
+				entries, err := configs.ReadLines(pluginFile)
 				if err != nil {
 					a.OutputSignal.AddError(err)
 					return

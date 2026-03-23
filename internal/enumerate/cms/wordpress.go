@@ -20,11 +20,11 @@ import (
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
 )
 
-// GetEnumerateWordpressPluginWordlistPath returns the path to the wordlist for the given plugin file size
-func GetEnumerateWordpressPluginWordlistPath(PluginsFileSize enumeratecmswordpressfern.PluginsFileSize) string {
+// GetEnumerateWordpressPluginEmbeddedPath returns the embedded config path for the given plugin file size.
+func GetEnumerateWordpressPluginEmbeddedPath(PluginsFileSize enumeratecmswordpressfern.PluginsFileSize) string {
 	wordlistPaths := map[enumeratecmswordpressfern.PluginsFileSize]string{
-		enumeratecmswordpressfern.PluginsFileSizeSmall: "/opt/method/webscan/var/conf/enumerate/cms/wordpress/plugins_small.txt",
-		enumeratecmswordpressfern.PluginsFileSizeLarge: "/opt/method/webscan/var/conf/enumerate/cms/wordpress/plugins_large.txt",
+		enumeratecmswordpressfern.PluginsFileSizeSmall: "enumerate/cms/wordpress/plugins_small.txt",
+		enumeratecmswordpressfern.PluginsFileSizeLarge: "enumerate/cms/wordpress/plugins_large.txt",
 	}
 	return wordlistPaths[PluginsFileSize]
 }

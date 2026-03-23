@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/Method-Security/webscan/configs"
 	discover "github.com/Method-Security/webscan/generated/go/discover"
 )
 
@@ -25,22 +26,35 @@ func FilterFingerprints(companies []string, fingerprints discover.SaasFingerprin
 	return &discover.SaasFingerprintFile{Fingerprints: filteredFingerprints}, nil
 }
 
-// UnmarshalFingerprints unmarshals the fingerprint files into a SaasFingerprintFile
+// embeddedSaasFiles maps known container paths to their embedded config paths.
+var embeddedSaasFiles = map[string]string{
+	"/opt/method/webscan/var/conf/discover/saas/saas_fingerprints.json": "discover/saas/saas_fingerprints.json",
+	"/opt/method/webscan/var/conf/discover/saas/sso_fingerprints.json":  "discover/saas/sso_fingerprints.json",
+}
+
+// UnmarshalFingerprints unmarshals the fingerprint files into a SaasFingerprintFile.
+// Tries the filesystem first, then falls back to embedded configs for known default paths.
 func UnmarshalFingerprints(fingerprintFiles []string) discover.SaasFingerprintFile {
 	result := discover.SaasFingerprintFile{
 		Fingerprints: make(map[string]*discover.SaasFingerprintEntry),
 	}
-	// Read and unmarshal each fingerprint file
 	for _, file := range fingerprintFiles {
 		data, err := os.ReadFile(file)
 		if err != nil {
-			continue
+			// Fall back to embedded config for known default paths
+			if embeddedPath, ok := embeddedSaasFiles[file]; ok {
+				data, err = configs.ReadFile(embeddedPath)
+				if err != nil {
+					continue
+				}
+			} else {
+				continue
+			}
 		}
 		var fingerprints discover.SaasFingerprintFile
 		if err := json.Unmarshal(data, &fingerprints); err != nil {
 			continue
 		}
-		// Merge fingerprints from this file into result
 		for k, v := range fingerprints.Fingerprints {
 			result.Fingerprints[k] = v
 		}

@@ -3,8 +3,6 @@ package configs
 import (
 	"embed"
 	"fmt"
-	"io/fs"
-	"os"
 	"strings"
 )
 
@@ -23,24 +21,13 @@ func ReadLines(path string) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read embedded config %s: %w", path, err)
 	}
-	content := strings.TrimRight(string(data), "\n")
+	content := strings.TrimRight(string(data), "\r\n")
 	if content == "" {
 		return []string{}, nil
 	}
-	return strings.Split(content, "\n"), nil
-}
-
-// ReadFileWithFallback tries to read from the filesystem first, then falls back to the embedded config.
-// This supports user-provided custom paths (filesystem) while defaulting to embedded configs.
-func ReadFileWithFallback(filesystemPath string, embeddedPath string) ([]byte, error) {
-	data, err := os.ReadFile(filesystemPath)
-	if err == nil {
-		return data, nil
+	lines := strings.Split(content, "\n")
+	for i, line := range lines {
+		lines[i] = strings.TrimRight(line, "\r")
 	}
-	return ReadFile(embeddedPath)
-}
-
-// FS returns the embedded filesystem for direct access if needed.
-func FS() fs.FS {
-	return configFS
+	return lines, nil
 }

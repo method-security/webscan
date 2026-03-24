@@ -356,8 +356,8 @@ func (a *WebScan) InitEnumerateCommand() {
 					a.OutputSignal.AddError(err)
 					return
 				}
-				moduleFile := enumeratecms.GetEnumerateDrupalModuleWordlistPath(modulesFileSizeEnum)
-				entries, err := utils.GetEntriesFromTXTFiles([]string{moduleFile})
+				moduleFile := enumeratecms.GetEnumerateDrupalModuleEmbeddedPath(modulesFileSizeEnum)
+				entries, err := configs.ReadLines(moduleFile)
 				if err != nil {
 					a.OutputSignal.AddError(err)
 					return

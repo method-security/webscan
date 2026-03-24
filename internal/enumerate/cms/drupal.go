@@ -36,11 +36,11 @@ var (
 	drupalJSReferenceRegex   = regexp.MustCompile(`src=['"]([^'"]*modules/contrib/([^/'"]+)/[^'"]*\.js[^'"]*?)['"]`)
 )
 
-// GetEnumerateDrupalModuleWordlistPath returns the path to the wordlist for the given module file size
-func GetEnumerateDrupalModuleWordlistPath(modulesFileSize enumeratecmsdrupalfern.ModulesFileSize) string {
+// GetEnumerateDrupalModuleEmbeddedPath returns the embedded config path for the given module file size.
+func GetEnumerateDrupalModuleEmbeddedPath(modulesFileSize enumeratecmsdrupalfern.ModulesFileSize) string {
 	wordlistPaths := map[enumeratecmsdrupalfern.ModulesFileSize]string{
-		enumeratecmsdrupalfern.ModulesFileSizeSmall: "/opt/method/webscan/var/conf/enumerate/cms/drupal/modules_small.txt",
-		enumeratecmsdrupalfern.ModulesFileSizeLarge: "/opt/method/webscan/var/conf/enumerate/cms/drupal/modules_large.txt",
+		enumeratecmsdrupalfern.ModulesFileSizeSmall: "enumerate/cms/drupal/modules_small.txt",
+		enumeratecmsdrupalfern.ModulesFileSizeLarge: "enumerate/cms/drupal/modules_large.txt",
 	}
 	return wordlistPaths[modulesFileSize]
 }

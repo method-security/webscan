@@ -592,8 +592,8 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			saasFingerprints := discoversaashelpers.UnmarshalFingerprints(saasFilePaths)
-			ssoFingerprints := discoversaashelpers.UnmarshalFingerprints(ssoFilePaths)
+			saasFingerprints := discoversaashelpers.UnmarshalFingerprints(saasFilePaths, "discover/saas/saas_fingerprints.json")
+			ssoFingerprints := discoversaashelpers.UnmarshalFingerprints(ssoFilePaths, "discover/saas/sso_fingerprints.json")
 			if len(saasFingerprints.Fingerprints) == 0 {
 				a.OutputSignal.AddError(errors.New("no SaaS fingerprints found"))
 				return

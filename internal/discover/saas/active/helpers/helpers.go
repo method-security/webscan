@@ -27,28 +27,20 @@ func FilterFingerprints(companies []string, fingerprints discover.SaasFingerprin
 }
 
 // UnmarshalFingerprints unmarshals the fingerprint files into a SaasFingerprintFile.
-// If no paths are provided, loads directly from embedded configs for both saas and sso fingerprints.
-func UnmarshalFingerprints(fingerprintFiles []string) discover.SaasFingerprintFile {
+// If no paths are provided, loads from the specified embedded config path.
+func UnmarshalFingerprints(fingerprintFiles []string, embeddedFallbackPath string) discover.SaasFingerprintFile {
 	result := discover.SaasFingerprintFile{
 		Fingerprints: make(map[string]*discover.SaasFingerprintEntry),
 	}
 
 	if len(fingerprintFiles) == 0 {
-		embeddedPaths := []string{
-			"discover/saas/saas_fingerprints.json",
-			"discover/saas/sso_fingerprints.json",
-		}
-		for _, embeddedPath := range embeddedPaths {
-			data, err := configs.ReadFile(embeddedPath)
-			if err != nil {
-				continue
-			}
+		data, err := configs.ReadFile(embeddedFallbackPath)
+		if err == nil {
 			var fingerprints discover.SaasFingerprintFile
-			if err := json.Unmarshal(data, &fingerprints); err != nil {
-				continue
-			}
-			for k, v := range fingerprints.Fingerprints {
-				result.Fingerprints[k] = v
+			if err := json.Unmarshal(data, &fingerprints); err == nil {
+				for k, v := range fingerprints.Fingerprints {
+					result.Fingerprints[k] = v
+				}
 			}
 		}
 	} else {

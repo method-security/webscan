@@ -4,6 +4,7 @@ import (
 	// Standard
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -23,14 +24,33 @@ import (
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
-// InitializeBrowser starts a headless browser instance and establishes connection
+// InitializeBrowser starts a headless browser instance and establishes connection.
+// If a browser path is specified and exists, it uses that binary. Otherwise it
+// falls back to rod's auto-download, which fetches a compatible Chromium to ~/.cache/rod/browser/.
+// The launcher uses a separate 5-minute timeout so that a first-time Chromium download
+// isn't killed by the per-request timeout.
 func (b *Requester) InitializeBrowser(ctx context.Context) error {
+	log := svc1log.FromContext(ctx)
 	launch := launcher.New().Headless(true)
+
 	if b.PathToBrowser != nil && *b.PathToBrowser != "" {
-		launch = launch.Bin(*b.PathToBrowser)
+		if _, err := os.Stat(*b.PathToBrowser); err == nil {
+			log.Info("Using specified browser binary", svc1log.SafeParam("path", *b.PathToBrowser))
+			launch = launch.Bin(*b.PathToBrowser)
+		} else {
+			log.Warn("Specified browser path not found, falling back to rod auto-download",
+				svc1log.SafeParam("path", *b.PathToBrowser))
+		}
+	} else {
+		log.Info("No browser path specified, rod will auto-detect or download Chromium")
 	}
 
-	browserURL, err := launch.Context(ctx).Launch()
+	// The launcher uses a separate 5-minute timeout so that a first-time Chromium download
+	// No configurable needed, 5 minutes is a reasonable default.
+	launchCtx, launchCancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer launchCancel()
+
+	browserURL, err := launch.Context(launchCtx).Launch()
 	if err != nil {
 		return fmt.Errorf("browser launch failed: %v", err)
 	}

@@ -592,8 +592,8 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			saasFingerprints := discoversaashelpers.UnmarshalFingerprints(saasFilePaths)
-			ssoFingerprints := discoversaashelpers.UnmarshalFingerprints(ssoFilePaths)
+			saasFingerprints := discoversaashelpers.UnmarshalFingerprints(saasFilePaths, "discover/saas/saas_fingerprints.json")
+			ssoFingerprints := discoversaashelpers.UnmarshalFingerprints(ssoFilePaths, "discover/saas/sso_fingerprints.json")
 			if len(saasFingerprints.Fingerprints) == 0 {
 				a.OutputSignal.AddError(errors.New("no SaaS fingerprints found"))
 				return
@@ -684,8 +684,8 @@ func (a *WebScan) InitDiscoverCommand() {
 	// Target Flags
 	discoverSaasCmd.Flags().StringSlice("orgs", []string{}, "The organization names to use for discovery")
 	// Config Flags
-	discoverSaasCmd.Flags().StringSlice("saas-file-paths", []string{"/opt/method/webscan/var/conf/discover/saas/saas_fingerprints.json"}, "Files containing SaaS application fingerprints")
-	discoverSaasCmd.Flags().StringSlice("sso-file-paths", []string{"/opt/method/webscan/var/conf/discover/saas/sso_fingerprints.json"}, "Files containing SSO application fingerprints")
+	discoverSaasCmd.Flags().StringSlice("saas-file-paths", []string{}, "Files containing SaaS application fingerprints")
+	discoverSaasCmd.Flags().StringSlice("sso-file-paths", []string{}, "Files containing SSO application fingerprints")
 	discoverSaasCmd.Flags().StringSlice("saas-companies", []string{}, "The specific SaaS companies to use for discovery (Must be present in the SaaS fingerprints file)")
 	discoverSaasCmd.Flags().StringSlice("sso-companies", []string{}, "The specific SSO companies to use for discovery (Must be present in the SSO fingerprints file)")
 	discoverSaasCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")

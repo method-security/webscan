@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/Method-Security/webscan/configs"
 	discover "github.com/Method-Security/webscan/generated/go/discover"
 )
 
@@ -25,24 +26,36 @@ func FilterFingerprints(companies []string, fingerprints discover.SaasFingerprin
 	return &discover.SaasFingerprintFile{Fingerprints: filteredFingerprints}, nil
 }
 
-// UnmarshalFingerprints unmarshals the fingerprint files into a SaasFingerprintFile
-func UnmarshalFingerprints(fingerprintFiles []string) discover.SaasFingerprintFile {
+// UnmarshalFingerprints unmarshals the fingerprint files into a SaasFingerprintFile.
+// If no paths are provided, loads from the specified embedded config path.
+func UnmarshalFingerprints(fingerprintFiles []string, embeddedFallbackPath string) discover.SaasFingerprintFile {
 	result := discover.SaasFingerprintFile{
 		Fingerprints: make(map[string]*discover.SaasFingerprintEntry),
 	}
-	// Read and unmarshal each fingerprint file
-	for _, file := range fingerprintFiles {
-		data, err := os.ReadFile(file)
-		if err != nil {
-			continue
+
+	if len(fingerprintFiles) == 0 {
+		data, err := configs.ReadFile(embeddedFallbackPath)
+		if err == nil {
+			var fingerprints discover.SaasFingerprintFile
+			if err := json.Unmarshal(data, &fingerprints); err == nil {
+				for k, v := range fingerprints.Fingerprints {
+					result.Fingerprints[k] = v
+				}
+			}
 		}
-		var fingerprints discover.SaasFingerprintFile
-		if err := json.Unmarshal(data, &fingerprints); err != nil {
-			continue
-		}
-		// Merge fingerprints from this file into result
-		for k, v := range fingerprints.Fingerprints {
-			result.Fingerprints[k] = v
+	} else {
+		for _, file := range fingerprintFiles {
+			data, err := os.ReadFile(file)
+			if err != nil {
+				continue
+			}
+			var fingerprints discover.SaasFingerprintFile
+			if err := json.Unmarshal(data, &fingerprints); err != nil {
+				continue
+			}
+			for k, v := range fingerprints.Fingerprints {
+				result.Fingerprints[k] = v
+			}
 		}
 	}
 

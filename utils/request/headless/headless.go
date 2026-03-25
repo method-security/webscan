@@ -4,6 +4,7 @@ import (
 	// Standard
 	"context"
 	"fmt"
+	stdlog "log"
 	"os"
 	"strings"
 	"sync"
@@ -27,16 +28,14 @@ import (
 // InitializeBrowser starts a headless browser instance and establishes connection.
 // If a browser path is specified and exists, it uses that binary. Otherwise it
 // falls back to rod's auto-download, which fetches a compatible Chromium to ~/.cache/rod/browser/.
-// The launcher uses a separate 5-minute timeout so that a first-time Chromium download
-// isn't killed by the per-request timeout.
 func (b *Requester) InitializeBrowser(ctx context.Context) error {
 	log := svc1log.FromContext(ctx)
-	launch := launcher.New().Headless(true)
 
+	var binPath string
 	if b.PathToBrowser != nil && *b.PathToBrowser != "" {
 		if _, err := os.Stat(*b.PathToBrowser); err == nil {
 			log.Info("Using specified browser binary", svc1log.SafeParam("path", *b.PathToBrowser))
-			launch = launch.Bin(*b.PathToBrowser)
+			binPath = *b.PathToBrowser
 		} else {
 			log.Warn("Specified browser path not found, falling back to rod auto-download",
 				svc1log.SafeParam("path", *b.PathToBrowser))
@@ -45,12 +44,27 @@ func (b *Requester) InitializeBrowser(ctx context.Context) error {
 		log.Info("No browser path specified, rod will auto-detect or download Chromium")
 	}
 
-	// The launcher uses a separate 5-minute timeout so that a first-time Chromium download
-	// No configurable needed, 5 minutes is a reasonable default.
-	launchCtx, launchCancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer launchCancel()
+	// When no valid binary is available, resolve (and possibly download) one
+	// ourselves so that download progress goes to stderr instead of stdout.
+	// Uses a 5-minute timeout so a first-time Chromium download isn't killed
+	// by the per-request timeout carried in ctx.
+	if binPath == "" {
+		dlCtx, dlCancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer dlCancel()
 
-	browserURL, err := launch.Context(launchCtx).Launch()
+		browser := launcher.NewBrowser()
+		browser.Logger = stdlog.New(os.Stderr, "[launcher.Browser]", stdlog.LstdFlags)
+		browser.Context = dlCtx
+
+		resolved, err := browser.Get()
+		if err != nil {
+			return fmt.Errorf("browser resolution failed: %v", err)
+		}
+		binPath = resolved
+	}
+
+	launch := launcher.New().Headless(true).Bin(binPath)
+	browserURL, err := launch.Launch()
 	if err != nil {
 		return fmt.Errorf("browser launch failed: %v", err)
 	}

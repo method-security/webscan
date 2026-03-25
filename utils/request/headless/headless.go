@@ -63,7 +63,7 @@ func (b *Requester) InitializeBrowser(ctx context.Context) error {
 		binPath = resolved
 	}
 
-	launchCtx, launchCancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	launchCtx, launchCancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer launchCancel()
 
 	launch := launcher.New().Headless(true).Bin(binPath).Context(launchCtx)
@@ -99,7 +99,7 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 	// Initialize browser if not already done
 	if b.Browser == nil {
 		if err := b.InitializeBrowser(ctx); err != nil {
-			return report, fmt.Errorf("browser initialization failed: %v", err)
+			return report, fmt.Errorf("browser initialization failed: %v", err) // Do not change, DD Metric is based on this error message
 		}
 
 		// Configure TLS verification

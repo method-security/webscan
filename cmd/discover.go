@@ -383,7 +383,7 @@ func (a *WebScan) InitDiscoverCommand() {
 	// Request Method Flags for all capture subcommands
 	discoverPageCmd.Flags().String("request-method", "STANDARD", "Request method to use (standard, headless, browserbase)")
 	discoverPageCmd.Flags().String("headless-path", "", "Path to headless browser executable")
-	discoverPageCmd.Flags().Int("min-dom-stabalize-time", 5, "Minimum time to wait for DOM stabilization in seconds")
+	discoverPageCmd.Flags().Int("min-dom-stabalize-time", 20, "Minimum time to wait for DOM stabilization in seconds")
 	discoverPageCmd.Flags().String("browserbase-token", "", "Browserbase API token for cloud browser access")
 	discoverPageCmd.Flags().String("browserbase-project", "", "Browserbase project ID")
 	discoverPageCmd.Flags().Bool("browserbase-proxy", false, "Use Browserbase proxy for requests")
@@ -461,7 +461,7 @@ func (a *WebScan) InitDiscoverCommand() {
 	// Request Method Flags
 	discoverProbeCmd.Flags().String("request-method", "STANDARD", "Request method to use (standard, headless, browserbase)")
 	discoverProbeCmd.Flags().String("headless-path", "", "Path to headless browser executable")
-	discoverProbeCmd.Flags().Int("min-dom-stabalize-time", 5, "Minimum time to wait for DOM stabilization in seconds")
+	discoverProbeCmd.Flags().Int("min-dom-stabalize-time", 20, "Minimum time to wait for DOM stabilization in seconds")
 	discoverProbeCmd.Flags().String("browserbase-token", "", "Browserbase API token for cloud browser access")
 	discoverProbeCmd.Flags().String("browserbase-project", "", "Browserbase project ID")
 	discoverProbeCmd.Flags().Bool("browserbase-proxy", false, "Use Browserbase proxy for requests")
@@ -553,7 +553,7 @@ func (a *WebScan) InitDiscoverCommand() {
 	// Request Method Flags
 	discoverRouteCmd.Flags().String("request-method", "STANDARD", "Request method to use (standard, headless, browserbase)")
 	discoverRouteCmd.Flags().String("headless-path", "", "Path to headless browser executable")
-	discoverRouteCmd.Flags().Int("min-dom-stabalize-time", 5, "Minimum time to wait for DOM stabilization in seconds")
+	discoverRouteCmd.Flags().Int("min-dom-stabalize-time", 20, "Minimum time to wait for DOM stabilization in seconds")
 	discoverRouteCmd.Flags().String("browserbase-token", "", "Browserbase API token for cloud browser access")
 	discoverRouteCmd.Flags().String("browserbase-project", "", "Browserbase project ID")
 	discoverRouteCmd.Flags().Bool("browserbase-proxy", false, "Use Browserbase proxy for requests")
@@ -695,7 +695,7 @@ func (a *WebScan) InitDiscoverCommand() {
 	// Request Method Flags for all capture subcommands
 	discoverSaasCmd.Flags().String("request-method", "HEADLESS", "Request method (headless, browserbase)")
 	discoverSaasCmd.Flags().String("headless-path", "", "Path to a headless browser executable")
-	discoverSaasCmd.Flags().Int("min-dom-stabalize-time", 5, "Minimum time in seconds to wait for DOM to stabilize")
+	discoverSaasCmd.Flags().Int("min-dom-stabalize-time", 20, "Minimum time in seconds to wait for DOM to stabilize")
 	discoverSaasCmd.Flags().String("browserbase-token", "", "Browserbase API token")
 	discoverSaasCmd.Flags().String("browserbase-project", "", "Browserbase project ID")
 	discoverSaasCmd.Flags().Bool("browserbase-proxy", false, "Instruct Browserbase to use a proxy")

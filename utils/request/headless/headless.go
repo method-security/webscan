@@ -63,7 +63,10 @@ func (b *Requester) InitializeBrowser(ctx context.Context) error {
 		binPath = resolved
 	}
 
-	launch := launcher.New().Headless(true).Bin(binPath)
+	launchCtx, launchCancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer launchCancel()
+
+	launch := launcher.New().Headless(true).Bin(binPath).Context(launchCtx)
 	browserURL, err := launch.Launch()
 	if err != nil {
 		return fmt.Errorf("browser launch failed: %v", err)

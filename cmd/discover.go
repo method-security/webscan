@@ -374,7 +374,7 @@ func (a *WebScan) InitDiscoverCommand() {
 	discoverPageCmd.Flags().String("target", "", "URL target to capture and analyze")
 	// Config Flags
 	discoverPageCmd.Flags().Bool("sensitive-content-detection", false, "Enable sensitive content detection")
-	discoverPageCmd.Flags().String("sensitive-content-fingerprints-path", "configs/discover/page/sensitive_content_fingerprints.json", "Path to the sensitive content fingerprints file")
+	discoverPageCmd.Flags().String("sensitive-content-fingerprints-path", "", "Path to a custom sensitive content fingerprints file (uses built-in fingerprints by default)")
 	discoverPageCmd.Flags().String("response-codes", "200-299", "Response codes to consider as valid responses")
 	discoverPageCmd.Flags().Bool("screenshot", false, "Capture a screenshot of the page")
 	discoverPageCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")

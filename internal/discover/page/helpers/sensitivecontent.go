@@ -6,18 +6,29 @@ import (
 	"os"
 	"regexp"
 
+	// Internal
+	"github.com/Method-Security/webscan/configs"
+
 	// Generated
 	"github.com/Method-Security/webscan/generated/go/discover"
-	//External
+	// External
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
-// LoadSensitiveConentFingerprints loads fingerprints from the JSON configuration file
+const embeddedFingerprintsPath = "discover/page/sensitive_content_fingerprints.json"
+
+// LoadSensitiveConentFingerprints loads fingerprints from a custom file path or
+// falls back to the embedded default fingerprints baked into the binary.
 func LoadSensitiveConentFingerprints(ctx context.Context, configPath *string) (*discover.SensitiveContentFingerprints, error) {
 	log := svc1log.FromContext(ctx)
 
-	// Read the JSON file
-	data, err := os.ReadFile(*configPath)
+	var data []byte
+	var err error
+	if configPath != nil && *configPath != "" {
+		data, err = os.ReadFile(*configPath)
+	} else {
+		data, err = configs.ReadFile(embeddedFingerprintsPath)
+	}
 	if err != nil {
 		return nil, err
 	}

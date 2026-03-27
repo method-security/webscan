@@ -120,7 +120,7 @@ Flags:
       --headless-path string            Path to headless browser executable
   -h, --help                            help for page
       --max-redirects int               Maximum number of redirects to follow (default 10)
-      --min-dom-stabalize-time int      Minimum time to wait for DOM stabilization in seconds (default 5)
+      --min-dom-stabalize-time int      Minimum time to wait for DOM stabilization in seconds (default 20)
       --request-method string           Request method to use (standard, headless, browserbase) (default "STANDARD")
       --response-codes string           Response codes to consider as valid responses (default "200-299")
       --screenshot                      Capture a screenshot of the page
@@ -160,7 +160,7 @@ Flags:
       --headless-path string            Path to headless browser executable
   -h, --help                            help for probe
       --max-redirects int               Maximum number of redirects to follow (default 10)
-      --min-dom-stabalize-time int      Minimum time to wait for DOM stabilization in seconds (default 5)
+      --min-dom-stabalize-time int      Minimum time to wait for DOM stabilization in seconds (default 20)
       --protocol string                 Protocol to use for the probe (HTTP, HTTPS)
       --request-method string           Request method to use (standard, headless, browserbase) (default "STANDARD")
       --targets strings                 URL targets to probe for web applications
@@ -201,7 +201,7 @@ Flags:
   -h, --help                            help for route
       --ignore-base-url-match           Add route even if it does not share the target's base URL
       --max-redirects int               Maximum number of redirects to follow (default 100)
-      --min-dom-stabalize-time int      Minimum time to wait for DOM stabilization in seconds (default 5)
+      --min-dom-stabalize-time int      Minimum time to wait for DOM stabilization in seconds (default 20)
       --request-method string           Request method to use (standard, headless, browserbase) (default "STANDARD")
       --spider-depth int                Maximum depth for route spidering (default 3)
       --target string                   URL target to discover routes from
@@ -241,7 +241,7 @@ Flags:
       --headless-path string            Path to a headless browser executable
   -h, --help                            help for saas
       --max-redirects int               Maximum number of redirects to follow (default 10)
-      --min-dom-stabalize-time int      Minimum time in seconds to wait for DOM to stabilize (default 5)
+      --min-dom-stabalize-time int      Minimum time in seconds to wait for DOM to stabilize (default 20)
       --orgs strings                    The organization names to use for discovery
       --request-method string           Request method (headless, browserbase) (default "HEADLESS")
       --saas-companies strings          The specific SaaS companies to use for discovery (Must be present in the SaaS fingerprints file)

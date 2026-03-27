@@ -1,0 +1,30 @@
+id: cradlepoint-web-management-interface-detect
+info:
+  name: Cradlepoint Web Management Interface Detection
+  author: method-security
+  severity: info
+  description: Detects Cradlepoint network device web management interfaces by identifying Cradlepoint-specific login variables and server headers.
+  metadata:
+    method-application-type: NETWORK_MANAGEMENT_SYSTEM
+    method-module-name: CRADLEPOINT
+    method-sub-module-name: MANAGEMENT_CONSOLE
+    cpe: cpe:2.3:h:cradlepoint:*:*:*:*:*:*:*:*:*
+  tags: discovery,cradlepoint,web-management,network-management-system
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/login/"
+    redirects: true
+    max-redirects: 3
+    stop-at-first-match: true
+    matchers-condition: and
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "cplogin"
+      - type: word
+        part: header
+        words:
+          - "CradlepointHTTPService"

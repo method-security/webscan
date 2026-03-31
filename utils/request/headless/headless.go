@@ -101,17 +101,17 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 		if err := b.InitializeBrowser(ctx); err != nil {
 			return report, fmt.Errorf("browser initialization failed: %v", err) // Do not change, DD Metric is based on this error message
 		}
-
-		// Configure TLS verification
-		if !config.VerifyTls {
-			err = b.Browser.IgnoreCertErrors(true)
-			if err != nil {
-				log.Warn("Failed to disable certificate error checking", svc1log.SafeParam("error", err.Error()))
-				return report, fmt.Errorf("failed to disable certificate error checking: %v", err)
-			}
-			log.Info("Certificate error checking disabled")
-		}
 		log.Info("Connected to browser")
+	}
+
+	// Configure TLS verification (must run even for pre-initialized browsers)
+	if !config.VerifyTls {
+		err = b.Browser.IgnoreCertErrors(true)
+		if err != nil {
+			log.Warn("Failed to disable certificate error checking", svc1log.SafeParam("error", err.Error()))
+			return report, fmt.Errorf("failed to disable certificate error checking: %v", err)
+		}
+		log.Info("Certificate error checking disabled")
 	}
 
 	// =========================================================================================

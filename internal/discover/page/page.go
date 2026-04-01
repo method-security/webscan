@@ -28,14 +28,15 @@ func getHTTPRequestConfig(baseURL string, path string, queryParams map[string]st
 		},
 	}
 	return common.SendHttpRequestConfig{
-		Request:            &request,
-		MaxRedirects:       config.MaxRedirects,
-		VerifyTls:          config.VerifyTls,
-		Timeout:            config.Timeout,
-		RequestMethod:      config.RequestMethod,
-		HeadlessConfig:     config.HeadlessConfig,
-		BrowserbaseConfig:  config.BrowserbaseConfig,
-		BrowserbaseSecrets: browserbaseSecrets,
+		Request:                    &request,
+		MaxRedirects:               config.MaxRedirects,
+		VerifyTls:                  config.VerifyTls,
+		Timeout:                    config.Timeout,
+		IgnoreCrossDomainRedirects: config.IgnoreCrossDomainRedirects,
+		RequestMethod:              config.RequestMethod,
+		HeadlessConfig:             config.HeadlessConfig,
+		BrowserbaseConfig:          config.BrowserbaseConfig,
+		BrowserbaseSecrets:         browserbaseSecrets,
 	}
 }
 

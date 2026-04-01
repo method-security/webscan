@@ -154,7 +154,7 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 
 		// Setup request monitoring and navigate
 		headerCapture := setupHeaderInterception(page)
-		handleNavigation(ctx, page, &redirectChain, requestComplete, &once, config.MaxRedirects, browsersErr)
+		handleNavigation(ctx, page, &redirectChain, requestComplete, &once, config.MaxRedirects, config.IgnoreCrossDomainRedirects, browsersErr)
 
 		navErr := performNavigation(ctx, page, constructedURL, config)
 		if navErr != nil {

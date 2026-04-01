@@ -10,6 +10,7 @@ types:
       maxRedirects: integer
       verifyTls: boolean
       timeout: integer
+      ignoreCrossDomainRedirects: boolean
       requestMethod: method.RequestMethod
       headlessConfig: optional<method.HeadlessRequestConfig>
       browserbaseConfig: optional<method.BrowserbaseRequestConfig>

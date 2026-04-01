@@ -38,6 +38,9 @@ func (a *WebScan) InitDiscoverCommand() {
 		Long:  `Perform various discovery scans to identify web applications, directories, routes, and static assets.`,
 	}
 
+	// General Discover Flags
+	discoverCmd.PersistentFlags().Bool("ignore-cross-domain-redirects", false, "If true, do not follow redirects to a different domain and treat them as errors")
+
 	// Application Command
 	discoverApplicationCmd := &cobra.Command{
 		Use:   "application",
@@ -112,7 +115,7 @@ func (a *WebScan) InitDiscoverCommand() {
 	discoverApplicationCmd.Flags().Int("threads", 25, "Number of concurrent threads for scanning")
 	discoverApplicationCmd.Flags().String("proxy", "", "Optional HTTP proxy URL")
 	discoverApplicationCmd.Flags().Bool("verbose-logs", false, "Verbose logs")
-	discoverApplicationCmd.Flags().Int("global-rate-limit", 0, "Global rate limit (requests per second, 0 = no limit)")
+	discoverApplicationCmd.Flags().Int("global-rate-limit", 0, "Global rate limit (requests per second, 0 means no limit)")
 
 	// Mark Required Flags
 	_ = discoverApplicationCmd.MarkFlagRequired("targets")
@@ -236,8 +239,13 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			ignoreCrossDomainRedirects, err := cmd.Flags().GetBool("ignore-cross-domain-redirects")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
 			// Set config
-			config := getDiscoverDirectoryConfig(targets, paths, wordlistType, wordlistSize, httpMethods, responseCodes, ignoreBaseContentMatch, verifyTLS, threshold, timeout, maxRedirectsBaselineRequest, threads, maxRuntime, retries, sleep)
+			config := getDiscoverDirectoryConfig(targets, paths, wordlistType, wordlistSize, httpMethods, responseCodes, ignoreBaseContentMatch, verifyTLS, threshold, timeout, ignoreCrossDomainRedirects, maxRedirectsBaselineRequest, threads, maxRuntime, retries, sleep)
 
 			// Generate a report
 			rep, err := discoverdirectory.RunDirectoryDiscovery(cmd.Context(), config)
@@ -326,6 +334,12 @@ func (a *WebScan) InitDiscoverCommand() {
 				return
 			}
 
+			ignoreCrossDomainRedirects, err := cmd.Flags().GetBool("ignore-cross-domain-redirects")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
 			// Get Request Method flag
 			requestMethodConfig, err := requesthelpers.GetRequestMethodFlags(cmd)
 			if err != nil {
@@ -346,7 +360,7 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Set Config
-			config := getDiscoverPageConfig(target, sensitiveContentDetection, sensitiveContentFingerprintsPath, responseCodes, maxRedirects, verifyTLS, timeout, takeScreenshot, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
+			config := getDiscoverPageConfig(target, sensitiveContentDetection, sensitiveContentFingerprintsPath, responseCodes, maxRedirects, verifyTLS, timeout, ignoreCrossDomainRedirects, takeScreenshot, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
 
 			// Load sensitive content fingerprints if sensitive content detection is enabled and no fingerprints are found, return an error
 			var sensitiveContentFingerprints *discover.SensitiveContentFingerprints
@@ -432,6 +446,12 @@ func (a *WebScan) InitDiscoverCommand() {
 				return
 			}
 
+			ignoreCrossDomainRedirects, err := cmd.Flags().GetBool("ignore-cross-domain-redirects")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
 			// Get Request Method flags
 			requestMethodConfig, err := requesthelpers.GetRequestMethodFlags(cmd)
 			if err != nil {
@@ -440,7 +460,7 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Set Config
-			config := getDiscoverProbeConfig(targets, protocol, maxRedirects, verifyTLS, timeout, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
+			config := getDiscoverProbeConfig(targets, protocol, maxRedirects, verifyTLS, timeout, ignoreCrossDomainRedirects, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
 
 			// Generate report
 			report, err := discoverprobe.PerformWebProbe(cmd.Context(), config, requestMethodConfig.BrowserbaseSecrets)
@@ -525,6 +545,12 @@ func (a *WebScan) InitDiscoverCommand() {
 				return
 			}
 
+			ignoreCrossDomainRedirects, err := cmd.Flags().GetBool("ignore-cross-domain-redirects")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
 			// Get Request Method flags
 			requestMethodConfig, err := requesthelpers.GetRequestMethodFlags(cmd)
 			if err != nil {
@@ -533,7 +559,7 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Set Config
-			config := getDiscoverRouteConfig(target, ignoreBaseURLMatch, collectStaticAssets, spiderDepth, maxRedirects, verifyTLS, timeout, threads, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
+			config := getDiscoverRouteConfig(target, ignoreBaseURLMatch, collectStaticAssets, spiderDepth, maxRedirects, verifyTLS, timeout, ignoreCrossDomainRedirects, threads, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
 
 			// Generate a report
 			report := discoverroute.PerformRouteCapture(cmd.Context(), config, requestMethodConfig.BrowserbaseSecrets)
@@ -730,18 +756,19 @@ func getDiscoverApplicationConfig(targets []string, resource string, timeout int
 }
 
 // getDiscoverPageConfig builds the config for page capture and analysis.
-func getDiscoverPageConfig(target string, sensitiveContentDetection bool, sensitiveContentFingerprintsPath string, responseCodes string, maxRedirects int, verifyTLS bool, timeout int, takeScreenshot bool, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) discover.DiscoverPageConfig {
+func getDiscoverPageConfig(target string, sensitiveContentDetection bool, sensitiveContentFingerprintsPath string, responseCodes string, maxRedirects int, verifyTLS bool, timeout int, ignoreCrossDomainRedirects bool, takeScreenshot bool, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) discover.DiscoverPageConfig {
 	config := discover.DiscoverPageConfig{
-		Target:                    target,
-		ResponseCodes:             responseCodes,
-		SensitiveContentDetection: sensitiveContentDetection,
-		MaxRedirects:              maxRedirects,
-		VerifyTls:                 verifyTLS,
-		Timeout:                   max(timeout, 0),
-		Screenshot:                takeScreenshot,
-		RequestMethod:             requestMethod,
-		HeadlessConfig:            headlessConfig,
-		BrowserbaseConfig:         browserbaseConfig,
+		Target:                     target,
+		ResponseCodes:              responseCodes,
+		SensitiveContentDetection:  sensitiveContentDetection,
+		MaxRedirects:               maxRedirects,
+		VerifyTls:                  verifyTLS,
+		Timeout:                    max(timeout, 0),
+		IgnoreCrossDomainRedirects: ignoreCrossDomainRedirects,
+		Screenshot:                 takeScreenshot,
+		RequestMethod:              requestMethod,
+		HeadlessConfig:             headlessConfig,
+		BrowserbaseConfig:          browserbaseConfig,
 	}
 	if sensitiveContentFingerprintsPath != "" {
 		config.SensitiveContentFingerprintsPath = &sensitiveContentFingerprintsPath
@@ -750,15 +777,16 @@ func getDiscoverPageConfig(target string, sensitiveContentDetection bool, sensit
 }
 
 // getDiscoverProbeConfig builds the config for probe discovery.
-func getDiscoverProbeConfig(targets []string, protocol string, maxRedirects int, verifyTLS bool, timeout int, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) *discover.DiscoverProbeConfig {
+func getDiscoverProbeConfig(targets []string, protocol string, maxRedirects int, verifyTLS bool, timeout int, ignoreCrossDomainRedirects bool, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) *discover.DiscoverProbeConfig {
 	config := &discover.DiscoverProbeConfig{
-		Targets:           targets,
-		MaxRedirects:      maxRedirects,
-		VerifyTls:         verifyTLS,
-		Timeout:           max(timeout, 0),
-		RequestMethod:     requestMethod,
-		HeadlessConfig:    headlessConfig,
-		BrowserbaseConfig: browserbaseConfig,
+		Targets:                    targets,
+		MaxRedirects:               maxRedirects,
+		VerifyTls:                  verifyTLS,
+		Timeout:                    max(timeout, 0),
+		IgnoreCrossDomainRedirects: ignoreCrossDomainRedirects,
+		RequestMethod:              requestMethod,
+		HeadlessConfig:             headlessConfig,
+		BrowserbaseConfig:          browserbaseConfig,
 	}
 
 	// Set protocol if provided, otherwise leave unset for backward compatibility
@@ -780,19 +808,20 @@ func getDiscoverProbeConfig(targets []string, protocol string, maxRedirects int,
 }
 
 // getDiscoverRouteConfig builds the config for route discovery.
-func getDiscoverRouteConfig(target string, ignoreBaseURLMatch bool, collectStaticAssets bool, spiderDepth int, maxRedirects int, verifyTLS bool, timeout int, threads int, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) discover.DiscoverRouteConfig {
+func getDiscoverRouteConfig(target string, ignoreBaseURLMatch bool, collectStaticAssets bool, spiderDepth int, maxRedirects int, verifyTLS bool, timeout int, ignoreCrossDomainRedirects bool, threads int, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) discover.DiscoverRouteConfig {
 	config := discover.DiscoverRouteConfig{
-		Target:              target,
-		CollectStaticAssets: collectStaticAssets,
-		IgnoreBaseUrlMatch:  ignoreBaseURLMatch,
-		SpiderDepth:         spiderDepth,
-		MaxRedirects:        maxRedirects,
-		VerifyTls:           verifyTLS,
-		Timeout:             max(timeout, 0),
-		Threads:             max(threads, 0),
-		RequestMethod:       requestMethod,
-		HeadlessConfig:      headlessConfig,
-		BrowserbaseConfig:   browserbaseConfig,
+		Target:                     target,
+		CollectStaticAssets:        collectStaticAssets,
+		IgnoreBaseUrlMatch:         ignoreBaseURLMatch,
+		SpiderDepth:                spiderDepth,
+		MaxRedirects:               maxRedirects,
+		VerifyTls:                  verifyTLS,
+		Timeout:                    max(timeout, 0),
+		IgnoreCrossDomainRedirects: ignoreCrossDomainRedirects,
+		Threads:                    max(threads, 0),
+		RequestMethod:              requestMethod,
+		HeadlessConfig:             headlessConfig,
+		BrowserbaseConfig:          browserbaseConfig,
 	}
 	return config
 }
@@ -815,7 +844,7 @@ func getDiscoverSaasConfig(orgs []string, saasCompanies []string, ssoCompanies [
 }
 
 // getDiscoverDirectoryConfig builds the config for directory discovery.
-func getDiscoverDirectoryConfig(targets []string, paths []string, wordlistType string, wordlistSize string, httpMethods []common.HttpMethod, responseCodes string, ignoreBaseContentMatch bool, verifyTLS bool, threshold float64, timeout int, maxRedirectsBaselineRequest int, threads int, maxRuntime int, retries int, sleep int) discover.DiscoverDirectoryConfig {
+func getDiscoverDirectoryConfig(targets []string, paths []string, wordlistType string, wordlistSize string, httpMethods []common.HttpMethod, responseCodes string, ignoreBaseContentMatch bool, verifyTLS bool, threshold float64, timeout int, ignoreCrossDomainRedirects bool, maxRedirectsBaselineRequest int, threads int, maxRuntime int, retries int, sleep int) discover.DiscoverDirectoryConfig {
 	config := discover.DiscoverDirectoryConfig{
 		Targets:                     targets,
 		Paths:                       paths,
@@ -825,6 +854,7 @@ func getDiscoverDirectoryConfig(targets []string, paths []string, wordlistType s
 		VerifyTls:                   verifyTLS,
 		Threshold:                   threshold,
 		Timeout:                     timeout,
+		IgnoreCrossDomainRedirects:  ignoreCrossDomainRedirects,
 		MaxRedirectsBaselineRequest: maxRedirectsBaselineRequest,
 		Threads:                     threads,
 		MaxRuntime:                  maxRuntime,

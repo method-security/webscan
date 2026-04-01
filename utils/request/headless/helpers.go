@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -84,7 +85,7 @@ func setupHeaderInterception(page *rod.Page) *NetworkHeaderCapture {
 }
 
 // handleNavigation sets up tracking for top-level frame navigations
-func handleNavigation(ctx context.Context, page *rod.Page, redirectChain *[]string, requestComplete chan struct{}, once *sync.Once, maxRedirects int, redirectError chan error) {
+func handleNavigation(ctx context.Context, page *rod.Page, redirectChain *[]string, requestComplete chan struct{}, once *sync.Once, maxRedirects int, ignoreCrossDomainRedirects bool, redirectError chan error) {
 	log := svc1log.FromContext(ctx)
 
 	// Use a simple completion flag to prevent further event processing
@@ -94,6 +95,48 @@ func handleNavigation(ctx context.Context, page *rod.Page, redirectChain *[]stri
 	enableNetworkErr := proto.NetworkEnable{}.Call(page)
 	if enableNetworkErr != nil {
 		log.Warn("Failed to enable network tracking for redirects", svc1log.SafeParam("error", enableNetworkErr))
+	}
+
+	// Enable Fetch domain interception to block cross-domain redirects before the browser follows them
+	if ignoreCrossDomainRedirects {
+		err := proto.FetchEnable{
+			Patterns: []*proto.FetchRequestPattern{
+				{
+					ResourceType: proto.NetworkResourceTypeDocument,
+				},
+			},
+		}.Call(page)
+		if err != nil {
+			log.Warn("Failed to enable Fetch interception for cross-domain redirect blocking", svc1log.SafeParam("error", err))
+		} else {
+			go page.EachEvent(func(e *proto.FetchRequestPaused) {
+				if atomic.LoadInt32(&completed) == 1 {
+					// Already completed, just continue the request to avoid hanging
+					_ = proto.FetchContinueRequest{RequestID: e.RequestID}.Call(page)
+					return
+				}
+
+				requestURL := e.Request.URL
+				if len(*redirectChain) > 0 {
+					originalURL := (*redirectChain)[0]
+					if isCrossDomainRedirect(originalURL, requestURL) {
+						log.Info("Fetch: blocking cross-domain request", svc1log.SafeParam("original", originalURL), svc1log.SafeParam("blocked", requestURL))
+						_ = proto.FetchFailRequest{
+							RequestID:   e.RequestID,
+							ErrorReason: proto.NetworkErrorReasonAborted,
+						}.Call(page)
+						once.Do(func() {
+							atomic.StoreInt32(&completed, 1)
+							redirectError <- fmt.Errorf("cross-domain redirect blocked: %s -> %s", originalURL, requestURL) // Dont change this comment used for DD metric
+							close(requestComplete)
+						})
+						return
+					}
+				}
+				// Allow same-domain requests to proceed
+				_ = proto.FetchContinueRequest{RequestID: e.RequestID}.Call(page)
+			})()
+		}
 	}
 
 	// Set up event listeners for navigation events and network redirects
@@ -112,6 +155,20 @@ func handleNavigation(ctx context.Context, page *rod.Page, redirectChain *[]stri
 				if location, exists := e.Response.Headers["location"]; exists && location.Str() != "" {
 					locationURL := location.Str()
 					log.Debug("Captured HTTP redirect", svc1log.SafeParam("from", e.Response.URL), svc1log.SafeParam("to", locationURL), svc1log.SafeParam("status", e.Response.Status))
+
+					// Check for cross-domain redirect at the network level
+					if ignoreCrossDomainRedirects && len(*redirectChain) > 0 {
+						originalURL := (*redirectChain)[0]
+						if isCrossDomainRedirect(originalURL, locationURL) {
+							log.Info("Blocking cross-domain redirect at network level", svc1log.SafeParam("from", e.Response.URL), svc1log.SafeParam("to", locationURL))
+							once.Do(func() {
+								atomic.StoreInt32(&completed, 1)
+								redirectError <- fmt.Errorf("cross-domain redirect blocked: %s -> %s", e.Response.URL, locationURL) // Dont change this comment used for DD metric
+								close(requestComplete)
+							})
+							return
+						}
+					}
 
 					// Add the redirect destination to the chain if not already present
 					exists := false
@@ -146,6 +203,20 @@ func handleNavigation(ctx context.Context, page *rod.Page, redirectChain *[]stri
 						close(requestComplete)
 					})
 					return
+				}
+
+				// Check for cross-domain redirect
+				if ignoreCrossDomainRedirects && len(*redirectChain) > 0 {
+					originalURL := (*redirectChain)[0]
+					if isCrossDomainRedirect(originalURL, e.Frame.URL) {
+						log.Info("Blocking cross-domain redirect", svc1log.SafeParam("from", originalURL), svc1log.SafeParam("to", e.Frame.URL))
+						once.Do(func() {
+							atomic.StoreInt32(&completed, 1)
+							redirectError <- fmt.Errorf("cross-domain redirect blocked: %s -> %s", originalURL, e.Frame.URL) // Dont change this comment used for DD metric
+							close(requestComplete)
+						})
+						return
+					}
 				}
 
 				// Check if URL is already in chain
@@ -416,6 +487,19 @@ func getStatusCodeFromPage(page *rod.Page) int {
 
 	// Default to 0 if we can't determine status
 	return 0
+}
+
+// isCrossDomainRedirect checks if a redirect URL points to a different domain than the original URL
+func isCrossDomainRedirect(originalURL, redirectURL string) bool {
+	parsedOriginal, err := url.Parse(originalURL)
+	if err != nil {
+		return false
+	}
+	parsedRedirect, err := url.Parse(redirectURL)
+	if err != nil {
+		return false
+	}
+	return parsedOriginal.Host != parsedRedirect.Host
 }
 
 // cleanErrMsg extracts meaningful error message from navigation errors

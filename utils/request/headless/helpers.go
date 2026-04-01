@@ -85,7 +85,7 @@ func setupHeaderInterception(page *rod.Page) *NetworkHeaderCapture {
 }
 
 // handleNavigation sets up tracking for top-level frame navigations
-func handleNavigation(ctx context.Context, page *rod.Page, redirectChain *[]string, requestComplete chan struct{}, once *sync.Once, maxRedirects int, ignoreCrossDomainRedirects bool, redirectError chan error) {
+func handleNavigation(ctx context.Context, page *rod.Page, redirectChain *[]string, requestComplete chan struct{}, once *sync.Once, maxRedirects int, redirectError chan error) {
 	log := svc1log.FromContext(ctx)
 
 	// Use a simple completion flag to prevent further event processing
@@ -114,21 +114,7 @@ func handleNavigation(ctx context.Context, page *rod.Page, redirectChain *[]stri
 					locationURL := location.Str()
 					log.Debug("Captured HTTP redirect", svc1log.SafeParam("from", e.Response.URL), svc1log.SafeParam("to", locationURL), svc1log.SafeParam("status", e.Response.Status))
 
-					// Check for cross-domain redirect at the network level
-					if ignoreCrossDomainRedirects && len(*redirectChain) > 0 {
-						originalURL := (*redirectChain)[0]
-						if isCrossDomainRedirect(originalURL, locationURL) {
-							log.Info("Blocking cross-domain redirect at network level", svc1log.SafeParam("from", e.Response.URL), svc1log.SafeParam("to", locationURL))
-							once.Do(func() {
-								atomic.StoreInt32(&completed, 1)
-								redirectError <- fmt.Errorf("cross-domain redirect blocked: %s -> %s", e.Response.URL, locationURL) // Dont change this comment used for DD metric
-								close(requestComplete)
-							})
-							return
-						}
-					}
-
-					// Add the redirect destination to the chain if not already present
+						// Add the redirect destination to the chain if not already present
 					exists := false
 					for _, url := range *redirectChain {
 						if url == locationURL {

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	neturl "net/url"
 	"time"
 
 	// Generated
@@ -90,6 +91,19 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 		if err != nil {
 			log.Error("Failed to parse redirect location", svc1log.SafeParam("error", err))
 			return nil, redirectChain, fmt.Errorf("failed to parse redirect location: %v", err)
+		}
+
+		// Check if redirect is cross-domain and should be blocked
+		if config.IgnoreCrossDomainRedirects {
+			originalURL, parseErr := neturl.Parse(url)
+			if parseErr == nil && originalURL.Host != nextURL.Host {
+				log.Info("Blocking cross-domain redirect", svc1log.SafeParam("from", currentURL), svc1log.SafeParam("to", nextURL.String()))
+				err = resp.Body.Close()
+				if err != nil {
+					log.Error("Failed to close response body", svc1log.SafeParam("error", err))
+				}
+				return nil, redirectChain, fmt.Errorf("cross-domain redirect blocked: %s -> %s", currentURL, nextURL.String()) // Dont change this comment used for DD metric
+			}
 		}
 
 		// Check if this is just a trailing slash redirect (should not count as a redirect)

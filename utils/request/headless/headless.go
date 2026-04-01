@@ -323,5 +323,16 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 		finalErr = fmt.Errorf("headless capture failed: %s", cleanErrMsg(browserErr))
 	}
 
+	// Check for cross-domain redirect after navigation completes
+	if finalErr == nil && config.IgnoreCrossDomainRedirects && len(redirectChain) > 1 {
+		originalURL := redirectChain[0]
+		for _, chainURL := range redirectChain[1:] {
+			if isCrossDomainRedirect(originalURL, chainURL) {
+				log.Info("Cross-domain redirect detected in redirect chain", svc1log.SafeParam("from", originalURL), svc1log.SafeParam("to", chainURL))
+				return common.HttpRequestResponse{Request: config.Request}, fmt.Errorf("cross-domain redirect blocked: %s -> %s", originalURL, chainURL)
+			}
+		}
+	}
+
 	return report, finalErr
 }

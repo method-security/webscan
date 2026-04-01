@@ -8,7 +8,6 @@ import (
 
 	// Internal
 	"github.com/Method-Security/webscan/configs"
-
 	// Generated
 	"github.com/Method-Security/webscan/generated/go/discover"
 	// External

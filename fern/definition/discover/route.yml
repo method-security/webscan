@@ -14,6 +14,7 @@ types:
       timeout: integer
       sleep: integer
       jitter: integer
+      ignoreCrossDomainRedirects: boolean
       threads: integer
       requestMethod: method.RequestMethod
       headlessConfig: optional<method.HeadlessRequestConfig>

@@ -11,6 +11,8 @@ types:
             pluginsFileSize: optional<PluginsFileSize>
             verifyTls: boolean
             timeout: integer
+            sleep: integer
+            jitter: integer
             threads: integer
     # Fingerprint File Struct
     DetectionSource:

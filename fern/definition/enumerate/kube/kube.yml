@@ -7,6 +7,8 @@ types:
       target: string
       verifyTls: boolean
       timeout: integer
+      sleep: integer
+      jitter: integer
   EnumerateKubeResult:
     properties:
       target: string

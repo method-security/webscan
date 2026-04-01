@@ -33,6 +33,8 @@ types:
             modulesFileSize: optional<ModulesFileSize>
             verifyTls: boolean
             timeout: integer
+            sleep: integer
+            jitter: integer
             threads: integer
     # Result
     EnumerateDrupalModulesResult:

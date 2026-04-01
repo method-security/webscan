@@ -232,8 +232,9 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 						}
 
 						if config.Sleep > 0 {
+							delay := utils.CalculateDelayWithJitter(config.Sleep, config.Jitter)
 							select {
-							case <-time.After(time.Duration(config.Sleep) * time.Second):
+							case <-time.After(delay):
 							case <-ctx.Done():
 								return
 							}

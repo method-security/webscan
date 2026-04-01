@@ -13,7 +13,7 @@ import (
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
 	"github.com/Method-Security/webscan/generated/go/discover"
-	"github.com/Method-Security/webscan/utils"
+	utils "github.com/Method-Security/webscan/utils"
 
 	// Utils
 	request "github.com/Method-Security/webscan/utils/request"
@@ -373,6 +373,12 @@ func PerformRouteCapture(ctx context.Context, config discover.DiscoverRouteConfi
 				if err != nil {
 					errChan <- fmt.Sprintf("error performing request to %s: %s", targetURL, err)
 					return
+				}
+
+				// Apply stealth delay between requests
+				if config.Sleep > 0 {
+					delay := utils.CalculateDelayWithJitter(config.Sleep, config.Jitter)
+					time.Sleep(delay)
 				}
 
 				// Extract the routes and if enabled, static assets

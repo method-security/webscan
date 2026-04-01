@@ -18,6 +18,7 @@ import (
 	// Internal
 	pentestwafdetect "github.com/Method-Security/webscan/internal/pentest/waf/detect"
 	// Utils
+	utils "github.com/Method-Security/webscan/utils"
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
 	standard "github.com/Method-Security/webscan/utils/request/standard"
 
@@ -186,7 +187,10 @@ requestLoop:
 		}(requestNumber)
 
 		// Enforce the calculated request interval for sequential timing
-		time.Sleep(time.Duration(config.Sleep) * time.Second)
+		if config.Sleep > 0 {
+			delay := utils.CalculateDelayWithJitter(config.Sleep, config.Jitter)
+			time.Sleep(delay)
+		}
 	}
 
 	// Wait for all request goroutines to complete

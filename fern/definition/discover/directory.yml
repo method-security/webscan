@@ -29,6 +29,7 @@ types:
       maxRuntime: integer
       retries: integer
       sleep: integer
+      jitter: integer
       threads: integer
   # Report Structs
   DirectoryTargetInfo:

@@ -10,12 +10,14 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
 	enumeratecmswordpressfern "github.com/Method-Security/webscan/generated/go/enumerate/cms/wordpress"
 
 	// Utils
+	utils "github.com/Method-Security/webscan/utils"
 	request "github.com/Method-Security/webscan/utils/request"
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
 )
@@ -400,7 +402,7 @@ func checkReadmeFiles(ctx context.Context, url string, config *enumeratecmswordp
 	errors := []string{}
 
 	// Loop through plugins and check for readme.txt
-	for _, plugin := range config.Plugins {
+	for i, plugin := range config.Plugins {
 		baseURL, path, _, err := requesthelpers.SplitTargetURL(url)
 		if err != nil {
 			errors = append(errors, err.Error())
@@ -412,6 +414,12 @@ func checkReadmeFiles(ctx context.Context, url string, config *enumeratecmswordp
 		if err != nil {
 			errors = append(errors, err.Error())
 			continue
+		}
+
+		// Apply stealth delay between requests
+		if config.Sleep > 0 && i < len(config.Plugins)-1 {
+			delay := utils.CalculateDelayWithJitter(config.Sleep, config.Jitter)
+			time.Sleep(delay)
 		}
 		if readmeRequest.Response != nil && readmeRequest.Response.StatusCode != nil && *readmeRequest.Response.StatusCode != 200 {
 			continue

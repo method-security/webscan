@@ -24,16 +24,3 @@ func CalculateDelayWithJitter(baseDelaySeconds int, jitterPercent int) time.Dura
 
 	return baseDelay
 }
-
-func CalculateStealthDelay(sleepPtr *int, jitterPtr *int) time.Duration {
-	if sleepPtr == nil || *sleepPtr <= 0 {
-		return 0
-	}
-
-	jitterPercent := 0
-	if jitterPtr != nil {
-		jitterPercent = *jitterPtr
-	}
-
-	return CalculateDelayWithJitter(*sleepPtr, jitterPercent)
-}

@@ -25,6 +25,7 @@ types:
       verifyTls: boolean
       threshold: float
       timeout: integer
+      ignoreCrossDomainRedirects: boolean
       maxRedirectsBaselineRequest: integer
       maxRuntime: integer
       retries: integer

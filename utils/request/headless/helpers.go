@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -113,7 +114,7 @@ func handleNavigation(ctx context.Context, page *rod.Page, redirectChain *[]stri
 					locationURL := location.Str()
 					log.Debug("Captured HTTP redirect", svc1log.SafeParam("from", e.Response.URL), svc1log.SafeParam("to", locationURL), svc1log.SafeParam("status", e.Response.Status))
 
-					// Add the redirect destination to the chain if not already present
+						// Add the redirect destination to the chain if not already present
 					exists := false
 					for _, url := range *redirectChain {
 						if url == locationURL {
@@ -416,6 +417,21 @@ func getStatusCodeFromPage(page *rod.Page) int {
 
 	// Default to 0 if we can't determine status
 	return 0
+}
+
+// isCrossDomainRedirect checks if a redirect URL points to a different domain than the original URL.
+// Relative redirect URLs (e.g. "/login") are resolved against the original URL first so that
+// same-domain relative redirects are not incorrectly flagged as cross-domain.
+func isCrossDomainRedirect(originalURL, redirectURL string) bool {
+	parsedOriginal, err := url.Parse(originalURL)
+	if err != nil {
+		return false
+	}
+	resolved, err := parsedOriginal.Parse(redirectURL)
+	if err != nil {
+		return false
+	}
+	return parsedOriginal.Host != resolved.Host
 }
 
 // cleanErrMsg extracts meaningful error message from navigation errors

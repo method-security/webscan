@@ -35,14 +35,15 @@ func createDirectorySendHTTPRequestConfig(baseURL, path string, method common.Ht
 		Params:  &requestParams,
 	}
 	return common.SendHttpRequestConfig{
-		Request:            &request,
-		MaxRedirects:       MaxRedirects,
-		VerifyTls:          config.VerifyTls,
-		Timeout:            config.Timeout,
-		RequestMethod:      common.RequestMethodStandard,
-		HeadlessConfig:     nil,
-		BrowserbaseConfig:  nil,
-		BrowserbaseSecrets: nil,
+		Request:                    &request,
+		MaxRedirects:               MaxRedirects,
+		VerifyTls:                  config.VerifyTls,
+		Timeout:                    config.Timeout,
+		IgnoreCrossDomainRedirects: config.IgnoreCrossDomainRedirects,
+		RequestMethod:              common.RequestMethodStandard,
+		HeadlessConfig:             nil,
+		BrowserbaseConfig:          nil,
+		BrowserbaseSecrets:         nil,
 	}
 }
 

@@ -154,29 +154,6 @@ func buildNucleiOptions(cfg Config, templateDir, workflowDir string) []nucleilib
 		nucleilib.WithTemplatesOrWorkflows(templateSources),
 		nucleilib.EnableSelfContainedTemplates(),
 		nucleilib.DisableUpdateCheck(),
-		nucleilib.EnableHeadlessWithOpts(
-			&nucleilib.HeadlessOpts{
-				PageTimeout: cfg.Timeout, // Use config timeout instead of fixed 30s
-				ShowBrowser: false,
-				UseChrome:   true,
-				HeadlessOptions: func() []string {
-					baseOptions := []string{
-						"--no-sandbox",            // needed when running as root or in many Docker images
-						"--disable-dev-shm-usage", // avoids /dev/shm size limits in containers
-						"--disable-gpu",           // GPU isn't available in headless Linux anyway
-						"--mute-audio",
-						"--disable-background-timer-throttling",
-						"--disable-web-security",                         // helps bypass some WAF restrictions
-						"--disable-features=VizDisplayCompositor",        // prevent hanging
-						"--timeout=" + fmt.Sprintf("%d000", cfg.Timeout), // JavaScript timeout in milliseconds
-					}
-					if cfg.Proxy != "" {
-						baseOptions = append(baseOptions, "--proxy-server="+cfg.Proxy)
-					}
-					return baseOptions
-				}(),
-			},
-		),
 		nucleilib.WithNetworkConfig(nucleilib.NetworkConfig{
 			Timeout: cfg.Timeout,
 		}),
@@ -205,6 +182,33 @@ func buildNucleiOptions(cfg Config, templateDir, workflowDir string) []nucleilib
 			e.Options().Timeout = cfg.Timeout
 			return nil
 		},
+	}
+
+	// Enable headless browser only for DAST mode (e.g. XSS workflows)
+	if cfg.RunMode == nuclei.NucleiRunModeDast {
+		opts = append(opts, nucleilib.EnableHeadlessWithOpts(
+			&nucleilib.HeadlessOpts{
+				PageTimeout: cfg.Timeout,
+				ShowBrowser: false,
+				UseChrome:   true,
+				HeadlessOptions: func() []string {
+					baseOptions := []string{
+						"--no-sandbox",
+						"--disable-dev-shm-usage",
+						"--disable-gpu",
+						"--mute-audio",
+						"--disable-background-timer-throttling",
+						"--disable-web-security",
+						"--disable-features=VizDisplayCompositor",
+						"--timeout=" + fmt.Sprintf("%d000", cfg.Timeout),
+					}
+					if cfg.Proxy != "" {
+						baseOptions = append(baseOptions, "--proxy-server="+cfg.Proxy)
+					}
+					return baseOptions
+				}(),
+			},
+		))
 	}
 
 	// Add custom catalog if we have workflows

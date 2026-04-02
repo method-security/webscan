@@ -431,7 +431,7 @@ func isCrossDomainRedirect(originalURL, redirectURL string) bool {
 	if err != nil {
 		return false
 	}
-	return parsedOriginal.Host != resolved.Host
+	return parsedOriginal.Hostname() != resolved.Hostname()
 }
 
 // cleanErrMsg extracts meaningful error message from navigation errors

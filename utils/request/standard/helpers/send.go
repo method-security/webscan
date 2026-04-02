@@ -96,7 +96,7 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 		// Check if redirect is cross-domain and should be blocked
 		if config.IgnoreCrossDomainRedirects {
 			originalURL, parseErr := neturl.Parse(url)
-			if parseErr == nil && originalURL.Host != nextURL.Host {
+			if parseErr == nil && originalURL.Hostname() != nextURL.Hostname() {
 				log.Info("Blocking cross-domain redirect", svc1log.SafeParam("from", currentURL), svc1log.SafeParam("to", nextURL.String()))
 				err = resp.Body.Close()
 				if err != nil {

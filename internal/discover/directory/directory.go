@@ -224,11 +224,15 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 						}
 
 						// Analyze response
-						isValid := AnalyzeResponse(ctx, *httpRequest, validCodes, config.IgnoreBaseContentMatch, baselineSizeInt, baselineWordsInt, baselineSizeRandomPath, baselineWordsRandomPath, config.Threshold)
+						isValid, errMsg := AnalyzeResponse(ctx, *httpRequest, validCodes, config.IgnoreBaseContentMatch, baselineSizeInt, baselineWordsInt, baselineSizeRandomPath, baselineWordsRandomPath, config.Threshold)
 
 						if isValid {
 							attemptsMutex.Lock()
 							attempts = append(attempts, httpRequest)
+							attemptsMutex.Unlock()
+						} else if errMsg != "" {
+							attemptsMutex.Lock()
+							errors = append(errors, errMsg)
 							attemptsMutex.Unlock()
 						}
 
@@ -270,19 +274,27 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 }
 
 // AnalyzeResponse checks if the response signifies that directory/file was found based on the response code and the baseline size and word count
-func AnalyzeResponse(ctx context.Context, request common.HttpRequestResponse, validCodes map[int]bool, checkBaseContentMatch bool, baselineSize, baselineWords int, baselineSizeRandomPath *int, baselineWordsRandomPath *int, threshold float64) bool {
+func AnalyzeResponse(ctx context.Context, request common.HttpRequestResponse, validCodes map[int]bool, checkBaseContentMatch bool, baselineSize, baselineWords int, baselineSizeRandomPath *int, baselineWordsRandomPath *int, threshold float64) (bool, string) {
 	log := svc1log.FromContext(ctx)
-	if request.Response == nil || request.Response.StatusCode == nil || !validCodes[*request.Response.StatusCode] {
-		return false
+	if request.Response == nil || request.Response.StatusCode == nil {
+		return false, ""
+	}
+	if !validCodes[*request.Response.StatusCode] {
+		errMsg := fmt.Sprintf("%s%s returned status code %d which is not in the allowed response codes", request.Request.BaseUrl, request.Request.Path, *request.Response.StatusCode)
+		log.Info(errMsg,
+			svc1log.SafeParam("url", request.Request.BaseUrl),
+			svc1log.SafeParam("path", request.Request.Path),
+			svc1log.SafeParam("status_code", *request.Response.StatusCode))
+		return false, errMsg
 	}
 
 	bodyStr := requesthelpers.GetResponseBodyStringFromBodyStruct(request.Response.ResponseBody)
 	if bodyStr == nil {
-		return false
+		return false, ""
 	}
 	bodySize := len(*bodyStr)
 	if bodySize == 0 {
-		return false
+		return false, ""
 	}
 
 	wordCount := len(strings.Fields(*bodyStr))
@@ -291,11 +303,11 @@ func AnalyzeResponse(ctx context.Context, request common.HttpRequestResponse, va
 	if checkBaseContentMatch {
 		if (areSimilar(bodySize, baselineSize, threshold) && areSimilar(wordCount, baselineWords, threshold)) ||
 			(baselineSizeRandomPath != nil && baselineWordsRandomPath != nil && areSimilar(bodySize, *baselineSizeRandomPath, threshold) && areSimilar(wordCount, *baselineWordsRandomPath, threshold)) {
-			return false
+			return false, ""
 		}
 	}
 	log.Info("Valid directory/file found", svc1log.SafeParam("url", request.Request.BaseUrl), svc1log.SafeParam("path", request.Request.Path), svc1log.SafeParam("size", bodySize), svc1log.SafeParam("words", wordCount))
-	return true
+	return true, ""
 }
 
 // baseLine gets the baseline size and word count of the target to be used for validation of the response

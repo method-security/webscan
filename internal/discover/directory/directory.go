@@ -281,7 +281,7 @@ func AnalyzeResponse(ctx context.Context, request common.HttpRequestResponse, va
 	}
 	if !validCodes[*request.Response.StatusCode] {
 		errMsg := fmt.Sprintf("%s%s returned status code %d which is not in the allowed response codes", request.Request.BaseUrl, request.Request.Path, *request.Response.StatusCode)
-		log.Error(errMsg,
+		log.Info(errMsg,
 			svc1log.SafeParam("url", request.Request.BaseUrl),
 			svc1log.SafeParam("path", request.Request.Path),
 			svc1log.SafeParam("status_code", *request.Response.StatusCode))

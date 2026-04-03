@@ -545,12 +545,6 @@ func (a *WebScan) InitDiscoverCommand() {
 				return
 			}
 
-			ignoreCrossDomainRedirects, err := cmd.Flags().GetBool("ignore-cross-domain-redirects")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-
 			// Get Request Method flags
 			requestMethodConfig, err := requesthelpers.GetRequestMethodFlags(cmd)
 			if err != nil {
@@ -559,7 +553,7 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Set Config
-			config := getDiscoverRouteConfig(target, ignoreCrossDomain, collectStaticAssets, spiderDepth, maxRedirects, verifyTLS, timeout, ignoreCrossDomainRedirects, threads, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
+			config := getDiscoverRouteConfig(target, ignoreCrossDomain, collectStaticAssets, spiderDepth, maxRedirects, verifyTLS, timeout, threads, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
 
 			// Generate a report
 			report := discoverroute.PerformRouteCapture(cmd.Context(), config, requestMethodConfig.BrowserbaseSecrets)
@@ -569,7 +563,7 @@ func (a *WebScan) InitDiscoverCommand() {
 	// Target Flags
 	discoverRouteCmd.Flags().String("target", "", "URL target to discover routes from")
 	// Config Flags
-	discoverRouteCmd.Flags().Bool("ignore-cross-domain", true, "Ignore routes that do not share the target's base URL")
+	discoverRouteCmd.Flags().Bool("ignore-cross-domain", false, "Ignore routes that do not share the target's base URL")
 	discoverRouteCmd.Flags().Bool("collect-static-assets", false, "Collect static assets from route discovery")
 	discoverRouteCmd.Flags().Int("spider-depth", 3, "Maximum depth for route spidering")
 	discoverRouteCmd.Flags().Int("max-redirects", 100, "Maximum number of redirects to follow")
@@ -808,20 +802,19 @@ func getDiscoverProbeConfig(targets []string, protocol string, maxRedirects int,
 }
 
 // getDiscoverRouteConfig builds the config for route discovery.
-func getDiscoverRouteConfig(target string, ignoreCrossDomain bool, collectStaticAssets bool, spiderDepth int, maxRedirects int, verifyTLS bool, timeout int, ignoreCrossDomainRedirects bool, threads int, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) discover.DiscoverRouteConfig {
+func getDiscoverRouteConfig(target string, ignoreCrossDomain bool, collectStaticAssets bool, spiderDepth int, maxRedirects int, verifyTLS bool, timeout int, threads int, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) discover.DiscoverRouteConfig {
 	config := discover.DiscoverRouteConfig{
-		Target:                     target,
-		CollectStaticAssets:        collectStaticAssets,
-		IgnoreCrossDomain:          ignoreCrossDomain,
-		SpiderDepth:                spiderDepth,
-		MaxRedirects:               maxRedirects,
-		VerifyTls:                  verifyTLS,
-		Timeout:                    max(timeout, 0),
-		IgnoreCrossDomainRedirects: ignoreCrossDomainRedirects,
-		Threads:                    max(threads, 0),
-		RequestMethod:              requestMethod,
-		HeadlessConfig:             headlessConfig,
-		BrowserbaseConfig:          browserbaseConfig,
+		Target:              target,
+		CollectStaticAssets: collectStaticAssets,
+		IgnoreCrossDomain:   ignoreCrossDomain,
+		SpiderDepth:         spiderDepth,
+		MaxRedirects:        maxRedirects,
+		VerifyTls:           verifyTLS,
+		Timeout:             max(timeout, 0),
+		Threads:             max(threads, 0),
+		RequestMethod:       requestMethod,
+		HeadlessConfig:      headlessConfig,
+		BrowserbaseConfig:   browserbaseConfig,
 	}
 	return config
 }

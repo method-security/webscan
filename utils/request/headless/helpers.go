@@ -114,7 +114,7 @@ func handleNavigation(ctx context.Context, page *rod.Page, redirectChain *[]stri
 					locationURL := location.Str()
 					log.Debug("Captured HTTP redirect", svc1log.SafeParam("from", e.Response.URL), svc1log.SafeParam("to", locationURL), svc1log.SafeParam("status", e.Response.Status))
 
-						// Add the redirect destination to the chain if not already present
+					// Add the redirect destination to the chain if not already present
 					exists := false
 					for _, url := range *redirectChain {
 						if url == locationURL {

@@ -199,7 +199,7 @@ Flags:
       --collect-static-assets           Collect static assets from route discovery
       --headless-path string            Path to headless browser executable
   -h, --help                            help for route
-      --ignore-base-url-match           Add route even if it does not share the target's base URL
+      --ignore-cross-domain              Ignore routes that do not share the target's base URL (default true)
       --max-redirects int               Maximum number of redirects to follow (default 100)
       --min-dom-stabalize-time int      Minimum time to wait for DOM stabilization in seconds (default 20)
       --request-method string           Request method to use (standard, headless, browserbase) (default "STANDARD")

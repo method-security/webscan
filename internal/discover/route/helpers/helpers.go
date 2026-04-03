@@ -269,19 +269,17 @@ func URLRemoveQueryParams(rawURL string) (string, error) {
 }
 
 // IsURLAllowed checks if a target URL is allowed based on base URL, static asset rules, and domain matching.
-func IsURLAllowed(baseURL string, targetURL string, ignoreBaseURLMatch bool, collectStaticAssets bool) bool {
-	// First check to see if the targetURL is a static asset type
+func IsURLAllowed(baseURL string, targetURL string, ignoreCrossDomain bool, collectStaticAssets bool) bool {
 	if collectStaticAssets {
 		if utils.IsStaticAsset(targetURL) {
-			return true // Allow static assets when ignoreStaticAssets is false
+			return true
 		}
 	}
 
-	if ignoreBaseURLMatch {
+	if !ignoreCrossDomain {
 		return true
 	}
 
-	// Check if targetDomain is the same as baseDomain or a subdomain
 	return IsSubdomain(baseURL, targetURL)
 }
 

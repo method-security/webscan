@@ -277,7 +277,7 @@ func (v *visitor) processFetchCall(node *ast.CallExpression) {
 
 	// Check if the URL is allowed
 	// Only consider URLs that are part of the base URL if specified
-	if !discoverroutehelpers.IsURLAllowed(v.baseURL, urlStr, v.baseURLsOnly, v.baseURLsOnly) {
+	if !discoverroutehelpers.IsURLAllowed(v.baseURL, urlStr, v.baseURLsOnly, v.captureStaticAssets) {
 		return
 	}
 

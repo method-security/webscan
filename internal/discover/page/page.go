@@ -4,6 +4,7 @@ import (
 	// Standard
 	"context"
 	"fmt"
+
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
 	"github.com/Method-Security/webscan/generated/go/discover"

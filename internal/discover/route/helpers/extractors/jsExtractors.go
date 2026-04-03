@@ -94,7 +94,7 @@ func extractRoutesFromPatterns(content string, baseURL string, routeCaptureConfi
 			fullURL := discoverroutehelpers.ResolveURL(baseURL, urlStr)
 
 			// Check if the URL is allowed
-			if !discoverroutehelpers.IsURLAllowed(baseURL, fullURL, routeCaptureConfig.IgnoreBaseUrlMatch, routeCaptureConfig.CollectStaticAssets) {
+			if !discoverroutehelpers.IsURLAllowed(baseURL, fullURL, routeCaptureConfig.IgnoreCrossDomain, routeCaptureConfig.CollectStaticAssets) {
 				continue
 			}
 
@@ -223,7 +223,7 @@ func extractScriptContentRoutes(ctx context.Context, scriptContent string, baseU
 	}
 
 	// If parsing succeeds, use AST traversal
-	ast.Walk(&visitor{routes: &routes, urls: urls, baseURL: baseURL, baseURLsOnly: routeCaptureConfig.IgnoreBaseUrlMatch, captureStaticAssets: routeCaptureConfig.CollectStaticAssets, errors: &errors}, program)
+	ast.Walk(&visitor{routes: &routes, urls: urls, baseURL: baseURL, baseURLsOnly: routeCaptureConfig.IgnoreCrossDomain, captureStaticAssets: routeCaptureConfig.CollectStaticAssets, errors: &errors}, program)
 
 	return discoverroutehelpers.MergeWebRoutes(routes), discoverroutehelpers.SetToListString(urls), errors
 }
@@ -348,14 +348,14 @@ func ExtractScriptRoutes(ctx context.Context, doc *goquery.Document, baseURL str
 			}
 
 			// If onlybaseURLs is set, only request script src that are relative
-			if !routeCaptureConfig.IgnoreBaseUrlMatch && discoverroutehelpers.IsAbsoluteURL(src) {
+			if routeCaptureConfig.IgnoreCrossDomain && discoverroutehelpers.IsAbsoluteURL(src) {
 				return
 			}
 
 			fullURL := discoverroutehelpers.ResolveURL(baseURL, src)
 
 			// Check if the URL is allowed
-			if !discoverroutehelpers.IsURLAllowed(baseURL, fullURL, routeCaptureConfig.IgnoreBaseUrlMatch, routeCaptureConfig.CollectStaticAssets) {
+			if !discoverroutehelpers.IsURLAllowed(baseURL, fullURL, routeCaptureConfig.IgnoreCrossDomain, routeCaptureConfig.CollectStaticAssets) {
 				return
 			}
 

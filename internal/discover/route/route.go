@@ -49,7 +49,7 @@ func ExtractRedirectRoutes(redirectChain []string, baseURL string, routeCaptureC
 		}
 
 		// Check if the URL is allowed
-		if !discoverroutehelpers.IsURLAllowed(baseURL, redirectURL, routeCaptureConfig.IgnoreBaseUrlMatch, routeCaptureConfig.CollectStaticAssets) {
+		if !discoverroutehelpers.IsURLAllowed(baseURL, redirectURL, routeCaptureConfig.IgnoreCrossDomain, routeCaptureConfig.CollectStaticAssets) {
 			continue
 		}
 
@@ -250,7 +250,7 @@ func extractRoutes(ctx context.Context, httpRequestResponse *common.HttpRequestR
 		}
 
 		fullRedirectedURL := redirectedURL
-		networkRoutes, networkUrls, networkErrors := capturerouteextractors.ExtractNetworkRoutes(networkRouteCtx, browser, fullRedirectedURL, routeCaptureConfig.IgnoreBaseUrlMatch, routeCaptureConfig.CollectStaticAssets)
+		networkRoutes, networkUrls, networkErrors := capturerouteextractors.ExtractNetworkRoutes(networkRouteCtx, browser, fullRedirectedURL, routeCaptureConfig.IgnoreCrossDomain, routeCaptureConfig.CollectStaticAssets)
 		routes = append(routes, networkRoutes...)
 		urls = discoverroutehelpers.AddListToSetString(urls, networkUrls)
 		errors = append(errors, networkErrors...)
@@ -264,7 +264,7 @@ func extractRoutes(ctx context.Context, httpRequestResponse *common.HttpRequestR
 	staticAssets := make(map[string]struct{})
 	for url := range urls {
 		if routeCaptureConfig.CollectStaticAssets && utils.IsStaticAsset(url) {
-			if discoverroutehelpers.IsSubdomain(redirectedURLBase, url) || routeCaptureConfig.IgnoreBaseUrlMatch {
+			if discoverroutehelpers.IsSubdomain(redirectedURLBase, url) || !routeCaptureConfig.IgnoreCrossDomain {
 				staticAssets[url] = struct{}{}
 			}
 		}

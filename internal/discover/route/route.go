@@ -132,7 +132,7 @@ func createSendHTTPRequestConfigWithQuery(baseURL, path string, queryParams map[
 		MaxRedirects:               config.MaxRedirects,
 		VerifyTls:                  config.VerifyTls,
 		Timeout:                    config.Timeout,
-		IgnoreCrossDomainRedirects: config.IgnoreCrossDomainRedirects,
+		IgnoreCrossDomainRedirects: config.IgnoreCrossDomain,
 		RequestMethod:              config.RequestMethod,
 		HeadlessConfig:             config.HeadlessConfig,
 		BrowserbaseConfig:          config.BrowserbaseConfig,

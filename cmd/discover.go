@@ -91,9 +91,14 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			globalTimeout, err := cmd.Flags().GetInt("global-timeout")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
 
 			// Create config
-			config, err := getDiscoverApplicationConfig(targets, resourceType, timeout, threads, proxy, verboseLogs, globalRateLimit)
+			config, err := getDiscoverApplicationConfig(targets, resourceType, timeout, threads, proxy, verboseLogs, globalRateLimit, globalTimeout)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -116,6 +121,7 @@ func (a *WebScan) InitDiscoverCommand() {
 	discoverApplicationCmd.Flags().String("proxy", "", "Optional HTTP proxy URL")
 	discoverApplicationCmd.Flags().Bool("verbose-logs", false, "Verbose logs")
 	discoverApplicationCmd.Flags().Int("global-rate-limit", 0, "Global rate limit (requests per second, 0 means no limit)")
+	discoverApplicationCmd.Flags().Int("global-timeout", 0, "Maximum total scan time in seconds (0 means no timout)")
 
 	// Mark Required Flags
 	_ = discoverApplicationCmd.MarkFlagRequired("targets")
@@ -731,7 +737,7 @@ func (a *WebScan) InitDiscoverCommand() {
 }
 
 // getDiscoverApplicationConfig builds the config for application fingerprinting discovery.
-func getDiscoverApplicationConfig(targets []string, resource string, timeout int, threads int, proxy string, verboseLogs bool, globalRateLimit int) (*discover.DiscoverApplicationConfig, error) {
+func getDiscoverApplicationConfig(targets []string, resource string, timeout int, threads int, proxy string, verboseLogs bool, globalRateLimit int, globalTimeout int) (*discover.DiscoverApplicationConfig, error) {
 	resourceEnum, err := getDiscoverApplicationResourceConfigTypeFromString(resource)
 	if err != nil {
 		return nil, fmt.Errorf("invalid resource type: %s", resource)
@@ -745,6 +751,7 @@ func getDiscoverApplicationConfig(targets []string, resource string, timeout int
 		Proxy:           &proxy,
 		VerboseLogs:     verboseLogs,
 		GlobalRateLimit: max(0, globalRateLimit),
+		GlobalTimeout:   max(0, globalTimeout),
 	}
 	return config, nil
 }

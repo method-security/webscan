@@ -33,6 +33,7 @@ type Config struct {
 	VerboseLogs     bool
 	Timeout         int
 	GlobalRateLimit int
+	GlobalTimeout   int
 }
 
 func validateConfig(cfg *Config) error {
@@ -289,6 +290,7 @@ func GetRunnerConfig(templateFileSystems, workflowFileSystems []fs.FS, config nu
 		VerboseLogs:     config.VerboseLogs,
 		Timeout:         config.Timeout,
 		GlobalRateLimit: config.GlobalRateLimit,
+		GlobalTimeout:   config.GlobalTimeout,
 	}
 	return rconfig
 }
@@ -301,11 +303,16 @@ func Run(ctx context.Context, cfg Config, reportBuilder *report.Builder) ([]*nuc
 	}
 
 	// Add a maximum execution timeout for the entire scan to prevent hanging
-	maxScanTime := time.Duration(cfg.Timeout*20) * time.Second // 20x timeout for total scan time
-	scanCtx, cancel := context.WithTimeout(ctx, maxScanTime)
+	var scanCtx context.Context
+	var cancel context.CancelFunc
+	if cfg.GlobalTimeout > 0 {
+		scanCtx, cancel = context.WithTimeout(ctx, time.Duration(cfg.GlobalTimeout)*time.Second)
+	} else {
+		scanCtx, cancel = context.WithCancel(ctx)
+	}
 	defer cancel()
 
-	log.Info("Scan will timeout after", svc1log.SafeParam("maxScanTime", maxScanTime))
+	log.Info("Scan global timeout", svc1log.SafeParam("globalTimeout", cfg.GlobalTimeout))
 
 	log.Info("Copying templates and workflows to tmp dirs")
 	templateDir, workflowDir, err := copyFilesToTmpDirs(cfg)

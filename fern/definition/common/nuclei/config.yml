@@ -23,4 +23,5 @@ types:
       proxy: optional<string>
       verboseLogs: boolean
       globalRateLimit: integer
+      globalTimeout: integer
 

@@ -45,6 +45,7 @@ types:
       proxy: optional<string>
       verboseLogs: boolean
       globalRateLimit: integer
+      globalTimeout: integer
   # Application Fingerprint Attempt Struct
   ApplicationFingerprintAttempt:
     properties:

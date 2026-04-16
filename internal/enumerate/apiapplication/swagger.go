@@ -773,11 +773,11 @@ func convertSecurityDefinitionsV3(securityDefinitions map[string]*v3.SecuritySch
 	return schemes
 }
 
-func convertOAuthFlowV3(flows *v3.OAuthFlows) *enumerateapiapplicationfern.OAuthFlow {
+func convertOAuthFlowV3(flows *v3.OAuthFlows) *enumerateapiapplicationfern.OauthFlow {
 	if flows == nil {
 		return nil
 	}
-	return &enumerateapiapplicationfern.OAuthFlow{
+	return &enumerateapiapplicationfern.OauthFlow{
 		Implicit:          convertOAuthFlowDetailsV3(flows.Implicit),
 		Password:          convertOAuthFlowDetailsV3(flows.Password),
 		ClientCredentials: convertOAuthFlowDetailsV3(flows.ClientCredentials),
@@ -785,11 +785,11 @@ func convertOAuthFlowV3(flows *v3.OAuthFlows) *enumerateapiapplicationfern.OAuth
 	}
 }
 
-func convertOAuthFlowDetailsV3(flow *v3.OAuthFlow) *enumerateapiapplicationfern.OAuthFlowDetails {
+func convertOAuthFlowDetailsV3(flow *v3.OAuthFlow) *enumerateapiapplicationfern.OauthFlowDetails {
 	if flow == nil {
 		return nil
 	}
-	return &enumerateapiapplicationfern.OAuthFlowDetails{
+	return &enumerateapiapplicationfern.OauthFlowDetails{
 		AuthorizationUrl: &flow.AuthorizationUrl,
 		TokenUrl:         &flow.TokenUrl,
 		RefreshUrl:       &flow.RefreshUrl,

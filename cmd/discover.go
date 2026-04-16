@@ -121,7 +121,7 @@ func (a *WebScan) InitDiscoverCommand() {
 	discoverApplicationCmd.Flags().String("proxy", "", "Optional HTTP proxy URL")
 	discoverApplicationCmd.Flags().Bool("verbose-logs", false, "Verbose logs")
 	discoverApplicationCmd.Flags().Int("global-rate-limit", 0, "Global rate limit (requests per second, 0 means no limit)")
-	discoverApplicationCmd.Flags().Int("global-timeout", 0, "Maximum total scan time in seconds (0 = auto-derived from timeout)")
+	discoverApplicationCmd.Flags().Int("global-timeout", 0, "Maximum total scan time in seconds (0 means no timout)")
 
 	// Mark Required Flags
 	_ = discoverApplicationCmd.MarkFlagRequired("targets")

@@ -45,7 +45,7 @@ types:
       schemes: map<string, optional<list<string>>>
   RequestSchema:
     properties:
-      type: list<string>
+      type: optional<list<string>>
       properties: optional<list<SchemaProperty>>
       required: optional<list<string>>
       items: optional<RequestSchema>
@@ -75,7 +75,7 @@ types:
   SchemaProperty:
     properties:
       name: string
-      type: list<string>
+      type: optional<list<string>>
       format: optional<string>
       description: optional<string>
       required: optional<boolean>

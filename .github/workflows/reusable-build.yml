@@ -227,12 +227,6 @@ jobs:
           mv artifacts/macos-latest-dist/darwin_arm64/build-macos_darwin_arm64_v8.0/* output/build-darwin_arm64/
         shell: bash
 
-      - name: Copy AMD64 binary to Docker context
-        run: cp output/build-linux_amd64/webscan ./webscan
-
-      - name: Build Docker Image (AMD64)
-        run: docker buildx build . --platform linux/amd64 --tag methodsecurity/webscan:latest-amd64
-
       - name: View Output
         run: ls -al output output/*
       - uses: goreleaser/goreleaser-action@1a80836c5c9d9e5755a25cb59ec6f45a3b5f41a8 # ratchet:goreleaser/goreleaser-action@v7

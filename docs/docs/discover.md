@@ -17,6 +17,14 @@ webscan discover [command]
 - **route**: Route discovery and analysis
 - **saas**: SaaS application discovery by organization name
 
+## Common Flags
+
+The following flag is available on all `discover` subcommands:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--ignore-cross-domain-redirects` | bool | false | Do not follow redirects to a different domain and treat them as errors |
+
 ## Commands
 
 ### Application

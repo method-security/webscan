@@ -21,9 +21,7 @@ webscan discover [command]
 
 The following flag is available on all `discover` subcommands:
 
-| Flag | Type | Default | Description |
-|------|------|---------|-------------|
-| `--ignore-cross-domain-redirects` | bool | false | Do not follow redirects to a different domain and treat them as errors |
+- `--ignore-cross-domain-redirects` (bool, default: `false`) — Do not follow redirects to a different domain and treat them as errors
 
 ## Commands
 

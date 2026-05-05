@@ -17,6 +17,12 @@ webscan discover [command]
 - **route**: Route discovery and analysis
 - **saas**: SaaS application discovery by organization name
 
+## Common Flags
+
+The following flag is available on all `discover` subcommands:
+
+- `--ignore-cross-domain-redirects` (bool, default: `false`) — Do not follow redirects to a different domain and treat them as errors
+
 ## Commands
 
 ### Application
@@ -38,6 +44,7 @@ Usage:
 
 Flags:
       --global-rate-limit int   Global rate limit (requests per second, 0 = no limit)
+      --global-timeout int      Maximum total scan time in seconds (0 means no timeout)
   -h, --help                    help for application
       --proxy string            Optional HTTP proxy URL
       --resource-type string    Type of resource to fingerprint (e.g., web, api, cms) (default "ALL")
@@ -113,20 +120,22 @@ Usage:
   webscan discover page [flags]
 
 Flags:
-      --browserbase-countries strings   List of countries to use for Browserbase proxy
-      --browserbase-project string      Browserbase project ID
-      --browserbase-proxy               Use Browserbase proxy for requests
-      --browserbase-token string        Browserbase API token for cloud browser access
-      --headless-path string            Path to headless browser executable
-  -h, --help                            help for page
-      --max-redirects int               Maximum number of redirects to follow (default 10)
-      --min-dom-stabalize-time int      Minimum time to wait for DOM stabilization in seconds (default 20)
-      --request-method string           Request method to use (standard, headless, browserbase) (default "STANDARD")
-      --response-codes string           Response codes to consider as valid responses (default "200-299")
-      --screenshot                      Capture a screenshot of the page
-      --target string                   URL target to capture and analyze
-      --timeout int                     Timeout per request in seconds (default 30)
-      --verify-tls                      Verify TLS certificates when making HTTPS requests
+      --browserbase-countries strings              List of countries to use for Browserbase proxy
+      --browserbase-project string                 Browserbase project ID
+      --browserbase-proxy                          Use Browserbase proxy for requests
+      --browserbase-token string                   Browserbase API token for cloud browser access
+      --headless-path string                       Path to headless browser executable
+  -h, --help                                       help for page
+      --max-redirects int                          Maximum number of redirects to follow (default 10)
+      --min-dom-stabalize-time int                 Minimum time to wait for DOM stabilization in seconds (default 20)
+      --request-method string                      Request method to use (standard, headless, browserbase) (default "STANDARD")
+      --response-codes string                      Response codes to consider as valid responses (default "200-299")
+      --screenshot                                 Capture a screenshot of the page
+      --sensitive-content-detection                Enable sensitive content detection
+      --sensitive-content-fingerprints-path string Path to a custom sensitive content fingerprints file (uses built-in fingerprints by default)
+      --target string                              URL target to capture and analyze
+      --timeout int                                Timeout per request in seconds (default 30)
+      --verify-tls                                 Verify TLS certificates when making HTTPS requests
 
 Global Flags:
   -o, --output string        Output format (signal, json, yaml). Default value is signal (default "signal")
@@ -199,7 +208,7 @@ Flags:
       --collect-static-assets           Collect static assets from route discovery
       --headless-path string            Path to headless browser executable
   -h, --help                            help for route
-      --ignore-cross-domain              Ignore routes that do not share the target's base URL (default true)
+      --ignore-cross-domain              Ignore routes that do not share the target's base URL (default false)
       --max-redirects int               Maximum number of redirects to follow (default 100)
       --min-dom-stabalize-time int      Minimum time to wait for DOM stabilization in seconds (default 20)
       --request-method string           Request method to use (standard, headless, browserbase) (default "STANDARD")
@@ -245,9 +254,9 @@ Flags:
       --orgs strings                    The organization names to use for discovery
       --request-method string           Request method (headless, browserbase) (default "HEADLESS")
       --saas-companies strings          The specific SaaS companies to use for discovery (Must be present in the SaaS fingerprints file)
-      --saas-file-paths strings         Files containing SaaS application fingerprints (default ["/opt/method/webscan/var/conf/discover/saas/saas_fingerprints.json"])
+      --saas-file-paths strings         Files containing SaaS application fingerprints
       --sso-companies strings           The specific SSO companies to use for discovery (Must be present in the SSO fingerprints file)
-      --sso-file-paths strings          Files containing SSO application fingerprints (default ["/opt/method/webscan/var/conf/discover/saas/sso_fingerprints.json"])
+      --sso-file-paths strings          Files containing SSO application fingerprints
       --threads int                     Number of concurrent threads for discovery (default: number of CPUs)
       --timeout int                     Timeout in seconds for the capture (default 30)
       --verify-tls                      Verify TLS certificates when making HTTPS requests

@@ -11,6 +11,7 @@ webscan enumerate [command]
 
 - **api-application**: Enumerate API applications including GraphQL and Swagger endpoints
 - **cms**: Enumerate content management systems like WordPress plugins and Drupal modules
+- **container-registry**: Enumerate container registries including Docker registries
 - **general**: Perform general enumeration tasks like rate limit testing
 - **kube**: Enumerate Kubernetes resources and configurations
 
@@ -155,6 +156,36 @@ Global Flags:
   -v, --verbose              Verbose output
 ```
 
+
+### Container Registry
+
+Enumerate container registries and their contents.
+
+#### Docker
+```bash
+webscan enumerate container-registry docker --targets https://registry.example.com
+```
+##### Help Text
+```bash
+webscan enumerate container-registry docker -h
+Discover and analyze Docker container registries, including repositories, images, and their manifest data.
+
+Usage:
+  webscan enumerate container-registry docker [flags]
+
+Flags:
+  -h, --help              help for docker
+      --targets strings   URLs of Docker Container Registries to enumerate
+      --threads int       Number of concurrent manifest requests per repository (default 25)
+      --timeout int       Timeout per request in seconds (default 30)
+      --verify-tls        Verify TLS certificates when making HTTPS requests
+
+Global Flags:
+  -o, --output string        Output format (signal, json, yaml). Default value is signal (default "signal")
+  -f, --output-file string   Path to output file. If blank, will output to STDOUT
+  -q, --quiet                Suppress output
+  -v, --verbose              Verbose output
+```
 
 ### General
 

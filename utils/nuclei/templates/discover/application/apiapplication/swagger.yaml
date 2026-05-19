@@ -12,6 +12,7 @@ info:
 http:
   - method: GET
     path:
+      - "{{BaseURL}}"
       - "{{BaseURL}}/swagger-ui.html"
       - "{{BaseURL}}/swagger-ui/index.html"
       - "{{BaseURL}}/swagger/index.html"

@@ -35,7 +35,9 @@ func LoadTarGzip(data []byte) (*FS, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open gzip stream: %w", err)
 	}
-	defer gzr.Close()
+	defer func() {
+		_ = gzr.Close()
+	}()
 
 	fsys := &FS{entries: make(map[string]*entry)}
 	fsys.ensureDir(".")

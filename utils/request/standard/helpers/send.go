@@ -17,7 +17,20 @@ import (
 	utils "github.com/Method-Security/webscan/utils"
 	// External
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
+	"github.com/projectdiscovery/useragent"
 )
+
+// randomUserAgent is a realistic browser User-Agent picked once at startup
+// and reused for all requests in this process, avoiding the Go default
+// (Go-http-client/1.1) which is trivially fingerprinted as a scanner.
+var randomUserAgent = pickUserAgent()
+
+func pickUserAgent() string {
+	if ua := useragent.PickRandom(); ua != nil {
+		return ua.Raw
+	}
+	return "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+}
 
 func SendHTTPRequest(ctx context.Context, url string, headers map[string]string, bodyReader io.Reader, config common.SendHttpRequestConfig) (*http.Response, []string, error) {
 	log := svc1log.FromContext(ctx)
@@ -65,6 +78,11 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 		// Set Headers
 		for k, v := range headers {
 			req.Header.Set(k, v)
+		}
+
+		// Set a realistic User-Agent if the caller didn't provide one
+		if req.Header.Get("User-Agent") == "" {
+			req.Header.Set("User-Agent", randomUserAgent)
 		}
 
 		// Send Request

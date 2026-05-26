@@ -23,7 +23,7 @@ type archiveFile struct {
 }
 
 // WriteBundle writes a deterministic tar.gz archive for the provided bundle.
-func WriteBundle(b Bundle) error {
+func WriteBundle(b Bundle) (returnErr error) {
 	files, err := collectFiles(b)
 	if err != nil {
 		return err
@@ -37,7 +37,11 @@ func WriteBundle(b Bundle) error {
 	if err != nil {
 		return err
 	}
-	defer out.Close()
+	defer func() {
+		if err := out.Close(); returnErr == nil {
+			returnErr = err
+		}
+	}()
 
 	gzw, err := gzip.NewWriterLevel(out, gzip.BestCompression)
 	if err != nil {

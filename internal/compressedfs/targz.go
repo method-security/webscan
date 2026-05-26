@@ -15,15 +15,6 @@ import (
 	"time"
 )
 
-// MustLoadTarGzip loads a gzip-compressed tar archive into an in-memory fs.FS.
-func MustLoadTarGzip(data []byte) fs.FS {
-	fsys, err := LoadTarGzip(data)
-	if err != nil {
-		panic(err)
-	}
-	return fsys
-}
-
 // NewLazyTarGzip returns a filesystem that inflates the archive on first use.
 func NewLazyTarGzip(data []byte) fs.FS {
 	return &LazyFS{data: data}

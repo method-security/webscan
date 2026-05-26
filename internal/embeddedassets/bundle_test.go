@@ -1,6 +1,4 @@
-//go:build ignore
-
-package main
+package embeddedassets
 
 import (
 	"os"
@@ -30,9 +28,9 @@ func TestCollectFilesExcludesEmbedIgnoredNames(t *testing.T) {
 		writeTestFile(t, filepath.Join(base, path))
 	}
 
-	files, err := collectFiles(bundle{
-		roots: roots,
-		base:  base,
+	files, err := collectFiles(Bundle{
+		Roots: roots,
+		Base:  base,
 	})
 	if err != nil {
 		t.Fatal(err)

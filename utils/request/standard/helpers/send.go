@@ -20,10 +20,10 @@ import (
 	"github.com/projectdiscovery/useragent"
 )
 
-// defaultUserAgent is a realistic browser User-Agent picked once at startup
+// randomUserAgent is a realistic browser User-Agent picked once at startup
 // and reused for all requests in this process, avoiding the Go default
 // (Go-http-client/1.1) which is trivially fingerprinted as a scanner.
-var defaultUserAgent = pickUserAgent()
+var randomUserAgent = pickUserAgent()
 
 func pickUserAgent() string {
 	if ua := useragent.PickRandom(); ua != nil {
@@ -82,7 +82,7 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 
 		// Set a realistic User-Agent if the caller didn't provide one
 		if req.Header.Get("User-Agent") == "" {
-			req.Header.Set("User-Agent", defaultUserAgent)
+			req.Header.Set("User-Agent", randomUserAgent)
 		}
 
 		// Send Request

@@ -3,12 +3,14 @@ package nuclei
 import (
 	// Standard
 	"context"
-	"embed"
+	_ "embed"
 	"fmt"
 	"io/fs"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/Method-Security/webscan/internal/compressedfs"
 
 	// External
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
@@ -16,8 +18,10 @@ import (
 
 // All is the templates (pentest and discover)
 //
-//go:embed pentest discover
-var All embed.FS
+//go:embed embedded/templates.tar.gz
+var templateArchive []byte
+
+var All fs.FS = compressedfs.NewLazyTarGzip(templateArchive)
 
 // GetTemplateFileSystem returns filesystem views for templates based on the provided template paths.
 // templatePaths can contain either:

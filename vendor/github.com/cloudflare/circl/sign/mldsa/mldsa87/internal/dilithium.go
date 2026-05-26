@@ -66,6 +66,9 @@ type PrivateKey struct {
 	s1h VecL // NTT(s₁)
 	s2h VecK // NTT(s₂)
 	t0h VecK // NTT(t₀)
+
+	seed    [common.SeedSize]byte
+	seedSet bool
 }
 
 type unpackedSignature struct {
@@ -86,6 +89,9 @@ func (sig *unpackedSignature) Pack(buf []byte) {
 // Returns whether buf contains a properly packed signature.
 func (sig *unpackedSignature) Unpack(buf []byte) bool {
 	if len(buf) < SignatureSize {
+		return false
+	}
+	if NIST && len(buf) != SignatureSize {
 		return false
 	}
 	copy(sig.c[:], buf[:])
@@ -136,6 +142,8 @@ func (sk *PrivateKey) Pack(buf *[PrivateKeySize]byte) {
 
 // Sets sk to the private key encoded in buf.
 func (sk *PrivateKey) Unpack(buf *[PrivateKeySize]byte) {
+	sk.seedSet = false
+
 	copy(sk.rho[:], buf[:32])
 	copy(sk.key[:], buf[32:64])
 	copy(sk.tr[:], buf[64:64+TRSize])
@@ -177,6 +185,9 @@ func NewKeyFromSeed(seed *[common.SeedSize]byte) (*PublicKey, *PrivateKey) {
 	var pk PublicKey
 	var sk PrivateKey
 	var sSeed [64]byte
+
+	sk.seedSet = true
+	copy(sk.seed[:], seed[:])
 
 	h := sha3.NewShake256()
 	_, _ = h.Write(seed[:])
@@ -229,6 +240,15 @@ func NewKeyFromSeed(seed *[common.SeedSize]byte) (*PublicKey, *PrivateKey) {
 	pk.tr = &sk.tr
 
 	return &pk, &sk
+}
+
+func (sk *PrivateKey) Seed() []byte {
+	if !sk.seedSet {
+		return nil
+	}
+	var ret [common.SeedSize]byte
+	copy(ret[:], sk.seed[:])
+	return ret[:]
 }
 
 // Computes t0 and t1 from sk.s1h, sk.s2 and sk.A.

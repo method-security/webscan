@@ -101,6 +101,12 @@ func collectFiles(b bundle) ([]archiveFile, error) {
 			if err != nil {
 				return err
 			}
+			if isEmbedExcluded(d.Name()) {
+				if d.IsDir() {
+					return filepath.SkipDir
+				}
+				return nil
+			}
 			if d.IsDir() {
 				return nil
 			}
@@ -122,4 +128,8 @@ func collectFiles(b bundle) ([]archiveFile, error) {
 		return files[i].name < files[j].name
 	})
 	return files, nil
+}
+
+func isEmbedExcluded(name string) bool {
+	return len(name) > 0 && (name[0] == '.' || name[0] == '_')
 }

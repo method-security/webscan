@@ -91,6 +91,11 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 		}
 	}
 
+	// Resolve User-Agent once so the same value is used across all redirects.
+	// Resolving inside the loop would pick a different random UA per redirect,
+	// which no real browser does and can trip bot-detection.
+	resolvedUserAgent := ResolveUserAgent(config.UserAgent)
+
 	// Handle Redirects (Runs once if MaxRedirects == 0 which is for requests that don't follow redirects)
 	currentURL := url
 	for redirects := 0; redirects <= config.MaxRedirects; redirects++ {
@@ -113,7 +118,7 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 
 		// Set a realistic User-Agent if the caller didn't provide one
 		if req.Header.Get("User-Agent") == "" {
-			req.Header.Set("User-Agent", ResolveUserAgent(config.UserAgent))
+			req.Header.Set("User-Agent", resolvedUserAgent)
 		}
 
 		// Send Request

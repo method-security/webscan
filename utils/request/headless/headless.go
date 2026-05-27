@@ -215,6 +215,15 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 		if err != nil {
 			log.Warn("Page stabilization warning", svc1log.SafeParam("error", err.Error()))
 		}
+		select {
+		case err := <-browsersErr:
+			if err != nil {
+				log.Error("Redirect error occurred during stabilization", svc1log.SafeParam("error", err.Error()))
+				browserErr = err
+				return
+			}
+		default:
+		}
 
 		// Use the latest captured main-document headers after stabilization so
 		// headers, finalURL, and HTML describe the same terminal document.

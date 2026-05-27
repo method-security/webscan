@@ -100,9 +100,6 @@ func handleNavigation(ctx context.Context, page *rod.Page, redirectChain *[]stri
 	// Set up event listeners for navigation events and network redirects
 	go page.EachEvent(
 		func(e *proto.NetworkRequestWillBeSent) {
-			if atomic.LoadInt32(&completed) == 1 {
-				return
-			}
 			if e.Type != proto.NetworkResourceTypeDocument || e.RedirectResponse == nil {
 				return
 			}
@@ -121,11 +118,7 @@ func handleNavigation(ctx context.Context, page *rod.Page, redirectChain *[]stri
 			if err != nil {
 				redirectChainMu.Unlock()
 				log.Info("Max redirects reached", svc1log.SafeParam("maxRedirects", strconv.Itoa(maxRedirects)))
-				once.Do(func() {
-					atomic.StoreInt32(&completed, 1)
-					redirectError <- err
-					close(requestComplete)
-				})
+				signalRedirectError(err, redirectError, requestComplete, once, &completed)
 				return
 			}
 			redirectChainMu.Unlock()
@@ -135,10 +128,6 @@ func handleNavigation(ctx context.Context, page *rod.Page, redirectChain *[]stri
 		},
 		// Capture HTTP redirect responses at the network level
 		func(e *proto.NetworkResponseReceived) {
-			if atomic.LoadInt32(&completed) == 1 {
-				return
-			}
-
 			// Only capture redirect responses for the main document
 			if e.Type == proto.NetworkResourceTypeDocument && e.Response.Status >= 300 && e.Response.Status < 400 {
 				// Extract the Location header from the redirect response
@@ -151,11 +140,7 @@ func handleNavigation(ctx context.Context, page *rod.Page, redirectChain *[]stri
 					if err != nil {
 						redirectChainMu.Unlock()
 						log.Info("Max redirects reached", svc1log.SafeParam("maxRedirects", strconv.Itoa(maxRedirects)))
-						once.Do(func() {
-							atomic.StoreInt32(&completed, 1)
-							redirectError <- err
-							close(requestComplete)
-						})
+						signalRedirectError(err, redirectError, requestComplete, once, &completed)
 						return
 					}
 					redirectChainMu.Unlock()
@@ -166,9 +151,6 @@ func handleNavigation(ctx context.Context, page *rod.Page, redirectChain *[]stri
 			}
 		},
 		func(e *proto.PageFrameNavigated) {
-			if atomic.LoadInt32(&completed) == 1 {
-				return
-			}
 			if e.Frame.ParentID == "" && e.Frame.URL != "" && !utils.IsStaticAsset(e.Frame.URL) {
 				// Check for Chrome error pages
 				if strings.HasPrefix(e.Frame.URL, "chrome-error://") {
@@ -188,11 +170,7 @@ func handleNavigation(ctx context.Context, page *rod.Page, redirectChain *[]stri
 				if err != nil {
 					redirectChainMu.Unlock()
 					log.Info("Max redirects reached", svc1log.SafeParam("maxRedirects", strconv.Itoa(maxRedirects)))
-					once.Do(func() {
-						atomic.StoreInt32(&completed, 1)
-						redirectError <- err
-						close(requestComplete)
-					})
+					signalRedirectError(err, redirectError, requestComplete, once, &completed)
 					return
 				}
 				chain := strings.Join(*redirectChain, " -> ")
@@ -206,10 +184,7 @@ func handleNavigation(ctx context.Context, page *rod.Page, redirectChain *[]stri
 						close(requestComplete)
 					})
 				} else {
-					once.Do(func() {
-						atomic.StoreInt32(&completed, 1)
-						close(requestComplete)
-					})
+					log.Debug("Ignoring already-seen top-level frame navigation", svc1log.SafeParam("url", e.Frame.URL))
 				}
 			}
 		},
@@ -257,6 +232,17 @@ func handleNavigation(ctx context.Context, page *rod.Page, redirectChain *[]stri
 			}
 		},
 	)()
+}
+
+func signalRedirectError(err error, redirectError chan error, requestComplete chan struct{}, once *sync.Once, completed *int32) {
+	select {
+	case redirectError <- err:
+	default:
+	}
+	once.Do(func() {
+		atomic.StoreInt32(completed, 1)
+		close(requestComplete)
+	})
 }
 
 func appendRedirectURLLocked(redirectChain *[]string, redirectURL string, maxRedirects int) (bool, error) {

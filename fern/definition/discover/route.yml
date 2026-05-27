@@ -13,6 +13,7 @@ types:
       verifyTls: boolean
       timeout: integer
       threads: integer
+      userAgent: method.UserAgentPreset
       requestMethod: method.RequestMethod
       headlessConfig: optional<method.HeadlessRequestConfig>
       browserbaseConfig: optional<method.BrowserbaseRequestConfig>

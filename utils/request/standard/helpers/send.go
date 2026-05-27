@@ -17,7 +17,51 @@ import (
 	utils "github.com/Method-Security/webscan/utils"
 	// External
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
+	"github.com/projectdiscovery/useragent"
 )
+
+// ResolveUserAgent returns a User-Agent string based on the given preset.
+// If preset is nil or RANDOM, a random browser UA is picked.
+func ResolveUserAgent(preset *common.UserAgentPreset) string {
+	if preset == nil || *preset == common.UserAgentPresetRandom {
+		return pickRandomUserAgent()
+	}
+	switch *preset {
+	case common.UserAgentPresetChrome:
+		return pickUserAgentByFilter(useragent.Chrome)
+	case common.UserAgentPresetFirefox:
+		return pickUserAgentByFilter(useragent.Mozilla)
+	case common.UserAgentPresetSafari:
+		// Chrome and Edge UAs are also tagged "Safari" because they forked from WebKit.
+		// Exclude them so we only pick genuine Safari UAs.
+		return pickUserAgentByFilter(func(ua *useragent.UserAgent) bool {
+			return useragent.ContainsTags(ua, "Safari") && !useragent.ContainsTagsAny(ua, "Chrome", "Chromium", "Edge")
+		})
+	case common.UserAgentPresetEdge:
+		return pickUserAgentByFilter(func(ua *useragent.UserAgent) bool {
+			return useragent.ContainsTagsAny(ua, "Edge")
+		})
+	default:
+		return pickRandomUserAgent()
+	}
+}
+
+func pickRandomUserAgent() string {
+	if ua := useragent.PickRandom(); ua != nil {
+		return ua.Raw
+	}
+	return fallbackUserAgent
+}
+
+func pickUserAgentByFilter(filter useragent.Filter) string {
+	uas, err := useragent.PickWithFilters(1, filter)
+	if err == nil && len(uas) > 0 {
+		return uas[0].Raw
+	}
+	return pickRandomUserAgent()
+}
+
+const fallbackUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
 
 func SendHTTPRequest(ctx context.Context, url string, headers map[string]string, bodyReader io.Reader, config common.SendHttpRequestConfig) (*http.Response, []string, error) {
 	log := svc1log.FromContext(ctx)
@@ -65,6 +109,11 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 		// Set Headers
 		for k, v := range headers {
 			req.Header.Set(k, v)
+		}
+
+		// Set a realistic User-Agent if the caller didn't provide one
+		if req.Header.Get("User-Agent") == "" {
+			req.Header.Set("User-Agent", ResolveUserAgent(config.UserAgent))
 		}
 
 		// Send Request

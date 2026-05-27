@@ -20,6 +20,24 @@ type MethodFlagData struct {
 	BrowserbaseSecrets *common.BrowserbaseRequestSecrets
 }
 
+// GetUserAgentFlag extracts and validates the user-agent flag from a cobra command.
+// Returns nil (meaning RANDOM) if the flag is not registered on this command.
+func GetUserAgentFlag(cmd *cobra.Command) (*common.UserAgentPreset, error) {
+	flag := cmd.Flags().Lookup("user-agent")
+	if flag == nil {
+		return nil, nil
+	}
+	val, err := cmd.Flags().GetString("user-agent")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user-agent flag: %w", err)
+	}
+	preset, err := common.NewUserAgentPresetFromString(strings.ToUpper(val))
+	if err != nil {
+		return nil, fmt.Errorf("invalid user-agent preset: %w", err)
+	}
+	return &preset, nil
+}
+
 // GetRequestMethodFlags extracts and validates all request method related configuration from a cobra command
 func GetRequestMethodFlags(cmd *cobra.Command) (*MethodFlagData, error) {
 	// Get Request Method flag

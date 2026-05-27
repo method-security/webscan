@@ -1,0 +1,62 @@
+id: grafana-detect
+info:
+  name: Grafana Detection
+  author: method-security
+  severity: info
+  description: Detects Grafana instances by validating the unauthenticated health endpoint and Grafana-specific frontend bootstrap markers.
+  metadata:
+    method-application-type: OBSERVABILITY_PLATFORM
+    method-module-name: GRAFANA
+    cpe: cpe:2.3:a:grafana:grafana:*:*:*:*:*:*:*:*
+  tags: discovery,grafana,observability,monitoring,observability-platform
+flow: http(1) && http(2)
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/api/health"
+    redirects: true
+    max-redirects: 5
+    matchers-condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+        internal: true
+      - type: word
+        part: header
+        words:
+          - "application/json"
+        case-insensitive: true
+        internal: true
+      - type: regex
+        part: body
+        regex:
+          - '"commit"\s*:\s*"[0-9a-f]{7,40}"'
+        internal: true
+      - type: regex
+        part: body
+        regex:
+          - '"version"\s*:\s*"[0-9]+(?:\.[0-9]+){1,3}(?:[-+][^"]+)?"'
+        internal: true
+
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/login"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers-condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+      - type: regex
+        part: body
+        regex:
+          - "(?i)(window\\.__grafanaBootData|grafanaBootData|grafana-app|public/build/runtime|<title>Grafana</title>)"
+      - type: word
+        part: body
+        words:
+          - "Grafana"
+        case-insensitive: true

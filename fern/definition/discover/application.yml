@@ -20,6 +20,7 @@ types:
       - NETWORK_CONTROLLER
       - NETWORK_FIREWALL
       - NETWORK_MANAGEMENT_SYSTEM
+      - OBSERVABILITY_PLATFORM
       - VDI_APPLICATION
       - WEB_SERVER
   ApplicationDetectionState:

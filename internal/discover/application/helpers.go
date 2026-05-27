@@ -27,6 +27,7 @@ func getTemplatePaths(resourceConfigType *discover.ApplicationResourceConfigType
 		discover.ApplicationResourceTypeNetworkManagementSystem,
 		discover.ApplicationResourceTypeVdiApplication,
 		discover.ApplicationResourceTypeWebServer,
+		discover.ApplicationResourceTypeObservabilityPlatform,
 	}
 
 	// Map resource types to base template paths (without request method subdirectory)
@@ -46,6 +47,7 @@ func getTemplatePaths(resourceConfigType *discover.ApplicationResourceConfigType
 		discover.ApplicationResourceTypeNetworkManagementSystem:      "networkmanagementsystem",
 		discover.ApplicationResourceTypeVdiApplication:               "vdiapplication",
 		discover.ApplicationResourceTypeWebServer:                    "webserver",
+		discover.ApplicationResourceTypeObservabilityPlatform:        "observabilityplatform",
 	}
 
 	var templatePaths []string

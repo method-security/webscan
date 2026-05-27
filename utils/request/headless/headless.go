@@ -122,6 +122,7 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 		requestComplete = make(chan struct{})
 		browsersErr     = make(chan error, 1)
 		redirectChain   = []string{*constructedURL}
+		redirectChainMu sync.Mutex
 		browserErr      error
 		statusCode      int
 	)
@@ -154,7 +155,7 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 
 		// Setup request monitoring and navigate
 		headerCapture := setupHeaderInterception(page)
-		handleNavigation(ctx, page, &redirectChain, requestComplete, &once, config.MaxRedirects, browsersErr)
+		handleNavigation(ctx, page, &redirectChain, &redirectChainMu, requestComplete, &once, config.MaxRedirects, browsersErr)
 
 		navErr := performNavigation(ctx, page, constructedURL, config)
 		if navErr != nil {
@@ -173,13 +174,27 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 			}
 			return
 		case <-requestComplete:
-			log.Info("Request complete, redirect chain", svc1log.SafeParam("chain", strings.Join(redirectChain, " -> ")))
+			redirectChainMu.Lock()
+			chain := strings.Join(redirectChain, " -> ")
+			redirectChainMu.Unlock()
+			log.Info("Request complete, redirect chain", svc1log.SafeParam("chain", chain))
+			select {
+			case err := <-browsersErr:
+				if err != nil {
+					log.Error("Redirect error occurred", svc1log.SafeParam("error", err.Error()))
+					browserErr = err
+				}
+			default:
+			}
 		case <-ctx.Done():
+			redirectChainMu.Lock()
+			chain := strings.Join(redirectChain, " -> ")
+			redirectChainMu.Unlock()
 			if ctx.Err() == context.DeadlineExceeded {
 				log.Warn("Request timed out",
 					svc1log.SafeParam("url", *constructedURL),
 					svc1log.SafeParam("timeout", config.Timeout),
-					svc1log.SafeParam("redirectChain", strings.Join(redirectChain, " -> ")))
+					svc1log.SafeParam("redirectChain", chain))
 				browserErr = fmt.Errorf("request timeout after %d seconds", config.Timeout)
 			} else {
 				log.Warn("Request cancelled",
@@ -193,6 +208,18 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 		// =========================================================================================
 		// RESPONSE PROCESSING
 		// =========================================================================================
+
+		// Wait for page to fully load and for client-side routers/auth flows to
+		// settle before reading finalURL or HTML.
+		err = waitForPageLoad(page, b.MinDOMStabalizeTimeSeconds, log)
+		if err != nil {
+			log.Warn("Page stabilization warning", svc1log.SafeParam("error", err.Error()))
+		}
+
+		// Use the latest captured main-document headers after stabilization so
+		// headers, finalURL, and HTML describe the same terminal document.
+		var responseHeaders map[string][]string
+		responseHeaders = getResponseHeaders(ctx, page, headerCapture)
 
 		// Batch JavaScript evaluations for better performance
 		batchJS := `() => {
@@ -210,7 +237,6 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 
 		batchResult, err := page.Eval(batchJS)
 		var finalURL string
-		var responseHeaders map[string][]string
 		var isErrorPage bool
 
 		if err != nil {
@@ -251,31 +277,28 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 			}
 		}
 
-		// Always use the reliable headers extraction method
-		responseHeaders = getResponseHeaders(ctx, page, headerCapture)
-
 		// Redirect Chain
 		if finalURL != "" && !utils.IsStaticAsset(finalURL) {
-			exists := false
-			for _, url := range redirectChain {
-				if url == finalURL {
-					exists = true
-					break
-				}
+			redirectChainMu.Lock()
+			added, redirectErr := appendRedirectURLLocked(&redirectChain, finalURL, config.MaxRedirects)
+			if redirectErr != nil {
+				redirectChainMu.Unlock()
+				browserErr = redirectErr
+				return
 			}
-			if !exists {
-				redirectChain = append(redirectChain, finalURL)
+			if added {
+				chain := strings.Join(redirectChain, " -> ")
+				redirectChainMu.Unlock()
 				log.Info("Adding final URL to chain", svc1log.SafeParam("url", finalURL))
-				log.Info("Updated redirect chain", svc1log.SafeParam("chain", strings.Join(redirectChain, " -> ")))
+				log.Info("Updated redirect chain", svc1log.SafeParam("chain", chain))
+			} else {
+				redirectChainMu.Unlock()
 			}
 		}
+		redirectChainMu.Lock()
 		redirectChain = filterRedirectChain(redirectChain)
-
-		// Wait for page to fully load (optimized)
-		err = waitForPageLoad(page, b.MinDOMStabalizeTimeSeconds, log)
-		if err != nil {
-			log.Warn("Page stabilization warning", svc1log.SafeParam("error", err.Error()))
-		}
+		responseRedirectChain := append([]string(nil), redirectChain...)
+		redirectChainMu.Unlock()
 
 		log.Info("Final URL", svc1log.SafeParam("url", finalURL))
 
@@ -304,7 +327,7 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 		// Build final response
 		response := requesthelpers.CreateHTTPResponse(
 			statusCode,
-			redirectChain,
+			responseRedirectChain,
 			responseHeaders,
 			responseBody,
 		)
@@ -324,9 +347,12 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 	}
 
 	// Check for cross-domain redirect after navigation completes
-	if finalErr == nil && config.IgnoreCrossDomainRedirects && len(redirectChain) > 1 {
-		originalURL := redirectChain[0]
-		for _, chainURL := range redirectChain[1:] {
+	redirectChainMu.Lock()
+	finalRedirectChain := append([]string(nil), redirectChain...)
+	redirectChainMu.Unlock()
+	if finalErr == nil && config.IgnoreCrossDomainRedirects && len(finalRedirectChain) > 1 {
+		originalURL := finalRedirectChain[0]
+		for _, chainURL := range finalRedirectChain[1:] {
 			if isCrossDomainRedirect(originalURL, chainURL) {
 				log.Info("Cross-domain redirect detected in redirect chain", svc1log.SafeParam("from", originalURL), svc1log.SafeParam("to", chainURL))
 				return common.HttpRequestResponse{Request: config.Request}, fmt.Errorf("cross-domain redirect blocked: %s -> %s", originalURL, chainURL)

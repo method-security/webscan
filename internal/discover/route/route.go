@@ -66,7 +66,7 @@ func ExtractRedirectRoutes(redirectChain []string, baseURL string, routeCaptureC
 			continue
 		}
 
-		parsedCleanURL, err := url.Parse(urlNoQuery)
+		routeBaseURL, routePath, err := discoverroutehelpers.SplitURLBaseAndPath(urlNoQuery)
 		if err != nil {
 			errors = append(errors, fmt.Sprintf("Failed to parse clean redirect URL %s: %s", urlNoQuery, err))
 			continue
@@ -75,8 +75,8 @@ func ExtractRedirectRoutes(redirectChain []string, baseURL string, routeCaptureC
 		urls[urlNoQuery] = struct{}{}
 
 		routeVar := &discover.RouteDetails{
-			BaseUrl:     baseURL,
-			Path:        parsedCleanURL.Path,
+			BaseUrl:     routeBaseURL,
+			Path:        routePath,
 			Method:      common.HttpMethodGet.Ptr(), // Redirects are typically GET
 			QueryParams: queryParams,
 		}
@@ -90,14 +90,17 @@ func ExtractRedirectRoutes(redirectChain []string, baseURL string, routeCaptureC
 // buildAllParameterURLs creates URLs for ALL discovered parameter values (no sampling)
 func buildAllParameterURLs(route *discover.RouteDetails) []string {
 	var allURLs []string
-	baseURL := route.BaseUrl + route.Path
-
-	if route.QueryParams == nil || len(route.QueryParams) == 0 {
+	if route == nil || route.QueryParams == nil || len(route.QueryParams) == 0 {
 		return allURLs
 	}
 
+	baseURL := route.BaseUrl + route.Path
+
 	// Build URLs with ALL discovered parameter values - no sampling or limits
 	for _, param := range route.QueryParams {
+		if param == nil {
+			continue
+		}
 		if param.ExampleValues != nil && len(param.ExampleValues) > 0 {
 			// Test EVERY value for this parameter to ensure complete coverage
 			for _, value := range param.ExampleValues {
@@ -168,17 +171,14 @@ func extractRoutes(ctx context.Context, httpRequestResponse *common.HttpRequestR
 	redirectedURL := httpRequestResponse.Response.RedirectChain[len(httpRequestResponse.Response.RedirectChain)-1]
 	log.Info("Redirected URL", svc1log.SafeParam("url", redirectedURL))
 
-	// Parse the redirected URL to preserve query parameters
-	parsedRedirectedURL, err := url.Parse(redirectedURL)
+	// Use the full page URL for resolving relative paths, but keep BaseUrl output origin-only.
+	redirectedURLBase, _, err := discoverroutehelpers.SplitURLBaseAndPath(redirectedURL)
 	if err != nil {
-		errorMsg := fmt.Sprintf("Failed to parse redirected URL %s: %s", redirectedURL, err)
+		errorMsg := fmt.Sprintf("Failed to split redirected URL %s: %s", redirectedURL, err)
 		log.Error(errorMsg)
 		errors = append(errors, errorMsg)
 		return routes, discoverroutehelpers.SetToListString(urls), errors
 	}
-
-	// Extract base URL (without query parameters for route extraction context)
-	redirectedURLBase := fmt.Sprintf("%s://%s", parsedRedirectedURL.Scheme, parsedRedirectedURL.Host)
 
 	// Helper function to process errors with context
 	processErrors := func(source string, newErrors []string) {
@@ -189,35 +189,35 @@ func extractRoutes(ctx context.Context, httpRequestResponse *common.HttpRequestR
 
 	// Extract routes from form elements
 	log.Info("Extracting routes from form elements")
-	formRoutes, formUrls, formErrors := capturerouteextractors.ExtractFormRoutes(doc, redirectedURLBase, routeCaptureConfig)
+	formRoutes, formUrls, formErrors := capturerouteextractors.ExtractFormRoutes(doc, redirectedURL, routeCaptureConfig)
 	routes = append(routes, formRoutes...)
 	urls = discoverroutehelpers.AddListToSetString(urls, formUrls)
 	processErrors("Form Elements", formErrors)
 
 	// Extract routes from anchor elements
 	log.Info("Extracting routes from anchor elements")
-	anchorRoutes, anchorUrls, anchorErrors := capturerouteextractors.ExtractAnchorRoutes(doc, redirectedURLBase, routeCaptureConfig)
+	anchorRoutes, anchorUrls, anchorErrors := capturerouteextractors.ExtractAnchorRoutes(doc, redirectedURL, routeCaptureConfig)
 	routes = append(routes, anchorRoutes...)
 	urls = discoverroutehelpers.AddListToSetString(urls, anchorUrls)
 	processErrors("Anchor Elements", anchorErrors)
 
 	// Extract routes from link elements
 	log.Info("Extracting routes from link elements")
-	linkRoutes, linkUrls, linkErrors := capturerouteextractors.ExtractLinkRoutes(doc, redirectedURLBase, routeCaptureConfig)
+	linkRoutes, linkUrls, linkErrors := capturerouteextractors.ExtractLinkRoutes(doc, redirectedURL, routeCaptureConfig)
 	routes = append(routes, linkRoutes...)
 	urls = discoverroutehelpers.AddListToSetString(urls, linkUrls)
 	processErrors("Link Elements", linkErrors)
 
 	// Extract routes from script elements
 	log.Info("Extracting routes from script elements")
-	scriptRoutes, scriptUrls, scriptErrors := capturerouteextractors.ExtractScriptRoutes(ctx, doc, redirectedURLBase, routeCaptureConfig)
+	scriptRoutes, scriptUrls, scriptErrors := capturerouteextractors.ExtractScriptRoutes(ctx, doc, redirectedURL, routeCaptureConfig)
 	routes = append(routes, scriptRoutes...)
 	urls = discoverroutehelpers.AddListToSetString(urls, scriptUrls)
 	errors = append(errors, scriptErrors...)
 
 	// Extract routes from inline script elements
 	log.Info("Extracting routes from inline script elements")
-	inlineScriptRoutes, inlineScriptUrls, inlineScriptErrors := capturerouteextractors.ExtractInlineScriptRoutes(ctx, doc, redirectedURLBase, routeCaptureConfig)
+	inlineScriptRoutes, inlineScriptUrls, inlineScriptErrors := capturerouteextractors.ExtractInlineScriptRoutes(ctx, doc, redirectedURL, routeCaptureConfig)
 	routes = append(routes, inlineScriptRoutes...)
 	urls = discoverroutehelpers.AddListToSetString(urls, inlineScriptUrls)
 	errors = append(errors, inlineScriptErrors...)
@@ -350,11 +350,14 @@ func PerformRouteCapture(ctx context.Context, config discover.DiscoverRouteConfi
 					return
 				}
 
-				// Extract base URL
-				currentBaseURL := fmt.Sprintf("%s://%s", parsedURL.Scheme, parsedURL.Host)
+				// Extract base URL and path
+				currentBaseURL, currentPath, err := discoverroutehelpers.SplitURLBaseAndPath(targetURL)
+				if err != nil {
+					errChan <- fmt.Sprintf("error splitting URL %s: %s", targetURL, err)
+					return
+				}
 
-				// Separate path and query parameters
-				currentPath := parsedURL.Path
+				// Separate query parameters
 				var queryParams map[string]string
 				if parsedURL.RawQuery != "" {
 					queryParams = make(map[string]string)
@@ -394,6 +397,9 @@ func PerformRouteCapture(ctx context.Context, config discover.DiscoverRouteConfi
 
 				// Collect routes to spider
 				for _, route := range routes {
+					if route == nil {
+						continue
+					}
 					// Visit the base route (without parameters)
 					baseRouteURL := route.BaseUrl + route.Path
 					mu.Lock()

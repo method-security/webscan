@@ -9,7 +9,40 @@ info:
     method-module-name: KIBANA
     cpe: cpe:2.3:a:elastic:kibana:*:*:*:*:*:*:*:*
   tags: discovery,kibana,elastic,observability,observability-platform
+flow: http(1) && http(2)
 http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/api/status"
+    redirects: true
+    max-redirects: 5
+    matchers-condition: and
+    matchers:
+      - type: dsl
+        internal: true
+        dsl:
+          - "status_code == 200 || status_code == 503"
+      - type: word
+        part: header
+        words:
+          - "application/json"
+        case-insensitive: true
+        internal: true
+      - type: regex
+        part: body
+        regex:
+          - '"version"\s*:\s*\{[^}]*"number"\s*:\s*"[0-9]+(?:\.[0-9]+){1,3}(?:[-+][^"]+)?"'
+        internal: true
+      - type: regex
+        part: body
+        regex:
+          - '"build_(?:hash|number|snapshot)"\s*:'
+        internal: true
+      - type: regex
+        part: body
+        regex:
+          - '"status"\s*:\s*\{'
+        internal: true
   - method: GET
     path:
       - "{{BaseURL}}"

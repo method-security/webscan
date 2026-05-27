@@ -38,7 +38,6 @@ http:
         regex:
           - '"version"\s*:\s*"[0-9]+(?:\.[0-9]+){1,3}(?:[-+][^"]+)?"'
         internal: true
-
   - method: GET
     path:
       - "{{BaseURL}}"

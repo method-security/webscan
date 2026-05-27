@@ -28,7 +28,11 @@ func ResolveUserAgent(preset *common.UserAgentPreset) string {
 	}
 	switch *preset {
 	case common.UserAgentPresetChrome:
-		return pickUserAgentByFilter(useragent.Chrome)
+		// Edge UAs are also tagged "Chrome" because Edge is Chromium-based.
+		// Exclude them so we only pick genuine Chrome UAs.
+		return pickUserAgentByFilter(func(ua *useragent.UserAgent) bool {
+			return useragent.ContainsTagsAny(ua, "Chrome", "Chromium") && !useragent.ContainsTagsAny(ua, "Edge")
+		})
 	case common.UserAgentPresetFirefox:
 		return pickUserAgentByFilter(useragent.Mozilla)
 	case common.UserAgentPresetSafari:

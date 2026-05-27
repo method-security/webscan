@@ -361,11 +361,10 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 	redirectChainMu.Unlock()
 	if finalErr == nil && config.IgnoreCrossDomainRedirects && len(finalRedirectChain) > 1 {
 		originalURL := finalRedirectChain[0]
-		for _, chainURL := range finalRedirectChain[1:] {
-			if isCrossDomainRedirect(originalURL, chainURL) {
-				log.Info("Cross-domain redirect detected in redirect chain", svc1log.SafeParam("from", originalURL), svc1log.SafeParam("to", chainURL))
-				return common.HttpRequestResponse{Request: config.Request}, fmt.Errorf("cross-domain redirect blocked: %s -> %s", originalURL, chainURL)
-			}
+		finalURL := finalRedirectChain[len(finalRedirectChain)-1]
+		if isCrossDomainRedirect(originalURL, finalURL) {
+			log.Info("Cross-domain redirect detected in redirect chain", svc1log.SafeParam("from", originalURL), svc1log.SafeParam("to", finalURL))
+			return common.HttpRequestResponse{Request: config.Request}, fmt.Errorf("cross-domain redirect blocked: %s -> %s", originalURL, finalURL)
 		}
 	}
 

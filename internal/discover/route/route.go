@@ -90,15 +90,18 @@ func ExtractRedirectRoutes(redirectChain []string, baseURL string, routeCaptureC
 // buildAllParameterURLs creates URLs for ALL discovered parameter values (no sampling)
 func buildAllParameterURLs(route *discover.RouteDetails) []string {
 	var allURLs []string
-	baseURL := route.BaseUrl + route.Path
-
-	if len(route.QueryParams) == 0 {
+	if route == nil || route.QueryParams == nil || len(route.QueryParams) == 0 {
 		return allURLs
 	}
 
+	baseURL := route.BaseUrl + route.Path
+
 	// Build URLs with ALL discovered parameter values - no sampling or limits
 	for _, param := range route.QueryParams {
-		if len(param.ExampleValues) > 0 {
+		if param == nil {
+			continue
+		}
+		if param.ExampleValues != nil && len(param.ExampleValues) > 0 {
 			// Test EVERY value for this parameter to ensure complete coverage
 			for _, value := range param.ExampleValues {
 				// For single parameter, create simple query string
@@ -152,7 +155,7 @@ func extractRoutes(ctx context.Context, httpRequestResponse *common.HttpRequestR
 		errors = append(errors, "No response body content available")
 		return routes, discoverroutehelpers.SetToListString(urls), errors
 	}
-	if len(httpRequestResponse.Response.RedirectChain) == 0 {
+	if httpRequestResponse.Response.RedirectChain == nil || len(httpRequestResponse.Response.RedirectChain) == 0 {
 		errors = append(errors, "No redirect chain available")
 		return routes, discoverroutehelpers.SetToListString(urls), errors
 	}
@@ -394,6 +397,9 @@ func PerformRouteCapture(ctx context.Context, config discover.DiscoverRouteConfi
 
 				// Collect routes to spider
 				for _, route := range routes {
+					if route == nil {
+						continue
+					}
 					// Visit the base route (without parameters)
 					baseRouteURL := route.BaseUrl + route.Path
 					mu.Lock()
@@ -405,7 +411,7 @@ func PerformRouteCapture(ctx context.Context, config discover.DiscoverRouteConfi
 					mu.Unlock()
 
 					// Visit routes with ALL their discovered query parameter values (comprehensive testing)
-					if len(route.QueryParams) > 0 {
+					if route.QueryParams != nil && len(route.QueryParams) > 0 {
 						// Build URLs with ALL parameter values - no sampling to ensure complete coverage
 						allParameterURLs := buildAllParameterURLs(route)
 						mu.Lock()

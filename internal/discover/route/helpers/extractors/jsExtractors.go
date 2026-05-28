@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"regexp"
 	"strings"
 
@@ -105,7 +104,7 @@ func extractRoutesFromPatterns(content string, baseURL string, routeCaptureConfi
 				continue
 			}
 
-			parsedURL, err := url.Parse(urlNoQuery)
+			routeBaseURL, routePath, err := discoverroutehelpers.SplitURLBaseAndPath(urlNoQuery)
 			if err != nil {
 				errors = append(errors, err.Error())
 				continue
@@ -117,8 +116,8 @@ func extractRoutesFromPatterns(content string, baseURL string, routeCaptureConfi
 			}
 
 			route := &discover.RouteDetails{
-				BaseUrl: baseURL,
-				Path:    parsedURL.Path,
+				BaseUrl: routeBaseURL,
+				Path:    routePath,
 				Method:  common.HttpMethod(method).Ptr(),
 			}
 
@@ -274,10 +273,11 @@ func (v *visitor) processFetchCall(node *ast.CallExpression) {
 		return
 	}
 	urlStr := urlArg.Value
+	fullURL := discoverroutehelpers.ResolveURL(v.baseURL, urlStr)
 
 	// Check if the URL is allowed
 	// Only consider URLs that are part of the base URL if specified
-	if !discoverroutehelpers.IsURLAllowed(v.baseURL, urlStr, v.baseURLsOnly, v.captureStaticAssets) {
+	if !discoverroutehelpers.IsURLAllowed(v.baseURL, fullURL, v.baseURLsOnly, v.captureStaticAssets) {
 		return
 	}
 
@@ -302,7 +302,7 @@ func (v *visitor) processFetchCall(node *ast.CallExpression) {
 		}
 	}
 
-	v.addRoute(urlStr, method, bodyParams, queryParams)
+	v.addRoute(fullURL, method, bodyParams, queryParams)
 }
 
 // addRoute adds a route to the list
@@ -314,15 +314,15 @@ func (v *visitor) addRoute(urlStr, method string, bodyParams []*discover.RouteBo
 		return
 	}
 
-	parsedURL, err := url.Parse(urlNoQuery)
+	routeBaseURL, routePath, err := discoverroutehelpers.SplitURLBaseAndPath(urlNoQuery)
 	if err != nil {
 		*v.errors = append(*v.errors, err.Error())
 		return
 	}
 
 	route := &discover.RouteDetails{
-		BaseUrl:     v.baseURL,
-		Path:        parsedURL.Path,
+		BaseUrl:     routeBaseURL,
+		Path:        routePath,
 		Method:      common.HttpMethod(method).Ptr(),
 		BodyParams:  bodyParams,
 		QueryParams: queryParams,

@@ -268,6 +268,23 @@ func URLRemoveQueryParams(rawURL string) (string, error) {
 	return parsedURL.String(), nil
 }
 
+// SplitURLBaseAndPath returns the URL origin and path as separate route fields.
+func SplitURLBaseAndPath(rawURL string) (string, string, error) {
+	parsedURL, err := url.Parse(rawURL)
+	if err != nil {
+		return "", "", err
+	}
+
+	baseURL := ""
+	if parsedURL.Scheme != "" && parsedURL.Host != "" {
+		baseURL = fmt.Sprintf("%s://%s", parsedURL.Scheme, parsedURL.Host)
+	} else if parsedURL.Host != "" {
+		baseURL = "//" + parsedURL.Host
+	}
+
+	return strings.TrimRight(baseURL, "/"), parsedURL.Path, nil
+}
+
 // IsURLAllowed checks if a target URL is allowed based on base URL, static asset rules, and domain matching.
 func IsURLAllowed(baseURL string, targetURL string, ignoreCrossDomain bool, collectStaticAssets bool) bool {
 	if collectStaticAssets {

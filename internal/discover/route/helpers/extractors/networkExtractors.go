@@ -115,18 +115,18 @@ func ExtractNetworkRoutes(ctx context.Context, browser *headless.Requester, targ
 			continue
 		}
 
-		// Get the path from the full URL
-		parsedURL, err := url.Parse(urlNoQuery)
+		// Get the origin and path from the full URL
+		routeBaseURL, routePath, err := discoverroutehelpers.SplitURLBaseAndPath(urlNoQuery)
 		if err != nil {
 			errors = append(errors, err.Error())
 			continue
 		}
 
 		// Build WebRoute object
-		log.Info("Building WebRoute object", svc1log.SafeParam("url", urlNoQuery), svc1log.SafeParam("path", parsedURL.Path), svc1log.SafeParam("method", request.Method))
+		log.Info("Building WebRoute object", svc1log.SafeParam("url", urlNoQuery), svc1log.SafeParam("path", routePath), svc1log.SafeParam("method", request.Method))
 		webRoute := &discover.RouteDetails{
-			BaseUrl: urlNoQuery,
-			Path:    parsedURL.Path,
+			BaseUrl: routeBaseURL,
+			Path:    routePath,
 			Method:  common.HttpMethod(request.Method).Ptr(),
 		}
 

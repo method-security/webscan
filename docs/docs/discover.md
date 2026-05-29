@@ -21,7 +21,7 @@ webscan discover [command]
 
 The following flag is available on all `discover` subcommands:
 
-- `--ignore-cross-domain-redirects` (bool, default: `false`) — Do not follow redirects to a different domain and treat them as errors
+- `--ignore-cross-domain-redirects` (bool, default: `true`) — Do not follow redirects to a different domain and treat them as errors
 
 ## Commands
 
@@ -43,8 +43,8 @@ Usage:
   webscan discover application [flags]
 
 Flags:
-      --global-rate-limit int   Global rate limit (requests per second, 0 = no limit)
-      --global-timeout int      Maximum total scan time in seconds (0 means no timeout)
+      --global-rate-limit int   Global rate limit in requests per second (default 10)
+      --global-timeout int      Maximum total scan time in seconds
   -h, --help                    help for application
       --proxy string            Optional HTTP proxy URL
       --resource-type string    Type of resource to fingerprint (e.g., web, api, cms) (default "ALL")
@@ -82,18 +82,18 @@ Flags:
       --http-methods strings                 HTTP methods to use (e.g. GET,POST,PUT) (default [GET])
       --ignore-base-content-match            Ignores valid responses with identical size and word length to the base path, typically signifying a web backend redirect (default true)
       --max-redirects-baseline-request int   Maximum number of redirects to follow for the baseline request (default 10)
-      --max-runtime int                      Maximum time to run the engagement (seconds) (Default is 0, which will run indefinitely)
+      --max-runtime int                      Maximum time to run the engagement in seconds (default 650)
       --paths strings                        Paths to scan
       --response-codes string                Response codes to consider as valid responses (default "200-299")
       --retries int                          Number of times to retry a request if it fails
       --sleep int                            Number of seconds to sleep between requests
       --targets strings                      Targets to be scanned
-      --threads int                          Number of threads to use
+      --threads int                          Number of threads to use (default 25)
       --threshold float                      Threshold for successful results (default 0.25)
-      --timeout int                          Timeout per request in seconds (default 30)
+      --timeout int                          Timeout per request in seconds (default 20)
       --verify-tls                           Verify TLS certificates when making HTTPS requests
-      --wordlist-size string                 Size of wordlist to use (TINY, SMALL, MEDIUM, LARGE)
-      --wordlist-type string                 Type of wordlist to use automatically (directories, files)
+      --wordlist-size string                 Size of wordlist to use (TINY, SMALL, MEDIUM, LARGE) (default "SMALL")
+      --wordlist-type string                 Type of wordlist to use automatically (directories, files) (default "DIRECTORIES")
 
 Global Flags:
   -o, --output string        Output format (signal, json, yaml). Default value is signal (default "signal")
@@ -128,13 +128,13 @@ Flags:
   -h, --help                                       help for page
       --max-redirects int                          Maximum number of redirects to follow (default 10)
       --min-dom-stabalize-time int                 Minimum time to wait for DOM stabilization in seconds (default 20)
-      --request-method string                      Request method to use (standard, headless, browserbase) (default "STANDARD")
+      --request-method string                      Request method to use (standard, headless, browserbase) (default "HEADLESS")
       --response-codes string                      Response codes to consider as valid responses (default "200-299")
       --screenshot                                 Capture a screenshot of the page
-      --sensitive-content-detection                Enable sensitive content detection
-      --sensitive-content-fingerprints-path string Path to a custom sensitive content fingerprints file (uses built-in fingerprints by default)
+      --sensitive-content-detection                Enable sensitive content detection (default true)
+      --sensitive-content-fingerprints-path string Path to a custom sensitive content fingerprints file
       --target string                              URL target to capture and analyze
-      --timeout int                                Timeout per request in seconds (default 30)
+      --timeout int                                Timeout per request in seconds (default 180)
       --verify-tls                                 Verify TLS certificates when making HTTPS requests
 
 Global Flags:
@@ -173,7 +173,7 @@ Flags:
       --protocol string                 Protocol to use for the probe (HTTP, HTTPS)
       --request-method string           Request method to use (standard, headless, browserbase) (default "STANDARD")
       --targets strings                 URL targets to probe for web applications
-      --timeout int                     Timeout per request in seconds (default 30)
+      --timeout int                     Timeout per request in seconds (default 180)
       --verify-tls                      Verify TLS certificates when making HTTPS requests
 
 Global Flags:
@@ -208,14 +208,14 @@ Flags:
       --collect-static-assets           Collect static assets from route discovery
       --headless-path string            Path to headless browser executable
   -h, --help                            help for route
-      --ignore-cross-domain              Ignore routes that do not share the target's base URL (default false)
-      --max-redirects int               Maximum number of redirects to follow (default 100)
+      --ignore-cross-domain              Ignore routes that do not share the target's base URL (default true)
+      --max-redirects int               Maximum number of redirects to follow (default 10)
       --min-dom-stabalize-time int      Minimum time to wait for DOM stabilization in seconds (default 20)
-      --request-method string           Request method to use (standard, headless, browserbase) (default "STANDARD")
-      --spider-depth int                Maximum depth for route spidering (default 3)
+      --request-method string           Request method to use (standard, headless, browserbase) (default "HEADLESS")
+      --spider-depth int                Maximum depth for route spidering (default 1)
       --target string                   URL target to discover routes from
       --threads int                     Number of concurrent threads for scanning
-      --timeout int                     Timeout per request in seconds (default 30)
+      --timeout int                     Timeout per request in seconds (default 90)
       --verify-tls                      Verify TLS certificates when making HTTPS requests
 
 Global Flags:
@@ -257,8 +257,8 @@ Flags:
       --saas-file-paths strings         Files containing SaaS application fingerprints
       --sso-companies strings           The specific SSO companies to use for discovery (Must be present in the SSO fingerprints file)
       --sso-file-paths strings          Files containing SSO application fingerprints
-      --threads int                     Number of concurrent threads for discovery (default: number of CPUs)
-      --timeout int                     Timeout in seconds for the capture (default 30)
+      --threads int                     Number of concurrent threads for discovery (default 25)
+      --timeout int                     Timeout in seconds for the capture (default 90)
       --verify-tls                      Verify TLS certificates when making HTTPS requests
 
 Global Flags:
@@ -267,4 +267,3 @@ Global Flags:
   -q, --quiet                Suppress output
   -v, --verbose              Verbose output
 ```
-

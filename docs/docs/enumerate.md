@@ -116,7 +116,7 @@ Flags:
       --plugins-file-paths strings  Paths to files containing WordPress plugin lists
       --plugins-file-size string    Size of the WordPress plugin list to use (default "SMALL")
       --targets strings             URL targets to perform WordPress plugin enumeration against
-      --threads int                 Number of concurrent threads for scanning
+      --threads int                 Number of concurrent threads for scanning (default 50)
       --timeout int                 Timeout per request in seconds (default 30)
       --verify-tls                  Verify TLS certificates when making HTTPS requests
 
@@ -145,7 +145,7 @@ Flags:
       --modules-file-paths strings   Paths to files containing Drupal module lists
       --modules-file-size string     Size of the Drupal module list to use (default "SMALL")
       --targets strings              URL targets to perform Drupal module enumeration against
-      --threads int                  Number of concurrent threads for scanning
+      --threads int                  Number of concurrent threads for scanning (default 50)
       --timeout int                  Timeout per request in seconds (default 30)
       --verify-tls                   Verify TLS certificates when making HTTPS requests
 
@@ -176,7 +176,7 @@ Usage:
 Flags:
   -h, --help              help for docker
       --targets strings   URLs of Docker Container Registries to enumerate
-      --threads int       Number of concurrent manifest requests per repository (default 25)
+      --threads int       Number of concurrent manifest requests per repository (default 50)
       --timeout int       Timeout per request in seconds (default 30)
       --verify-tls        Verify TLS certificates when making HTTPS requests
 
@@ -205,11 +205,11 @@ Usage:
 
 Flags:
   -h, --help                help for ratelimit
-      --max-requests int    Maximum number of requests to send (default 10)
+      --max-requests int    Maximum number of requests to send (default 100)
       --sleep int           Time window between requests in seconds
       --targets strings     URL targets to perform rate limit enumeration against
-      --threads int         Number of concurrent threads for scanning
-      --timeout int         Timeout per request in seconds (default 30)
+      --threads int         Number of concurrent threads for scanning (default 100)
+      --timeout int         Timeout per request in seconds (default 5)
       --verify-tls          Verify TLS certificates when making HTTPS requests
 
 Global Flags:
@@ -218,4 +218,3 @@ Global Flags:
   -q, --quiet                Suppress output
   -v, --verbose              Verbose output
 ```
-

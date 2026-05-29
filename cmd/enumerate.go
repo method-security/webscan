@@ -289,7 +289,7 @@ func (a *WebScan) InitEnumerateCommand() {
 	enumerateCMSWordpressPluginsCmd.Flags().String("plugins-file-size", "SMALL", "Size of the WordPress plugin list to use")
 	enumerateCMSWordpressPluginsCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
 	enumerateCMSWordpressPluginsCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
-	enumerateCMSWordpressPluginsCmd.Flags().Int("threads", 0, "Number of concurrent threads for scanning")
+	enumerateCMSWordpressPluginsCmd.Flags().Int("threads", 50, "Number of concurrent threads for scanning")
 
 	// Mark required flags
 	_ = enumerateCMSWordpressPluginsCmd.MarkFlagRequired("targets")
@@ -402,7 +402,7 @@ func (a *WebScan) InitEnumerateCommand() {
 	enumerateCMSDrupalModulesCmd.Flags().String("modules-file-size", string(enumeratecmsdrupalfern.ModulesFileSizeSmall), "Size of the Drupal module list to use")
 	enumerateCMSDrupalModulesCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
 	enumerateCMSDrupalModulesCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
-	enumerateCMSDrupalModulesCmd.Flags().Int("threads", 0, "Number of concurrent threads for scanning")
+	enumerateCMSDrupalModulesCmd.Flags().Int("threads", 50, "Number of concurrent threads for scanning")
 
 	// Mark required flags
 	_ = enumerateCMSDrupalModulesCmd.MarkFlagRequired("targets")
@@ -477,11 +477,11 @@ func (a *WebScan) InitEnumerateCommand() {
 	// Target Flags
 	enumerateGeneralRatelimitCmd.Flags().StringSlice("targets", []string{}, "URL targets to perform rate limit enumeration against")
 	// Config Flags
-	enumerateGeneralRatelimitCmd.Flags().Int("max-requests", 10, "Maximum number of requests to send")
+	enumerateGeneralRatelimitCmd.Flags().Int("max-requests", 100, "Maximum number of requests to send")
 	enumerateGeneralRatelimitCmd.Flags().Int("sleep", 0, "Time window between requests in seconds")
 	enumerateGeneralRatelimitCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
-	enumerateGeneralRatelimitCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
-	enumerateGeneralRatelimitCmd.Flags().Int("threads", 0, "Number of concurrent threads for scanning")
+	enumerateGeneralRatelimitCmd.Flags().Int("timeout", 5, "Timeout per request in seconds")
+	enumerateGeneralRatelimitCmd.Flags().Int("threads", 100, "Number of concurrent threads for scanning")
 
 	// Mark required flags
 	_ = enumerateGeneralRatelimitCmd.MarkFlagRequired("targets")
@@ -545,7 +545,7 @@ func (a *WebScan) InitEnumerateCommand() {
 	// Config Flags
 	enumerateContainerRegistryDockerCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
 	enumerateContainerRegistryDockerCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
-	enumerateContainerRegistryDockerCmd.Flags().Int("threads", 25, "Number of concurrent manifest requests per repository")
+	enumerateContainerRegistryDockerCmd.Flags().Int("threads", 50, "Number of concurrent manifest requests per repository")
 
 	// Mark required flags
 	_ = enumerateContainerRegistryDockerCmd.MarkFlagRequired("targets")

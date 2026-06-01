@@ -16,7 +16,7 @@ import (
 
 var commonKubepaths = []string{"/api", "/livez", "/version"}
 
-func createSendHTTPRequestConfig(baseURL, path string, verifyTLS bool, timeout int) common.SendHttpRequestConfig {
+func createSendHTTPRequestConfig(baseURL, path string, verifyTLS bool, timeout int, userAgent common.UserAgentPreset) common.SendHttpRequestConfig {
 	request := common.HttpRequest{
 		BaseUrl: baseURL,
 		Path:    path,
@@ -28,6 +28,7 @@ func createSendHTTPRequestConfig(baseURL, path string, verifyTLS bool, timeout i
 		MaxRedirects:       0,
 		VerifyTls:          verifyTLS,
 		Timeout:            timeout,
+		UserAgent:          userAgent,
 		RequestMethod:      common.RequestMethodStandard,
 		HeadlessConfig:     nil,
 		BrowserbaseConfig:  nil,
@@ -53,7 +54,7 @@ func PerformAppEnumerateKube(ctx context.Context, config *enumeratekubefern.Enum
 	requests := []*common.HttpRequestResponse{}
 	for _, path := range commonKubepaths {
 		// Create Request Config
-		requestConfig := createSendHTTPRequestConfig(baseURL, fmt.Sprintf("%s%s", parsedTargetPath, path), config.VerifyTls, config.Timeout)
+		requestConfig := createSendHTTPRequestConfig(baseURL, fmt.Sprintf("%s%s", parsedTargetPath, path), config.VerifyTls, config.Timeout, config.UserAgent)
 
 		// Send Request
 		request, err := request.SendRequest(ctx, requestConfig)

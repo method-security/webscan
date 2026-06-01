@@ -41,6 +41,7 @@ func createSendHTTPRequestConfig(baseURL, path string, config *enumeratecmswordp
 		MaxRedirects:       0,
 		VerifyTls:          config.VerifyTls,
 		Timeout:            config.Timeout,
+		UserAgent:          config.UserAgent,
 		RequestMethod:      common.RequestMethodStandard,
 		HeadlessConfig:     nil,
 		BrowserbaseConfig:  nil,

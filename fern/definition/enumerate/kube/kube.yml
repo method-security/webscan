@@ -1,5 +1,6 @@
 imports:
   http: ../../common/http.yml
+  method: ../../common/method.yml
 types:
   # Function Config Struct
   EnumerateKubeConfig:
@@ -7,6 +8,7 @@ types:
       target: string
       verifyTls: boolean
       timeout: integer
+      userAgent: method.UserAgentPreset
   EnumerateKubeResult:
     properties:
       target: string

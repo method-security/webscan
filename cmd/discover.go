@@ -39,7 +39,7 @@ func (a *WebScan) InitDiscoverCommand() {
 	}
 
 	// General Discover Flags
-	discoverCmd.PersistentFlags().Bool("ignore-cross-domain-redirects", false, "If true, do not follow redirects to a different domain and treat them as errors")
+	discoverCmd.PersistentFlags().Bool("ignore-cross-domain-redirects", true, "If true, do not follow redirects to a different domain and treat them as errors")
 
 	// Application Command
 	discoverApplicationCmd := &cobra.Command{
@@ -120,8 +120,8 @@ func (a *WebScan) InitDiscoverCommand() {
 	discoverApplicationCmd.Flags().Int("threads", 25, "Number of concurrent threads for scanning")
 	discoverApplicationCmd.Flags().String("proxy", "", "Optional HTTP proxy URL")
 	discoverApplicationCmd.Flags().Bool("verbose-logs", false, "Verbose logs")
-	discoverApplicationCmd.Flags().Int("global-rate-limit", 0, "Global rate limit (requests per second, 0 means no limit)")
-	discoverApplicationCmd.Flags().Int("global-timeout", 0, "Maximum total scan time in seconds (0 means no timout)")
+	discoverApplicationCmd.Flags().Int("global-rate-limit", 10, "Global rate limit in requests per second")
+	discoverApplicationCmd.Flags().Int("global-timeout", 0, "Maximum total scan time in seconds")
 
 	// Mark Required Flags
 	_ = discoverApplicationCmd.MarkFlagRequired("targets")
@@ -266,7 +266,7 @@ func (a *WebScan) InitDiscoverCommand() {
 	discoverDirectoryCmd.Flags().StringSlice("targets", []string{}, "Targets to be scanned")
 	// Directory Discovery Flags
 	discoverDirectoryCmd.Flags().StringSlice("paths", []string{}, "Paths to scan")
-	discoverDirectoryCmd.Flags().String("wordlist-type", "", "Type of wordlist to use automatically (directories, files)")
+	discoverDirectoryCmd.Flags().String("wordlist-type", "", "Type of wordlist to use automatically (DIRECTORIES, FILES)")
 	discoverDirectoryCmd.Flags().String("wordlist-size", "", "Size of wordlist to use (TINY, SMALL, MEDIUM, LARGE)")
 	discoverDirectoryCmd.Flags().StringSlice("http-methods", []string{"GET"}, "HTTP methods to use (e.g. GET,POST,PUT)")
 	// Config Flags
@@ -274,10 +274,10 @@ func (a *WebScan) InitDiscoverCommand() {
 	discoverDirectoryCmd.Flags().Bool("ignore-base-content-match", true, "Ignores valid responses with identical size and word length to the base path, typically signifying a web backend redirect")
 	discoverDirectoryCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
 	discoverDirectoryCmd.Flags().Float64("threshold", 0.25, "Threshold for successful results")
-	discoverDirectoryCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
+	discoverDirectoryCmd.Flags().Int("timeout", 20, "Timeout per request in seconds")
 	discoverDirectoryCmd.Flags().Int("max-redirects-baseline-request", 10, "Maximum number of redirects to follow for the baseline request")
-	discoverDirectoryCmd.Flags().Int("max-runtime", 0, "Maximum time to run the engagement (seconds) (Default is 0, which will run indefinitely)")
-	discoverDirectoryCmd.Flags().Int("threads", 0, "Number of threads to use")
+	discoverDirectoryCmd.Flags().Int("max-runtime", 650, "Maximum time to run the engagement in seconds")
+	discoverDirectoryCmd.Flags().Int("threads", 25, "Number of threads to use")
 	discoverDirectoryCmd.Flags().Int("retries", 0, "Number of times to retry a request if it fails")
 	discoverDirectoryCmd.Flags().Int("sleep", 0, "Number of seconds to sleep between requests")
 
@@ -393,15 +393,15 @@ func (a *WebScan) InitDiscoverCommand() {
 	// Target Flags
 	discoverPageCmd.Flags().String("target", "", "URL target to capture and analyze")
 	// Config Flags
-	discoverPageCmd.Flags().Bool("sensitive-content-detection", false, "Enable sensitive content detection")
-	discoverPageCmd.Flags().String("sensitive-content-fingerprints-path", "", "Path to a custom sensitive content fingerprints file (uses built-in fingerprints by default)")
+	discoverPageCmd.Flags().Bool("sensitive-content-detection", true, "Enable sensitive content detection")
+	discoverPageCmd.Flags().String("sensitive-content-fingerprints-path", "", "Path to a custom sensitive content fingerprints file")
 	discoverPageCmd.Flags().String("response-codes", "200-299", "Response codes to consider as valid responses")
 	discoverPageCmd.Flags().Bool("screenshot", false, "Capture a screenshot of the page")
 	discoverPageCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
 	discoverPageCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
-	discoverPageCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
+	discoverPageCmd.Flags().Int("timeout", 180, "Timeout per request in seconds")
 	// Request Method Flags for all capture subcommands
-	discoverPageCmd.Flags().String("request-method", "STANDARD", "Request method to use (standard, headless, browserbase)")
+	discoverPageCmd.Flags().String("request-method", "HEADLESS", "Request method to use (standard, headless, browserbase)")
 	discoverPageCmd.Flags().String("headless-path", "", "Path to headless browser executable")
 	discoverPageCmd.Flags().Int("min-dom-stabalize-time", 20, "Minimum time to wait for DOM stabilization in seconds")
 	discoverPageCmd.Flags().String("browserbase-token", "", "Browserbase API token for cloud browser access")
@@ -584,15 +584,15 @@ func (a *WebScan) InitDiscoverCommand() {
 	// Target Flags
 	discoverRouteCmd.Flags().String("target", "", "URL target to discover routes from")
 	// Config Flags
-	discoverRouteCmd.Flags().Bool("ignore-cross-domain", false, "Ignore routes that do not share the target's base URL")
+	discoverRouteCmd.Flags().Bool("ignore-cross-domain", true, "Ignore routes that do not share the target's base URL")
 	discoverRouteCmd.Flags().Bool("collect-static-assets", false, "Collect static assets from route discovery")
-	discoverRouteCmd.Flags().Int("spider-depth", 3, "Maximum depth for route spidering")
-	discoverRouteCmd.Flags().Int("max-redirects", 100, "Maximum number of redirects to follow")
+	discoverRouteCmd.Flags().Int("spider-depth", 1, "Maximum depth for route spidering")
+	discoverRouteCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
 	discoverRouteCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
-	discoverRouteCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
+	discoverRouteCmd.Flags().Int("timeout", 90, "Timeout per request in seconds")
 	discoverRouteCmd.Flags().Int("threads", 0, "Number of concurrent threads for scanning")
 	// Request Method Flags
-	discoverRouteCmd.Flags().String("request-method", "STANDARD", "Request method to use (standard, headless, browserbase)")
+	discoverRouteCmd.Flags().String("request-method", "HEADLESS", "Request method to use (standard, headless, browserbase)")
 	discoverRouteCmd.Flags().String("headless-path", "", "Path to headless browser executable")
 	discoverRouteCmd.Flags().Int("min-dom-stabalize-time", 20, "Minimum time to wait for DOM stabilization in seconds")
 	discoverRouteCmd.Flags().String("browserbase-token", "", "Browserbase API token for cloud browser access")
@@ -731,8 +731,8 @@ func (a *WebScan) InitDiscoverCommand() {
 	discoverSaasCmd.Flags().StringSlice("sso-companies", []string{}, "The specific SSO companies to use for discovery (Must be present in the SSO fingerprints file)")
 	discoverSaasCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
 	discoverSaasCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
-	discoverSaasCmd.Flags().Int("timeout", 30, "Timeout in seconds for the capture")
-	discoverSaasCmd.Flags().Int("threads", 0, "Number of concurrent threads for discovery (default: number of CPUs)")
+	discoverSaasCmd.Flags().Int("timeout", 90, "Timeout in seconds for the capture")
+	discoverSaasCmd.Flags().Int("threads", 25, "Number of concurrent threads for discovery")
 	// Request Method Flags for all capture subcommands
 	discoverSaasCmd.Flags().String("request-method", "HEADLESS", "Request method (headless, browserbase)")
 	discoverSaasCmd.Flags().String("headless-path", "", "Path to a headless browser executable")

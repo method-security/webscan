@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	neturl "net/url"
+	"sync"
 	"time"
 
 	// Generated
@@ -20,9 +21,27 @@ import (
 	"github.com/projectdiscovery/useragent"
 )
 
+// Cache the resolved User-Agent for the lifetime of the process so that
+// every request in a single CLI invocation sends the same UA. Without this,
+// each SendHTTPRequest call would pick a different random UA, producing
+// inconsistencies between e.g. the HTTP and HTTPS probes to the same target
+// that bot-detection systems can flag. A new process gets a fresh pick.
+var (
+	cachedUserAgent     string
+	cachedUserAgentOnce sync.Once
+)
+
 // ResolveUserAgent returns a User-Agent string based on the given preset.
-// If preset is nil or RANDOM, a random browser UA is picked.
+// If preset is nil or RANDOM, a random browser UA is picked. The result is
+// resolved once per process and reused for all subsequent calls.
 func ResolveUserAgent(preset *common.UserAgentPreset) string {
+	cachedUserAgentOnce.Do(func() {
+		cachedUserAgent = resolveUserAgent(preset)
+	})
+	return cachedUserAgent
+}
+
+func resolveUserAgent(preset *common.UserAgentPreset) string {
 	if preset == nil || *preset == common.UserAgentPresetRandom {
 		return pickRandomUserAgent()
 	}

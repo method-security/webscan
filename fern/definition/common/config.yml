@@ -11,7 +11,7 @@ types:
       timeout: integer
       ignoreCrossDomainRedirects: boolean
       requestMethod: method.RequestMethod
-      userAgent: optional<method.UserAgentPreset>
+      userAgent: method.UserAgentPreset
       headlessConfig: optional<method.HeadlessRequestConfig>
       browserbaseConfig: optional<method.BrowserbaseRequestConfig>
       browserbaseSecrets: optional<method.BrowserbaseRequestSecrets>

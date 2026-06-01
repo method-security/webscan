@@ -23,20 +23,20 @@ var (
 )
 
 // Resolve returns a User-Agent string for the given preset. If preset is
-// nil or RANDOM, a random browser UA is picked. The result is resolved
-// once per process and reused for all subsequent calls.
-func Resolve(preset *common.UserAgentPreset) string {
+// the zero value (empty string) or RANDOM, a random browser UA is picked.
+// The result is resolved once per process and reused for all subsequent calls.
+func Resolve(preset common.UserAgentPreset) string {
 	cachedOnce.Do(func() {
 		cached = pick(preset)
 	})
 	return cached
 }
 
-func pick(preset *common.UserAgentPreset) string {
-	if preset == nil || *preset == common.UserAgentPresetRandom {
+func pick(preset common.UserAgentPreset) string {
+	if preset == "" || preset == common.UserAgentPresetRandom {
 		return pickRandom()
 	}
-	switch *preset {
+	switch preset {
 	case common.UserAgentPresetChrome:
 		// Edge UAs are also tagged "Chrome" because Edge is Chromium-based.
 		// Exclude them so we only pick genuine Chrome UAs.

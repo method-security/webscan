@@ -11,7 +11,7 @@ types:
       verifyTls: boolean
       timeout: integer
       ignoreCrossDomainRedirects: boolean
-      userAgent: optional<method.UserAgentPreset>
+      userAgent: method.UserAgentPreset
       requestMethod: method.RequestMethod
       headlessConfig: optional<method.HeadlessRequestConfig>
       browserbaseConfig: optional<method.BrowserbaseRequestConfig>

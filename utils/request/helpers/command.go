@@ -38,6 +38,20 @@ func GetUserAgentFlag(cmd *cobra.Command) (*common.UserAgentPreset, error) {
 	return &preset, nil
 }
 
+// ValidateUserAgentWithRequestMethod returns an error if the user explicitly set
+// --user-agent to a non-default value while using a request method that ignores it
+// (headless or browserbase). If --user-agent was left at the default (RANDOM),
+// no error is returned since the user didn't explicitly request a specific UA.
+func ValidateUserAgentWithRequestMethod(userAgent *common.UserAgentPreset, requestMethod common.RequestMethod) error {
+	if userAgent == nil || *userAgent == common.UserAgentPresetRandom {
+		return nil
+	}
+	if requestMethod == common.RequestMethodHeadless || requestMethod == common.RequestMethodBrowserbase {
+		return fmt.Errorf("--user-agent flag is not supported with %s request method", requestMethod)
+	}
+	return nil
+}
+
 // GetRequestMethodFlags extracts and validates all request method related configuration from a cobra command
 func GetRequestMethodFlags(cmd *cobra.Command) (*MethodFlagData, error) {
 	// Get Request Method flag

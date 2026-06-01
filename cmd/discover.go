@@ -472,6 +472,12 @@ func (a *WebScan) InitDiscoverCommand() {
 				return
 			}
 
+			// Validate user-agent is not explicitly set with headless/browserbase
+			if err := requesthelpers.ValidateUserAgentWithRequestMethod(userAgentPreset, requestMethodConfig.RequestMethodEnum); err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
 			// Set Config
 			config := getDiscoverProbeConfig(targets, protocol, maxRedirects, verifyTLS, timeout, ignoreCrossDomainRedirects, userAgentPreset, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
 

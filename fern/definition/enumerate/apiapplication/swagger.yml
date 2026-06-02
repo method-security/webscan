@@ -1,10 +1,12 @@
 imports:
   common: ./common.yml
+  method: ../../common/method.yml
 types:
   EnumerateSwaggerConfig:
     properties:
       target: string
       timeout: integer
+      userAgent: method.UserAgentPreset
   EnumerateSwaggerResult:
     properties:
       apiType: common.ApiType

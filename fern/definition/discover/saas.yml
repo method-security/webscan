@@ -28,6 +28,7 @@ types:
       requestMethod: method.RequestMethod
       headlessConfig: optional<method.HeadlessRequestConfig>
       browserbaseConfig: optional<method.BrowserbaseRequestConfig>
+      userAgent: method.UserAgentPreset
   # Report
   SaasActiveFinding:
     properties:

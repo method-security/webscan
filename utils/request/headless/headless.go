@@ -333,21 +333,22 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 
 		// Extract response body
 		var responseBody []byte
-		if statusCode >= 200 && statusCode < 300 {
-			htmlContent, err := page.HTML()
+		if browserErr == nil && statusCode >= 200 && statusCode < 300 {
+			htmlContent, htmlErr := page.HTML()
 			htmlCaptured := false
-			if err != nil {
-				errStr := err.Error()
+			if htmlErr != nil {
+				errStr := htmlErr.Error()
 				if strings.Contains(errStr, "Execution context was destroyed") || strings.Contains(errStr, "-32000") {
 					log.Info("Execution context destroyed while getting HTML content (likely due to redirect)")
 				} else {
-					log.Error("Failed to get HTML content", svc1log.SafeParam("error", err.Error()))
+					log.Error("Failed to get HTML content", svc1log.SafeParam("error", htmlErr.Error()))
 				}
 				responseBody = nil
 				responseHeaders = cloneHeadersWithContentType(responseHeaders, "text/html")
 			} else {
 				htmlCaptured = true
 				responseBody = []byte(htmlContent)
+				responseHeaders = cloneHeadersWithoutContentEncoding(responseHeaders)
 			}
 			if shouldLoadStaticResource(htmlContent, *constructedURL, finalURL) {
 				resourceURL := finalURL
@@ -363,13 +364,18 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 					}
 				} else if err != nil {
 					log.Info("Failed to load static resource body, falling back to page HTML", svc1log.SafeParam("error", cleanErrMsg(err)))
+					if !htmlCaptured {
+						browserErr = fmt.Errorf("failed to capture static resource body: HTML extraction failed (%s); static resource load failed (%s)", cleanErrMsg(htmlErr), cleanErrMsg(err))
+						return
+					}
 					responseHeaders = cloneHeadersWithContentType(responseHeaders, "text/html")
 				} else {
 					log.Info("Loaded static resource did not validate, falling back to page HTML")
+					if !htmlCaptured {
+						browserErr = fmt.Errorf("failed to capture static resource body: HTML extraction failed (%s); loaded static resource did not validate as binary", cleanErrMsg(htmlErr))
+						return
+					}
 					responseHeaders = cloneHeadersWithContentType(responseHeaders, "text/html")
-				}
-				if !htmlCaptured && responseBody == nil {
-					responseBody = []byte{}
 				}
 			}
 		}

@@ -425,6 +425,9 @@ func isChromeStaticAssetViewerHTML(htmlContent string) bool {
 	if isChromePDFViewerHTML(htmlContent) {
 		return true
 	}
+	if !shouldParseStaticAssetViewerHTML(htmlContent) {
+		return false
+	}
 
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlContent))
 	if err != nil {
@@ -454,10 +457,24 @@ func isChromeStaticAssetViewerHTML(htmlContent string) bool {
 	}
 }
 
+func shouldParseStaticAssetViewerHTML(htmlContent string) bool {
+	const maxViewerShellHTMLBytes = 256 * 1024
+	if htmlContent == "" || len(htmlContent) > maxViewerShellHTMLBytes {
+		return false
+	}
+
+	content := strings.ToLower(htmlContent)
+	mediaTags := strings.Count(content, "<img") +
+		strings.Count(content, "<video") +
+		strings.Count(content, "<audio")
+	return mediaTags == 1
+}
+
 func shouldLoadStaticResource(htmlContent, constructedURL, finalURL string) bool {
-	return isChromeStaticAssetViewerHTML(htmlContent) ||
-		utils.IsStaticAsset(constructedURL) ||
-		utils.IsStaticAsset(finalURL)
+	if utils.IsStaticAsset(constructedURL) || utils.IsStaticAsset(finalURL) {
+		return true
+	}
+	return isChromeStaticAssetViewerHTML(htmlContent)
 }
 
 func isValidStaticResourceBody(body []byte) bool {
@@ -473,7 +490,7 @@ func headersForLoadedStaticResource(existingHeaders, loadedHeaders map[string][]
 }
 
 func cloneHeadersWithBodyMetadata(headers map[string][]string, body []byte) map[string][]string {
-	cloned := cloneHeaders(headers)
+	cloned := cloneHeadersWithoutContentEncoding(headers)
 	contentType := requesthelpers.DetectContentTypeFromBytes(body)
 	contentLength := strconv.Itoa(len(body))
 	replacedContentType := false
@@ -497,8 +514,18 @@ func cloneHeadersWithBodyMetadata(headers map[string][]string, body []byte) map[
 	return cloned
 }
 
-func cloneHeadersWithContentType(headers map[string][]string, contentType string) map[string][]string {
+func cloneHeadersWithoutContentEncoding(headers map[string][]string) map[string][]string {
 	cloned := cloneHeaders(headers)
+	for key := range cloned {
+		if strings.EqualFold(key, "Content-Encoding") {
+			delete(cloned, key)
+		}
+	}
+	return cloned
+}
+
+func cloneHeadersWithContentType(headers map[string][]string, contentType string) map[string][]string {
+	cloned := cloneHeadersWithoutContentEncoding(headers)
 	replaced := false
 	for key := range cloned {
 		if strings.EqualFold(key, "Content-Type") {

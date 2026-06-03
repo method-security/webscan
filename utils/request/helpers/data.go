@@ -183,9 +183,14 @@ func CreateBodyFromBytes(contentType string, bodyData []byte) *common.Body {
 	}
 }
 
+// DetectContentTypeFromBytes classifies body bytes using Go's content sniffing.
+func DetectContentTypeFromBytes(bodyData []byte) string {
+	return http.DetectContentType(bodyData)
+}
+
 // CreateBodyFromDetectedBytes classifies body bytes using Go's content sniffing.
 func CreateBodyFromDetectedBytes(bodyData []byte) *common.Body {
-	return CreateBodyFromBytes(http.DetectContentType(bodyData), bodyData)
+	return CreateBodyFromBytes(DetectContentTypeFromBytes(bodyData), bodyData)
 }
 
 // IsDetectedBinaryBody reports whether body bytes classify the same way STANDARD

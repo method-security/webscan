@@ -338,9 +338,7 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 					loadedBody, loadedHeaders, loadedStatusCode, err := loadNetworkResourceBody(page, resourceURL)
 					if err == nil && isValidStaticResourceBody(loadedBody) {
 						responseBody = loadedBody
-						if len(loadedHeaders) > 0 {
-							responseHeaders = loadedHeaders
-						}
+						responseHeaders = headersForLoadedStaticResource(responseHeaders, loadedHeaders, loadedBody)
 						if loadedStatusCode > 0 {
 							statusCode = loadedStatusCode
 						}

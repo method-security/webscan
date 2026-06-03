@@ -19,6 +19,7 @@ import (
 	utils "github.com/Method-Security/webscan/utils"
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
 	// External
+	goquery "github.com/PuerkitoBio/goquery"
 	rod "github.com/go-rod/rod"
 	proto "github.com/go-rod/rod/lib/proto"
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
@@ -417,18 +418,40 @@ func isInternalBrowserURL(raw string) bool {
 
 func isChromePDFViewerHTML(htmlContent string) bool {
 	content := strings.ToLower(htmlContent)
-	return strings.Contains(content, `type="application/pdf"`) ||
-		(strings.Contains(content, "background-color: rgb(38, 38, 38)") &&
-			strings.Contains(content, "<body>") &&
-			strings.Contains(content, "</body>"))
+	return strings.Contains(content, `type="application/pdf"`)
 }
 
 func isChromeStaticAssetViewerHTML(htmlContent string) bool {
-	content := strings.ToLower(htmlContent)
-	return isChromePDFViewerHTML(htmlContent) ||
-		(strings.Contains(content, "<img ") && strings.Contains(content, "src=")) ||
-		strings.Contains(content, "<video") ||
-		strings.Contains(content, "<audio")
+	if isChromePDFViewerHTML(htmlContent) {
+		return true
+	}
+
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlContent))
+	if err != nil {
+		return false
+	}
+	body := doc.Find("body")
+	if body.Length() != 1 {
+		return false
+	}
+	children := body.Children()
+	if children.Length() != 1 {
+		return false
+	}
+
+	media := children.First()
+	switch strings.ToLower(goquery.NodeName(media)) {
+	case "img":
+		_, ok := media.Attr("src")
+		return ok
+	case "video", "audio":
+		if _, ok := media.Attr("src"); ok {
+			return true
+		}
+		return media.Find("source[src]").Length() > 0
+	default:
+		return false
+	}
 }
 
 func shouldLoadStaticResource(htmlContent, constructedURL, finalURL string) bool {
@@ -439,6 +462,39 @@ func shouldLoadStaticResource(htmlContent, constructedURL, finalURL string) bool
 
 func isValidStaticResourceBody(body []byte) bool {
 	return len(body) > 0 && requesthelpers.IsDetectedBinaryBody(body)
+}
+
+func headersForLoadedStaticResource(existingHeaders, loadedHeaders map[string][]string, body []byte) map[string][]string {
+	headers := existingHeaders
+	if len(loadedHeaders) > 0 {
+		headers = loadedHeaders
+	}
+	return cloneHeadersWithBodyMetadata(headers, body)
+}
+
+func cloneHeadersWithBodyMetadata(headers map[string][]string, body []byte) map[string][]string {
+	cloned := cloneHeaders(headers)
+	contentType := requesthelpers.DetectContentTypeFromBytes(body)
+	contentLength := strconv.Itoa(len(body))
+	replacedContentType := false
+	replacedContentLength := false
+	for key := range cloned {
+		switch {
+		case strings.EqualFold(key, "Content-Type"):
+			cloned[key] = []string{contentType}
+			replacedContentType = true
+		case strings.EqualFold(key, "Content-Length"):
+			cloned[key] = []string{contentLength}
+			replacedContentLength = true
+		}
+	}
+	if !replacedContentType {
+		cloned["Content-Type"] = []string{contentType}
+	}
+	if !replacedContentLength {
+		cloned["Content-Length"] = []string{contentLength}
+	}
+	return cloned
 }
 
 func cloneHeadersWithContentType(headers map[string][]string, contentType string) map[string][]string {

@@ -38,16 +38,25 @@ func GetUserAgentFlag(cmd *cobra.Command) (common.UserAgentPreset, error) {
 	return preset, nil
 }
 
-// ValidateUserAgentWithRequestMethod returns an error if the user explicitly set
-// --user-agent to a non-default value while using a request method that ignores it
-// (headless or browserbase). If --user-agent was left at the default (RANDOM),
-// no error is returned since the user didn't explicitly request a specific UA.
-func ValidateUserAgentWithRequestMethod(userAgent common.UserAgentPreset, requestMethod common.RequestMethod) error {
-	if userAgent == "" || userAgent == common.UserAgentPresetRandom {
+// ValidateUserAgentWithRequestMethod returns an error if the user explicitly
+// supplied --user-agent in a way the request method cannot honor. `explicit`
+// must be true only when the user actually typed the flag on the command line
+// (typically cmd.Flags().Changed("user-agent")); a missing flag is never an
+// error and uses the request method's default UA.
+//
+// Headless and browserbase modes apply CHROME/FIREFOX/SAFARI/EDGE via CDP, but
+// reject RANDOM because randomizing the UA string while every other
+// browser-introspectable signal still says Chromium creates an obvious
+// fingerprint mismatch. Operators who want Chrome's real UA should simply omit
+// the flag.
+func ValidateUserAgentWithRequestMethod(userAgent common.UserAgentPreset, requestMethod common.RequestMethod, explicit bool) error {
+	if !explicit {
 		return nil
 	}
 	if requestMethod == common.RequestMethodHeadless || requestMethod == common.RequestMethodBrowserbase {
-		return fmt.Errorf("--user-agent flag is not supported with %s request method", requestMethod)
+		if userAgent == common.UserAgentPresetRandom {
+			return fmt.Errorf("--user-agent RANDOM is not supported with %s request method; omit the flag to use Chrome's native UA, or specify CHROME/FIREFOX/SAFARI/EDGE", requestMethod)
+		}
 	}
 	return nil
 }

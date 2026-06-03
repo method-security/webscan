@@ -372,8 +372,8 @@ func (a *WebScan) InitDiscoverCommand() {
 				return
 			}
 
-			// Validate user-agent is not explicitly set with headless/browserbase
-			if err := requesthelpers.ValidateUserAgentWithRequestMethod(userAgentPreset, requestMethodConfig.RequestMethodEnum); err != nil {
+			// Validate user-agent compatibility with the chosen request method
+			if err := requesthelpers.ValidateUserAgentWithRequestMethod(userAgentPreset, requestMethodConfig.RequestMethodEnum, cmd.Flags().Changed("user-agent")); err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
@@ -499,8 +499,8 @@ func (a *WebScan) InitDiscoverCommand() {
 				return
 			}
 
-			// Validate user-agent is not explicitly set with headless/browserbase
-			if err := requesthelpers.ValidateUserAgentWithRequestMethod(userAgentPreset, requestMethodConfig.RequestMethodEnum); err != nil {
+			// Validate user-agent compatibility with the chosen request method
+			if err := requesthelpers.ValidateUserAgentWithRequestMethod(userAgentPreset, requestMethodConfig.RequestMethodEnum, cmd.Flags().Changed("user-agent")); err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
@@ -607,8 +607,8 @@ func (a *WebScan) InitDiscoverCommand() {
 				return
 			}
 
-			// Validate user-agent is not explicitly set with headless/browserbase
-			if err := requesthelpers.ValidateUserAgentWithRequestMethod(userAgentPreset, requestMethodConfig.RequestMethodEnum); err != nil {
+			// Validate user-agent compatibility with the chosen request method
+			if err := requesthelpers.ValidateUserAgentWithRequestMethod(userAgentPreset, requestMethodConfig.RequestMethodEnum, cmd.Flags().Changed("user-agent")); err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
@@ -752,8 +752,20 @@ func (a *WebScan) InitDiscoverCommand() {
 				return
 			}
 
+			userAgentPreset, err := requesthelpers.GetUserAgentFlag(cmd)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Validate user-agent compatibility with the chosen request method
+			if err := requesthelpers.ValidateUserAgentWithRequestMethod(userAgentPreset, requestMethodEnum, cmd.Flags().Changed("user-agent")); err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
 			// Get the config
-			config := getDiscoverSaasConfig(orgs, saasCompanies, ssoCompanies, maxRedirects, verifyTLS, timeout, threads, requestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
+			config := getDiscoverSaasConfig(orgs, saasCompanies, ssoCompanies, maxRedirects, verifyTLS, timeout, threads, userAgentPreset, requestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
 
 			// Generate the report
 			report, err := discoversaas.LaunchDiscoverSaas(cmd.Context(), config, *filteredSaasFingerprints, *filteredSsoFingerprints, requestMethodConfig.BrowserbaseSecrets)
@@ -775,8 +787,7 @@ func (a *WebScan) InitDiscoverCommand() {
 	discoverSaasCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
 	discoverSaasCmd.Flags().Int("timeout", 90, "Timeout in seconds for the capture")
 	discoverSaasCmd.Flags().Int("threads", 25, "Number of concurrent threads for discovery")
-	// TODO: Add --user-agent flag here once headless/browserbase paths support UserAgentPreset.
-	// Skipped for now because saas only supports headless/browserbase, not the standard HTTP client.
+	discoverSaasCmd.Flags().String("user-agent", "RANDOM", "User-Agent preset (RANDOM, CHROME, FIREFOX, SAFARI, EDGE)")
 	// Request Method Flags for all capture subcommands
 	discoverSaasCmd.Flags().String("request-method", "HEADLESS", "Request method (headless, browserbase)")
 	discoverSaasCmd.Flags().String("headless-path", "", "Path to a headless browser executable")
@@ -889,7 +900,7 @@ func getDiscoverRouteConfig(target string, ignoreCrossDomain bool, collectStatic
 }
 
 // getDiscoverSaasConfig builds the config for SaaS active discovery.
-func getDiscoverSaasConfig(orgs []string, saasCompanies []string, ssoCompanies []string, maxRedirects int, verifyTLS bool, timeout int, threads int, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) discover.DiscoverSaasConfig {
+func getDiscoverSaasConfig(orgs []string, saasCompanies []string, ssoCompanies []string, maxRedirects int, verifyTLS bool, timeout int, threads int, userAgent common.UserAgentPreset, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) discover.DiscoverSaasConfig {
 	config := discover.DiscoverSaasConfig{
 		Orgs:              orgs,
 		SaasCompanies:     saasCompanies,
@@ -898,6 +909,7 @@ func getDiscoverSaasConfig(orgs []string, saasCompanies []string, ssoCompanies [
 		VerifyTls:         verifyTLS,
 		Timeout:           max(timeout, 0),
 		Threads:           max(threads, 0),
+		UserAgent:         userAgent,
 		RequestMethod:     requestMethod,
 		HeadlessConfig:    headlessConfig,
 		BrowserbaseConfig: browserbaseConfig,

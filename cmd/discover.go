@@ -372,8 +372,8 @@ func (a *WebScan) InitDiscoverCommand() {
 				return
 			}
 
-			// Validate user-agent is not explicitly set with headless/browserbase
-			if err := requesthelpers.ValidateUserAgentWithRequestMethod(userAgentPreset, requestMethodConfig.RequestMethodEnum); err != nil {
+			// Validate user-agent compatibility with the chosen request method
+			if err := requesthelpers.ValidateUserAgentWithRequestMethod(userAgentPreset, requestMethodConfig.RequestMethodEnum, cmd.Flags().Changed("user-agent")); err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
@@ -499,8 +499,8 @@ func (a *WebScan) InitDiscoverCommand() {
 				return
 			}
 
-			// Validate user-agent is not explicitly set with headless/browserbase
-			if err := requesthelpers.ValidateUserAgentWithRequestMethod(userAgentPreset, requestMethodConfig.RequestMethodEnum); err != nil {
+			// Validate user-agent compatibility with the chosen request method
+			if err := requesthelpers.ValidateUserAgentWithRequestMethod(userAgentPreset, requestMethodConfig.RequestMethodEnum, cmd.Flags().Changed("user-agent")); err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
@@ -607,8 +607,8 @@ func (a *WebScan) InitDiscoverCommand() {
 				return
 			}
 
-			// Validate user-agent is not explicitly set with headless/browserbase
-			if err := requesthelpers.ValidateUserAgentWithRequestMethod(userAgentPreset, requestMethodConfig.RequestMethodEnum); err != nil {
+			// Validate user-agent compatibility with the chosen request method
+			if err := requesthelpers.ValidateUserAgentWithRequestMethod(userAgentPreset, requestMethodConfig.RequestMethodEnum, cmd.Flags().Changed("user-agent")); err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}

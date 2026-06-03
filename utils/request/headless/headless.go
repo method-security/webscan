@@ -17,6 +17,7 @@ import (
 	// Utils
 	utils "github.com/Method-Security/webscan/utils"
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
+	useragent "github.com/Method-Security/webscan/utils/useragent"
 
 	// External
 	rod "github.com/go-rod/rod"
@@ -152,6 +153,20 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 			svc1log.SafeParam("configTimeout", config.Timeout),
 			svc1log.SafeParam("domStabilizeTime", b.MinDOMStabalizeTimeSeconds),
 			svc1log.SafeParam("totalPageTimeout", int(pageTimeout.Seconds())))
+
+		// Apply user-agent override only when an explicit non-random preset was
+		// supplied. We never override on RANDOM/empty because every browser
+		// signal beyond the UA string (navigator.platform, client hints, JS
+		// runtime) still identifies as Chromium; a mismatched UA string would
+		// be an obvious fingerprint tell.
+		if config.UserAgent != "" && config.UserAgent != common.UserAgentPresetRandom {
+			uaString := useragent.Resolve(config.UserAgent)
+			if uaErr := page.SetUserAgent(&proto.NetworkSetUserAgentOverride{UserAgent: uaString}); uaErr != nil {
+				log.Warn("Failed to set user-agent override", svc1log.SafeParam("error", uaErr.Error()))
+			} else {
+				log.Info("Set user-agent override", svc1log.SafeParam("preset", string(config.UserAgent)))
+			}
+		}
 
 		// Setup request monitoring and navigate
 		headerCapture := setupHeaderInterception(page)

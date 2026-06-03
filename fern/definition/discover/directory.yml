@@ -1,5 +1,6 @@
 imports:
   http: ../common/http.yml
+  method: ../common/method.yml
 types:
   # Wordlist Enums
   WordlistType:
@@ -31,6 +32,7 @@ types:
       retries: integer
       sleep: integer
       threads: integer
+      userAgent: method.UserAgentPreset
   # Report Structs
   DirectoryTargetInfo:
     properties:

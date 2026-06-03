@@ -40,6 +40,7 @@ func createDirectorySendHTTPRequestConfig(baseURL, path string, method common.Ht
 		VerifyTls:                  config.VerifyTls,
 		Timeout:                    config.Timeout,
 		IgnoreCrossDomainRedirects: config.IgnoreCrossDomainRedirects,
+		UserAgent:                  config.UserAgent,
 		RequestMethod:              common.RequestMethodStandard,
 		HeadlessConfig:             nil,
 		BrowserbaseConfig:          nil,

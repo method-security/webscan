@@ -1,3 +1,5 @@
+imports:
+    method: ../../../common/method.yml
 types:
     # Enums
     ModulesFileSize:
@@ -34,6 +36,7 @@ types:
             verifyTls: boolean
             timeout: integer
             threads: integer
+            userAgent: method.UserAgentPreset
     # Result
     EnumerateDrupalModulesResult:
         properties:

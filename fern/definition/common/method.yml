@@ -1,4 +1,12 @@
 types:
+  # User Agent Preset Enum
+  UserAgentPreset:
+    enum:
+      - RANDOM
+      - CHROME
+      - FIREFOX
+      - SAFARI
+      - EDGE
   # Request Method Enum
   RequestMethod:
     enum:

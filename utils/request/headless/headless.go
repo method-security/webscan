@@ -320,6 +320,7 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 		var responseBody []byte
 		if statusCode >= 200 && statusCode < 300 {
 			htmlContent, err := page.HTML()
+			htmlCaptured := false
 			if err != nil {
 				errStr := err.Error()
 				if strings.Contains(errStr, "Execution context was destroyed") || strings.Contains(errStr, "-32000") {
@@ -328,28 +329,32 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 					log.Error("Failed to get HTML content", svc1log.SafeParam("error", err.Error()))
 				}
 				responseBody = nil
+				responseHeaders = cloneHeadersWithContentType(responseHeaders, "text/html")
 			} else {
+				htmlCaptured = true
 				responseBody = []byte(htmlContent)
-				if shouldLoadStaticResource(htmlContent, *constructedURL, finalURL) {
-					resourceURL := finalURL
-					if resourceURL == "" || isInternalBrowserURL(resourceURL) {
-						resourceURL = *constructedURL
+			}
+			if shouldLoadStaticResource(htmlContent, *constructedURL, finalURL) {
+				resourceURL := finalURL
+				if resourceURL == "" || isInternalBrowserURL(resourceURL) {
+					resourceURL = *constructedURL
+				}
+				loadedBody, loadedHeaders, loadedStatusCode, err := loadNetworkResourceBody(page, resourceURL)
+				if err == nil && isValidStaticResourceBody(loadedBody) {
+					responseBody = loadedBody
+					responseHeaders = headersForLoadedStaticResource(responseHeaders, loadedHeaders, loadedBody)
+					if loadedStatusCode > 0 {
+						statusCode = loadedStatusCode
 					}
-					loadedBody, loadedHeaders, loadedStatusCode, err := loadNetworkResourceBody(page, resourceURL)
-					if err == nil && isValidStaticResourceBody(loadedBody) {
-						responseBody = loadedBody
-						if len(loadedHeaders) > 0 {
-							responseHeaders = loadedHeaders
-						}
-						if loadedStatusCode > 0 {
-							statusCode = loadedStatusCode
-						}
-					} else if err != nil {
-						log.Info("Failed to load static resource body, falling back to page HTML", svc1log.SafeParam("error", cleanErrMsg(err)))
-					} else {
-						log.Info("Loaded static resource did not validate, falling back to page HTML")
-						responseHeaders = cloneHeadersWithContentType(responseHeaders, "text/html")
-					}
+				} else if err != nil {
+					log.Info("Failed to load static resource body, falling back to page HTML", svc1log.SafeParam("error", cleanErrMsg(err)))
+					responseHeaders = cloneHeadersWithContentType(responseHeaders, "text/html")
+				} else {
+					log.Info("Loaded static resource did not validate, falling back to page HTML")
+					responseHeaders = cloneHeadersWithContentType(responseHeaders, "text/html")
+				}
+				if !htmlCaptured && responseBody == nil {
+					responseBody = []byte{}
 				}
 			}
 		}

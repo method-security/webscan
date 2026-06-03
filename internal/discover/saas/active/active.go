@@ -43,6 +43,7 @@ func createSendHTTPRequestConfig(baseURL, path string, config discover.DiscoverS
 		HeadlessConfig:     config.HeadlessConfig,
 		BrowserbaseConfig:  config.BrowserbaseConfig,
 		BrowserbaseSecrets: browserbaseSecrets,
+		UserAgent:          config.UserAgent,
 	}
 }
 

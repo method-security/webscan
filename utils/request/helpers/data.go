@@ -183,6 +183,23 @@ func CreateBodyFromBytes(contentType string, bodyData []byte) *common.Body {
 	}
 }
 
+// DetectContentTypeFromBytes classifies body bytes using Go's content sniffing.
+func DetectContentTypeFromBytes(bodyData []byte) string {
+	return http.DetectContentType(bodyData)
+}
+
+// CreateBodyFromDetectedBytes classifies body bytes using Go's content sniffing.
+func CreateBodyFromDetectedBytes(bodyData []byte) *common.Body {
+	return CreateBodyFromBytes(DetectContentTypeFromBytes(bodyData), bodyData)
+}
+
+// IsDetectedBinaryBody reports whether body bytes classify the same way STANDARD
+// would classify a binary response when no Content-Type header is available.
+func IsDetectedBinaryBody(bodyData []byte) bool {
+	body := CreateBodyFromDetectedBytes(bodyData)
+	return body != nil && body.Kind == "binary"
+}
+
 // CreateHTTPResponseFromBytes creates an HttpResponse struct from HttpResponse data using byte array
 func CreateHTTPResponseFromBytes(statusCode int, redirectChain []string, headers map[string][]string, responseBody []byte) common.HttpResponse {
 	// Process headers to split comma-delimited values
@@ -201,8 +218,8 @@ func CreateHTTPResponseFromBytes(statusCode int, redirectChain []string, headers
 
 	// Get content type from headers
 	contentType := ""
-	if ct, ok := processedHeaders["Content-Type"]; ok && len(ct) > 0 {
-		contentType = ct[0]
+	if ct := GetHeaderValueFromHeaderMap(processedHeaders, "Content-Type"); ct != nil {
+		contentType = *ct
 	}
 
 	// If no content type is provided, try to detect it from string representation

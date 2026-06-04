@@ -140,7 +140,10 @@ func extractLinks(htmlContent, pageURL string, config discover.DiscoverWordlistC
 
 	doc.Find("a[href]").Each(func(_ int, s *goquery.Selection) {
 		href, exists := s.Attr("href")
-		if !exists || href == "" || strings.HasPrefix(href, "#") || strings.HasPrefix(href, "javascript:") {
+		if !exists || href == "" || strings.HasPrefix(href, "#") ||
+			strings.HasPrefix(href, "javascript:") ||
+			strings.HasPrefix(href, "data:") ||
+			strings.HasPrefix(href, "vbscript:") {
 			return
 		}
 

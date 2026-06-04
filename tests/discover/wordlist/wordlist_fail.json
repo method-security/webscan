@@ -1,0 +1,19 @@
+{
+  "config": {
+    "target": "http://invalid.method.directory:80",
+    "minWordLength": 5,
+    "spiderDepth": 2,
+    "includeMetadata": false,
+    "includeComments": false,
+    "includeAltText": false,
+    "ignoreCrossDomain": true,
+    "verifyTls": false,
+    "timeout": 30,
+    "threads": 5,
+    "userAgent": "RANDOM"
+  },
+  "result": {
+    "target": "http://invalid.method.directory:80"
+  },
+  "errors": ["error performing request to http://invalid.method.directory:80: dial tcp: lookup invalid.method.directory: no such host"]
+}

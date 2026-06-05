@@ -18,6 +18,7 @@ import (
 	// Utils
 	utils "github.com/Method-Security/webscan/utils"
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
+
 	// External
 	goquery "github.com/PuerkitoBio/goquery"
 	rod "github.com/go-rod/rod"

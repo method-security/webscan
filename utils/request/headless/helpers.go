@@ -4,6 +4,7 @@ import (
 	// Standard
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
@@ -479,7 +480,7 @@ func shouldLoadStaticResource(htmlContent, constructedURL, finalURL string) bool
 }
 
 func isValidStaticResourceBody(body []byte) bool {
-	return len(body) > 0 && requesthelpers.IsDetectedBinaryBody(body)
+	return len(body) > 0 && (requesthelpers.IsDetectedBinaryBody(body) || json.Valid(body))
 }
 
 func headersForLoadedStaticResource(existingHeaders, loadedHeaders map[string][]string, body []byte) map[string][]string {
@@ -492,7 +493,7 @@ func headersForLoadedStaticResource(existingHeaders, loadedHeaders map[string][]
 
 func cloneHeadersWithBodyMetadata(headers map[string][]string, body []byte) map[string][]string {
 	cloned := cloneHeadersWithoutContentEncoding(headers)
-	contentType := requesthelpers.DetectContentTypeFromBytes(body)
+	contentType := detectLoadedStaticResourceContentType(body)
 	contentLength := strconv.Itoa(len(body))
 	replacedContentType := false
 	replacedContentLength := false
@@ -513,6 +514,13 @@ func cloneHeadersWithBodyMetadata(headers map[string][]string, body []byte) map[
 		cloned["Content-Length"] = []string{contentLength}
 	}
 	return cloned
+}
+
+func detectLoadedStaticResourceContentType(body []byte) string {
+	if json.Valid(body) {
+		return "application/json"
+	}
+	return requesthelpers.DetectContentTypeFromBytes(body)
 }
 
 func cloneHeadersWithoutContentEncoding(headers map[string][]string) map[string][]string {

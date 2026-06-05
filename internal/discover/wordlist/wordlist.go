@@ -23,6 +23,7 @@ import (
 	// External
 	goquery "github.com/PuerkitoBio/goquery"
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
+	"golang.org/x/net/publicsuffix"
 )
 
 // commentRegex matches HTML comments <!-- ... -->
@@ -33,9 +34,17 @@ func buildWordRegex(minLen int) *regexp.Regexp {
 	return regexp.MustCompile(fmt.Sprintf(`\b[A-Za-z]{%d,}\b`, minLen))
 }
 
-// registrableDomain extracts the registrable domain (last two DNS labels) from a hostname.
-// For example, "www.example.com" → "example.com", "api.staging.example.com" → "example.com".
+// registrableDomain extracts the registrable domain (eTLD+1) from a hostname using
+// the ICANN Public Suffix List via golang.org/x/net/publicsuffix. This correctly
+// handles multi-part TLDs such as .co.uk or .com.br, where a naive last-two-labels
+// heuristic would treat unrelated sites (e.g. foo.co.uk and bar.co.uk) as the same
+// registrable domain.
+// For example: "www.example.com" → "example.com", "api.example.co.uk" → "example.co.uk".
 func registrableDomain(host string) string {
+	if etld1, err := publicsuffix.EffectiveTLDPlusOne(host); err == nil {
+		return etld1
+	}
+	// Fallback for private domains or unexpected parse errors.
 	parts := strings.Split(host, ".")
 	if len(parts) >= 2 {
 		return strings.Join(parts[len(parts)-2:], ".")
@@ -276,25 +285,37 @@ func PerformWordlistCapture(ctx context.Context, config discover.DiscoverWordlis
 
 				log.Info("Fetching URL for wordlist", svc1log.SafeParam("url", targetURL))
 
+				// unmarkVisited removes targetURL from visitedURLs so that a later
+				// depth can retry it if the URL is re-discovered via another link.
+				unmarkVisited := func() {
+					mu.Lock()
+					delete(visitedURLs, targetURL)
+					mu.Unlock()
+				}
+
 				requestConfig, err := createRequestConfig(targetURL, config)
 				if err != nil {
+					unmarkVisited()
 					errChan <- fmt.Sprintf("error creating request config for %s: %s", targetURL, err)
 					return
 				}
 
 				resp, err := request.SendRequest(ctx, requestConfig)
 				if err != nil {
+					unmarkVisited()
 					errChan <- fmt.Sprintf("error fetching %s: %s", targetURL, err)
 					return
 				}
 
 				if resp == nil || resp.Response == nil || resp.Response.ResponseBody == nil {
+					unmarkVisited()
 					errChan <- fmt.Sprintf("no response body from %s", targetURL)
 					return
 				}
 
 				bodyPtr := requesthelpers.GetResponseBodyStringFromBodyStruct(resp.Response.ResponseBody)
 				if bodyPtr == nil {
+					unmarkVisited()
 					errChan <- fmt.Sprintf("empty response body from %s", targetURL)
 					return
 				}
@@ -318,21 +339,30 @@ func PerformWordlistCapture(ctx context.Context, config discover.DiscoverWordlis
 				}
 				mu.Unlock()
 
-				// Skip word extraction when IgnoreCrossDomain is enabled and the
-				// response came from an off-scope page (e.g. the request was
-				// redirected to a different registrable domain). isSameDomain
-				// uses registrable-domain comparison so same-site subdomains
-				// and trailing-slash redirects are always included. Checking
-				// config.Target alone is sufficient — targetURL is guaranteed
-				// to be in-scope (it was enqueued by extractLinks, which now
-				// filters exclusively against config.Target).
-				if !config.IgnoreCrossDomain || isSameDomain(config.Target, finalURL) {
+				// isInScope is true when the final page is within the crawl scope:
+				// either IgnoreCrossDomain is off (crawl anything) or the final
+				// URL lands on the same registrable domain as config.Target.
+				// isSameDomain uses the ICANN PSL so same-site subdomains
+				// (e.g. www vs api) are always accepted.
+				isInScope := !config.IgnoreCrossDomain || isSameDomain(config.Target, finalURL)
+
+				if isInScope {
 					words := extractWords(bodyStr, config)
 					mu.Lock()
 					for _, w := range words {
 						wordCounts[strings.ToLower(w)]++
 					}
 					mu.Unlock()
+				}
+
+				// Skip link extraction for off-scope pages: when IgnoreCrossDomain
+				// is enabled and the response landed on a different registrable
+				// domain, we should not enqueue links found on that page even
+				// though extractLinks would filter them against config.Target.
+				// Trusting link discovery from external pages could introduce
+				// unexpected crawl paths.
+				if !isInScope {
+					return
 				}
 
 				// Use the final post-redirect URL as the base for link resolution so

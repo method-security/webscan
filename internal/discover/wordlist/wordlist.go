@@ -196,13 +196,15 @@ func extractLinks(htmlContent, pageURL string, config discover.DiscoverWordlistC
 		// as the same URL and not fetched twice (consistent with route discovery).
 		resolved = strings.TrimRight(resolved, "/")
 
-		// Cross-domain check: allow links that are same-domain with either the
-		// crawl seed (config.Target) or the current page (pageURL). The pageURL
-		// condition handles pages reached via a cross-domain redirect — we
-		// already fetched and processed that page's HTML, so we should also
-		// follow its in-domain links. Links to a third registrable domain are
-		// still rejected.
-		if config.IgnoreCrossDomain && !isSameDomain(config.Target, resolved) && !isSameDomain(pageURL, resolved) {
+		// Cross-domain check: only enqueue links that are same-domain with the
+		// crawl seed (config.Target). isSameDomain uses registrable-domain
+		// comparison, so same-site subdomains (e.g. www.example.com vs
+		// api.example.com) are accepted. pageURL must NOT be used as a
+		// secondary scope anchor here — when a redirect lands on another
+		// registrable domain, pageURL is that off-scope domain, and allowing
+		// links same-domain with pageURL would cause the entire off-scope site
+		// to be crawled despite IgnoreCrossDomain being set.
+		if config.IgnoreCrossDomain && !isSameDomain(config.Target, resolved) {
 			return
 		}
 
@@ -318,10 +320,13 @@ func PerformWordlistCapture(ctx context.Context, config discover.DiscoverWordlis
 
 				// Skip word extraction when IgnoreCrossDomain is enabled and the
 				// response came from an off-scope page (e.g. the request was
-				// redirected to a different registrable domain).  We check both
-				// config.Target and targetURL so that in-domain subdomains and
-				// same-site redirect chains are always included.
-				if !config.IgnoreCrossDomain || isSameDomain(config.Target, finalURL) || isSameDomain(targetURL, finalURL) {
+				// redirected to a different registrable domain). isSameDomain
+				// uses registrable-domain comparison so same-site subdomains
+				// and trailing-slash redirects are always included. Checking
+				// config.Target alone is sufficient — targetURL is guaranteed
+				// to be in-scope (it was enqueued by extractLinks, which now
+				// filters exclusively against config.Target).
+				if !config.IgnoreCrossDomain || isSameDomain(config.Target, finalURL) {
 					words := extractWords(bodyStr, config)
 					mu.Lock()
 					for _, w := range words {

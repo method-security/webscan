@@ -15,5 +15,5 @@
   "result": {
     "target": "http://invalid.method.directory:80"
   },
-  "errors": ["error performing request to http://invalid.method.directory:80: dial tcp: lookup invalid.method.directory: no such host"]
+  "errors": ["error fetching http://invalid.method.directory:80: standard capture failed: request failed: redirect request failed: dial tcp: lookup invalid.method.directory: no such host"]
 }

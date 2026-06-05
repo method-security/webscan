@@ -84,12 +84,19 @@ func createRequestConfig(rawURL string, config discover.DiscoverWordlistConfig) 
 			Query: queryParams,
 		},
 	}
+	// IgnoreCrossDomainRedirects is always false: the HTTP layer uses exact
+	// hostname matching for redirects, which is stricter than the
+	// registrable-domain matching that extractLinks / isSameDomain applies.
+	// Blocking canonical redirects (e.g. example.com → www.example.com) here
+	// would drop in-scope pages even when IgnoreCrossDomain is enabled.
+	// Cross-domain filtering is handled after redirect resolution, at the
+	// link-enqueueing stage.
 	return common.SendHttpRequestConfig{
 		Request:                    httpReq,
 		MaxRedirects:               10,
 		VerifyTls:                  config.VerifyTls,
 		Timeout:                    config.Timeout,
-		IgnoreCrossDomainRedirects: config.IgnoreCrossDomain,
+		IgnoreCrossDomainRedirects: false,
 		RequestMethod:              common.RequestMethodStandard,
 		UserAgent:                  config.UserAgent,
 	}, nil

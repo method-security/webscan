@@ -4,6 +4,7 @@ import (
 	// Standard
 	"context"
 	"fmt"
+	"net"
 	"net/url"
 	"regexp"
 	"runtime"
@@ -32,7 +33,19 @@ func buildWordRegex(minLen int) *regexp.Regexp {
 	return regexp.MustCompile(fmt.Sprintf(`\b[A-Za-z]{%d,}\b`, minLen))
 }
 
-// isSameDomain returns true when targetURL shares the same effective domain as baseURL.
+// registrableDomain extracts the registrable domain (last two DNS labels) from a hostname.
+// For example, "www.example.com" → "example.com", "api.staging.example.com" → "example.com".
+func registrableDomain(host string) string {
+	parts := strings.Split(host, ".")
+	if len(parts) >= 2 {
+		return strings.Join(parts[len(parts)-2:], ".")
+	}
+	return host
+}
+
+// isSameDomain returns true when targetURL belongs to the same registrable domain
+// as baseURL. Same-site subdomains (e.g. www vs api) are allowed; cross-site URLs
+// are rejected. IP addresses require an exact match since they have no subdomain hierarchy.
 func isSameDomain(baseURL, targetURL string) bool {
 	base, err := url.Parse(baseURL)
 	if err != nil {
@@ -42,7 +55,15 @@ func isSameDomain(baseURL, targetURL string) bool {
 	if err != nil {
 		return false
 	}
-	return strings.EqualFold(base.Hostname(), target.Hostname())
+	baseHost := strings.ToLower(base.Hostname())
+	targetHost := strings.ToLower(target.Hostname())
+
+	// IP addresses have no subdomain hierarchy — require an exact match.
+	if net.ParseIP(baseHost) != nil || net.ParseIP(targetHost) != nil {
+		return baseHost == targetHost
+	}
+
+	return registrableDomain(baseHost) == registrableDomain(targetHost)
 }
 
 // createRequestConfig builds a SendHttpRequestConfig for a standard GET request.
@@ -152,13 +173,25 @@ func extractLinks(htmlContent, pageURL string, config discover.DiscoverWordlistC
 			return
 		}
 
-		resolved := base.ResolveReference(ref).String()
+		resolvedURL := base.ResolveReference(ref)
+		// Only follow http/https links — skip mailto:, ftp:, tel:, and other schemes
+		// that were not caught by the early-exit guards above.
+		if resolvedURL.Scheme != "http" && resolvedURL.Scheme != "https" {
+			return
+		}
+
+		resolved := resolvedURL.String()
 		// Strip fragment
 		if idx := strings.Index(resolved, "#"); idx >= 0 {
 			resolved = resolved[:idx]
 		}
+		// Normalize trailing slash so that e.g. "/page" and "/page/" are treated
+		// as the same URL and not fetched twice (consistent with route discovery).
+		resolved = strings.TrimRight(resolved, "/")
 
-		if config.IgnoreCrossDomain && !isSameDomain(pageURL, resolved) {
+		// Cross-domain check is performed against the crawl seed (config.Target),
+		// not the current page, so same-site links found at any depth are allowed.
+		if config.IgnoreCrossDomain && !isSameDomain(config.Target, resolved) {
 			return
 		}
 

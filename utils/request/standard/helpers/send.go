@@ -85,6 +85,14 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 
 		// Check if Response is not a redirect, return
 		if resp.StatusCode < 300 || resp.StatusCode >= 400 {
+			// Trailing-slash redirects update currentURL without adding a new
+			// redirectChain entry (they are not counted as real redirects).
+			// Update the last chain entry in-place so the chain length stays
+			// accurate and callers get the true canonical URL without a
+			// spurious extra hop.
+			if currentURL != redirectChain[len(redirectChain)-1] {
+				redirectChain[len(redirectChain)-1] = currentURL
+			}
 			return resp, redirectChain, nil
 		}
 
@@ -92,6 +100,9 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 		location := resp.Header.Get("Location")
 		if location == "" {
 			log.Debug("No location header found returning response", svc1log.SafeParam("url", currentURL), svc1log.SafeParam("status", resp.StatusCode))
+			if currentURL != redirectChain[len(redirectChain)-1] {
+				redirectChain[len(redirectChain)-1] = currentURL
+			}
 			return resp, redirectChain, nil
 		}
 

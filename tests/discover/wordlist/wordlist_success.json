@@ -1,0 +1,26 @@
+{
+  "config": {
+    "target": "http://example.method.directory:80",
+    "minWordLength": 5,
+    "spiderDepth": 2,
+    "includeMetadata": false,
+    "includeComments": false,
+    "includeAltText": false,
+    "ignoreCrossDomain": true,
+    "verifyTls": false,
+    "timeout": 30,
+    "threads": 5,
+    "userAgent": "RANDOM"
+  },
+  "result": {
+    "target": "http://example.method.directory:80",
+    "words": [
+      {"word": "company", "count": 5},
+      {"word": "employee", "count": 3},
+      {"word": "welcome", "count": 2}
+    ],
+    "totalUnique": 3,
+    "urlsCrawled": ["http://example.method.directory:80", "http://example.method.directory:80/about"]
+  },
+  "errors": []
+}

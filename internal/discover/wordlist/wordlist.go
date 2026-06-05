@@ -196,9 +196,13 @@ func extractLinks(htmlContent, pageURL string, config discover.DiscoverWordlistC
 		// as the same URL and not fetched twice (consistent with route discovery).
 		resolved = strings.TrimRight(resolved, "/")
 
-		// Cross-domain check is performed against the crawl seed (config.Target),
-		// not the current page, so same-site links found at any depth are allowed.
-		if config.IgnoreCrossDomain && !isSameDomain(config.Target, resolved) {
+		// Cross-domain check: allow links that are same-domain with either the
+		// crawl seed (config.Target) or the current page (pageURL). The pageURL
+		// condition handles pages reached via a cross-domain redirect — we
+		// already fetched and processed that page's HTML, so we should also
+		// follow its in-domain links. Links to a third registrable domain are
+		// still rejected.
+		if config.IgnoreCrossDomain && !isSameDomain(config.Target, resolved) && !isSameDomain(pageURL, resolved) {
 			return
 		}
 

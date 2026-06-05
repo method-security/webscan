@@ -803,7 +803,6 @@ func (a *WebScan) InitDiscoverCommand() {
 	// Add Command to 'Discover' Command
 	discoverCmd.AddCommand(discoverSaasCmd)
 
-
 	// Wordlist Command
 	discoverWordlistCmd := &cobra.Command{
 		Use:   "wordlist",

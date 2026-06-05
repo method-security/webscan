@@ -3,6 +3,7 @@ package headless
 import (
 	// Standard
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/url"
@@ -16,7 +17,9 @@ import (
 	common "github.com/Method-Security/webscan/generated/go/common"
 	// Utils
 	utils "github.com/Method-Security/webscan/utils"
+	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
 	// External
+	goquery "github.com/PuerkitoBio/goquery"
 	rod "github.com/go-rod/rod"
 	proto "github.com/go-rod/rod/lib/proto"
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
@@ -39,18 +42,14 @@ func NewNetworkHeaderCapture() *NetworkHeaderCapture {
 func (n *NetworkHeaderCapture) SetHeaders(headers map[string][]string) {
 	n.mutex.Lock()
 	defer n.mutex.Unlock()
-	n.Headers = headers
+	n.Headers = cloneHeaders(headers)
 }
 
 // GetHeaders safely gets headers
 func (n *NetworkHeaderCapture) GetHeaders() map[string][]string {
 	n.mutex.RLock()
 	defer n.mutex.RUnlock()
-	result := make(map[string][]string)
-	for k, v := range n.Headers {
-		result[k] = v
-	}
-	return result
+	return cloneHeaders(n.Headers)
 }
 
 // setupHeaderInterception sets up network event monitoring to capture response headers
@@ -70,7 +69,7 @@ func setupHeaderInterception(page *rod.Page) *NetworkHeaderCapture {
 	go page.EachEvent(
 		func(e *proto.NetworkResponseReceived) {
 			// Only capture headers for main document responses
-			if e.Type == proto.NetworkResourceTypeDocument {
+			if e.Type == proto.NetworkResourceTypeDocument && e.Response != nil && !isInternalBrowserURL(e.Response.URL) {
 				headers := make(map[string][]string)
 				for key, value := range e.Response.Headers {
 					// Convert gson.JSON to string
@@ -82,6 +81,80 @@ func setupHeaderInterception(page *rod.Page) *NetworkHeaderCapture {
 	)()
 
 	return headerCapture
+}
+
+func loadNetworkResourceBody(page *rod.Page, resourceURL string) ([]byte, map[string][]string, int, error) {
+	result, err := proto.NetworkLoadNetworkResource{
+		FrameID: page.FrameID,
+		URL:     resourceURL,
+		Options: &proto.NetworkLoadNetworkResourceOptions{
+			DisableCache:       true,
+			IncludeCredentials: true,
+		},
+	}.Call(page)
+	if err != nil {
+		return nil, nil, 0, err
+	}
+	if result == nil || result.Resource == nil {
+		return nil, nil, 0, fmt.Errorf("network resource load returned no resource")
+	}
+	resource := result.Resource
+	if !resource.Success {
+		if resource.NetErrorName != "" {
+			return nil, nil, 0, fmt.Errorf("network resource load failed: %s", resource.NetErrorName)
+		}
+		return nil, nil, 0, fmt.Errorf("network resource load failed")
+	}
+
+	headers := make(map[string][]string)
+	for key, value := range resource.Headers {
+		headers[key] = []string{value.Str()}
+	}
+
+	statusCode := 0
+	if resource.HTTPStatusCode != nil {
+		statusCode = int(*resource.HTTPStatusCode)
+	}
+
+	if resource.Stream == "" {
+		return nil, headers, statusCode, nil
+	}
+	defer func() {
+		_ = proto.IOClose{Handle: resource.Stream}.Call(page)
+	}()
+
+	body, err := readIOStream(page, resource.Stream)
+	if err != nil {
+		return nil, headers, statusCode, err
+	}
+	return body, headers, statusCode, nil
+}
+
+func readIOStream(page *rod.Page, handle proto.IOStreamHandle) ([]byte, error) {
+	var body []byte
+	chunkSize := 64 * 1024
+	for {
+		readResult, err := proto.IORead{
+			Handle: handle,
+			Size:   &chunkSize,
+		}.Call(page)
+		if err != nil {
+			return nil, err
+		}
+		if readResult.Base64Encoded {
+			chunk, err := base64.StdEncoding.DecodeString(readResult.Data)
+			if err != nil {
+				return nil, err
+			}
+			body = append(body, chunk...)
+		} else {
+			body = append(body, []byte(readResult.Data)...)
+		}
+		if readResult.EOF {
+			break
+		}
+	}
+	return body, nil
 }
 
 // handleNavigation sets up tracking for top-level frame navigations
@@ -324,6 +397,146 @@ func normalizeDefaultPort(raw string) string {
 
 func isDefaultPort(scheme, port string) bool {
 	return (scheme == "http" && port == "80") || (scheme == "https" && port == "443")
+}
+
+func cloneHeaders(headers map[string][]string) map[string][]string {
+	result := make(map[string][]string, len(headers))
+	for key, values := range headers {
+		result[key] = append([]string(nil), values...)
+	}
+	return result
+}
+
+func isInternalBrowserURL(raw string) bool {
+	return raw == "" ||
+		raw == "about:blank" ||
+		strings.HasPrefix(raw, "chrome://") ||
+		strings.HasPrefix(raw, "chrome-error://") ||
+		strings.HasPrefix(raw, "chrome-extension://") ||
+		strings.HasPrefix(raw, "devtools://")
+}
+
+func isChromePDFViewerHTML(htmlContent string) bool {
+	content := strings.ToLower(htmlContent)
+	return strings.Contains(content, `type="application/pdf"`)
+}
+
+func isChromeStaticAssetViewerHTML(htmlContent string) bool {
+	if isChromePDFViewerHTML(htmlContent) {
+		return true
+	}
+	if !shouldParseStaticAssetViewerHTML(htmlContent) {
+		return false
+	}
+
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlContent))
+	if err != nil {
+		return false
+	}
+	body := doc.Find("body")
+	if body.Length() != 1 {
+		return false
+	}
+	children := body.Children()
+	if children.Length() != 1 {
+		return false
+	}
+
+	media := children.First()
+	switch strings.ToLower(goquery.NodeName(media)) {
+	case "img":
+		_, ok := media.Attr("src")
+		return ok
+	case "video", "audio":
+		if _, ok := media.Attr("src"); ok {
+			return true
+		}
+		return media.Find("source[src]").Length() > 0
+	default:
+		return false
+	}
+}
+
+func shouldParseStaticAssetViewerHTML(htmlContent string) bool {
+	const maxViewerShellHTMLBytes = 256 * 1024
+	if htmlContent == "" || len(htmlContent) > maxViewerShellHTMLBytes {
+		return false
+	}
+
+	content := strings.ToLower(htmlContent)
+	mediaTags := strings.Count(content, "<img") +
+		strings.Count(content, "<video") +
+		strings.Count(content, "<audio")
+	return mediaTags == 1
+}
+
+func shouldLoadStaticResource(htmlContent, constructedURL, finalURL string) bool {
+	if utils.IsStaticAsset(constructedURL) || utils.IsStaticAsset(finalURL) {
+		return true
+	}
+	return isChromeStaticAssetViewerHTML(htmlContent)
+}
+
+func isValidStaticResourceBody(body []byte) bool {
+	return len(body) > 0 && requesthelpers.IsDetectedBinaryBody(body)
+}
+
+func headersForLoadedStaticResource(existingHeaders, loadedHeaders map[string][]string, body []byte) map[string][]string {
+	headers := existingHeaders
+	if len(loadedHeaders) > 0 {
+		headers = loadedHeaders
+	}
+	return cloneHeadersWithBodyMetadata(headers, body)
+}
+
+func cloneHeadersWithBodyMetadata(headers map[string][]string, body []byte) map[string][]string {
+	cloned := cloneHeadersWithoutContentEncoding(headers)
+	contentType := requesthelpers.DetectContentTypeFromBytes(body)
+	contentLength := strconv.Itoa(len(body))
+	replacedContentType := false
+	replacedContentLength := false
+	for key := range cloned {
+		switch {
+		case strings.EqualFold(key, "Content-Type"):
+			cloned[key] = []string{contentType}
+			replacedContentType = true
+		case strings.EqualFold(key, "Content-Length"):
+			cloned[key] = []string{contentLength}
+			replacedContentLength = true
+		}
+	}
+	if !replacedContentType {
+		cloned["Content-Type"] = []string{contentType}
+	}
+	if !replacedContentLength {
+		cloned["Content-Length"] = []string{contentLength}
+	}
+	return cloned
+}
+
+func cloneHeadersWithoutContentEncoding(headers map[string][]string) map[string][]string {
+	cloned := cloneHeaders(headers)
+	for key := range cloned {
+		if strings.EqualFold(key, "Content-Encoding") {
+			delete(cloned, key)
+		}
+	}
+	return cloned
+}
+
+func cloneHeadersWithContentType(headers map[string][]string, contentType string) map[string][]string {
+	cloned := cloneHeadersWithoutContentEncoding(headers)
+	replaced := false
+	for key := range cloned {
+		if strings.EqualFold(key, "Content-Type") {
+			cloned[key] = []string{contentType}
+			replaced = true
+		}
+	}
+	if !replaced {
+		cloned["Content-Type"] = []string{contentType}
+	}
+	return cloned
 }
 
 // performNavigation handles the actual page navigation based on config

@@ -240,11 +240,6 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 		default:
 		}
 
-		// Use the latest captured main-document headers after stabilization so
-		// headers, finalURL, and HTML describe the same terminal document.
-		var responseHeaders map[string][]string
-		responseHeaders = getResponseHeaders(ctx, page, headerCapture)
-
 		// Batch JavaScript evaluations for better performance
 		batchJS := `() => {
 			return {
@@ -332,24 +327,60 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 			browserErr = fmt.Errorf("navigation failed: Chrome error page detected")
 		}
 
+		// Use the latest captured main-document headers after stabilization so
+		// headers, finalURL, and HTML describe the same terminal document.
+		responseHeaders := getResponseHeaders(ctx, page, headerCapture)
+
 		// Extract response body
-		var responseBody string
-		if statusCode >= 200 && statusCode < 300 {
-			htmlContent, err := page.HTML()
-			if err != nil {
-				errStr := err.Error()
+		var responseBody []byte
+		if browserErr == nil && statusCode >= 200 && statusCode < 300 {
+			htmlContent, htmlErr := page.HTML()
+			htmlCaptured := false
+			if htmlErr != nil {
+				errStr := htmlErr.Error()
 				if strings.Contains(errStr, "Execution context was destroyed") || strings.Contains(errStr, "-32000") {
 					log.Info("Execution context destroyed while getting HTML content (likely due to redirect)")
 				} else {
-					log.Error("Failed to get HTML content", svc1log.SafeParam("error", err.Error()))
+					log.Error("Failed to get HTML content", svc1log.SafeParam("error", htmlErr.Error()))
 				}
-				responseBody = ""
+				responseBody = nil
+				responseHeaders = cloneHeadersWithContentType(responseHeaders, "text/html")
 			} else {
-				responseBody = htmlContent
+				htmlCaptured = true
+				responseBody = []byte(htmlContent)
+				responseHeaders = cloneHeadersWithoutContentEncoding(responseHeaders)
+			}
+			if shouldLoadStaticResource(htmlContent, *constructedURL, finalURL) {
+				resourceURL := finalURL
+				if resourceURL == "" || isInternalBrowserURL(resourceURL) {
+					resourceURL = *constructedURL
+				}
+				loadedBody, loadedHeaders, loadedStatusCode, err := loadNetworkResourceBody(page, resourceURL)
+				if err == nil && isValidStaticResourceBody(loadedBody) {
+					responseBody = loadedBody
+					responseHeaders = headersForLoadedStaticResource(responseHeaders, loadedHeaders, loadedBody)
+					if loadedStatusCode > 0 {
+						statusCode = loadedStatusCode
+					}
+				} else if err != nil {
+					log.Info("Failed to load static resource body, falling back to page HTML", svc1log.SafeParam("error", cleanErrMsg(err)))
+					if !htmlCaptured {
+						browserErr = fmt.Errorf("failed to capture static resource body: HTML extraction failed (%s); static resource load failed (%s)", cleanErrMsg(htmlErr), cleanErrMsg(err))
+						return
+					}
+					responseHeaders = cloneHeadersWithContentType(responseHeaders, "text/html")
+				} else {
+					log.Info("Loaded static resource did not validate, falling back to page HTML")
+					if !htmlCaptured {
+						browserErr = fmt.Errorf("failed to capture static resource body: HTML extraction failed (%s); loaded static resource did not validate as binary", cleanErrMsg(htmlErr))
+						return
+					}
+					responseHeaders = cloneHeadersWithContentType(responseHeaders, "text/html")
+				}
 			}
 		}
 		// Build final response
-		response := requesthelpers.CreateHTTPResponse(
+		response := requesthelpers.CreateHTTPResponseFromBytes(
 			statusCode,
 			responseRedirectChain,
 			responseHeaders,

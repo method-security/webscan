@@ -16,6 +16,7 @@ import (
 	// Utils
 	utils "github.com/Method-Security/webscan/utils"
 	useragent "github.com/Method-Security/webscan/utils/useragent"
+
 	// External
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )

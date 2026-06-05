@@ -19,6 +19,7 @@ import (
 	discoverroute "github.com/Method-Security/webscan/internal/discover/route"
 	discoversaas "github.com/Method-Security/webscan/internal/discover/saas/active"
 	discoversaashelpers "github.com/Method-Security/webscan/internal/discover/saas/active/helpers"
+	discoverwordlist "github.com/Method-Security/webscan/internal/discover/wordlist"
 
 	// Utils
 	nucleihelpers "github.com/Method-Security/webscan/utils/nuclei/helpers"
@@ -802,6 +803,104 @@ func (a *WebScan) InitDiscoverCommand() {
 	// Add Command to 'Discover' Command
 	discoverCmd.AddCommand(discoverSaasCmd)
 
+	// Wordlist Command
+	discoverWordlistCmd := &cobra.Command{
+		Use:   "wordlist",
+		Short: "Generate a wordlist from web content (CeWL-style)",
+		Long:  `Crawl a target website and extract unique words from page content to build a custom wordlist, similar to CeWL.`,
+		Run: func(cmd *cobra.Command, args []string) {
+			defer a.OutputSignal.PanicHandler(cmd.Context())
+
+			// Get Target flag
+			target, err := cmd.Flags().GetString("target")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Get Config flags
+			minWordLength, err := cmd.Flags().GetInt("min-word-length")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			spiderDepth, err := cmd.Flags().GetInt("spider-depth")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			includeMetadata, err := cmd.Flags().GetBool("include-metadata")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			includeComments, err := cmd.Flags().GetBool("include-comments")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			includeAltText, err := cmd.Flags().GetBool("include-alt-text")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			ignoreCrossDomain, err := cmd.Flags().GetBool("ignore-cross-domain")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			verifyTLS, err := cmd.Flags().GetBool("verify-tls")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			timeout, err := cmd.Flags().GetInt("timeout")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			threads, err := cmd.Flags().GetInt("threads")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Get User Agent flag
+			userAgentPreset, err := requesthelpers.GetUserAgentFlag(cmd)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Set Config
+			config := getDiscoverWordlistConfig(target, minWordLength, spiderDepth, includeMetadata, includeComments, includeAltText, ignoreCrossDomain, verifyTLS, timeout, threads, userAgentPreset)
+
+			// Generate a report
+			report := discoverwordlist.PerformWordlistCapture(cmd.Context(), config)
+			a.OutputSignal.Content = report
+		},
+	}
+	// Target Flags
+	discoverWordlistCmd.Flags().String("target", "", "URL target to crawl for wordlist generation")
+	// Config Flags
+	discoverWordlistCmd.Flags().Int("min-word-length", 5, "Minimum word length to include in wordlist")
+	discoverWordlistCmd.Flags().Int("spider-depth", 2, "Maximum depth for web spidering")
+	discoverWordlistCmd.Flags().Bool("include-metadata", false, "Include words from meta tag content")
+	discoverWordlistCmd.Flags().Bool("include-comments", false, "Include words from HTML comments")
+	discoverWordlistCmd.Flags().Bool("include-alt-text", false, "Include words from image alt attributes")
+	discoverWordlistCmd.Flags().Bool("ignore-cross-domain", true, "Ignore links that lead to a different domain")
+	discoverWordlistCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
+	discoverWordlistCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
+	discoverWordlistCmd.Flags().Int("threads", 5, "Number of concurrent threads for crawling")
+	// User Agent Flag
+	discoverWordlistCmd.Flags().String("user-agent", "RANDOM", "User-Agent preset (RANDOM, CHROME, FIREFOX, SAFARI, EDGE)")
+
+	// Mark Required Flags
+	_ = discoverWordlistCmd.MarkFlagRequired("target")
+
+	// Add Command to 'Discover' Command
+	discoverCmd.AddCommand(discoverWordlistCmd)
+
 	// Add Command to Root Command
 	a.RootCmd.AddCommand(discoverCmd)
 }
@@ -973,4 +1072,21 @@ func getDiscoverApplicationResourceConfigTypeFromString(resource string) (discov
 	return discover.ApplicationResourceConfigType{
 		ApplicationResourceType: resourceEnum,
 	}, nil
+}
+
+// getDiscoverWordlistConfig builds the config for wordlist generation.
+func getDiscoverWordlistConfig(target string, minWordLength int, spiderDepth int, includeMetadata bool, includeComments bool, includeAltText bool, ignoreCrossDomain bool, verifyTLS bool, timeout int, threads int, userAgent common.UserAgentPreset) discover.DiscoverWordlistConfig {
+	return discover.DiscoverWordlistConfig{
+		Target:            target,
+		MinWordLength:     max(minWordLength, 1),
+		SpiderDepth:       max(spiderDepth, 1),
+		IncludeMetadata:   includeMetadata,
+		IncludeComments:   includeComments,
+		IncludeAltText:    includeAltText,
+		IgnoreCrossDomain: ignoreCrossDomain,
+		VerifyTls:         verifyTLS,
+		Timeout:           max(timeout, 0),
+		Threads:           max(threads, 0),
+		UserAgent:         userAgent,
+	}
 }

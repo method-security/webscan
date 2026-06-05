@@ -126,9 +126,11 @@ func extractWords(htmlContent string, config discover.DiscoverWordlistConfig) []
 	builder.WriteString(doc.Find("body").Text())
 	builder.WriteString(" ")
 
-	// Meta tag content values
+	// Meta tag content values — include all meta[content] variants: name-based
+	// (description, keywords), property-based (Open Graph, Twitter Cards), and
+	// http-equiv. The prior selector meta[name][content] excluded property tags.
 	if config.IncludeMetadata {
-		doc.Find("meta[name][content]").Each(func(_ int, s *goquery.Selection) {
+		doc.Find("meta[content]").Each(func(_ int, s *goquery.Selection) {
 			if content, exists := s.Attr("content"); exists {
 				builder.WriteString(content)
 				builder.WriteString(" ")

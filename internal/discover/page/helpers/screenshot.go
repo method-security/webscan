@@ -11,6 +11,7 @@ import (
 	// Utils
 	headless "github.com/Method-Security/webscan/utils/request/headless"
 	useragent "github.com/Method-Security/webscan/utils/useragent"
+
 	// External
 	proto "github.com/go-rod/rod/lib/proto"
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"

@@ -294,9 +294,15 @@ func PerformWordlistCapture(ctx context.Context, config discover.DiscoverWordlis
 				}
 				bodyStr := *bodyPtr
 
-				// Record crawled URL
+				// Record crawled URL; also mark the final redirect destination as
+				// visited so that if another path discovers the canonical URL directly
+				// it isn't fetched a second time.
 				mu.Lock()
 				allCrawled = append(allCrawled, targetURL)
+				if resp.Response != nil && len(resp.Response.RedirectChain) > 1 {
+					finalURL := strings.TrimRight(resp.Response.RedirectChain[len(resp.Response.RedirectChain)-1], "/")
+					visitedURLs[finalURL] = struct{}{}
+				}
 				mu.Unlock()
 
 				// Extract words and add to counts
@@ -307,8 +313,16 @@ func PerformWordlistCapture(ctx context.Context, config discover.DiscoverWordlis
 				}
 				mu.Unlock()
 
+				// Use the final post-redirect URL as the base for link resolution so
+				// that relative hrefs resolve against the correct host, not the
+				// original pre-redirect URL.
+				baseForLinks := targetURL
+				if resp.Response != nil && len(resp.Response.RedirectChain) > 0 {
+					baseForLinks = resp.Response.RedirectChain[len(resp.Response.RedirectChain)-1]
+				}
+
 				// Extract links for next depth
-				links := extractLinks(bodyStr, targetURL, config)
+				links := extractLinks(bodyStr, baseForLinks, config)
 				for _, link := range links {
 					mu.Lock()
 					_, alreadyVisited := visitedURLs[link]
@@ -344,6 +358,10 @@ func PerformWordlistCapture(ctx context.Context, config discover.DiscoverWordlis
 	sort.Slice(words, func(i, j int) bool {
 		return words[i].Word < words[j].Word
 	})
+
+	// Sort crawled URLs for deterministic output regardless of goroutine
+	// completion order.
+	sort.Strings(allCrawled)
 
 	totalUnique := len(words)
 	report.Result.Words = words

@@ -1,0 +1,26 @@
+id: fortinet-fortigate-sslvpn-detect
+info:
+  name: Fortinet FortiGate SSL-VPN Portal Detection
+  author: method-security
+  severity: info
+  description: Detects Fortinet FortiGate SSL-VPN portals using FortiGate remote login paths and Fortinet-specific language and cookie markers.
+  metadata:
+    method-application-type: NETWORK_EDGE_APPLICATION
+    method-module-name: FORTINET_FORTIGATE_SSLVPN
+    cpe: cpe:2.3:o:fortinet:fortios:*:*:*:*:*:*:*:*
+  tags: discovery,fortinet,fortigate,fortios,ssl-vpn,network-edge
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/remote/login"
+      - "{{BaseURL}}/remote/fgt_lang"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'contains(tolower(body), "fortigate ssl-vpn") || contains(tolower(body), "fortigate ssl vpn")'
+          - 'contains(tolower(body), "fortinet") && contains(tolower(body), "remote/login")'
+          - 'contains(tolower(header), "fgtlanguage") && contains(tolower(body), "fortinet")'

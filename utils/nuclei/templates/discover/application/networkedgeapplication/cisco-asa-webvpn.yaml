@@ -1,0 +1,33 @@
+id: cisco-asa-webvpn-detect
+info:
+  name: Cisco ASA / Secure Firewall WebVPN Detection
+  author: method-security
+  severity: info
+  description: Detects Cisco ASA, Secure Firewall, and AnyConnect SSL VPN portals using CSCOE/CSCOU paths, WebVPN cookies, and Cisco-branded portal content.
+  metadata:
+    method-application-type: NETWORK_EDGE_APPLICATION
+    method-module-name: CISCO_ASA_WEBVPN
+    cpe: cpe:2.3:a:cisco:adaptive_security_appliance_software:*:*:*:*:*:*:*:*
+  tags: discovery,cisco,asa,secure-firewall,webvpn,anyconnect,network-edge
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/+CSCOE+/logon.html"
+      - "{{BaseURL}}/+CSCOE+/portal.html"
+      - "{{BaseURL}}/+CSCOE+/saml/sp/metadata"
+      - "{{BaseURL}}/+CSCOU+/anyconnect-win-4.10.06079-webdeploy-k9.pkg"
+      - "{{BaseURL}}/+CSCOE+/win.js"
+      - "{{BaseURL}}/+webvpn+/index.html"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'contains(body, "+CSCOE+") && contains(tolower(body), "webvpn")'
+          - 'contains(tolower(body), "cisco") && contains(tolower(body), "ssl vpn service")'
+          - 'contains(tolower(header), "webvpn") && contains(body, "+CSCOE+")'
+          - 'contains(tolower(header), "csco_webvpn") && (contains(body, "+CSCOE+") || contains(body, "+CSCOU+"))'
+          - 'contains(tolower(body), "anyconnect") && contains(body, "+CSCOU+") && contains(tolower(body), "cisco")'
+          - 'contains(tolower(body), "webvpn_login_primary_username") && contains(tolower(body), "cisco")'

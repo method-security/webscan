@@ -1,0 +1,27 @@
+id: citrix-sharefile-detect
+info:
+  name: Citrix ShareFile Detection
+  author: method-security
+  severity: info
+  description: Detects Citrix ShareFile collaboration and file sharing portals using ShareFile-specific login pages and Citrix branding.
+  metadata:
+    method-application-type: COLLABORATION_APPLICATION
+    method-module-name: CITRIX_SHAREFILE
+    cpe: cpe:2.3:a:citrix:sharefile:*:*:*:*:*:*:*:*
+  tags: discovery,citrix,sharefile,collaboration,file-sharing
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/Authentication/Login"
+      - "{{BaseURL}}/oauth/authorize"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'contains(tolower(body), "sharefile") && contains(tolower(body), "citrix")'
+          - 'contains(tolower(body), "sharefile login")'
+          - 'contains(tolower(body), "sf-login") && contains(tolower(body), "sharefile")'
+          - 'contains(tolower(header), "sf-api") && contains(tolower(body), "sharefile")'

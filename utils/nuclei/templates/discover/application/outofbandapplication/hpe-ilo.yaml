@@ -1,0 +1,35 @@
+id: hpe-ilo-detect
+info:
+  name: HPE iLO Detection
+  author: method-security
+  severity: info
+  description: Detects HPE Integrated Lights-Out out-of-band management interfaces using iLO login pages, headers, and Redfish/OEM markers.
+  metadata:
+    method-application-type: OUT_OF_BAND_APPLICATION
+    method-module-name: HPE_ILO
+    cpe: cpe:2.3:a:hpe:integrated_lights-out:*:*:*:*:*:*:*:*
+  tags: discovery,hpe,hp,ilo,bmc,redfish,out-of-band,remote-management
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/login.html"
+      - "{{BaseURL}}/html/login.html"
+      - "{{BaseURL}}/redfish/v1/"
+      - "{{BaseURL}}/json/login_session"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'contains(tolower(body), "integrated lights-out") && (contains(tolower(body), "hewlett packard") || contains(tolower(body), "hpe") || contains(tolower(body), "hp"))'
+          - 'contains(tolower(body), "hpe ilo") || contains(tolower(body), "hp ilo")'
+          - 'contains(body, "\"Oem\"") && contains(body, "\"Hpe\"") && contains(body, "\"RedfishVersion\"")'
+          - 'contains(tolower(body), "platform=\":ilo:\"") && contains(tolower(body), "hewlett-packard")'
+          - 'contains(tolower(header), "hp-ilo") || contains(tolower(header), "hpe-ilo")'
+      - type: regex
+        part: body
+        regex:
+          - '(?i)<title[^>]*>.*(?:HPE?|Hewlett Packard).*iLO.*</title>'
+          - '(?i)<title[^>]*>.*Integrated\s+Lights-Out.*</title>'

@@ -1,0 +1,26 @@
+id: atlassian-jira-detect
+info:
+  name: Atlassian Jira Detection
+  author: method-security
+  severity: info
+  description: Detects Atlassian Jira applications using Jira login paths, AJS metadata, and Jira web resource identifiers.
+  metadata:
+    method-application-type: COLLABORATION_APPLICATION
+    method-module-name: ATLASSIAN_JIRA
+    cpe: cpe:2.3:a:atlassian:jira:*:*:*:*:*:*:*:*
+  tags: discovery,atlassian,jira,collaboration
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/login.jsp"
+      - "{{BaseURL}}/secure/Dashboard.jspa"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'contains(tolower(body), "atlassian jira")'
+          - 'contains(tolower(body), "jira") && contains(tolower(body), "jira.webresources")'
+          - 'contains(tolower(body), "com.atlassian.jira") && contains(tolower(body), "jira")'

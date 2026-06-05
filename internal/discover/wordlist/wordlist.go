@@ -298,35 +298,43 @@ func PerformWordlistCapture(ctx context.Context, config discover.DiscoverWordlis
 				}
 				bodyStr := *bodyPtr
 
+				// Determine the canonical final URL after all redirects (including
+				// trailing-slash hops, which send.go now always appends to
+				// RedirectChain before returning).
+				finalURL := targetURL
+				if resp.Response != nil && len(resp.Response.RedirectChain) > 0 {
+					finalURL = resp.Response.RedirectChain[len(resp.Response.RedirectChain)-1]
+				}
+
 				// Record crawled URL; also mark the final redirect destination as
 				// visited so that if another path discovers the canonical URL directly
 				// it isn't fetched a second time.
 				mu.Lock()
 				allCrawled = append(allCrawled, targetURL)
-				if resp.Response != nil && len(resp.Response.RedirectChain) > 1 {
-					finalURL := strings.TrimRight(resp.Response.RedirectChain[len(resp.Response.RedirectChain)-1], "/")
-					visitedURLs[finalURL] = struct{}{}
+				if finalURL != targetURL {
+					visitedURLs[strings.TrimRight(finalURL, "/")] = struct{}{}
 				}
 				mu.Unlock()
 
-				// Extract words and add to counts
-				words := extractWords(bodyStr, config)
-				mu.Lock()
-				for _, w := range words {
-					wordCounts[strings.ToLower(w)]++
+				// Skip word extraction when IgnoreCrossDomain is enabled and the
+				// response came from an off-scope page (e.g. the request was
+				// redirected to a different registrable domain).  We check both
+				// config.Target and targetURL so that in-domain subdomains and
+				// same-site redirect chains are always included.
+				if !config.IgnoreCrossDomain || isSameDomain(config.Target, finalURL) || isSameDomain(targetURL, finalURL) {
+					words := extractWords(bodyStr, config)
+					mu.Lock()
+					for _, w := range words {
+						wordCounts[strings.ToLower(w)]++
+					}
+					mu.Unlock()
 				}
-				mu.Unlock()
 
 				// Use the final post-redirect URL as the base for link resolution so
 				// that relative hrefs resolve against the correct host, not the
-				// original pre-redirect URL.
-				baseForLinks := targetURL
-				if resp.Response != nil && len(resp.Response.RedirectChain) > 0 {
-					baseForLinks = resp.Response.RedirectChain[len(resp.Response.RedirectChain)-1]
-				}
-
-				// Extract links for next depth
-				links := extractLinks(bodyStr, baseForLinks, config)
+				// original pre-redirect URL.  With trailing-slash redirects now
+				// tracked in RedirectChain, this is always the true canonical URL.
+				links := extractLinks(bodyStr, finalURL, config)
 				for _, link := range links {
 					mu.Lock()
 					_, alreadyVisited := visitedURLs[link]

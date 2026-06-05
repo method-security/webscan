@@ -46,22 +46,22 @@ func isSameDomain(baseURL, targetURL string) bool {
 }
 
 // createRequestConfig builds a SendHttpRequestConfig for a standard GET request.
+// It uses SplitTargetURL to correctly populate BaseUrl, Path, and Params.Query so
+// that ConstructURL never dereferences a nil Params pointer and query-string URLs
+// are fetched accurately.
 func createRequestConfig(rawURL string, config discover.DiscoverWordlistConfig) (common.SendHttpRequestConfig, error) {
-	parsed, err := url.Parse(rawURL)
+	baseURL, path, queryParams, err := requesthelpers.SplitTargetURL(rawURL)
 	if err != nil {
 		return common.SendHttpRequestConfig{}, fmt.Errorf("invalid URL %s: %w", rawURL, err)
-	}
-
-	baseURL := fmt.Sprintf("%s://%s", parsed.Scheme, parsed.Host)
-	path := parsed.Path
-	if path == "" {
-		path = "/"
 	}
 
 	httpReq := &common.HttpRequest{
 		BaseUrl: baseURL,
 		Path:    path,
 		Method:  common.HttpMethodGet,
+		Params: &common.HttpRequestParams{
+			Query: queryParams,
+		},
 	}
 	return common.SendHttpRequestConfig{
 		Request:                    httpReq,

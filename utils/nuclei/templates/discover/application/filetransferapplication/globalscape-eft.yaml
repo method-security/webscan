@@ -21,6 +21,6 @@ http:
     matchers:
       - type: dsl
         dsl:
-          - 'contains(tolower(body), "globalscape") && contains(tolower(body), "eft")'
-          - 'contains(tolower(body), "eft web transfer client")'
-          - 'contains(tolower(body), "eftclient") && contains(tolower(body), "globalscape")'
+          - 'status_code == 200 && contains(tolower(body), "eft web transfer client")'
+          - 'status_code == 200 && contains(tolower(body), "eftclient") && contains(tolower(body), "globalscape")'
+          - 'status_code == 200 && contains(tolower(body), "/eftclient/") && contains(tolower(body), "account/login.htm")'

@@ -15,10 +15,6 @@ http:
       - "{{BaseURL}}"
       - "{{BaseURL}}/+CSCOE+/logon.html"
       - "{{BaseURL}}/+CSCOE+/portal.html"
-      - "{{BaseURL}}/+CSCOE+/saml/sp/metadata"
-      - "{{BaseURL}}/+CSCOU+/anyconnect-win-4.10.06079-webdeploy-k9.pkg"
-      - "{{BaseURL}}/+CSCOE+/win.js"
-      - "{{BaseURL}}/+webvpn+/index.html"
     redirects: true
     max-redirects: 5
     stop-at-first-match: true

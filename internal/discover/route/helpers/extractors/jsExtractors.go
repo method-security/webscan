@@ -379,7 +379,7 @@ func (v *visitor) resolveExpressionToString(expr ast.Expression) string {
 		if e.Operator.String() == "+" {
 			left := v.resolveExpressionToString(e.Left)
 			right := v.resolveExpressionToString(e.Right)
-			if left != "" || right != "" {
+			if left != "" && right != "" {
 				return left + right
 			}
 		}

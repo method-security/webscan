@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -453,6 +454,11 @@ func PerformRouteCapture(ctx context.Context, config discover.DiscoverRouteConfi
 
 	// Remove duplicate Routes and Static Assets
 	report.Result.Routes = discoverroutehelpers.MergeWebRoutes(allRoutes)
+	sort.Slice(report.Result.Routes, func(i, j int) bool {
+		ki := report.Result.Routes[i].BaseUrl + report.Result.Routes[i].Path
+		kj := report.Result.Routes[j].BaseUrl + report.Result.Routes[j].Path
+		return ki < kj
+	})
 	if config.MaxRoutes != nil && *config.MaxRoutes > 0 && len(report.Result.Routes) > *config.MaxRoutes {
 		report.Result.Routes = report.Result.Routes[:*config.MaxRoutes]
 	}

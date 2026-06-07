@@ -24,8 +24,8 @@ import (
 
 // sourceMap represents the structure of a JavaScript source map.
 type sourceMap struct {
-	Sources        []string `json:"sources"`
-	SourcesContent []string `json:"sourcesContent"`
+	Sources        []string  `json:"sources"`
+	SourcesContent []*string `json:"sourcesContent"`
 }
 
 // allCapsVarPattern matches ALL_CAPS variable names (at least two chars).
@@ -511,10 +511,11 @@ func fetchSourceMapRoutes(ctx context.Context, sourceMapURL string, baseURL stri
 		return routes, urls, errors
 	}
 
-	for i, content := range sm.SourcesContent {
-		if content == "" {
+	for i, contentPtr := range sm.SourcesContent {
+		if contentPtr == nil || *contentPtr == "" {
 			continue
 		}
+		content := *contentPtr
 
 		// Determine evidence tag from the parallel sources[] entry
 		sourceName := ""
@@ -585,8 +586,6 @@ func ExtractScriptRoutes(ctx context.Context, doc *goquery.Document, baseURL str
 				return
 			}
 
-			bundleCount++
-
 			// Fetch the JavaScript content
 			resp, err := http.Get(fullURL) //nolint:noctx
 			if err != nil {
@@ -607,6 +606,8 @@ func ExtractScriptRoutes(ctx context.Context, doc *goquery.Document, baseURL str
 				errors = append(errors, fmt.Sprintf("Failed to get %s: %s", fullURL, resp.Status))
 				return
 			}
+
+			bundleCount++
 			bodyBytes, err := io.ReadAll(resp.Body)
 			if err != nil {
 				errors = append(errors, err.Error())
@@ -631,7 +632,9 @@ func ExtractScriptRoutes(ctx context.Context, doc *goquery.Document, baseURL str
 				}
 				// Fallback: try <bundle_url>.map
 				if sourceMapURL == "" {
-					sourceMapURL = fullURL + ".map"
+					mapBase := strings.SplitN(fullURL, "?", 2)[0]
+					mapBase = strings.SplitN(mapBase, "#", 2)[0]
+					sourceMapURL = mapBase + ".map"
 				} else {
 					// Resolve relative source map URLs against the bundle URL
 					sourceMapURL = discoverroutehelpers.ResolveURL(fullURL, sourceMapURL)
@@ -705,7 +708,9 @@ func ExtractBundleURLRoutes(ctx context.Context, bundleURLs []string, baseURL st
 				sourceMapURL = resp.Header.Get("X-SourceMap")
 			}
 			if sourceMapURL == "" {
-				sourceMapURL = fullURL + ".map"
+				mapBase := strings.SplitN(fullURL, "?", 2)[0]
+				mapBase = strings.SplitN(mapBase, "#", 2)[0]
+				sourceMapURL = mapBase + ".map"
 			} else {
 				sourceMapURL = discoverroutehelpers.ResolveURL(fullURL, sourceMapURL)
 			}

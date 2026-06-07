@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"strings"
 	"time"
 
 	// Generated
@@ -32,14 +31,11 @@ func SendStandardRequest(ctx context.Context, config common.SendHttpRequestConfi
 	if err != nil {
 		return common.HttpRequestResponse{Request: request}, fmt.Errorf("request body preparation failed: %v", err)
 	}
-	constructedHeaders := make(map[string]string)
-	if request.Params != nil && request.Params.Headers != nil {
-		for k, v := range request.Params.Headers {
-			if len(v) > 0 {
-				constructedHeaders[k] = strings.Join(v, ",")
-			}
-		}
+	var rawHeaders map[string][]string
+	if request.Params != nil {
+		rawHeaders = request.Params.Headers
 	}
+	constructedHeaders := requesthelpers.FlattenHeaders(rawHeaders)
 
 	// Send Request
 	sentAt := time.Now()

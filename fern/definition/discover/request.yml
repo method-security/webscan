@@ -1,0 +1,39 @@
+imports:
+  http: ../common/http.yml
+  method: ../common/method.yml
+
+types:
+  TlsCertificate:
+    properties:
+      subject: string
+      issuer: string
+      sans: optional<list<string>>
+      notBefore: datetime
+      notAfter: datetime
+      serialNumber: optional<string>
+
+  DiscoverRequestConfig:
+    properties:
+      target: string
+      httpMethod: http.HttpMethod
+      headers: optional<map<string, string>>
+      jsonBody: optional<string>
+      textBody: optional<string>
+      formData: optional<map<string, string>>
+      maxRedirects: integer
+      followRedirects: boolean
+      verifyTls: boolean
+      timeout: integer
+      userAgent: method.UserAgentPreset
+      ignoreCrossDomainRedirects: boolean
+
+  DiscoverRequestResult:
+    properties:
+      request: optional<http.HttpRequestResponse>
+      tlsCertificates: optional<list<TlsCertificate>>
+
+  DiscoverRequestReport:
+    properties:
+      config: DiscoverRequestConfig
+      result: DiscoverRequestResult
+      errors: optional<list<string>>

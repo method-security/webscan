@@ -16,6 +16,7 @@ import (
 	discoverdirectory "github.com/Method-Security/webscan/internal/discover/directory"
 	discoverpage "github.com/Method-Security/webscan/internal/discover/page"
 	discoverpagehelpers "github.com/Method-Security/webscan/internal/discover/page/helpers"
+	discoverrequest "github.com/Method-Security/webscan/internal/discover/request"
 	discoverroute "github.com/Method-Security/webscan/internal/discover/route"
 	discoversaas "github.com/Method-Security/webscan/internal/discover/saas/active"
 	discoversaashelpers "github.com/Method-Security/webscan/internal/discover/saas/active/helpers"
@@ -442,6 +443,153 @@ func (a *WebScan) InitDiscoverCommand() {
 
 	// Add Command to 'Discover' Command
 	discoverCmd.AddCommand(discoverPageCmd)
+
+	// Request Command
+	discoverRequestCmd := &cobra.Command{
+		Use:   "request",
+		Short: "Send a freeform HTTP request to a target",
+		Long:  `Send a freeform HTTP request to a target URL and capture the full HTTP response along with TLS certificate details.`,
+		Run: func(cmd *cobra.Command, args []string) {
+			defer a.OutputSignal.PanicHandler(cmd.Context())
+
+			// Target flag
+			target, err := cmd.Flags().GetString("target")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// HTTP Method flag
+			httpMethodStr, err := cmd.Flags().GetString("http-method")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			httpMethod, err := common.NewHttpMethodFromString(strings.ToUpper(httpMethodStr))
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Header flag (repeated)
+			headerPairs, err := cmd.Flags().GetStringArray("header")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			headers := requesthelpers.ParseHeaderPairs(headerPairs)
+
+			// JSON body flag
+			jsonBodyStr, err := cmd.Flags().GetString("json-body")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			var jsonBody *string
+			if jsonBodyStr != "" {
+				jsonBody = &jsonBodyStr
+			}
+
+			// Text body flag
+			textBodyStr, err := cmd.Flags().GetString("text-body")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			var textBody *string
+			if textBodyStr != "" {
+				textBody = &textBodyStr
+			}
+
+			// Form data flag (repeated)
+			formDataPairs, err := cmd.Flags().GetStringArray("form-data")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			formData := requesthelpers.ParseFormDataPairs(formDataPairs)
+
+			// Config flags
+			maxRedirects, err := cmd.Flags().GetInt("max-redirects")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			followRedirects, err := cmd.Flags().GetBool("follow-redirects")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			verifyTLS, err := cmd.Flags().GetBool("verify-tls")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			timeout, err := cmd.Flags().GetInt("timeout")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			ignoreCrossDomainRedirects, err := cmd.Flags().GetBool("ignore-cross-domain-redirects")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Get User Agent flag
+			userAgentPreset, err := requesthelpers.GetUserAgentFlag(cmd)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// If follow-redirects is false, set maxRedirects to 0
+			if !followRedirects {
+				maxRedirects = 0
+			}
+
+			// Build config
+			config := discover.DiscoverRequestConfig{
+				Target:                     target,
+				HttpMethod:                 httpMethod,
+				Headers:                    headers,
+				JsonBody:                   jsonBody,
+				TextBody:                   textBody,
+				FormData:                   formData,
+				MaxRedirects:               maxRedirects,
+				FollowRedirects:            followRedirects,
+				VerifyTls:                  verifyTLS,
+				Timeout:                    timeout,
+				UserAgent:                  userAgentPreset,
+				IgnoreCrossDomainRedirects: ignoreCrossDomainRedirects,
+			}
+
+			// Generate report
+			report := discoverrequest.PerformRequest(cmd.Context(), config)
+			a.OutputSignal.Content = report
+		},
+	}
+	// Target Flags
+	discoverRequestCmd.Flags().String("target", "", "URL to send the HTTP request to")
+	// Request Flags
+	discoverRequestCmd.Flags().String("http-method", "GET", "HTTP method (GET,POST,PUT,DELETE,PATCH,HEAD,OPTIONS)")
+	discoverRequestCmd.Flags().StringArray("header", []string{}, "Request headers as 'Key: Value' pairs (repeatable)")
+	discoverRequestCmd.Flags().String("json-body", "", "Request body as JSON string")
+	discoverRequestCmd.Flags().String("text-body", "", "Request body as plain text")
+	discoverRequestCmd.Flags().StringArray("form-data", []string{}, "Form data as 'key=value' pairs (repeatable)")
+	// Config Flags
+	discoverRequestCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
+	discoverRequestCmd.Flags().Bool("follow-redirects", true, "Follow HTTP redirects")
+	discoverRequestCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates")
+	discoverRequestCmd.Flags().Int("timeout", 30, "Request timeout in seconds")
+	// User Agent Flag
+	discoverRequestCmd.Flags().String("user-agent", "RANDOM", "User-Agent preset (RANDOM, CHROME, FIREFOX, SAFARI, EDGE)")
+
+	// Mark Required Flags
+	_ = discoverRequestCmd.MarkFlagRequired("target")
+
+	// Add Command to 'Discover' Command
+	discoverCmd.AddCommand(discoverRequestCmd)
 
 	// Probe Command
 	discoverProbeCmd := &cobra.Command{

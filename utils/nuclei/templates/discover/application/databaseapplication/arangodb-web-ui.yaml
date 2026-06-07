@@ -1,0 +1,28 @@
+id: arangodb-web-ui-detect
+info:
+  name: ArangoDB Web UI Detection
+  author: method-security
+  severity: info
+  description: Detects ArangoDB web administration UI using ArangoDB-specific title, login, and API markers.
+  metadata:
+    method-application-type: DATABASE_APPLICATION
+    method-module-name: ARANGODB_WEB_UI
+    cpe: cpe:2.3:a:arangodb:arangodb:*:*:*:*:*:*:*:*
+  tags: discovery,database,admin,arangodb
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/_db/_system/_admin/aardvark/index.html"
+      - "{{BaseURL}}/_api/version"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'status_code == 200 && contains(tolower(header), "server: arangodb") && contains(tolower(body), "<title>arangodb web interface")'
+          - 'contains(tolower(header), "server: arangodb") && contains(tolower(header), "location: /_db/_system/_admin/aardvark/index.html")'
+          - 'status_code == 200 && contains(tolower(body), "<title>arangodb") && contains(tolower(body), "aardvark")'
+          - 'status_code == 200 && contains(tolower(body), "arangodb") && contains(tolower(body), "_admin/aardvark")'
+          - 'status_code == 200 && contains(tolower(body), "\"server\":\"arango\"") && contains(tolower(body), "\"version\"")'

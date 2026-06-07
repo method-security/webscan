@@ -1,0 +1,33 @@
+id: ivanti-connect-secure-detect
+info:
+  name: Ivanti Connect Secure / Pulse Connect Secure Detection
+  author: method-security
+  severity: info
+  description: Detects Ivanti Connect Secure and legacy Pulse Connect Secure VPN portals using product-specific Dana paths and branded login assets.
+  metadata:
+    method-application-type: NETWORK_EDGE_APPLICATION
+    method-module-name: IVANTI_CONNECT_SECURE
+    cpe: cpe:2.3:a:ivanti:connect_secure:*:*:*:*:*:*:*:*
+  tags: discovery,ivanti,pulse,connect-secure,vpn,network-edge
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/dana-na/auth/url_default/welcome.cgi"
+      - "{{BaseURL}}/dana/html5acc/guacamole/"
+      - "{{BaseURL}}/dana-na/imgs/login_logo.gif"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'contains(tolower(body), "pulse connect secure") || contains(tolower(body), "ivanti connect secure")'
+          - 'contains(tolower(body), "/dana-na/") && (contains(tolower(body), "welcome.cgi?p=logo") || contains(tolower(body), "dsid") || contains(tolower(body), "ivehost"))'
+      - type: word
+        part: header
+        words:
+          - "DSSIGNIN"
+          - "DSID"
+        case-insensitive: true
+        condition: and

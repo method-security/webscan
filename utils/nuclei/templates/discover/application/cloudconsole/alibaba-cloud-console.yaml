@@ -1,0 +1,26 @@
+id: alibaba-cloud-console-detect
+info:
+  name: Alibaba Cloud Console Detection
+  author: method-security
+  severity: info
+  description: Detects Alibaba Cloud console sign-in surfaces using Alibaba Cloud-specific login and console markers.
+  metadata:
+    method-application-type: CLOUD_CONSOLE
+    method-module-name: ALIBABA_CLOUD_CONSOLE
+    cpe: cpe:2.3:a:alibaba:cloud_console:*:*:*:*:*:*:*:*
+  tags: discovery,alibaba,aliyun,cloud,console
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/login/login.htm"
+      - "{{BaseURL}}/signin.htm"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'status_code == 200 && contains(tolower(body), "alibaba cloud") && contains(tolower(body), "console") && (contains(tolower(body), "sign in") || contains(tolower(body), "login"))'
+          - 'status_code == 200 && contains(tolower(body), "aliyun") && contains(tolower(body), "account.aliyun.com")'
+          - 'status_code == 200 && contains(tolower(body), "alibabacloud.com") && contains(tolower(body), "login")'

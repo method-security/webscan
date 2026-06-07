@@ -1,0 +1,27 @@
+id: ruckus-wireless-management-detect
+info:
+  name: Ruckus Wireless Management Detection
+  author: method-security
+  severity: info
+  description: Detects Ruckus ZoneDirector, Unleashed, and SmartZone wireless management interfaces using Ruckus-specific login markers.
+  metadata:
+    method-application-type: NETWORK_MANAGEMENT_SYSTEM
+    method-module-name: RUCKUS_WIRELESS_MANAGEMENT
+    cpe: cpe:2.3:a:ruckuswireless:*:*:*:*:*:*:*:*:*
+  tags: discovery,ruckus,zonedirector,unleashed,smartzone,network-management
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/admin/login.jsp"
+      - "{{BaseURL}}/wsg/login"
+      - "{{BaseURL}}/user/login"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'status_code == 200 && !contains(tolower(body), "gitlab community edition") && contains(tolower(body), "<title") && contains(tolower(body), "ruckus") && (contains(tolower(body), "zonedirector") || contains(tolower(body), "smartzone") || contains(tolower(body), "unleashed"))'
+          - 'status_code == 200 && !contains(tolower(body), "gitlab community edition") && contains(tolower(body), "ruckus wireless") && contains(tolower(body), "admin") && contains(tolower(body), "login")'
+          - 'status_code == 200 && !contains(tolower(body), "gitlab community edition") && contains(tolower(body), "ruckus") && contains(tolower(body), "smartzone") && contains(tolower(body), "/wsg/")'

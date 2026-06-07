@@ -1,0 +1,27 @@
+id: adminer-detect
+info:
+  name: Adminer Detection
+  author: method-security
+  severity: info
+  description: Detects Adminer database administration UI using Adminer-specific login form fields and title markers.
+  metadata:
+    method-application-type: DATABASE_APPLICATION
+    method-module-name: ADMINER
+    cpe: cpe:2.3:a:adminer:adminer:*:*:*:*:*:*:*:*
+  tags: discovery,database,admin,adminer
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/adminer.php"
+      - "{{BaseURL}}/adminer/"
+      - "{{BaseURL}}/mysql.php"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'status_code == 200 && contains(tolower(body), "<title>login - adminer") && contains(tolower(body), "name=\"auth[server]\"")'
+          - 'status_code == 200 && contains(tolower(body), "name=\"auth[driver]\"") && contains(tolower(body), "name=\"auth[username]\"") && contains(tolower(body), "adminer")'
+          - 'status_code == 200 && contains(tolower(body), "adminer.css") && contains(tolower(body), "name=\"auth[password]\"")'

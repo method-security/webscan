@@ -1,0 +1,26 @@
+id: microsoft-exchange-owa-detect
+info:
+  name: Microsoft Exchange OWA / ECP Detection
+  author: method-security
+  severity: info
+  description: Detects Microsoft Exchange Outlook Web App and ECP portals using Exchange-specific OWA paths, cookies, and version headers.
+  metadata:
+    method-application-type: COLLABORATION_APPLICATION
+    method-module-name: MICROSOFT_EXCHANGE_OWA
+    cpe: cpe:2.3:a:microsoft:exchange_server:*:*:*:*:*:*:*:*
+  tags: discovery,microsoft,exchange,owa,ecp,collaboration
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/owa/"
+      - "{{BaseURL}}/owa/auth/logon.aspx"
+      - "{{BaseURL}}/ecp/"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'contains(tolower(header), "x-owa-version") || contains(tolower(header), "x-feserver")'
+          - 'contains(tolower(body), "owa/auth") && contains(tolower(body), "microsoft exchange")'
+          - 'contains(tolower(body), "owalgnbdy") && contains(tolower(body), "outlook")'

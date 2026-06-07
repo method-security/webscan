@@ -1,0 +1,26 @@
+id: cloudbeaver-detect
+info:
+  name: CloudBeaver Detection
+  author: method-security
+  severity: info
+  description: Detects CloudBeaver web database manager interfaces using CloudBeaver-specific UI and static asset markers.
+  metadata:
+    method-application-type: DATABASE_APPLICATION
+    method-module-name: CLOUDBEAVER
+    cpe: cpe:2.3:a:dbeaver:cloudbeaver:*:*:*:*:*:*:*:*
+  tags: discovery,database,admin,dbeaver,cloudbeaver
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/login"
+      - "{{BaseURL}}/api/gql"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'status_code == 200 && contains(tolower(body), "<title>cloudbeaver community") && contains(tolower(body), "data-version=") && contains(tolower(body), "_root_uri_")'
+          - 'status_code == 200 && contains(tolower(body), "<title>cloudbeaver") && contains(tolower(body), "app-loading-screen") && contains(tolower(body), "manifest.webmanifest")'
+          - 'status_code == 200 && contains(tolower(body), "cloudbeaver") && contains(tolower(body), "app-loading-screen") && (contains(tolower(body), "assets/main") || contains(tolower(body), "styles/main"))'

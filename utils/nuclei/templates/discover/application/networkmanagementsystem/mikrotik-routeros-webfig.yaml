@@ -1,0 +1,26 @@
+id: mikrotik-routeros-webfig-detect
+info:
+  name: MikroTik RouterOS WebFig Detection
+  author: method-security
+  severity: info
+  description: Detects MikroTik RouterOS WebFig management interfaces using RouterOS/WebFig-specific page and asset markers.
+  metadata:
+    method-application-type: NETWORK_MANAGEMENT_SYSTEM
+    method-module-name: MIKROTIK_ROUTEROS_WEBFIG
+    cpe: cpe:2.3:o:mikrotik:routeros:*:*:*:*:*:*:*:*
+  tags: discovery,mikrotik,routeros,webfig,network-management
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/webfig/"
+      - "{{BaseURL}}/webfig/login"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'status_code == 200 && !contains(tolower(body), "gitlab community edition") && contains(tolower(body), "routeros") && contains(tolower(body), "webfig")'
+          - 'status_code == 200 && !contains(tolower(body), "gitlab community edition") && contains(tolower(body), "mikrotik") && contains(tolower(body), "webfig")'
+          - 'status_code == 200 && !contains(tolower(body), "gitlab community edition") && contains(tolower(body), "mikrotik") && contains(tolower(body), "routeros") && contains(tolower(body), "winbox")'

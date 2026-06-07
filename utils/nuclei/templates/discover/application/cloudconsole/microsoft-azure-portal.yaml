@@ -1,0 +1,27 @@
+id: microsoft-azure-portal-detect
+info:
+  name: Microsoft Azure Portal Detection
+  author: method-security
+  severity: info
+  description: Detects Microsoft Azure Portal console surfaces using Azure portal shell and sign-in markers.
+  metadata:
+    method-application-type: CLOUD_CONSOLE
+    method-module-name: MICROSOFT_AZURE_PORTAL
+    cpe: cpe:2.3:a:microsoft:azure_portal:*:*:*:*:*:*:*:*
+  tags: discovery,microsoft,azure,cloud,console
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/#home"
+      - "{{BaseURL}}/signin/index/"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'status_code == 200 && contains(tolower(body), "azure portal") && contains(tolower(body), "portal.azure.com")'
+          - 'status_code == 200 && contains(tolower(body), "microsoft azure") && contains(tolower(body), "azureportal")'
+          - 'status_code == 200 && contains(tolower(body), "ms.portal.shell") && contains(tolower(body), "azure")'
+          - 'status_code == 200 && contains(tolower(header), "x-ms-version") && contains(tolower(body), "microsoft azure") && contains(tolower(body), "portal.azure.com")'

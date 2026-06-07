@@ -1,0 +1,26 @@
+id: progress-wsftp-detect
+info:
+  name: Progress WS_FTP Server Detection
+  author: method-security
+  severity: info
+  description: Detects Progress WS_FTP Server web transfer clients using WS_FTP-specific thin client paths and branding.
+  metadata:
+    method-application-type: FILE_TRANSFER_APPLICATION
+    method-module-name: PROGRESS_WS_FTP
+    cpe: cpe:2.3:a:progress:ws_ftp_server:*:*:*:*:*:*:*:*
+  tags: discovery,progress,wsftp,file-transfer
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/thinclient/login.aspx"
+      - "{{BaseURL}}/AHT/"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'contains(tolower(body), "ws_ftp") && contains(tolower(body), "progress")'
+          - 'contains(tolower(body), "ws_ftp server")'
+          - 'contains(tolower(body), "ws_ftp") && contains(tolower(body), "thinclient")'

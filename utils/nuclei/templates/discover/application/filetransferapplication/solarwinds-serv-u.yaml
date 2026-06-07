@@ -1,0 +1,26 @@
+id: solarwinds-serv-u-detect
+info:
+  name: SolarWinds Serv-U Detection
+  author: method-security
+  severity: info
+  description: Detects SolarWinds Serv-U FTP/MFT web clients using Serv-U branded login pages and SolarWinds-specific page markers.
+  metadata:
+    method-application-type: FILE_TRANSFER_APPLICATION
+    method-module-name: SOLARWINDS_SERV_U
+    cpe: cpe:2.3:a:solarwinds:serv-u:*:*:*:*:*:*:*:*
+  tags: discovery,solarwinds,serv-u,mft,file-transfer
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/?Session="
+      - "{{BaseURL}}/Web%20Client/"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'contains(tolower(body), "serv-u") && contains(tolower(body), "solarwinds")'
+          - 'contains(tolower(body), "serv-u file server")'
+          - 'contains(tolower(body), "serv-u managed file transfer")'

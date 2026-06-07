@@ -66,8 +66,12 @@ func copyFilesToTmpDirs(cfg Config) (templateDir, workflowDir string, err error)
 		return "", "", err
 	}
 
-	// Copy templates
-	for _, src := range cfg.TemplateFS {
+	// Copy templates. Preserve the relative path from each source filesystem
+	// under a per-source subdirectory so (a) nested layouts retain their
+	// structure (templates referencing sibling paths still resolve) and (b)
+	// identical basenames from different sources do not overwrite each other.
+	for i, src := range cfg.TemplateFS {
+		srcDir := filepath.Join(templateDir, fmt.Sprintf("src-%d", i))
 		if walkErr := fs.WalkDir(src, ".", func(p string, d fs.DirEntry, walkErr error) error {
 			if walkErr != nil {
 				return walkErr
@@ -83,7 +87,10 @@ func copyFilesToTmpDirs(cfg Config) (templateDir, workflowDir string, err error)
 			if err != nil {
 				return err
 			}
-			dst := filepath.Join(templateDir, filepath.Base(p))
+			dst := filepath.Join(srcDir, p)
+			if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+				return err
+			}
 			return os.WriteFile(dst, data, 0o600)
 		}); walkErr != nil {
 			return "", "", fmt.Errorf("failed to copy templates: %w", walkErr)
@@ -96,7 +103,8 @@ func copyFilesToTmpDirs(cfg Config) (templateDir, workflowDir string, err error)
 		return "", "", err
 	}
 
-	for _, src := range cfg.WorkflowFS {
+	for i, src := range cfg.WorkflowFS {
+		srcSubtemplatesDir := filepath.Join(subtemplatesDir, fmt.Sprintf("src-%d", i))
 		if walkErr := fs.WalkDir(src, ".", func(p string, d fs.DirEntry, walkErr error) error {
 			if walkErr != nil {
 				return walkErr
@@ -113,15 +121,20 @@ func copyFilesToTmpDirs(cfg Config) (templateDir, workflowDir string, err error)
 				return err
 			}
 
-			// Determine if this is a workflow file or a template file
-			filename := filepath.Base(p)
+			// Determine if this is a workflow file or a template file. Workflow
+			// files stay at the workflowDir root (nuclei expects them there);
+			// preserve their basenames but namespace by source index to avoid
+			// collisions. Templates go under subtemplates/ retaining their
+			// relative path within a per-source subdir so nested layouts and
+			// sibling references survive.
 			var dst string
 			if strings.Contains(string(data), "workflows:") {
-				// This is a workflow file - put it in the root
-				dst = filepath.Join(workflowDir, filename)
+				dst = filepath.Join(workflowDir, fmt.Sprintf("src-%d-%s", i, filepath.Base(p)))
 			} else {
-				// This is a template file - put it in subtemplates/
-				dst = filepath.Join(subtemplatesDir, filename)
+				dst = filepath.Join(srcSubtemplatesDir, p)
+			}
+			if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+				return err
 			}
 			return os.WriteFile(dst, data, 0o600)
 		}); walkErr != nil {

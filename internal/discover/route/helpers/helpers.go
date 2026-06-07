@@ -71,6 +71,13 @@ func MergeWebRoutes(routes []*discover.RouteDetails) []*discover.RouteDetails {
 			existingRoute.QueryParams = MergeQueryParams(existingRoute.QueryParams, route.QueryParams)
 			// Merge BodyParams
 			existingRoute.BodyParams = MergeBodyParams(existingRoute.BodyParams, route.BodyParams)
+			// Prefer evidence-tagged fields (sourcemap/CONST beats untagged first-seen)
+			if existingRoute.Evidence == nil && route.Evidence != nil {
+				existingRoute.Evidence = route.Evidence
+			}
+			if existingRoute.PathTemplate == nil && route.PathTemplate != nil {
+				existingRoute.PathTemplate = route.PathTemplate
+			}
 		} else {
 			// Add new route to the map
 			// Create a copy to avoid modifying the original

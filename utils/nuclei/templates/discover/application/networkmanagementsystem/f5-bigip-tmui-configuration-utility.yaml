@@ -1,6 +1,6 @@
 id: f5-bigip-detect
 info:
-  name: F5 BIG-IP Configuration Utility Detection
+  name: F5 BIG-IP TMUI / Configuration Utility Admin Detection
   author: method-security
   severity: info
   description: Detects F5 BIG-IP Configuration Utility web management interfaces by identifying login pages and management-specific endpoints (not load balancer infrastructure).
@@ -15,7 +15,6 @@ http:
       - "{{BaseURL}}/tmui/login.jsp"
       - "{{BaseURL}}/tmui/tmui/login/welcome.jsp"
       - "{{BaseURL}}/xui/"
-      - "{{BaseURL}}/my.policy"
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
@@ -23,13 +22,13 @@ http:
       - type: regex
         part: body
         regex:
-          - '(?i)<title[^>]*>.*F5.*BIG-IP.*Configuration\s*Utility.*</title>'
+          - '(?i)<meta[^>]+name=["'']description["''][^>]+content=["'']BIG-IP(?:&reg;|®)?\s+Configuration\s+Utility["'']'
           - '(?i)F5\s*BIG-IP\s*(Configuration\s*Utility|Management\s*Console)'
           - '(?i)BIG-IP.*Configuration\s*Utility.*Login'
       - type: word
         part: body
         words:
-          - "F5 BIG-IP"
+          - "BIG-IP"
           - "tmui/login"
         case-insensitive: true
         condition: and
@@ -40,11 +39,6 @@ http:
           - "/tmui/"
         case-insensitive: true
         condition: and
-      - type: word
-        part: header
-        words:
-          - "F5-TrafficShield"
-        case-insensitive: true
       - type: dsl
         dsl:
-          - 'contains(tolower(header), "server: bigip") && (contains(tolower(body), "configuration") || contains(tolower(body), "tmui") || contains(tolower(body), "f5 big-ip") || contains(tolower(body), "bigip"))'
+          - 'status_code == 200 && contains(tolower(body), "big-ip") && contains(tolower(body), "configuration utility") && (contains(tolower(body), "tmui/login") || contains(tolower(body), "/xui/common/"))'

@@ -1,0 +1,25 @@
+id: zscaler-private-access-detect
+info:
+  name: Zscaler Private Access / Edge Portal Detection
+  author: method-security
+  severity: info
+  description: Detects Zscaler Private Access and Zscaler edge portals using branded ZPA and Zscaler login content.
+  metadata:
+    method-application-type: NETWORK_EDGE_APPLICATION
+    method-module-name: ZSCALER_PRIVATE_ACCESS
+    cpe: cpe:2.3:a:zscaler:private_access:*:*:*:*:*:*:*:*
+  tags: discovery,zscaler,zpa,ztna,swg,network-edge
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/login"
+      - "{{BaseURL}}/signin"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'contains(tolower(body), "zscaler private access")'
+          - 'contains(tolower(body), "zscaler") && contains(tolower(body), "zpa") && contains(tolower(body), "login")'

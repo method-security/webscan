@@ -1,0 +1,26 @@
+id: globalscape-eft-detect
+info:
+  name: Globalscape EFT Detection
+  author: method-security
+  severity: info
+  description: Detects Globalscape EFT web transfer portals using EFT-specific client paths and Globalscape branding.
+  metadata:
+    method-application-type: FILE_TRANSFER_APPLICATION
+    method-module-name: GLOBALSCAPE_EFT
+    cpe: cpe:2.3:a:globalscape:enhanced_file_transfer:*:*:*:*:*:*:*:*
+  tags: discovery,globalscape,eft,mft,file-transfer
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/EFTClient/Account/Login.htm"
+      - "{{BaseURL}}/EFTClient/"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'status_code == 200 && contains(tolower(body), "eft web transfer client")'
+          - 'status_code == 200 && contains(tolower(body), "eftclient") && contains(tolower(body), "globalscape")'
+          - 'status_code == 200 && contains(tolower(body), "/eftclient/") && contains(tolower(body), "account/login.htm")'

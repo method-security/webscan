@@ -1,0 +1,27 @@
+id: influxdb-ui-detect
+info:
+  name: InfluxDB UI Detection
+  author: method-security
+  severity: info
+  description: Detects InfluxDB web administration UI using InfluxDB-specific bootstrap and static asset markers.
+  metadata:
+    method-application-type: DATABASE_APPLICATION
+    method-module-name: INFLUXDB
+    cpe: cpe:2.3:a:influxdata:influxdb:*:*:*:*:*:*:*:*
+  tags: discovery,database,admin,influxdb
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/signin"
+      - "{{BaseURL}}/orgs"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'status_code == 200 && !contains(tolower(body), "gitlab community edition") && contains(tolower(body), "<title>influxdb") && contains(tolower(body), "/assets/")'
+          - 'status_code == 200 && contains(tolower(header), "x-influxdb-version") && contains(tolower(header), "x-influxdb-build") && contains(tolower(body), "<title>influxdb")'
+          - 'status_code == 200 && !contains(tolower(body), "gitlab community edition") && contains(tolower(body), "influxdb") && contains(tolower(body), "window.influx")'
+          - 'status_code == 200 && !contains(tolower(body), "gitlab community edition") && contains(tolower(body), "influxdata") && contains(tolower(body), "signin") && contains(tolower(body), "orgs")'

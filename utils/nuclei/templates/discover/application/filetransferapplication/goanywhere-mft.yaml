@@ -1,0 +1,28 @@
+id: goanywhere-mft-detect
+info:
+  name: Fortra GoAnywhere MFT Detection
+  author: method-security
+  severity: info
+  description: Detects Fortra GoAnywhere MFT managed file transfer portals using branded login pages and GoAnywhere-specific web paths.
+  metadata:
+    method-application-type: FILE_TRANSFER_APPLICATION
+    method-module-name: GOANYWHERE_MFT
+    cpe: cpe:2.3:a:fortra:goanywhere_managed_file_transfer:*:*:*:*:*:*:*:*
+  tags: discovery,fortra,goanywhere,mft,file-transfer
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/goanywhere/"
+      - "{{BaseURL}}/goanywhere/lic/accept"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'contains(tolower(body), "goanywhere mft") && (contains(tolower(body), "login") || contains(tolower(body), "sign in") || contains(tolower(body), "web client"))'
+          - 'contains(tolower(body), "goanywhere login")'
+          - 'contains(tolower(body), "goanywhere web client")'
+          - 'contains(tolower(body), "goanywhere") && contains(tolower(body), "j_security_check")'
+          - 'contains(tolower(body), "goanywhere") && contains(tolower(body), "license agreement") && contains(tolower(body), "accept")'

@@ -1,0 +1,29 @@
+id: dlink-router-web-ui-detect
+info:
+  name: D-Link Router Web Management Detection
+  author: method-security
+  severity: info
+  description: Detects D-Link router web management interfaces using D-Link model titles and login form markers.
+  metadata:
+    method-application-type: NETWORK_MANAGEMENT_SYSTEM
+    method-module-name: DLINK_ROUTER
+    cpe: cpe:2.3:h:dlink:*:*:*:*:*:*:*:*:*
+  tags: discovery,dlink,router,network-management
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/login.htm"
+      - "{{BaseURL}}/Main_Login.asp"
+      - "{{BaseURL}}/login.asp"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'status_code == 200 && !contains(tolower(body), "gitlab community edition") && !contains(tolower(body), "included with your linksys smart wi-fi") && !contains(tolower(body), "data.sloss.xyz/cloud.js") && !contains(tolower(body), "<title>gpon home gateway") && contains(tolower(body), "d-link") && contains(tolower(body), "login") && (contains(tolower(body), "dir-") || contains(tolower(body), "dsl-") || contains(tolower(body), "dap-"))'
+          - 'status_code == 200 && !contains(tolower(body), "gitlab community edition") && !contains(tolower(body), "included with your linksys smart wi-fi") && !contains(tolower(body), "data.sloss.xyz/cloud.js") && !contains(tolower(body), "<title>gpon home gateway") && contains(tolower(body), "d-link systems") && contains(tolower(body), "login") && contains(tolower(body), "password")'
+          - 'status_code == 200 && !contains(tolower(body), "included with your linksys smart wi-fi") && !contains(tolower(body), "data.sloss.xyz/cloud.js") && !contains(tolower(body), "<title>gpon home gateway") && contains(tolower(body), "main_login.asp") && contains(tolower(body), "d-link")'
+          - 'status_code == 200 && !contains(tolower(body), "included with your linksys smart wi-fi") && !contains(tolower(body), "data.sloss.xyz/cloud.js") && !contains(tolower(body), "<title>gpon home gateway") && contains(tolower(body), "<title>d-link corporation") && contains(tolower(body), "wireless router") && contains(tolower(body), "login")'
+          - 'status_code == 200 && !contains(tolower(body), "included with your linksys smart wi-fi") && !contains(tolower(body), "data.sloss.xyz/cloud.js") && !contains(tolower(body), "<title>gpon home gateway") && (contains(tolower(body), "<title>d-link dsl-") || contains(tolower(body), "<title>d-link router management system") || contains(tolower(body), "<title>d-link : unified services router") || contains(tolower(body), "<title>d-link voip wireless router"))'

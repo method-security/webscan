@@ -1,0 +1,26 @@
+id: crushftp-detect
+info:
+  name: CrushFTP Detection
+  author: method-security
+  severity: info
+  description: Detects CrushFTP file transfer servers using WebInterface login paths and CrushFTP-specific branding.
+  metadata:
+    method-application-type: FILE_TRANSFER_APPLICATION
+    method-module-name: CRUSHFTP
+    cpe: cpe:2.3:a:crushftp:crushftp:*:*:*:*:*:*:*:*
+  tags: discovery,crushftp,file-transfer
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/WebInterface/login.html"
+      - "{{BaseURL}}/WebInterface/function/"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'contains(tolower(body), "crushftp")'
+          - 'contains(body, "WebInterface") && contains(tolower(body), "crush")'
+          - 'contains(tolower(body), "crushftpdrive") || contains(tolower(body), "crushftpwebinterface")'

@@ -1,0 +1,26 @@
+id: draytek-vigor-web-ui-detect
+info:
+  name: DrayTek Vigor Web Management Detection
+  author: method-security
+  severity: info
+  description: Detects DrayTek Vigor router/firewall web management interfaces using Vigor-specific login titles, authentication realms, and headers.
+  metadata:
+    method-application-type: NETWORK_MANAGEMENT_SYSTEM
+    method-module-name: DRAYTEK_VIGOR
+    cpe: cpe:2.3:h:draytek:vigor:*:*:*:*:*:*:*:*
+  tags: discovery,draytek,vigor,router,network-management
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/weblogin.htm"
+      - "{{BaseURL}}/login.htm"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'status_code == 200 && !contains(tolower(body), "gitlab community edition") && !contains(tolower(body), "included with your linksys smart wi-fi") && !contains(tolower(body), "data.sloss.xyz/cloud.js") && !contains(tolower(body), "<title>gpon home gateway") && contains(tolower(body), "vigor login page") && contains(tolower(body), "draytek")'
+          - '!contains(tolower(body), "data.sloss.xyz/cloud.js") && !contains(tolower(body), "<title>gpon home gateway") && contains(tolower(header), "www-authenticate") && contains(tolower(header), "vigor") && (contains(tolower(header), "draytek") || contains(tolower(body), "draytek"))'
+          - 'status_code == 200 && !contains(tolower(body), "included with your linksys smart wi-fi") && !contains(tolower(body), "data.sloss.xyz/cloud.js") && !contains(tolower(body), "<title>gpon home gateway") && contains(tolower(body), "draytek") && contains(tolower(body), "vigor") && contains(tolower(body), "weblogin")'

@@ -1,0 +1,27 @@
+id: microsoft-sharepoint-detect
+info:
+  name: Microsoft SharePoint Detection
+  author: method-security
+  severity: info
+  description: Detects Microsoft SharePoint sites using SharePoint-specific headers, _layouts paths, and page generator markers.
+  metadata:
+    method-application-type: COLLABORATION_APPLICATION
+    method-module-name: MICROSOFT_SHAREPOINT
+    cpe: cpe:2.3:a:microsoft:sharepoint_server:*:*:*:*:*:*:*:*
+  tags: discovery,microsoft,sharepoint,collaboration
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/_layouts/15/start.aspx"
+      - "{{BaseURL}}/_layouts/15/viewlsts.aspx"
+      - "{{BaseURL}}/_layouts/15/Authenticate.aspx"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'contains(tolower(header), "microsoftsharepointteamservices")'
+          - 'contains(tolower(body), "sharepoint") && contains(tolower(body), "/_layouts/15/")'
+          - 'contains(tolower(body), "msapplication-tileimage") && contains(tolower(body), "sharepoint")'

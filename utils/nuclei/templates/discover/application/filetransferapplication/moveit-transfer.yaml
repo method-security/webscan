@@ -28,7 +28,6 @@ http:
       - type: word
         part: body
         words:
-          - "MOVEit Transfer"
           - "moveitisapi"
           - "stylesheet_MOVEit"
           - "MOVEit Mobile"
@@ -45,3 +44,6 @@ http:
           - '(?i)stylesheet_MOVEit[^"]*\.css'
           - '(?i)app-id=com\.progress\.moveit\.transfer'
           - '(?i)author.*Progress\s+Software\s+Corporation'
+      - type: dsl
+        dsl:
+          - 'status_code == 200 && contains(tolower(body), "moveit transfer") && (contains(tolower(body), "moveitisapi") || contains(tolower(body), "stylesheet_moveit") || contains(tolower(body), "com.progress.moveit.transfer") || contains(tolower(body), "human.aspx"))'

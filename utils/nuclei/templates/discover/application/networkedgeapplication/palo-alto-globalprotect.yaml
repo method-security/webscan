@@ -1,0 +1,25 @@
+id: palo-alto-globalprotect-detect
+info:
+  name: Palo Alto GlobalProtect Portal Detection
+  author: method-security
+  severity: info
+  description: Detects Palo Alto Networks GlobalProtect VPN portals by matching GlobalProtect-specific ESP login pages and PAN-OS assets.
+  metadata:
+    method-application-type: NETWORK_EDGE_APPLICATION
+    method-module-name: PALO_ALTO_GLOBALPROTECT
+    cpe: cpe:2.3:a:paloaltonetworks:globalprotect:*:*:*:*:*:*:*:*
+  tags: discovery,palo-alto,globalprotect,vpn,network-edge
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/global-protect/login.esp"
+      - "{{BaseURL}}/ssl-vpn/login.esp"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'contains(tolower(body), "globalprotect") && (contains(tolower(body), "login.esp") || contains(tolower(body), "pan_form") || contains(tolower(body), "panos"))'
+          - 'contains(tolower(body), "palo alto networks") && contains(tolower(body), "globalprotect")'

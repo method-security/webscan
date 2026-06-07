@@ -1,0 +1,26 @@
+id: asuswrt-router-web-ui-detect
+info:
+  name: ASUSWRT Router Web Management Detection
+  author: method-security
+  severity: info
+  description: Detects ASUSWRT / ASUS Wireless Router web management interfaces using ASUS router-specific titles and login assets.
+  metadata:
+    method-application-type: NETWORK_MANAGEMENT_SYSTEM
+    method-module-name: ASUSWRT_ROUTER
+    cpe: cpe:2.3:o:asus:asuswrt:*:*:*:*:*:*:*:*
+  tags: discovery,asus,asuswrt,router,network-management
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/Main_Login.asp"
+      - "{{BaseURL}}/index.asp"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'status_code == 200 && !contains(tolower(body), "gitlab community edition") && !contains(tolower(body), "included with your linksys smart wi-fi") && !contains(tolower(body), "data.sloss.xyz/cloud.js") && !contains(tolower(body), "<title>gpon home gateway") && contains(tolower(body), "<title>asus wireless router")'
+          - 'status_code == 200 && !contains(tolower(body), "included with your linksys smart wi-fi") && !contains(tolower(body), "data.sloss.xyz/cloud.js") && !contains(tolower(body), "<title>gpon home gateway") && contains(tolower(body), "asuswrt") && contains(tolower(body), "main_login.asp")'
+          - 'status_code == 200 && !contains(tolower(body), "included with your linksys smart wi-fi") && !contains(tolower(body), "data.sloss.xyz/cloud.js") && !contains(tolower(body), "<title>gpon home gateway") && contains(tolower(body), "asus router") && contains(tolower(body), "asus_token")'

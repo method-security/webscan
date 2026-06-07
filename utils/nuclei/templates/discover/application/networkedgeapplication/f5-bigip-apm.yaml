@@ -1,0 +1,27 @@
+id: f5-bigip-apm-detect
+info:
+  name: F5 BIG-IP APM / Edge Gateway Detection
+  author: method-security
+  severity: info
+  description: Detects F5 BIG-IP Access Policy Manager edge portals using my.policy and vdesk paths with F5/BIG-IP branded content.
+  metadata:
+    method-application-type: NETWORK_EDGE_APPLICATION
+    method-module-name: F5_BIGIP_APM
+    cpe: cpe:2.3:a:f5:big-ip_access_policy_manager:*:*:*:*:*:*:*:*
+  tags: discovery,f5,bigip,apm,vpn,network-edge
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/my.policy"
+      - "{{BaseURL}}/vdesk/hangup.php3"
+      - "{{BaseURL}}/vdesk/webtop.eui"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'contains(tolower(body), "f5 networks") && (contains(tolower(body), "my.policy") || contains(tolower(body), "vdesk"))'
+          - 'contains(tolower(body), "big-ip") && contains(tolower(body), "access policy")'
+          - 'contains(tolower(header), "lastmrh_session") && contains(tolower(body), "f5")'

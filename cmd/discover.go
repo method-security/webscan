@@ -477,15 +477,7 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			var headers map[string]string
-			if len(headerPairs) > 0 {
-				headers = make(map[string]string, len(headerPairs))
-				for _, pair := range headerPairs {
-					if kv := strings.SplitN(pair, ":", 2); len(kv) == 2 {
-						headers[strings.TrimSpace(kv[0])] = strings.TrimSpace(kv[1])
-					}
-				}
-			}
+			headers := requesthelpers.ParseHeaderPairs(headerPairs)
 
 			// JSON body flag
 			jsonBodyStr, err := cmd.Flags().GetString("json-body")
@@ -515,15 +507,7 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			var formData map[string]string
-			if len(formDataPairs) > 0 {
-				formData = make(map[string]string, len(formDataPairs))
-				for _, pair := range formDataPairs {
-					if kv := strings.SplitN(pair, "=", 2); len(kv) == 2 {
-						formData[strings.TrimSpace(kv[0])] = strings.TrimSpace(kv[1])
-					}
-				}
-			}
+			formData := requesthelpers.ParseFormDataPairs(formDataPairs)
 
 			// Config flags
 			maxRedirects, err := cmd.Flags().GetInt("max-redirects")

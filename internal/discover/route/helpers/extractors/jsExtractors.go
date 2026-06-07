@@ -342,10 +342,11 @@ func (v *visitor) Enter(n ast.Node) ast.Visitor {
 		v.handleCallExpression(node)
 	case *ast.VariableStatement:
 		v.handleVariableStatement(node)
-	case *ast.FunctionDeclaration:
-		_ = node
-		v.pushScope()
 	case *ast.FunctionLiteral:
+		// Push a new scope for every function body.
+		// otto's Walk visits the *FunctionLiteral inside both function expressions
+		// (var f = function(){}) and function declarations (function foo(){}),
+		// so this case covers all function-scoping boundaries.
 		_ = node
 		v.pushScope()
 	}
@@ -355,7 +356,7 @@ func (v *visitor) Enter(n ast.Node) ast.Visitor {
 // Exit method (required by the ast.Visitor interface)
 func (v *visitor) Exit(n ast.Node) {
 	switch n.(type) {
-	case *ast.FunctionDeclaration, *ast.FunctionLiteral:
+	case *ast.FunctionLiteral:
 		v.popScope()
 	}
 }

@@ -33,8 +33,15 @@ import (
 
 // resolveEffectiveTarget follows HTTP redirects for target and returns the final URL.
 // Falls back to target if the HEAD request fails.
-func resolveEffectiveTarget(target string) string {
-	resp, err := http.Head(target) //nolint:noctx
+func resolveEffectiveTarget(ctx context.Context, target string, timeoutSecs int) string {
+	client := &http.Client{
+		Timeout: time.Duration(timeoutSecs) * time.Second,
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodHead, target, nil)
+	if err != nil {
+		return target
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return target
 	}
@@ -320,7 +327,7 @@ func PerformRouteCapture(ctx context.Context, config discover.DiscoverRouteConfi
 	// Extract routes from explicit bundle URLs once before spidering (not per page)
 	if len(config.BundleUrls) > 0 {
 		log.Info("Extracting routes from explicit bundle URLs")
-		effectiveBase := resolveEffectiveTarget(config.Target)
+		effectiveBase := resolveEffectiveTarget(ctx, config.Target, config.Timeout)
 		bundleRoutes, _, bundleErrors := capturerouteextractors.ExtractBundleURLRoutes(ctx, config.BundleUrls, effectiveBase, config)
 		allRoutes = append(allRoutes, bundleRoutes...)
 		errors = append(errors, bundleErrors...)

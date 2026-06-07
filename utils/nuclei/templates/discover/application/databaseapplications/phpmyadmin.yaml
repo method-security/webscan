@@ -1,0 +1,27 @@
+id: phpmyadmin-detect
+info:
+  name: phpMyAdmin Detection
+  author: method-security
+  severity: info
+  description: Detects phpMyAdmin database administration interfaces using phpMyAdmin-specific login fields and assets.
+  metadata:
+    method-application-type: DATABASE_APPLICATIONS
+    method-module-name: PHPMYADMIN
+    cpe: cpe:2.3:a:phpmyadmin:phpmyadmin:*:*:*:*:*:*:*:*
+  tags: discovery,database,admin,phpmyadmin,mysql
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/phpmyadmin/"
+      - "{{BaseURL}}/phpMyAdmin/"
+      - "{{BaseURL}}/pma/"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'status_code == 200 && contains(tolower(body), "phpmyadmin") && contains(tolower(body), "pma_username") && contains(tolower(body), "pma_password")'
+          - 'status_code == 200 && contains(tolower(body), "phpmyadmin.css.php") && contains(tolower(body), "pma_username")'
+          - 'status_code == 200 && contains(tolower(body), "<title>phpmyadmin") && contains(tolower(body), "server choice")'

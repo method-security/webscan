@@ -1,0 +1,27 @@
+id: aruba-instant-detect
+info:
+  name: Aruba Instant Management Detection
+  author: method-security
+  severity: info
+  description: Detects Aruba Instant AP/controller web management interfaces using Aruba Instant-specific login markers.
+  metadata:
+    method-application-type: NETWORK_MANAGEMENT_SYSTEM
+    method-module-name: ARUBA_INSTANT
+    cpe: cpe:2.3:o:arubanetworks:aruba_instant:*:*:*:*:*:*:*:*
+  tags: discovery,aruba,instant,wireless,network-management
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/login"
+      - "{{BaseURL}}/screens/wms/wms.login"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'status_code == 200 && contains(tolower(body), "<title>aruba instant on")'
+          - 'status_code == 200 && contains(tolower(body), "aruba instant") && contains(tolower(body), "login")'
+          - 'status_code == 200 && contains(tolower(body), "arubanetworks") && contains(tolower(body), "instant") && contains(tolower(body), "virtual controller")'
+          - 'status_code == 200 && contains(tolower(body), "instant ui") && contains(tolower(body), "aruba")'

@@ -1,0 +1,26 @@
+id: totolink-router-web-ui-detect
+info:
+  name: TOTOLINK Router Web Management Detection
+  author: method-security
+  severity: info
+  description: Detects TOTOLINK router web management interfaces using TOTOLINK-specific login endpoints and form markers.
+  metadata:
+    method-application-type: NETWORK_MANAGEMENT_SYSTEM
+    method-module-name: TOTOLINK_ROUTER_WEB_UI
+    cpe: cpe:2.3:h:totolink:*:*:*:*:*:*:*:*:*
+  tags: discovery,totolink,router,network-management
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/login.html"
+      - "{{BaseURL}}/formLogin"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'status_code == 200 && !contains(tolower(body), "gitlab community edition") && !contains(tolower(body), "included with your linksys smart wi-fi") && !contains(tolower(body), "data.sloss.xyz/cloud.js") && !contains(tolower(body), "<title>gpon home gateway") && contains(tolower(body), "totolink") && contains(tolower(body), "formlogin")'
+          - 'status_code == 200 && !contains(tolower(body), "included with your linksys smart wi-fi") && !contains(tolower(body), "data.sloss.xyz/cloud.js") && !contains(tolower(body), "<title>gpon home gateway") && contains(tolower(body), "<title>totolink") && contains(tolower(body), "login")'
+          - 'status_code == 200 && !contains(tolower(body), "included with your linksys smart wi-fi") && !contains(tolower(body), "data.sloss.xyz/cloud.js") && !contains(tolower(body), "<title>gpon home gateway") && contains(tolower(body), "totolink") && contains(tolower(body), "setcookie") && contains(tolower(body), "password")'

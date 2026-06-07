@@ -1,0 +1,26 @@
+id: pgadmin-detect
+info:
+  name: pgAdmin Detection
+  author: method-security
+  severity: info
+  description: Detects pgAdmin 4 database administration interfaces using pgAdmin-specific login and static asset markers.
+  metadata:
+    method-application-type: DATABASE_APPLICATIONS
+    method-module-name: PGADMIN
+    cpe: cpe:2.3:a:pgadmin:pgadmin:*:*:*:*:*:*:*:*
+  tags: discovery,database,admin,pgadmin,postgresql
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/login"
+      - "{{BaseURL}}/browser/"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'status_code == 200 && !contains(tolower(body), "gitlab community edition") && contains(tolower(body), "pgadmin 4") && contains(tolower(body), "csrf_token") && contains(tolower(body), "email")'
+          - 'status_code == 200 && !contains(tolower(body), "gitlab community edition") && contains(tolower(body), "pgadmin.browser") && contains(tolower(body), "pgadmin")'
+          - 'status_code == 200 && !contains(tolower(body), "gitlab community edition") && contains(tolower(body), "<title>pgadmin") && contains(tolower(body), "/static/js")'

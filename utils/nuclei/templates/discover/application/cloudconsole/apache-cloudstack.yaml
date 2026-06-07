@@ -1,0 +1,27 @@
+id: apache-cloudstack-detect
+info:
+  name: Apache CloudStack Console Detection
+  author: method-security
+  severity: info
+  description: Detects Apache CloudStack management consoles using CloudStack-specific UI assets and API paths.
+  metadata:
+    method-application-type: CLOUD_CONSOLE
+    method-module-name: APACHE_CLOUDSTACK
+    cpe: cpe:2.3:a:apache:cloudstack:*:*:*:*:*:*:*:*
+  tags: discovery,apache,cloudstack,cloud,console
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/client/"
+      - "{{BaseURL}}/client/index.html"
+      - "{{BaseURL}}/client/api"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'status_code == 200 && contains(tolower(body), "apache cloudstack")'
+          - 'status_code == 200 && contains(tolower(body), "cloudstack") && contains(tolower(body), "/client/api")'
+          - 'status_code == 200 && contains(tolower(body), "cloudstack3") && contains(tolower(body), "login")'

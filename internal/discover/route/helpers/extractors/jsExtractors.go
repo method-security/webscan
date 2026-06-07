@@ -303,7 +303,36 @@ type visitor struct {
 	baseURLsOnly        bool
 	captureStaticAssets bool
 	errors              *[]string
-	symbolTable         map[string]string
+	symbolTable         map[string]string   // current (innermost) scope
+	scopeStack          []map[string]string // outer scopes, index 0 = outermost
+}
+
+// pushScope creates a new inner scope for function bodies.
+func (v *visitor) pushScope() {
+	v.scopeStack = append(v.scopeStack, v.symbolTable)
+	v.symbolTable = make(map[string]string)
+}
+
+// popScope restores the enclosing scope after leaving a function.
+func (v *visitor) popScope() {
+	if len(v.scopeStack) == 0 {
+		return
+	}
+	v.symbolTable = v.scopeStack[len(v.scopeStack)-1]
+	v.scopeStack = v.scopeStack[:len(v.scopeStack)-1]
+}
+
+// lookupSymbol resolves a name from the innermost scope outward.
+func (v *visitor) lookupSymbol(name string) (string, bool) {
+	if val, ok := v.symbolTable[name]; ok {
+		return val, true
+	}
+	for i := len(v.scopeStack) - 1; i >= 0; i-- {
+		if val, ok := v.scopeStack[i][name]; ok {
+			return val, true
+		}
+	}
+	return "", false
 }
 
 // Enter method for the visitor to process each node
@@ -313,12 +342,23 @@ func (v *visitor) Enter(n ast.Node) ast.Visitor {
 		v.handleCallExpression(node)
 	case *ast.VariableStatement:
 		v.handleVariableStatement(node)
+	case *ast.FunctionDeclaration:
+		_ = node
+		v.pushScope()
+	case *ast.FunctionLiteral:
+		_ = node
+		v.pushScope()
 	}
 	return v
 }
 
 // Exit method (required by the ast.Visitor interface)
-func (v *visitor) Exit(n ast.Node) {}
+func (v *visitor) Exit(n ast.Node) {
+	switch n.(type) {
+	case *ast.FunctionDeclaration, *ast.FunctionLiteral:
+		v.popScope()
+	}
+}
 
 // handleVariableStatement processes variable statements to build a symbol table.
 // It also emits routes for ALL_CAPS variables that look like API paths (Feature 2 + 3).
@@ -372,7 +412,7 @@ func (v *visitor) resolveExpressionToString(expr ast.Expression) string {
 	case *ast.StringLiteral:
 		return e.Value
 	case *ast.Identifier:
-		if val, ok := v.symbolTable[e.Name]; ok {
+		if val, ok := v.lookupSymbol(e.Name); ok {
 			return val
 		}
 	case *ast.BinaryExpression:
@@ -660,9 +700,10 @@ func ExtractBundleURLRoutes(ctx context.Context, bundleURLs []string, baseURL st
 	urls := make(map[string]struct{})
 	errors := []string{}
 
-	for i, bundleURL := range bundleURLs {
-		// Honor MaxBundles limit
-		if routeCaptureConfig.MaxBundles != nil && *routeCaptureConfig.MaxBundles > 0 && i >= *routeCaptureConfig.MaxBundles {
+	bundleCount := 0
+	for _, bundleURL := range bundleURLs {
+		// Honor MaxBundles limit (count successful fetches only, consistent with ExtractScriptRoutes)
+		if routeCaptureConfig.MaxBundles != nil && *routeCaptureConfig.MaxBundles > 0 && bundleCount >= *routeCaptureConfig.MaxBundles {
 			break
 		}
 
@@ -684,6 +725,7 @@ func ExtractBundleURLRoutes(ctx context.Context, bundleURLs []string, baseURL st
 			continue
 		}
 
+		bundleCount++
 		bodyBytes, err := io.ReadAll(resp.Body)
 		if cerr := resp.Body.Close(); cerr != nil && err == nil {
 			err = cerr

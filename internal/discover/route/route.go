@@ -4,6 +4,7 @@ import (
 	// Standard
 	"context"
 	"fmt"
+	"net/http"
 	"net/url"
 	"runtime"
 	"sort"
@@ -29,6 +30,20 @@ import (
 	goquery "github.com/PuerkitoBio/goquery"
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
+
+// resolveEffectiveTarget follows HTTP redirects for target and returns the final URL.
+// Falls back to target if the HEAD request fails.
+func resolveEffectiveTarget(target string) string {
+	resp, err := http.Head(target) //nolint:noctx
+	if err != nil {
+		return target
+	}
+	defer resp.Body.Close() //nolint:errcheck
+	if resp.Request != nil && resp.Request.URL != nil {
+		return strings.TrimRight(resp.Request.URL.String(), "/")
+	}
+	return target
+}
 
 // ExtractRedirectRoutes analyzes redirect chain URLs to extract routes with parameters
 func ExtractRedirectRoutes(redirectChain []string, baseURL string, routeCaptureConfig discover.DiscoverRouteConfig) ([]*discover.RouteDetails, []string, []string) {
@@ -305,7 +320,8 @@ func PerformRouteCapture(ctx context.Context, config discover.DiscoverRouteConfi
 	// Extract routes from explicit bundle URLs once before spidering (not per page)
 	if len(config.BundleUrls) > 0 {
 		log.Info("Extracting routes from explicit bundle URLs")
-		bundleRoutes, _, bundleErrors := capturerouteextractors.ExtractBundleURLRoutes(ctx, config.BundleUrls, config.Target, config)
+		effectiveBase := resolveEffectiveTarget(config.Target)
+		bundleRoutes, _, bundleErrors := capturerouteextractors.ExtractBundleURLRoutes(ctx, config.BundleUrls, effectiveBase, config)
 		allRoutes = append(allRoutes, bundleRoutes...)
 		errors = append(errors, bundleErrors...)
 	}
@@ -455,9 +471,16 @@ func PerformRouteCapture(ctx context.Context, config discover.DiscoverRouteConfi
 	// Remove duplicate Routes and Static Assets
 	report.Result.Routes = discoverroutehelpers.MergeWebRoutes(allRoutes)
 	sort.Slice(report.Result.Routes, func(i, j int) bool {
-		ki := report.Result.Routes[i].BaseUrl + report.Result.Routes[i].Path
-		kj := report.Result.Routes[j].BaseUrl + report.Result.Routes[j].Path
-		return ki < kj
+		ri := report.Result.Routes[i]
+		rj := report.Result.Routes[j]
+		// Evidence-tagged routes survive MaxRoutes cap before untagged routes
+		hasEvi := ri.Evidence != nil
+		hasEvj := rj.Evidence != nil
+		if hasEvi != hasEvj {
+			return hasEvi // true means ri comes first
+		}
+		// Same evidence tier: lexical for determinism
+		return ri.BaseUrl+ri.Path < rj.BaseUrl+rj.Path
 	})
 	if config.MaxRoutes != nil && *config.MaxRoutes > 0 && len(report.Result.Routes) > *config.MaxRoutes {
 		report.Result.Routes = report.Result.Routes[:*config.MaxRoutes]

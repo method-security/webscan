@@ -481,17 +481,9 @@ func (a *WebScan) InitDiscoverCommand() {
 			if len(headerPairs) > 0 {
 				headers = make(map[string]string, len(headerPairs))
 				for _, pair := range headerPairs {
-					var key, val string
-					if idx := strings.Index(pair, ": "); idx >= 0 {
-						key = strings.TrimSpace(pair[:idx])
-						val = strings.TrimSpace(pair[idx+2:])
-					} else if idx := strings.Index(pair, ":"); idx >= 0 {
-						key = strings.TrimSpace(pair[:idx])
-						val = strings.TrimSpace(pair[idx+1:])
-					} else {
-						continue
+					if kv := strings.SplitN(pair, ":", 2); len(kv) == 2 {
+						headers[strings.TrimSpace(kv[0])] = strings.TrimSpace(kv[1])
 					}
-					headers[key] = val
 				}
 			}
 
@@ -527,10 +519,8 @@ func (a *WebScan) InitDiscoverCommand() {
 			if len(formDataPairs) > 0 {
 				formData = make(map[string]string, len(formDataPairs))
 				for _, pair := range formDataPairs {
-					if idx := strings.Index(pair, "="); idx >= 0 {
-						k := strings.TrimSpace(pair[:idx])
-						v := strings.TrimSpace(pair[idx+1:])
-						formData[k] = v
+					if kv := strings.SplitN(pair, "=", 2); len(kv) == 2 {
+						formData[strings.TrimSpace(kv[0])] = strings.TrimSpace(kv[1])
 					}
 				}
 			}

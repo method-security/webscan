@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/x509"
 	"io"
-	"strings"
 	"time"
 
 	// Generated
@@ -172,14 +171,11 @@ func PerformRequest(ctx context.Context, config discover.DiscoverRequestConfig) 
 	}
 
 	// Build headers map for the raw HTTP call
-	constructedHeaders := make(map[string]string)
-	if request.Params != nil && request.Params.Headers != nil {
-		for k, v := range request.Params.Headers {
-			if len(v) > 0 {
-				constructedHeaders[k] = strings.Join(v, ",")
-			}
-		}
+	var rawHeaders map[string][]string
+	if request.Params != nil {
+		rawHeaders = request.Params.Headers
 	}
+	constructedHeaders := requesthelpers.FlattenHeaders(rawHeaders)
 
 	// Record sent time
 	sentAt := time.Now()

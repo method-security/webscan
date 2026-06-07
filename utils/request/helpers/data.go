@@ -13,6 +13,20 @@ import (
 	common "github.com/Method-Security/webscan/generated/go/common"
 )
 
+// FlattenHeaders converts a multi-value header map (map[string][]string) into a
+// single-value header map (map[string]string) by joining multiple values with a
+// comma. This is the format expected by SendHTTPRequest. Ranging over a nil map
+// is safe in Go so the caller does not need to nil-check before calling.
+func FlattenHeaders(headers map[string][]string) map[string]string {
+	flat := make(map[string]string, len(headers))
+	for k, v := range headers {
+		if len(v) > 0 {
+			flat[k] = strings.Join(v, ",")
+		}
+	}
+	return flat
+}
+
 // RemoveScheme removes http:// or https:// from the beginning of a string
 func RemoveScheme(url string) string {
 	if strings.HasPrefix(url, "http://") {

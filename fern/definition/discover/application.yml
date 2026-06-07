@@ -41,6 +41,7 @@ types:
     properties:
       targets: list<string>
       resourceType: ApplicationResourceConfigType
+      templatePaths: optional<list<string>>
       timeout: integer
       threads: integer
       proxy: optional<string>

@@ -6,6 +6,7 @@ import (
 	_ "embed"
 	"fmt"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -36,10 +37,39 @@ func GetTemplateFileSystem(ctx context.Context, templatePaths []string) ([]fs.FS
 
 	log.Info("Using template paths", svc1log.SafeParam("templatePaths", templatePaths))
 
+	// Separate filesystems collected from user-supplied OS paths (handled directly)
+	// from embedded paths that we resolve against the bundled archive.
+	var osFilesystems []fs.FS
+
 	// Collect all template files from the provided paths
 	var allTemplateFiles []string
 
 	for _, templatePath := range templatePaths {
+		// If the path exists on the host OS filesystem, treat it as a user-supplied
+		// custom template path and read it directly from disk.
+		if info, err := os.Stat(templatePath); err == nil {
+			abs, absErr := filepath.Abs(templatePath)
+			if absErr != nil {
+				abs = templatePath
+			}
+			if info.IsDir() {
+				osFilesystems = append(osFilesystems, os.DirFS(abs))
+				log.Info("Using OS template directory", svc1log.SafeParam("templatePath", abs))
+			} else if isTemplateFile(abs) {
+				// Expose just the single file by rooting at its parent directory
+				// and filtering to that filename.
+				parent := filepath.Dir(abs)
+				osFilesystems = append(osFilesystems, &specificTemplateFS{
+					baseFS:        os.DirFS(parent),
+					templateFiles: []string{filepath.Base(abs)},
+				})
+				log.Info("Using OS template file", svc1log.SafeParam("templatePath", abs))
+			} else {
+				log.Warn("OS template path is not a .yaml/.yml file, skipping", svc1log.SafeParam("templatePath", abs))
+			}
+			continue
+		}
+
 		// Clean the template path - remove utils/nuclei/templates/ prefix if present
 		cleanPath := templatePath
 		cleanPath = strings.TrimPrefix(cleanPath, "utils/nuclei/templates/")
@@ -68,7 +98,7 @@ func GetTemplateFileSystem(ctx context.Context, templatePaths []string) ([]fs.FS
 		}
 	}
 
-	if len(allTemplateFiles) == 0 {
+	if len(allTemplateFiles) == 0 && len(osFilesystems) == 0 {
 		return nil, fmt.Errorf("no valid template files found")
 	}
 
@@ -100,6 +130,9 @@ func GetTemplateFileSystem(ctx context.Context, templatePaths []string) ([]fs.FS
 
 		filesystems = append(filesystems, filteredFS)
 	}
+
+	// Append any OS-backed filesystems built from user-supplied paths.
+	filesystems = append(filesystems, osFilesystems...)
 
 	if len(filesystems) == 0 {
 		return nil, fmt.Errorf("no valid template directories found")

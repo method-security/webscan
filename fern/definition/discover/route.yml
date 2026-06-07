@@ -17,6 +17,10 @@ types:
       requestMethod: method.RequestMethod
       headlessConfig: optional<method.HeadlessRequestConfig>
       browserbaseConfig: optional<method.BrowserbaseRequestConfig>
+      bundleUrls: optional<list<string>>
+      fetchSourceMaps: optional<boolean>
+      maxBundles: optional<integer>
+      maxRoutes: optional<integer>
   # Report Struct
   RouteBodyParam:
     properties:
@@ -33,6 +37,8 @@ types:
       method: optional<http.HttpMethod>
       queryParams: optional<list<RouteQueryParam>>
       bodyParams: optional<list<RouteBodyParam>>
+      evidence: optional<string>
+      pathTemplate: optional<string>
   DiscoverRouteResult:
     properties:
       target: string

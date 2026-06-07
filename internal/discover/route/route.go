@@ -223,6 +223,15 @@ func extractRoutes(ctx context.Context, httpRequestResponse *common.HttpRequestR
 	urls = discoverroutehelpers.AddListToSetString(urls, inlineScriptUrls)
 	errors = append(errors, inlineScriptErrors...)
 
+	// Extract routes from explicit bundle URLs if provided in config
+	if len(routeCaptureConfig.BundleUrls) > 0 {
+		log.Info("Extracting routes from explicit bundle URLs")
+		bundleRoutes, bundleURLs, bundleErrors := capturerouteextractors.ExtractBundleURLRoutes(ctx, routeCaptureConfig.BundleUrls, redirectedURL, routeCaptureConfig)
+		routes = append(routes, bundleRoutes...)
+		urls = discoverroutehelpers.AddListToSetString(urls, bundleURLs)
+		errors = append(errors, bundleErrors...)
+	}
+
 	// Extract routes from redirect chain (analyze redirect URLs for parameters)
 	log.Info("Extracting routes from redirect chain")
 	redirectRoutes, redirectUrls, redirectErrors := ExtractRedirectRoutes(httpRequestResponse.Response.RedirectChain, redirectedURLBase, routeCaptureConfig)

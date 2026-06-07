@@ -6,7 +6,7 @@ info:
   description: Detects DrayTek Vigor router/firewall web management interfaces using Vigor-specific login titles, authentication realms, and headers.
   metadata:
     method-application-type: NETWORK_MANAGEMENT_SYSTEM
-    method-module-name: DRAYTEK_VIGOR_WEB_UI
+    method-module-name: DRAYTEK_VIGOR
     cpe: cpe:2.3:h:draytek:vigor:*:*:*:*:*:*:*:*
   tags: discovery,draytek,vigor,router,network-management
 http:

@@ -6,7 +6,7 @@ info:
   description: Detects TOTOLINK router web management interfaces using TOTOLINK-specific login endpoints and form markers.
   metadata:
     method-application-type: NETWORK_MANAGEMENT_SYSTEM
-    method-module-name: TOTOLINK_ROUTER_WEB_UI
+    method-module-name: TOTOLINK_ROUTER
     cpe: cpe:2.3:h:totolink:*:*:*:*:*:*:*:*:*
   tags: discovery,totolink,router,network-management
 http:

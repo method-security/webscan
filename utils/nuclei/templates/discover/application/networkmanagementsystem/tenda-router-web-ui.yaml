@@ -6,7 +6,7 @@ info:
   description: Detects Tenda router web management interfaces using Tenda login titles, GoAhead headers, and login/Auth endpoints.
   metadata:
     method-application-type: NETWORK_MANAGEMENT_SYSTEM
-    method-module-name: TENDA_ROUTER_WEB_UI
+    method-module-name: TENDA_ROUTER
     cpe: cpe:2.3:h:tenda:*:*:*:*:*:*:*:*:*
   tags: discovery,tenda,router,network-management
 http:

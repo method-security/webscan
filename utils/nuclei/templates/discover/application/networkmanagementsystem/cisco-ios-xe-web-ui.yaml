@@ -6,7 +6,7 @@ info:
   description: Detects Cisco IOS XE Web UI management consoles using IOS XE-specific login and webui markers.
   metadata:
     method-application-type: NETWORK_MANAGEMENT_SYSTEM
-    method-module-name: CISCO_IOS_XE_WEB_UI
+    method-module-name: CISCO_IOS_XE
     cpe: cpe:2.3:o:cisco:ios_xe:*:*:*:*:*:*:*:*
   tags: discovery,cisco,ios-xe,web-ui,network-management
 http:

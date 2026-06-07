@@ -6,7 +6,7 @@ info:
   description: Detects D-Link router web management interfaces using D-Link model titles and login form markers.
   metadata:
     method-application-type: NETWORK_MANAGEMENT_SYSTEM
-    method-module-name: DLINK_ROUTER_WEB_UI
+    method-module-name: DLINK_ROUTER
     cpe: cpe:2.3:h:dlink:*:*:*:*:*:*:*:*:*
   tags: discovery,dlink,router,network-management
 http:

@@ -6,7 +6,7 @@ info:
   description: Detects ASUSWRT / ASUS Wireless Router web management interfaces using ASUS router-specific titles and login assets.
   metadata:
     method-application-type: NETWORK_MANAGEMENT_SYSTEM
-    method-module-name: ASUSWRT_ROUTER_WEB_UI
+    method-module-name: ASUSWRT_ROUTER
     cpe: cpe:2.3:o:asus:asuswrt:*:*:*:*:*:*:*:*
   tags: discovery,asus,asuswrt,router,network-management
 http:

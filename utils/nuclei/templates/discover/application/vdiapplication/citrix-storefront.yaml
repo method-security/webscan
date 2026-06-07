@@ -1,0 +1,28 @@
+id: citrix-storefront-detect
+info:
+  name: Citrix StoreFront Detection
+  author: method-security
+  severity: info
+  description: Detects Citrix StoreFront web stores and Workspace/Receiver storefront portals using StoreWeb paths and Citrix storefront assets.
+  metadata:
+    method-application-type: VDI_APPLICATION
+    method-module-name: CITRIX_STOREFRONT
+    cpe: cpe:2.3:a:citrix:storefront:*:*:*:*:*:*:*:*
+  tags: discovery,citrix,storefront,workspace,receiver,vdi
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/Citrix/StoreWeb/"
+      - "{{BaseURL}}/Citrix/StoreWeb/#/login"
+      - "{{BaseURL}}/Citrix/Store/discovery"
+      - "{{BaseURL}}/Citrix/StoreWeb/receiver.html"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'status_code == 200 && contains(tolower(body), "citrix storefront")'
+          - 'status_code == 200 && contains(tolower(body), "receiver/images/common") && (contains(tolower(body), "ctxs.") || contains(tolower(body), "_ctxstxt"))'
+          - 'status_code == 200 && contains(tolower(body), "citrix workspace") && contains(tolower(body), "receiver/images/common") && contains(tolower(body), "ctxs")'

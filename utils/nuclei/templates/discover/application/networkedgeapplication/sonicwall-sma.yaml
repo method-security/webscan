@@ -1,0 +1,27 @@
+id: sonicwall-sma-detect
+info:
+  name: SonicWall SMA / SSL-VPN Portal Detection
+  author: method-security
+  severity: info
+  description: Detects SonicWall Secure Mobile Access and SSL-VPN portals by matching SonicWall-branded Virtual Office and SMA login assets.
+  metadata:
+    method-application-type: NETWORK_EDGE_APPLICATION
+    method-module-name: SONICWALL_SMA
+    cpe: cpe:2.3:a:sonicwall:secure_mobile_access:*:*:*:*:*:*:*:*
+  tags: discovery,sonicwall,sma,ssl-vpn,network-edge
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/cgi-bin/welcome"
+      - "{{BaseURL}}/spog/welcome"
+      - "{{BaseURL}}/__api__/v1/logon"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'contains(tolower(body), "sonicwall") && contains(tolower(body), "virtual office")'
+          - 'contains(tolower(body), "sonicwall") && contains(tolower(body), "secure mobile access")'
+          - 'contains(tolower(body), "sonicwall") && contains(tolower(body), "sma") && contains(tolower(body), "login")'

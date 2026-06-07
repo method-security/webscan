@@ -1,0 +1,28 @@
+id: apache-guacamole-detect
+info:
+  name: Apache Guacamole Detection
+  author: method-security
+  severity: info
+  description: Detects Apache Guacamole remote access gateways using Guacamole-specific titles, client assets, and API paths.
+  metadata:
+    method-application-type: VDI_APPLICATION
+    method-module-name: APACHE_GUACAMOLE
+    cpe: cpe:2.3:a:apache:guacamole:*:*:*:*:*:*:*:*
+  tags: discovery,apache,guacamole,remote-access,vdi,jump
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/guacamole/"
+      - "{{BaseURL}}/guacamole/#/"
+      - "{{BaseURL}}/guacamole/api/languages"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'contains(tolower(body), "apache guacamole")'
+          - 'contains(tolower(body), "guacamole-client") && contains(tolower(body), "app.js")'
+          - 'contains(tolower(body), "guacamole") && contains(tolower(body), "api/tokens")'
+          - 'contains(tolower(body), "guacamole-logo") && contains(tolower(body), "guacamole")'

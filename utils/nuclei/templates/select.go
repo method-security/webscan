@@ -50,7 +50,7 @@ func GetTemplateFileSystem(ctx context.Context, templatePaths []string) ([]fs.FS
 		// starts with ./ or ../. Bare relative paths like "pentest/dast" always
 		// resolve against the embedded archive — otherwise a same-named directory
 		// in the working tree would silently shadow the bundled templates.
-		if looksLikeOSPath(templatePath) {
+		if classifyTemplatePath(templatePath) {
 			info, err := os.Stat(templatePath)
 			if err != nil {
 				log.Warn("OS template path not found, skipping", svc1log.SafeParam("templatePath", templatePath), svc1log.SafeParam("error", err.Error()))
@@ -158,17 +158,36 @@ func GetTemplateFileSystem(ctx context.Context, templatePaths []string) ([]fs.FS
 	return filesystems, nil
 }
 
-// looksLikeOSPath reports whether the caller clearly intended a host-filesystem
-// path: absolute (e.g. /tmp/x.yaml or a Windows drive letter), or explicitly
-// relative to the current directory (./x or ../x). Bare relative paths like
-// "pentest/dast" are treated as embedded logical paths, even if a same-named
-// entry happens to exist in the working tree.
-func looksLikeOSPath(p string) bool {
+// embeddedPathPrefixes are the top-level directories inside the bundled
+// template archive. A path beginning with one of these is always resolved
+// against the embedded archive — never the host filesystem — so a same-named
+// directory in the working tree cannot shadow bundled templates.
+var embeddedPathPrefixes = []string{"pentest/", "discover/"}
+
+// classifyTemplatePath returns true when the path should be resolved against
+// the host filesystem rather than the embedded archive. The rules:
+//
+//   - Absolute paths and ./- / ../-prefixed paths are always OS paths.
+//   - Paths starting with a known embedded prefix ("pentest/", "discover/")
+//     are always embedded — this is what the internal callers pass and a
+//     user accidentally pointing --templates at a same-named directory in
+//     CWD should not silently shadow the bundle.
+//   - Any other relative path is treated as an OS path when it exists on
+//     disk; otherwise the embedded resolver gets a chance to match it.
+func classifyTemplatePath(p string) bool {
 	if filepath.IsAbs(p) {
 		return true
 	}
 	if strings.HasPrefix(p, "./") || strings.HasPrefix(p, "../") ||
 		strings.HasPrefix(p, ".\\") || strings.HasPrefix(p, "..\\") {
+		return true
+	}
+	for _, prefix := range embeddedPathPrefixes {
+		if strings.HasPrefix(p, prefix) {
+			return false
+		}
+	}
+	if _, err := os.Stat(p); err == nil {
 		return true
 	}
 	return false

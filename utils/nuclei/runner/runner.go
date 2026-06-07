@@ -103,8 +103,7 @@ func copyFilesToTmpDirs(cfg Config) (templateDir, workflowDir string, err error)
 		return "", "", err
 	}
 
-	for i, src := range cfg.WorkflowFS {
-		srcSubtemplatesDir := filepath.Join(subtemplatesDir, fmt.Sprintf("src-%d", i))
+	for _, src := range cfg.WorkflowFS {
 		if walkErr := fs.WalkDir(src, ".", func(p string, d fs.DirEntry, walkErr error) error {
 			if walkErr != nil {
 				return walkErr
@@ -122,19 +121,16 @@ func copyFilesToTmpDirs(cfg Config) (templateDir, workflowDir string, err error)
 			}
 
 			// Determine if this is a workflow file or a template file. Workflow
-			// files stay at the workflowDir root (nuclei expects them there);
-			// preserve their basenames but namespace by source index to avoid
-			// collisions. Templates go under subtemplates/ retaining their
-			// relative path within a per-source subdir so nested layouts and
-			// sibling references survive.
+			// files reference their subtemplates by basename
+			// (e.g. "subtemplates/xss-injection.yaml"), so both layers must
+			// stay flat at their respective roots for those references to
+			// resolve via nuclei's catalog.
+			filename := filepath.Base(p)
 			var dst string
 			if strings.Contains(string(data), "workflows:") {
-				dst = filepath.Join(workflowDir, fmt.Sprintf("src-%d-%s", i, filepath.Base(p)))
+				dst = filepath.Join(workflowDir, filename)
 			} else {
-				dst = filepath.Join(srcSubtemplatesDir, p)
-			}
-			if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
-				return err
+				dst = filepath.Join(subtemplatesDir, filename)
 			}
 			return os.WriteFile(dst, data, 0o600)
 		}); walkErr != nil {

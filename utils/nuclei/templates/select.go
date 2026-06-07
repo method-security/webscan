@@ -45,16 +45,33 @@ func GetTemplateFileSystem(ctx context.Context, templatePaths []string) ([]fs.FS
 	var allTemplateFiles []string
 
 	for _, templatePath := range templatePaths {
-		// If the path exists on the host OS filesystem, treat it as a user-supplied
-		// custom template path and read it directly from disk.
-		if info, err := os.Stat(templatePath); err == nil {
+		// Treat the path as OS-supplied only when the caller wrote something that
+		// clearly references the host filesystem: an absolute path or one that
+		// starts with ./ or ../. Bare relative paths like "pentest/dast" always
+		// resolve against the embedded archive — otherwise a same-named directory
+		// in the working tree would silently shadow the bundled templates.
+		if looksLikeOSPath(templatePath) {
+			info, err := os.Stat(templatePath)
+			if err != nil {
+				log.Warn("OS template path not found, skipping", svc1log.SafeParam("templatePath", templatePath), svc1log.SafeParam("error", err.Error()))
+				continue
+			}
 			abs, absErr := filepath.Abs(templatePath)
 			if absErr != nil {
 				abs = templatePath
 			}
 			if info.IsDir() {
+				count, walkErr := countTemplateFilesOnDisk(abs)
+				if walkErr != nil {
+					log.Warn("Failed to read OS template directory, skipping", svc1log.SafeParam("templatePath", abs), svc1log.SafeParam("error", walkErr.Error()))
+					continue
+				}
+				if count == 0 {
+					log.Warn("OS template directory contains no .yaml/.yml files, skipping", svc1log.SafeParam("templatePath", abs))
+					continue
+				}
 				osFilesystems = append(osFilesystems, os.DirFS(abs))
-				log.Info("Using OS template directory", svc1log.SafeParam("templatePath", abs))
+				log.Info("Using OS template directory", svc1log.SafeParam("templatePath", abs), svc1log.SafeParam("templateCount", count))
 			} else if isTemplateFile(abs) {
 				// Expose just the single file by rooting at its parent directory
 				// and filtering to that filename.
@@ -139,6 +156,40 @@ func GetTemplateFileSystem(ctx context.Context, templatePaths []string) ([]fs.FS
 	}
 
 	return filesystems, nil
+}
+
+// looksLikeOSPath reports whether the caller clearly intended a host-filesystem
+// path: absolute (e.g. /tmp/x.yaml or a Windows drive letter), or explicitly
+// relative to the current directory (./x or ../x). Bare relative paths like
+// "pentest/dast" are treated as embedded logical paths, even if a same-named
+// entry happens to exist in the working tree.
+func looksLikeOSPath(p string) bool {
+	if filepath.IsAbs(p) {
+		return true
+	}
+	if strings.HasPrefix(p, "./") || strings.HasPrefix(p, "../") ||
+		strings.HasPrefix(p, ".\\") || strings.HasPrefix(p, "..\\") {
+		return true
+	}
+	return false
+}
+
+// countTemplateFilesOnDisk counts .yaml/.yml files under dir (recursive).
+func countTemplateFilesOnDisk(dir string) (int, error) {
+	count := 0
+	err := filepath.WalkDir(dir, func(_ string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if isTemplateFile(d.Name()) {
+			count++
+		}
+		return nil
+	})
+	return count, err
 }
 
 // isTemplateFile checks if the given path appears to be a template file based on extension

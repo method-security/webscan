@@ -6,7 +6,7 @@ info:
   description: Detects MikroTik RouterOS WebFig management interfaces using RouterOS/WebFig-specific page and asset markers.
   metadata:
     method-application-type: NETWORK_MANAGEMENT_SYSTEM
-    method-module-name: MIKROTIK_ROUTEROS_WEBFIG
+    method-module-name: MIKROTIK_ROUTEROS
     cpe: cpe:2.3:o:mikrotik:routeros:*:*:*:*:*:*:*:*
   tags: discovery,mikrotik,routeros,webfig,network-management
 http:

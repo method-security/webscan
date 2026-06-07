@@ -6,7 +6,7 @@ info:
   description: Detects ArangoDB web administration UI using ArangoDB-specific title, login, and API markers.
   metadata:
     method-application-type: DATABASE_APPLICATION
-    method-module-name: ARANGODB_WEB_UI
+    method-module-name: ARANGODB
     cpe: cpe:2.3:a:arangodb:arangodb:*:*:*:*:*:*:*:*
   tags: discovery,database,admin,arangodb
 http:

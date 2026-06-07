@@ -110,6 +110,22 @@ func (a *WebScan) InitRootCommand() {
 	a.RootCmd.AddCommand(a.VersionCmd)
 }
 
+// sanitizeTemplatePaths trims whitespace from each --templates entry and
+// rejects empty values. An empty entry would otherwise bypass the
+// requirement on the matching built-in selection flag and could normalize
+// to a broad embedded template path inside the nuclei selector.
+func sanitizeTemplatePaths(raw []string) ([]string, error) {
+	out := make([]string, 0, len(raw))
+	for _, t := range raw {
+		trimmed := strings.TrimSpace(t)
+		if trimmed == "" {
+			return nil, errors.New("--templates contains an empty entry; supply a file or directory path")
+		}
+		out = append(out, trimmed)
+	}
+	return out, nil
+}
+
 func validateOutputFormat(output string) (writer.Format, error) {
 	var format writer.FormatValue
 	switch strings.ToLower(output) {

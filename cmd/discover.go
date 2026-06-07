@@ -98,7 +98,12 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			templates, err := cmd.Flags().GetStringSlice("templates")
+			rawTemplates, err := cmd.Flags().GetStringSlice("templates")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			templates, err := sanitizeTemplatePaths(rawTemplates)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return

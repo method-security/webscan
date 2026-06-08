@@ -1,0 +1,24 @@
+id: elasticsearch-detect
+info:
+  name: Elasticsearch Detection
+  author: method-security
+  severity: info
+  description: Detects Elasticsearch HTTP API endpoints using Elasticsearch-specific product headers, root API metadata, and authentication error responses.
+  metadata:
+    method-application-type: DATABASE_SYSTEM
+    method-module-name: ELASTICSEARCH
+    cpe: cpe:2.3:a:elastic:elasticsearch:*:*:*:*:*:*:*:*
+  tags: discovery,database,elasticsearch,elastic
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'status_code == 200 && contains(tolower(header), "x-elastic-product: elasticsearch")'
+          - 'status_code == 200 && contains(tolower(body), "\"cluster_name\"") && contains(tolower(body), "\"cluster_uuid\"") && contains(tolower(body), "\"version\"") && contains(tolower(body), "\"tagline\"") && contains(tolower(body), "you know, for search")'
+          - '(status_code == 401 || status_code == 403) && contains(tolower(header), "x-elastic-product: elasticsearch") && contains(tolower(body), "\"security_exception\"")'

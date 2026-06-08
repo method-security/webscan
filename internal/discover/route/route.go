@@ -477,7 +477,7 @@ func PerformRouteCapture(ctx context.Context, config discover.DiscoverRouteConfi
 
 	// Remove duplicate Routes and Static Assets
 	report.Result.Routes = discoverroutehelpers.MergeWebRoutes(allRoutes)
-	sort.Slice(report.Result.Routes, func(i, j int) bool {
+	sort.SliceStable(report.Result.Routes, func(i, j int) bool {
 		ri := report.Result.Routes[i]
 		rj := report.Result.Routes[j]
 		// Evidence-tagged routes survive MaxRoutes cap before untagged routes

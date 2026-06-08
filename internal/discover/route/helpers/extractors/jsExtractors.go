@@ -3,6 +3,7 @@ package discoverroute
 import (
 	// Standard
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -70,12 +71,53 @@ func fetchJSResource(ctx context.Context, fullURL string, routeCaptureConfig dis
 		statusCode = *response.Response.StatusCode
 	}
 
-	body := []byte{}
-	if bodyStr := requesthelpers.GetResponseBodyStringFromBodyStruct(response.Response.ResponseBody); bodyStr != nil {
-		body = []byte(*bodyStr)
+	body, err := responseBodyRawBytes(response.Response.ResponseBody)
+	if err != nil {
+		return nil, response.Response.ResponseHeaders, statusCode, fmt.Errorf("decode response body from %s: %w", fullURL, err)
 	}
 
 	return body, response.Response.ResponseHeaders, statusCode, nil
+}
+
+// responseBodyRawBytes returns the raw octets of a Body struct, handling
+// binary (base64-encoded), text, and json kinds the way JS bundle / source
+// map fetches need. The default helper
+// `requesthelpers.GetResponseBodyStringFromBodyStruct` returns the literal
+// base64 *text* for `binary` bodies, which silently corrupts JS / JSON
+// served as `application/octet-stream`. This helper base64-decodes binary
+// bodies and returns the underlying bytes so downstream parsers see the
+// real content.
+func responseBodyRawBytes(body *common.Body) ([]byte, error) {
+	if body == nil {
+		return []byte{}, nil
+	}
+	switch body.Kind {
+	case "binary":
+		if body.Binary == nil {
+			return []byte{}, nil
+		}
+		decoded, err := base64.StdEncoding.DecodeString(body.Binary.Base64)
+		if err != nil {
+			return nil, fmt.Errorf("base64 decode binary body: %w", err)
+		}
+		return decoded, nil
+	case "text":
+		if body.Text == nil {
+			return []byte{}, nil
+		}
+		return []byte(body.Text.Value), nil
+	case "json":
+		if body.Json == nil {
+			return []byte{}, nil
+		}
+		return []byte(body.Json.Data), nil
+	}
+	// For form/multipart/unknown kinds, fall back to the legacy helper to
+	// avoid behavior changes outside the JS/source-map fetch surface.
+	if str := requesthelpers.GetResponseBodyStringFromBodyStruct(body); str != nil {
+		return []byte(*str), nil
+	}
+	return []byte{}, nil
 }
 
 // firstHeaderValue returns the first value for the given header name from the

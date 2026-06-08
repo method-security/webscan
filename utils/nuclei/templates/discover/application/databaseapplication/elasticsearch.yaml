@@ -22,4 +22,3 @@ http:
           - 'status_code == 200 && contains(tolower(header), "x-elastic-product: elasticsearch")'
           - 'status_code == 200 && contains(tolower(body), "\"cluster_name\"") && contains(tolower(body), "\"cluster_uuid\"") && contains(tolower(body), "\"version\"") && contains(tolower(body), "\"tagline\"") && contains(tolower(body), "you know, for search")'
           - '(status_code == 401 || status_code == 403) && contains(tolower(header), "x-elastic-product: elasticsearch") && contains(tolower(body), "\"security_exception\"")'
-          - '(status_code == 401 || status_code == 403) && contains(tolower(body), "\"security_exception\"") && contains(tolower(body), "missing authentication credentials") && contains(tolower(body), "\"root_cause\"")'

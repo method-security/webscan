@@ -3,7 +3,7 @@ info:
   name: HashiCorp Vault Detection
   author: method-security
   severity: info
-  description: Detects HashiCorp Vault using the Vault cluster response header from the unauthenticated sys/health API.
+  description: Detects HashiCorp Vault using the unauthenticated sys/health API and Vault cluster identity fields.
   metadata:
     method-application-type: SECRET_MANAGEMENT_APPLICATION
     method-module-name: VAULT
@@ -12,14 +12,11 @@ info:
 http:
   - method: GET
     path:
-      - "{{BaseURL}}"
       - "{{BaseURL}}/v1/sys/health"
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
     matchers:
-      - type: word
-        part: header
-        words:
-          - "x-vault-cluster"
-        case-insensitive: true
+      - type: dsl
+        dsl:
+          - 'contains(tolower(header), "x-vault-cluster") || (contains(tolower(body), "\"initialized\"") && contains(tolower(body), "\"sealed\"") && (contains(tolower(body), "\"cluster_name\"") || contains(tolower(body), "\"cluster_id\"")))'

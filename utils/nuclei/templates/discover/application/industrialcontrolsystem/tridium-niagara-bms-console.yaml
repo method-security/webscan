@@ -19,10 +19,18 @@ http:
     max-redirects: 5
     stop-at-first-match: true
     matchers:
-      - type: dsl
-        dsl:
-          - 'contains(tolower(body), "niagara framework") && contains(tolower(body), "tridium") && (contains(tolower(body), "login") || contains(tolower(body), "station") || contains(tolower(body), "web launcher") || contains(tolower(body), "<title>niagara"))'
-          - 'contains(tolower(body), "tridium") && contains(tolower(body), "niagara") && (contains(tolower(body), "login") || contains(tolower(body), "station") || contains(tolower(body), "web launcher") || contains(tolower(body), "module://webeditors"))'
-          - 'contains(tolower(body), "powered by niagara") && contains(tolower(body), "tridium") && (contains(tolower(body), "login") || contains(tolower(body), "<title>niagara") || contains(tolower(body), "web launcher"))'
-          - 'contains(tolower(body), "module://webeditors") && contains(tolower(body), "niagara")'
-          - 'contains(tolower(body), "niagara web launcher") && contains(tolower(body), "tridium")'
+      - type: word
+        part: body
+        words:
+          - "Niagara Framework"
+          - "Tridium"
+          - "<title>"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "module://webEditors"
+          - "Niagara"
+        condition: and
+        case-insensitive: true

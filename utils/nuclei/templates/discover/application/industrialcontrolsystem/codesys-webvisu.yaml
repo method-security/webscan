@@ -19,9 +19,10 @@ http:
     max-redirects: 5
     stop-at-first-match: true
     matchers:
-      - type: dsl
-        dsl:
-          - 'contains(tolower(body), "codesys") && contains(tolower(body), "webvisu") && (contains(tolower(body), "webvisu.htm") || contains(tolower(body), ".app") || contains(tolower(body), ".visu") || contains(tolower(body), "plc"))'
-          - 'contains(tolower(body), "3s-smart software solutions") && contains(tolower(body), "webvisu")'
-          - 'contains(tolower(body), "codesys webvisu") && (contains(tolower(body), ".app") || contains(tolower(body), ".visu"))'
-          - 'contains(tolower(header), "codesys") && contains(tolower(body), "webvisu")'
+      - type: word
+        part: body
+        words:
+          - "CODESYS WebVisu"
+          - "3S-Smart Software Solutions"
+        condition: and
+        case-insensitive: true

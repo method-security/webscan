@@ -18,11 +18,19 @@ http:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
+    matchers-condition: or
     matchers:
-      - type: dsl
-        dsl:
-          - 'contains(tolower(body), "advantech webaccess") && (contains(tolower(body), "/broadweb/") || contains(tolower(body), "broadweb") || contains(tolower(body), "webaccess/scada") || contains(tolower(body), "<title>webaccess"))'
-          - 'contains(tolower(body), "webaccess/scada") && contains(tolower(body), "advantech")'
-          - 'contains(tolower(body), "/broadweb/") && contains(tolower(body), "advantech")'
-          - 'contains(tolower(body), "broadweb") && contains(tolower(body), "webaccess") && (contains(tolower(body), "advantech") || contains(tolower(body), "scada"))'
-          - 'contains(tolower(body), "<title>webaccess") && contains(tolower(body), "advantech")'
+      - type: word
+        part: body
+        words:
+          - "Advantech WebAccess"
+          - "BroadWeb"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "WebAccess/SCADA"
+          - "Advantech"
+        condition: and
+        case-insensitive: true

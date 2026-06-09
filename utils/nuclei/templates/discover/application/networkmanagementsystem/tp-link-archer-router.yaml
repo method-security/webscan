@@ -1,0 +1,41 @@
+id: tp-link-archer-soho-router-detect
+info:
+  name: TP-Link SOHO Router Web Management Detection
+  author: method-security
+  severity: info
+  description: Detects TP-Link consumer SOHO router web management interfaces for Archer, TL-WR, and Deco product lines using TP-Link-specific login paths, cookie names, and pre-auth firmware disclosure endpoints.
+  metadata:
+    method-application-type: NETWORK_MANAGEMENT_SYSTEM
+    method-module-name: TPLINK
+    method-sub-module-name: ARCHER
+    method-detection-state: DETECTED
+    cpe: cpe:2.3:o:tp-link:archer_firmware:*:*:*:*:*:*:*:*
+  tags: discovery,soho,tp-link,tplink,archer,tl-wr,deco,router,network-management
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/userRpm/LoginRpm.htm"
+      - "{{BaseURL}}/webpages/login.html"
+      - "{{BaseURL}}/login.cgi"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'status_code == 200 && !contains(tolower(body), "omada") && !contains(tolower(body), "tp-link eap") && (contains(tolower(body), "userrpm") || contains(tolower(body), "loginrpm.htm")) && contains(tolower(body), "tp-link")'
+          - 'status_code == 200 && !contains(tolower(body), "omada") && !contains(tolower(body), "tp-link eap") && contains(tolower(body), "tp-link") && (contains(tolower(body), "archer") || contains(tolower(body), "tl-wr") || contains(tolower(body), "tl-mr") || contains(tolower(body), "tl-wdr"))'
+          - 'status_code == 200 && !contains(tolower(body), "omada") && !contains(tolower(body), "tp-link eap") && contains(tolower(body), "tplink") && contains(tolower(body), "webpages/login")'
+          - 'status_code == 200 && !contains(tolower(body), "omada") && contains(tolower(header), "set-cookie") && (contains(tolower(header), "sysauth=") || contains(tolower(header), "sysauth-https=")) && (contains(tolower(body), "tp-link") || contains(tolower(body), "tplink"))'
+          - 'status_code == 200 && !contains(tolower(body), "omada") && !contains(tolower(body), "tp-link eap") && contains(tolower(body), "tp-link") && contains(tolower(body), "wireless router") && contains(tolower(body), "login")'
+          - 'status_code == 200 && !contains(tolower(body), "omada") && !contains(tolower(body), "tp-link eap") && (contains(tolower(body), "<title>tp-link") || contains(tolower(body), "<title>tl-")) && contains(tolower(body), "login")'
+    extractors:
+      - type: regex
+        name: firmware_version
+        part: body
+        group: 1
+        regex:
+          - '(?i)(?:firmware|fw)[^<]{0,50}?([0-9]+\.[0-9]+\.[0-9]+(?:\s+[Bb]uild\s+[0-9]+)?)'
+          - '(?i)"firmwareVersion"\s*:\s*"([^"]+)"'
+          - '(?i)soft_ver\s*=\s*[''"]([^''"]+)[''"]'

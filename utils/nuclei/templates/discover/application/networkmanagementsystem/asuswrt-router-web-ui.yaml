@@ -3,12 +3,14 @@ info:
   name: ASUSWRT Router Web Management Detection
   author: method-security
   severity: info
-  description: Detects ASUSWRT / ASUS Wireless Router web management interfaces using ASUS router-specific titles and login assets.
+  description: Detects ASUSWRT / ASUS consumer router web management interfaces (RT-series, ZenWiFi, AiMesh) using ASUS-specific login paths, cookie names, and admin UI markers.
   metadata:
     method-application-type: NETWORK_MANAGEMENT_SYSTEM
-    method-module-name: ASUSWRT_ROUTER
+    method-module-name: ASUS
+    method-sub-module-name: RT_SERIES
+    method-detection-state: DETECTED
     cpe: cpe:2.3:o:asus:asuswrt:*:*:*:*:*:*:*:*
-  tags: discovery,asus,asuswrt,router,network-management
+  tags: discovery,soho,asus,asuswrt,rt-series,zenwifi,aimesh,router,network-management
 http:
   - method: GET
     path:
@@ -24,3 +26,14 @@ http:
           - 'status_code == 200 && !contains(tolower(body), "gitlab community edition") && !contains(tolower(body), "included with your linksys smart wi-fi") && !contains(tolower(body), "data.sloss.xyz/cloud.js") && !contains(tolower(body), "<title>gpon home gateway") && contains(tolower(body), "<title>asus wireless router")'
           - 'status_code == 200 && !contains(tolower(body), "included with your linksys smart wi-fi") && !contains(tolower(body), "data.sloss.xyz/cloud.js") && !contains(tolower(body), "<title>gpon home gateway") && contains(tolower(body), "asuswrt") && contains(tolower(body), "main_login.asp")'
           - 'status_code == 200 && !contains(tolower(body), "included with your linksys smart wi-fi") && !contains(tolower(body), "data.sloss.xyz/cloud.js") && !contains(tolower(body), "<title>gpon home gateway") && contains(tolower(body), "asus router") && contains(tolower(body), "asus_token")'
+          - 'status_code == 200 && !contains(tolower(body), "included with your linksys smart wi-fi") && !contains(tolower(body), "data.sloss.xyz/cloud.js") && !contains(tolower(body), "<title>gpon home gateway") && (contains(tolower(body), "<title>asus zenwifi") || contains(tolower(body), "<title>asus aimesh"))'
+          - 'status_code == 200 && !contains(tolower(body), "data.sloss.xyz/cloud.js") && contains(tolower(header), "set-cookie") && contains(tolower(header), "asus_token") && (contains(tolower(body), "asus") || contains(tolower(body), "asuswrt"))'
+    extractors:
+      - type: regex
+        name: firmware_version
+        part: body
+        group: 1
+        regex:
+          - '(?i)firmware[^<]{0,40}?([0-9]+\.[0-9]+\.[0-9]+(?:\.[0-9]+)?)'
+          - '(?i)"firmwareVersion"\s*[=:]\s*"([^"]+)"'
+          - '(?i)fw_version\s*=\s*[''"]([^''"]+)[''"]'

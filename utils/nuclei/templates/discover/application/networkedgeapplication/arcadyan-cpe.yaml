@@ -1,0 +1,45 @@
+id: arcadyan-cpe-detect
+info:
+  name: Arcadyan ODM ISP CPE Detection
+  author: method-security
+  severity: info
+  description: Detects Arcadyan-manufactured ISP customer premises equipment (CPE/gateways/modems) by ODM-specific headers, login paths, and JavaScript tells — independent of ISP rebranding (BT Home Hub, Vodafone Gateway, T-Mobile). Arcadyan CPE is affected by CVE-2021-20090 (path traversal, Mirai botnet targeting).
+  metadata:
+    method-application-type: NETWORK_EDGE_APPLICATION
+    method-module-name: ISP_CPE
+    method-sub-module-name: ARCADYAN
+    method-detection-state: DETECTED
+    cpe: cpe:2.3:o:arcadyan:*:*:*:*:*:*:*:*:*
+  tags: discovery,soho,isp-cpe,arcadyan,tr069,network-edge
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/login.html"
+      - "{{BaseURL}}/cgi-bin/wbm/loginwbm"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'status_code == 200 && contains(tolower(body), "arcadyan")'
+          - 'status_code == 200 && contains(tolower(header), "x-powered-by") && contains(tolower(header), "arcadyan")'
+          - 'status_code == 200 && (contains(tolower(body), "arcadyan.css") || contains(tolower(body), "arcadyan.js") || contains(tolower(body), "/arcadyan/")) && (contains(tolower(body), "login") || contains(tolower(body), "gateway"))'
+          - 'status_code == 200 && (contains(tolower(body), "arv7519") || contains(tolower(body), "arv752") || contains(tolower(body), "vgv7") || contains(tolower(body), "arv4510") || contains(tolower(body), "vdv23xx")) && (contains(tolower(body), "login") || contains(tolower(body), "modem"))'
+          - 'status_code == 200 && contains(tolower(body), "/cgi-bin/wbm/") && (contains(tolower(body), "arcadyan") || contains(tolower(body), "gateway") || contains(tolower(body), "modem"))'
+    extractors:
+      - type: regex
+        name: firmware_version
+        part: body
+        group: 1
+        regex:
+          - '(?i)firmware[^<]{0,50}?([0-9]+\.[0-9]+\.[0-9]+(?:\.[0-9]+)?)'
+          - '(?i)(?:sw|software)[\s_]?version[^<]{0,20}?([0-9]+\.[0-9]+\.[0-9]+)'
+          - '(?i)"swVersion"\s*:\s*"([^"]+)"'
+      - type: regex
+        name: model
+        part: body
+        group: 1
+        regex:
+          - '(?i)(?:model|device_type)[^<]{0,20}?[=:]\s*"?([A-Z]{2,5}[0-9V]{2,8}[A-Z0-9]*)'

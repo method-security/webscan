@@ -1,0 +1,45 @@
+id: netgear-nighthawk-soho-router-detect
+info:
+  name: NETGEAR Nighthawk/Orbi Consumer Router Web Management Detection
+  author: method-security
+  severity: info
+  description: Detects NETGEAR consumer SOHO router web management interfaces for Nighthawk and Orbi product lines using NETGEAR login paths, HNAP1 endpoint, cookie names, and pre-auth firmware disclosure.
+  metadata:
+    method-application-type: NETWORK_MANAGEMENT_SYSTEM
+    method-module-name: NETGEAR
+    method-sub-module-name: NIGHTHAWK
+    method-detection-state: DETECTED
+    cpe: cpe:2.3:o:netgear:nighthawk_firmware:*:*:*:*:*:*:*:*
+  tags: discovery,soho,netgear,nighthawk,orbi,router,network-management
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/currentsetting.htm"
+      - "{{BaseURL}}/WAN_wan.htm"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'status_code == 200 && !contains(tolower(body), "gitlab community edition") && !contains(tolower(body), "prosafe") && !contains(tolower(body), "smart managed switch") && contains(tolower(body), "netgear") && (contains(tolower(body), "nighthawk") || contains(tolower(body), "orbi") || contains(tolower(body), "r7000") || contains(tolower(body), "r8000") || contains(tolower(body), "r6") || contains(tolower(body), "r7") || contains(tolower(body), "r8") || contains(tolower(body), "ax") || contains(tolower(body), "rbr"))'
+          - 'status_code == 200 && !contains(tolower(body), "prosafe") && contains(tolower(body), "netgear") && contains(tolower(body), "routerlogin") && contains(tolower(body), "login")'
+          - 'status_code == 200 && !contains(tolower(body), "prosafe") && contains(tolower(body), "netgear") && contains(tolower(body), "HNAP1") && (contains(tolower(body), "login") || contains(tolower(body), "router"))'
+          - 'status_code == 200 && !contains(tolower(body), "prosafe") && contains(tolower(body), "netgear") && (contains(tolower(body), "currentsetting") || contains(tolower(body), "firmwareversion")) && (contains(tolower(body), "model") || contains(tolower(body), "router"))'
+    extractors:
+      - type: regex
+        name: firmware_version
+        part: body
+        group: 1
+        regex:
+          - '(?i)firmware[^=<]{0,20}?=\s*([0-9]+\.[0-9]+\.[0-9]+(?:\.[0-9]+)?)'
+          - '(?i)<firmwareVersion>([^<]+)</firmwareVersion>'
+          - '(?i)FirmwareVersion\s*=\s*V([0-9]+\.[0-9]+\.[0-9]+(?:\.[0-9]+)?)'
+      - type: regex
+        name: model
+        part: body
+        group: 1
+        regex:
+          - '(?i)<Model>([^<]+)</Model>'
+          - '(?i)Model\s*=\s*([A-Z0-9]+-[A-Z0-9]+)'

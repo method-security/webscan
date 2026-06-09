@@ -3,12 +3,14 @@ info:
   name: NETGEAR Network Management Detection
   author: method-security
   severity: info
-  description: Detects NETGEAR switch/router web management interfaces using NETGEAR-specific management UI and model markers.
+  description: Detects NETGEAR ProSAFE switch/router web management interfaces using NETGEAR-specific management UI and model markers.
   metadata:
     method-application-type: NETWORK_MANAGEMENT_SYSTEM
-    method-module-name: NETGEAR_NETWORK_MANAGEMENT
+    method-module-name: NETGEAR
+    method-sub-module-name: PROSAFE
+    method-detection-state: DETECTED
     cpe: cpe:2.3:h:netgear:*:*:*:*:*:*:*:*:*
-  tags: discovery,netgear,switch,router,network-management
+  tags: discovery,soho,netgear,prosafe,switch,router,network-management
 http:
   - method: GET
     path:

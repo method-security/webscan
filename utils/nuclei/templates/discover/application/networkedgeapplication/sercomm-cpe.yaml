@@ -1,0 +1,47 @@
+id: sercomm-cpe-detect
+info:
+  name: Sercomm ODM ISP CPE Detection
+  author: method-security
+  severity: info
+  description: Detects Sercomm-manufactured ISP customer premises equipment (CPE/gateways/modems) by ODM-specific login paths, server headers, and firmware tells — independent of ISP rebranding (AT&T U-verse NVG, Charter/Spectrum, FiOS). Sercomm CPE is a known ORB target due to the TR-069 attack surface and CVE-2021-27132.
+  metadata:
+    method-application-type: NETWORK_EDGE_APPLICATION
+    method-module-name: ISP_CPE
+    method-sub-module-name: SERCOMM
+    method-detection-state: DETECTED
+    cpe: cpe:2.3:o:sercomm:*:*:*:*:*:*:*:*:*
+  tags: discovery,soho,isp-cpe,sercomm,tr069,network-edge
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/userlogin.html"
+      - "{{BaseURL}}/index.html"
+      - "{{BaseURL}}/login.html"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'status_code == 200 && contains(tolower(body), "sercomm") && contains(tolower(body), "login")'
+          - 'status_code == 200 && contains(tolower(body), "sercomm") && (contains(tolower(body), "userlogin") || contains(tolower(body), "modem") || contains(tolower(body), "gateway"))'
+          - 'status_code == 200 && contains(tolower(header), "mini_httpd") && (contains(tolower(body), "sercomm") || contains(tolower(body), "userlogin.html"))'
+          - 'status_code == 200 && contains(tolower(header), "server") && contains(tolower(header), "rompager") && (contains(tolower(body), "login") || contains(tolower(body), "modem"))'
+          - 'status_code == 200 && (contains(tolower(body), "nvg589") || contains(tolower(body), "nvg599") || contains(tolower(body), "nvg510") || contains(tolower(body), "vd625") || contains(tolower(body), "sgw500")) && contains(tolower(body), "login")'
+          - 'status_code == 200 && contains(tolower(body), "/userlogin.html") && !contains(tolower(body), "cisco") && !contains(tolower(body), "arris") && (contains(tolower(header), "mini_httpd") || contains(tolower(header), "boa"))'
+    extractors:
+      - type: regex
+        name: firmware_version
+        part: body
+        group: 1
+        regex:
+          - '(?i)firmware[^<]{0,50}?([0-9]+\.[0-9]+\.[0-9]+(?:\.[0-9]+)?)'
+          - '(?i)softwareVersion[^<]{0,20}?([0-9]+\.[0-9]+\.[0-9]+)'
+          - '(?i)sw_version\s*[=:]\s*[''"]([^''"]+)[''"]'
+      - type: regex
+        name: model
+        part: body
+        group: 1
+        regex:
+          - '(?i)(?:model|device)[^<]{0,20}?:\s*([A-Z]{2,5}[0-9]{3,6}[A-Z]?)'

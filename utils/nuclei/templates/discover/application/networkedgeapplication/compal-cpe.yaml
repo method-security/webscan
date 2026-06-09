@@ -1,0 +1,44 @@
+id: compal-cpe-detect
+info:
+  name: Compal ODM ISP CPE Detection
+  author: method-security
+  severity: info
+  description: Detects Compal-manufactured ISP customer premises equipment (cable modems/gateways) by ODM-specific CH7-prefix model designators, JavaScript paths, and firmware tells — independent of ISP rebranding (Comcast XB3/XB6, Charter CH7465, Shaw). Compal CH7000-family cable gateways are widely deployed across North American ISPs.
+  metadata:
+    method-application-type: NETWORK_EDGE_APPLICATION
+    method-module-name: ISP_CPE
+    method-sub-module-name: COMPAL
+    method-detection-state: DETECTED
+    cpe: cpe:2.3:o:compal:*:*:*:*:*:*:*:*:*
+  tags: discovery,soho,isp-cpe,compal,cable,docsis,network-edge
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/login.asp"
+      - "{{BaseURL}}/index.asp"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'status_code == 200 && contains(tolower(body), "compal") && (contains(tolower(body), "login") || contains(tolower(body), "gateway") || contains(tolower(body), "modem"))'
+          - 'status_code == 200 && (contains(tolower(body), "ch7465") || contains(tolower(body), "ch7485") || contains(tolower(body), "ch7466") || contains(tolower(body), "ch7486") || contains(tolower(body), "ch7464") || contains(tolower(body), "ch7467")) && (contains(tolower(body), "login") || contains(tolower(body), "gateway"))'
+          - 'status_code == 200 && contains(tolower(body), "compal") && (contains(tolower(body), "ch7") || contains(tolower(body), "docsis") || contains(tolower(body), "cable modem"))'
+          - 'status_code == 200 && contains(tolower(body), "/frontend/") && contains(tolower(body), "compal") && contains(tolower(body), "login")'
+    extractors:
+      - type: regex
+        name: firmware_version
+        part: body
+        group: 1
+        regex:
+          - '(?i)firmware[^<]{0,50}?([0-9]+\.[0-9]+\.[0-9]+(?:\.[0-9]+)?)'
+          - '(?i)swVersion[^<]{0,20}?[=:]\s*"?([0-9]+\.[0-9]+\.[0-9]+)'
+          - '(?i)"version"\s*:\s*"([0-9]+\.[0-9]+\.[0-9]+[^"]*)"'
+      - type: regex
+        name: model
+        part: body
+        group: 1
+        regex:
+          - '(?i)(CH7[0-9]{3}[A-Z0-9]*)'

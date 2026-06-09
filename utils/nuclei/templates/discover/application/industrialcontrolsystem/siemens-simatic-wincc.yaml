@@ -1,0 +1,25 @@
+id: siemens-simatic-wincc-detect
+info:
+  name: Siemens SIMATIC WinCC Detection
+  author: method-security
+  severity: info
+  description: Detects Siemens SIMATIC WinCC web interfaces using Siemens, SIMATIC WinCC, and web-console markers.
+  metadata:
+    method-application-type: INDUSTRIAL_CONTROL_SYSTEM
+    method-module-name: SIEMENS_SIMATIC_WINCC
+    cpe: cpe:2.3:a:siemens:simatic_wincc:*:*:*:*:*:*:*:*
+  tags: discovery,ics,ot,siemens,simatic,wincc
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/Portal/Portal.mwsl"
+      - "{{BaseURL}}/WinCC/"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'contains(tolower(body), "siemens") && contains(tolower(body), "simatic wincc") && (contains(tolower(body), "login") || contains(tolower(body), "/portal/portal.mwsl") || contains(tolower(body), "<title>simatic wincc") || contains(tolower(body), "<title>siemens simatic wincc"))'
+          - 'contains(tolower(body), "/portal/portal.mwsl") && contains(tolower(body), "wincc") && contains(tolower(body), "siemens")'

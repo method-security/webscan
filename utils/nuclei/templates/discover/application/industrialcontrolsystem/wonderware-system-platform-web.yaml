@@ -1,0 +1,24 @@
+id: wonderware-system-platform-web-detect
+info:
+  name: Wonderware System Platform Web Detection
+  author: method-security
+  severity: info
+  description: Detects Wonderware System Platform web interfaces using Wonderware, System Platform, and web-access markers.
+  metadata:
+    method-application-type: INDUSTRIAL_CONTROL_SYSTEM
+    method-module-name: WONDERWARE_SYSTEM_PLATFORM_WEB
+    cpe: cpe:2.3:a:aveva:wonderware_system_platform:*:*:*:*:*:*:*:*
+  tags: discovery,ics,ot,wonderware,system-platform,aveva
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/Wonderware/"
+      - "{{BaseURL}}/SystemPlatform/"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'contains(tolower(body), "wonderware") && contains(tolower(body), "system platform") && contains(tolower(body), "web") && (contains(tolower(body), "login") || contains(tolower(body), "intouch") || contains(tolower(body), "accessanywhere"))'

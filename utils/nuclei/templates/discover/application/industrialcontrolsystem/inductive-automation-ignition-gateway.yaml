@@ -1,0 +1,28 @@
+id: inductive-automation-ignition-gateway-detect
+info:
+  name: Inductive Automation Ignition Gateway Detection
+  author: method-security
+  severity: info
+  description: Detects Inductive Automation Ignition Gateway web consoles using Ignition Gateway and Inductive Automation-specific web markers.
+  metadata:
+    method-application-type: INDUSTRIAL_CONTROL_SYSTEM
+    method-module-name: INDUCTIVE_AUTOMATION_IGNITION_GATEWAY
+    cpe: cpe:2.3:a:inductiveautomation:ignition:*:*:*:*:*:*:*:*
+  tags: discovery,ics,ot,inductive-automation,ignition,gateway,scada
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/web/home"
+      - "{{BaseURL}}/system/gwinfo"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'contains(tolower(body), "ignition gateway") && contains(tolower(body), "inductive automation") && (contains(tolower(body), "/web/home") || contains(tolower(body), "/system/gwinfo") || contains(tolower(body), "gateway status") || contains(tolower(body), "<title>ignition gateway"))'
+          - 'contains(tolower(body), "ignition") && contains(tolower(body), "gateway") && contains(tolower(body), "inductiveautomation") && (contains(tolower(body), "/web/home") || contains(tolower(body), "/system/gwinfo") || contains(tolower(body), "<title>ignition"))'
+          - 'contains(tolower(body), "inductive automation") && contains(tolower(body), "/system/gwinfo")'
+          - 'contains(tolower(body), "ignition") && contains(tolower(body), "gateway status") && contains(tolower(body), "inductive automation")'
+          - 'contains(tolower(header), "ignition") && contains(tolower(body), "inductive automation")'

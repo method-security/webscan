@@ -1,0 +1,25 @@
+id: schneider-power-monitoring-expert-detect
+info:
+  name: Schneider Electric Power Monitoring Expert Detection
+  author: method-security
+  severity: info
+  description: Detects Schneider Electric Power Monitoring Expert and EcoStruxure Power Monitoring web interfaces.
+  metadata:
+    method-application-type: INDUSTRIAL_CONTROL_SYSTEM
+    method-module-name: SCHNEIDER_POWER_MONITORING_EXPERT
+    cpe: cpe:2.3:a:schneider-electric:ecostruxure_power_monitoring_expert:*:*:*:*:*:*:*:*
+  tags: discovery,ics,ot,schneider,ecostruxure,pme,power-monitoring
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/WebReach/"
+      - "{{BaseURL}}/PowerMonitoring/"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'contains(tolower(body), "schneider electric") && contains(tolower(body), "power monitoring expert") && (contains(tolower(body), "webreach") || contains(tolower(body), "login") || contains(tolower(body), "<title>power monitoring expert"))'
+          - 'contains(tolower(body), "schneider electric") && contains(tolower(body), "ecostruxure power monitoring") && (contains(tolower(body), "webreach") || contains(tolower(body), "login") || contains(tolower(body), "<title>ecostruxure power monitoring"))'

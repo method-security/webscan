@@ -1,0 +1,24 @@
+id: siemens-simatic-hmi-web-detect
+info:
+  name: Siemens SIMATIC HMI Web Detection
+  author: method-security
+  severity: info
+  description: Detects Siemens SIMATIC HMI web interfaces using SIMATIC HMI, Siemens, and runtime/login markers.
+  metadata:
+    method-application-type: INDUSTRIAL_CONTROL_SYSTEM
+    method-module-name: SIEMENS_SIMATIC_HMI_WEB
+    cpe: cpe:2.3:a:siemens:simatic_hmi:*:*:*:*:*:*:*:*
+  tags: discovery,ics,ot,siemens,simatic,hmi
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/Runtime/"
+      - "{{BaseURL}}/Siemens/HMI/"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'contains(tolower(body), "simatic hmi") && contains(tolower(body), "siemens") && (contains(tolower(body), "login") || contains(tolower(body), "runtime") || contains(tolower(body), "<title>simatic hmi"))'

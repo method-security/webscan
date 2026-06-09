@@ -1,0 +1,24 @@
+id: rockwell-factorytalk-services-platform-detect
+info:
+  name: Rockwell FactoryTalk Services Platform Detection
+  author: method-security
+  severity: info
+  description: Detects Rockwell FactoryTalk Services Platform web interfaces.
+  metadata:
+    method-application-type: INDUSTRIAL_CONTROL_SYSTEM
+    method-module-name: ROCKWELL_FACTORYTALK_SERVICES_PLATFORM
+    cpe: cpe:2.3:a:rockwellautomation:factorytalk_services_platform:*:*:*:*:*:*:*:*
+  tags: discovery,ics,ot,rockwell,factorytalk,services-platform
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/FactoryTalk/"
+      - "{{BaseURL}}/FactoryTalkServices/"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'contains(tolower(body), "factorytalk services platform") && contains(tolower(body), "rockwell")'

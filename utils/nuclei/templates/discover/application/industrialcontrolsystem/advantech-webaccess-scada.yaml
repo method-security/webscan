@@ -1,0 +1,28 @@
+id: advantech-webaccess-scada-detect
+info:
+  name: Advantech WebAccess / WebAccess SCADA Detection
+  author: method-security
+  severity: info
+  description: Detects Advantech WebAccess and WebAccess/SCADA web interfaces using Advantech and BroadWeb/WebAccess-specific markers.
+  metadata:
+    method-application-type: INDUSTRIAL_CONTROL_SYSTEM
+    method-module-name: ADVANTECH_WEBACCESS_SCADA
+    cpe: cpe:2.3:a:advantech:webaccess:*:*:*:*:*:*:*:*
+  tags: discovery,ics,ot,advantech,webaccess,scada
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/broadWeb/"
+      - "{{BaseURL}}/broadWeb/bwRoot.asp"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'contains(tolower(body), "advantech webaccess") && (contains(tolower(body), "/broadweb/") || contains(tolower(body), "broadweb") || contains(tolower(body), "webaccess/scada") || contains(tolower(body), "<title>webaccess"))'
+          - 'contains(tolower(body), "webaccess/scada") && contains(tolower(body), "advantech")'
+          - 'contains(tolower(body), "/broadweb/") && contains(tolower(body), "advantech")'
+          - 'contains(tolower(body), "broadweb") && contains(tolower(body), "webaccess") && (contains(tolower(body), "advantech") || contains(tolower(body), "scada"))'
+          - 'contains(tolower(body), "<title>webaccess") && contains(tolower(body), "advantech")'

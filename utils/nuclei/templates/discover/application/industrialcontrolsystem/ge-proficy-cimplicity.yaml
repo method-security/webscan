@@ -1,0 +1,26 @@
+id: ge-proficy-cimplicity-detect
+info:
+  name: GE Proficy CIMPLICITY Detection
+  author: method-security
+  severity: info
+  description: Detects GE Proficy CIMPLICITY web interfaces using CIMPLICITY and CimWeb markers.
+  metadata:
+    method-application-type: INDUSTRIAL_CONTROL_SYSTEM
+    method-module-name: GE_PROFICY_CIMPLICITY
+    cpe: cpe:2.3:a:ge:proficy_cimplicity:*:*:*:*:*:*:*:*
+  tags: discovery,ics,ot,ge,proficy,cimplicity
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/CimWeb/"
+      - "{{BaseURL}}/CIMPLICITY/"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'contains(tolower(body), "proficy") && contains(tolower(body), "cimplicity") && (contains(tolower(body), "login") || contains(tolower(body), "cimweb") || contains(tolower(body), "<title>proficy cimplicity") || contains(tolower(body), "<title>cimplicity"))'
+          - 'contains(tolower(body), "ge intelligent platforms") && contains(tolower(body), "cimplicity") && (contains(tolower(body), "login") || contains(tolower(body), "cimweb"))'
+          - 'contains(tolower(body), "ge vernova") && contains(tolower(body), "cimplicity") && (contains(tolower(body), "login") || contains(tolower(body), "cimweb"))'

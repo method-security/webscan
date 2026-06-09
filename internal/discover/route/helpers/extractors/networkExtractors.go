@@ -127,7 +127,7 @@ func ExtractNetworkRoutes(ctx context.Context, browser *headless.Requester, targ
 		webRoute := &discover.RouteDetails{
 			BaseUrl: routeBaseURL,
 			Path:    routePath,
-			Method:  common.HttpMethod(request.Method).Ptr(),
+			Method:  discoverroutehelpers.MethodPtr(common.HttpMethod(request.Method)),
 		}
 
 		// Capture query parameters

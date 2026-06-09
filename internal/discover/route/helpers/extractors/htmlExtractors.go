@@ -67,7 +67,8 @@ func ExtractFormRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig
 		} else {
 			method = strings.ToUpper(method)
 		}
-		routeVar.Method = common.HttpMethod(method).Ptr()
+		methodVal := common.HttpMethod(method)
+		routeVar.Method = &methodVal
 
 		// Collect input names
 		var queryParams []*discover.RouteQueryParam
@@ -148,7 +149,7 @@ func ExtractAnchorRoutes(doc *goquery.Document, baseURL string, routeCaptureConf
 			routeVar := &discover.RouteDetails{
 				BaseUrl: routeBaseURL,
 				Path:    routePath,
-				Method:  common.HttpMethodGet.Ptr(), // Anchor links are accessed via GET
+				Method:  discoverroutehelpers.MethodPtr(common.HttpMethodGet), // Anchor links are accessed via GET
 			}
 
 			// Add query parameters if any were found
@@ -177,8 +178,9 @@ func ExtractLinkRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig
 
 			// Skip if this is a static asset
 			if utils.IsStaticAsset(fullURL) {
-				// Only add to URLs if we're not ignoring static assets
-				if routeCaptureConfig.CollectStaticAssets {
+				// Only collect static assets that are in scope.
+				if routeCaptureConfig.CollectStaticAssets &&
+					discoverroutehelpers.IsURLAllowed(baseURL, fullURL, routeCaptureConfig.IgnoreCrossDomain, routeCaptureConfig.CollectStaticAssets) {
 					urls[fullURL] = struct{}{}
 				}
 				return
@@ -208,7 +210,7 @@ func ExtractLinkRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig
 			routeVar := &discover.RouteDetails{
 				BaseUrl: routeBaseURL,
 				Path:    routePath,
-				Method:  common.HttpMethodGet.Ptr(), // Link elements are accessed via GET
+				Method:  discoverroutehelpers.MethodPtr(common.HttpMethodGet), // Link elements are accessed via GET
 			}
 
 			routes = append(routes, routeVar)

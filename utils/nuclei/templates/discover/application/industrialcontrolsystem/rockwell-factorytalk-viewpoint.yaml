@@ -19,8 +19,8 @@ http:
     max-redirects: 5
     stop-at-first-match: true
     matchers:
-      - type: dsl
-        dsl:
-          - 'contains(tolower(body), "factorytalk viewpoint") && (contains(tolower(body), "rockwell automation") || contains(tolower(body), "/ftviewpoint/") || contains(tolower(body), "login") || contains(tolower(body), "<title>factorytalk viewpoint"))'
-          - 'contains(tolower(body), "rockwell automation") && contains(tolower(body), "factorytalk") && contains(tolower(body), "viewpoint")'
-          - 'contains(tolower(body), "/ftviewpoint/") && contains(tolower(body), "factorytalk")'
+      - type: word
+        part: body
+        words:
+          - "<title>FactoryTalk ViewPoint"
+        case-insensitive: true

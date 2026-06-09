@@ -19,7 +19,11 @@ http:
     max-redirects: 5
     stop-at-first-match: true
     matchers:
-      - type: dsl
-        dsl:
-          - 'contains(tolower(body), "schneider electric") && contains(tolower(body), "power monitoring expert") && (contains(tolower(body), "webreach") || contains(tolower(body), "login") || contains(tolower(body), "<title>power monitoring expert"))'
-          - 'contains(tolower(body), "schneider electric") && contains(tolower(body), "ecostruxure power monitoring") && (contains(tolower(body), "webreach") || contains(tolower(body), "login") || contains(tolower(body), "<title>ecostruxure power monitoring"))'
+      - type: word
+        part: body
+        words:
+          - "Schneider Electric"
+          - "Power Monitoring Expert"
+          - "WebReach"
+        condition: and
+        case-insensitive: true

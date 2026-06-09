@@ -3,7 +3,7 @@ info:
   name: Siemens PCS 7 Web Detection
   author: method-security
   severity: info
-  description: Detects Siemens PCS 7 web interfaces using Siemens, PCS 7, and web runtime/login markers.
+  description: Detects Siemens PCS 7 web interfaces using a PCS 7 title marker.
   metadata:
     method-application-type: INDUSTRIAL_CONTROL_SYSTEM
     method-module-name: SIEMENS_PCS7_WEB
@@ -19,6 +19,10 @@ http:
     max-redirects: 5
     stop-at-first-match: true
     matchers:
-      - type: dsl
-        dsl:
-          - 'contains(tolower(body), "siemens") && contains(tolower(body), "pcs 7") && contains(tolower(body), "web") && (contains(tolower(body), "login") || contains(tolower(body), "runtime") || contains(tolower(body), "<title>pcs 7") || contains(tolower(body), "<title>siemens pcs 7"))'
+      - type: word
+        part: body
+        words:
+          - "Siemens"
+          - "<title>PCS 7"
+        condition: and
+        case-insensitive: true

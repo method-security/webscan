@@ -19,6 +19,11 @@ http:
     max-redirects: 5
     stop-at-first-match: true
     matchers:
-      - type: dsl
-        dsl:
-          - 'contains(tolower(body), "wonderware") && contains(tolower(body), "system platform") && contains(tolower(body), "web") && (contains(tolower(body), "login") || contains(tolower(body), "intouch") || contains(tolower(body), "accessanywhere"))'
+      - type: word
+        part: body
+        words:
+          - "Wonderware System Platform"
+          - "InTouch"
+          - "Access Anywhere"
+        condition: and
+        case-insensitive: true

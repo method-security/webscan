@@ -125,7 +125,7 @@ func ExtractRedirectRoutes(redirectChain []string, baseURL string, routeCaptureC
 		routeVar := &discover.RouteDetails{
 			BaseUrl:     routeBaseURL,
 			Path:        routePath,
-			Method:      discoverroutehelpers.MethodPtr(common.HttpMethodGet), // Redirects are typically GET
+			Method:      common.HttpMethodGet, // Redirects are typically GET
 			QueryParams: queryParams,
 		}
 

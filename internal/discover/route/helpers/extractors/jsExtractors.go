@@ -290,7 +290,7 @@ func extractRoutesFromPatterns(content string, baseURL string, routeCaptureConfi
 			route := &discover.RouteDetails{
 				BaseUrl: routeBaseURL,
 				Path:    routePath,
-				Method:  discoverroutehelpers.MethodPtr(common.HttpMethod(method)),
+				Method:  common.HttpMethod(method),
 			}
 
 			// Apply path templating if the path has dynamic segments
@@ -512,7 +512,7 @@ func (v *visitor) handleVariableStatement(node *ast.VariableStatement) {
 						route := &discover.RouteDetails{
 							BaseUrl:      routeBaseURL,
 							Path:         routePath,
-							Method:       discoverroutehelpers.MethodPtr(common.HttpMethodGet),
+							Method:       common.HttpMethodGet,
 							Evidence:     &evidence,
 							PathTemplate: &tmpl,
 						}
@@ -621,7 +621,7 @@ func (v *visitor) addRoute(urlStr, method string, bodyParams []*discover.RouteBo
 	route := &discover.RouteDetails{
 		BaseUrl:     routeBaseURL,
 		Path:        routePath,
-		Method:      discoverroutehelpers.MethodPtr(common.HttpMethod(method)),
+		Method:      common.HttpMethod(method),
 		BodyParams:  bodyParams,
 		QueryParams: queryParams,
 	}

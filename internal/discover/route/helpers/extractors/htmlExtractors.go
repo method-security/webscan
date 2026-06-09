@@ -67,8 +67,7 @@ func ExtractFormRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig
 		} else {
 			method = strings.ToUpper(method)
 		}
-		methodVal := common.HttpMethod(method)
-		routeVar.Method = &methodVal
+		routeVar.Method = common.HttpMethod(method)
 
 		// Collect input names
 		var queryParams []*discover.RouteQueryParam
@@ -149,7 +148,7 @@ func ExtractAnchorRoutes(doc *goquery.Document, baseURL string, routeCaptureConf
 			routeVar := &discover.RouteDetails{
 				BaseUrl: routeBaseURL,
 				Path:    routePath,
-				Method:  discoverroutehelpers.MethodPtr(common.HttpMethodGet), // Anchor links are accessed via GET
+				Method:  common.HttpMethodGet, // Anchor links are accessed via GET
 			}
 
 			// Add query parameters if any were found
@@ -210,7 +209,7 @@ func ExtractLinkRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig
 			routeVar := &discover.RouteDetails{
 				BaseUrl: routeBaseURL,
 				Path:    routePath,
-				Method:  discoverroutehelpers.MethodPtr(common.HttpMethodGet), // Link elements are accessed via GET
+				Method:  common.HttpMethodGet, // Link elements are accessed via GET
 			}
 
 			routes = append(routes, routeVar)

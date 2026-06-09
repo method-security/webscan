@@ -16,13 +16,6 @@ import (
 	utils "github.com/Method-Security/webscan/utils"
 )
 
-// MethodPtr returns a pointer to m. Convenience for populating
-// RouteDetails.Method (which is *common.HttpMethod after the Fern
-// generator switched to optional).
-func MethodPtr(m common.HttpMethod) *common.HttpMethod {
-	return &m
-}
-
 // SetToListString converts a set of strings to a list of strings.
 func SetToListString(set map[string]struct{}) []string {
 	list := make([]string, 0, len(set))
@@ -59,9 +52,9 @@ func MergeWebRoutes(routes []*discover.RouteDetails) []*discover.RouteDetails {
 
 	for _, route := range routes {
 		// Create a unique key based on method and URL
-		method := common.HttpMethodGet
-		if route.Method != nil && *route.Method != "" {
-			method = *route.Method
+		method := route.Method
+		if method == "" {
+			method = common.HttpMethodGet
 		}
 
 		// Normalize path: treat empty path "" and root path "/" as equivalent

@@ -21,6 +21,5 @@ http:
     matchers:
       - type: dsl
         dsl:
-          - 'contains(tolower(body), "schneider electric") && contains(tolower(body), "power monitoring expert") && (contains(tolower(body), "webreach") || contains(tolower(body), "ion") || contains(tolower(body), "login") || contains(tolower(body), "<title>power monitoring expert"))'
-          - 'contains(tolower(body), "schneider electric") && contains(tolower(body), "ecostruxure power monitoring") && (contains(tolower(body), "webreach") || contains(tolower(body), "ion") || contains(tolower(body), "login") || contains(tolower(body), "<title>ecostruxure power monitoring"))'
-          - 'contains(tolower(body), "webreach") && contains(tolower(body), "ion") && contains(tolower(body), "schneider")'
+          - 'contains(tolower(body), "schneider electric") && contains(tolower(body), "power monitoring expert") && (contains(tolower(body), "webreach") || contains(tolower(body), "login") || contains(tolower(body), "<title>power monitoring expert"))'
+          - 'contains(tolower(body), "schneider electric") && contains(tolower(body), "ecostruxure power monitoring") && (contains(tolower(body), "webreach") || contains(tolower(body), "login") || contains(tolower(body), "<title>ecostruxure power monitoring"))'

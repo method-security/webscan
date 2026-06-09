@@ -1,0 +1,26 @@
+id: ge-proficy-ifix-detect
+info:
+  name: GE Proficy iFIX Detection
+  author: method-security
+  severity: info
+  description: Detects GE Proficy iFIX web interfaces using Proficy iFIX and WebSpace/login markers.
+  metadata:
+    method-application-type: INDUSTRIAL_CONTROL_SYSTEM
+    method-module-name: GE_PROFICY_IFIX
+    cpe: cpe:2.3:a:ge:proficy_ifix:*:*:*:*:*:*:*:*
+  tags: discovery,ics,ot,ge,proficy,ifix
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/iFIX/"
+      - "{{BaseURL}}/WebSpace/"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'contains(tolower(body), "proficy") && contains(tolower(body), "ifix") && (contains(tolower(body), "login") || contains(tolower(body), "webspace") || contains(tolower(body), "<title>proficy ifix") || contains(tolower(body), "<title>ifix"))'
+          - 'contains(tolower(body), "ge intelligent platforms") && contains(tolower(body), "ifix") && (contains(tolower(body), "login") || contains(tolower(body), "webspace"))'
+          - 'contains(tolower(body), "ge vernova") && contains(tolower(body), "ifix") && (contains(tolower(body), "login") || contains(tolower(body), "webspace"))'

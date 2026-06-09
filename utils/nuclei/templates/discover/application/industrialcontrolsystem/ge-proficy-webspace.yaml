@@ -1,0 +1,26 @@
+id: ge-proficy-webspace-detect
+info:
+  name: GE Proficy WebSpace Detection
+  author: method-security
+  severity: info
+  description: Detects GE Proficy WebSpace web interfaces using Proficy WebSpace login/launch markers.
+  metadata:
+    method-application-type: INDUSTRIAL_CONTROL_SYSTEM
+    method-module-name: GE_PROFICY_WEBSPACE
+    cpe: cpe:2.3:a:ge:proficy_webspace:*:*:*:*:*:*:*:*
+  tags: discovery,ics,ot,ge,proficy,webspace
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/ProficyWebSpace/"
+      - "{{BaseURL}}/WebSpace/"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'contains(tolower(body), "proficy webspace") && (contains(tolower(body), "login") || contains(tolower(body), "launch") || contains(tolower(body), "<title>proficy webspace") || contains(tolower(body), "/proficywebspace/"))'
+          - 'contains(tolower(body), "ge intelligent platforms") && contains(tolower(body), "proficy") && contains(tolower(body), "webspace") && (contains(tolower(body), "login") || contains(tolower(body), "launch"))'
+          - 'contains(tolower(body), "ge vernova") && contains(tolower(body), "proficy") && contains(tolower(body), "webspace") && (contains(tolower(body), "login") || contains(tolower(body), "launch"))'

@@ -1,0 +1,25 @@
+id: aveva-intouch-access-anywhere-detect
+info:
+  name: AVEVA InTouch Access Anywhere Detection
+  author: method-security
+  severity: info
+  description: Detects AVEVA/Wonderware InTouch Access Anywhere web-access interfaces.
+  metadata:
+    method-application-type: INDUSTRIAL_CONTROL_SYSTEM
+    method-module-name: AVEVA_INTOUCH_ACCESS_ANYWHERE
+    cpe: cpe:2.3:a:aveva:intouch_access_anywhere:*:*:*:*:*:*:*:*
+  tags: discovery,ics,ot,aveva,wonderware,intouch,access-anywhere
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/AccessAnywhere/"
+      - "{{BaseURL}}/AccessAnywhere/start.html"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'contains(tolower(body), "intouch access anywhere") && (contains(tolower(body), "wonderware") || contains(tolower(body), "aveva")) && (contains(tolower(body), "accessanywhere") || contains(tolower(body), "start.html") || contains(tolower(body), "login") || contains(tolower(body), "<title>intouch access anywhere"))'
+          - 'contains(tolower(body), "accessanywhere") && contains(tolower(body), "intouch") && (contains(tolower(body), "wonderware") || contains(tolower(body), "aveva"))'

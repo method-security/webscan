@@ -1,0 +1,25 @@
+id: iconics-genesis64-detect
+info:
+  name: ICONICS GENESIS64 Detection
+  author: method-security
+  severity: info
+  description: Detects ICONICS GENESIS64 web interfaces using GENESIS64 and ICONICS-specific route/login markers.
+  metadata:
+    method-application-type: INDUSTRIAL_CONTROL_SYSTEM
+    method-module-name: ICONICS_GENESIS64
+    cpe: cpe:2.3:a:iconics:genesis64:*:*:*:*:*:*:*:*
+  tags: discovery,ics,ot,iconics,genesis64
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/GENESIS64/"
+      - "{{BaseURL}}/GENESIS64/Login.aspx"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'contains(tolower(body), "genesis64") && contains(tolower(body), "iconics") && (contains(tolower(body), "/genesis64/") || contains(tolower(body), "login") || contains(tolower(body), "<title>genesis64") || contains(tolower(body), "<title>iconics genesis64"))'
+          - 'contains(tolower(body), "/genesis64/") && contains(tolower(body), "iconics")'

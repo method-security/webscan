@@ -4,7 +4,6 @@ import (
 	// Standard
 	"context"
 	"fmt"
-	"net/http"
 	"net/url"
 	"runtime"
 	"sort"
@@ -32,22 +31,48 @@ import (
 )
 
 // resolveEffectiveTarget follows HTTP redirects for target and returns the final URL.
-// Falls back to target if the HEAD request fails.
-func resolveEffectiveTarget(ctx context.Context, target string, timeoutSecs int) string {
-	client := &http.Client{
-		Timeout: time.Duration(timeoutSecs) * time.Second,
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodHead, target, nil)
+// Falls back to target if the HEAD request fails. Routes the HEAD through
+// utils/request so it honors VerifyTls, UserAgent and Timeout from the
+// surrounding DiscoverRouteConfig.
+//
+// TODO(aitf-71-followup): support headless/browserbase modes; today this
+// always uses the standard transport regardless of config.RequestMethod.
+func resolveEffectiveTarget(ctx context.Context, target string, config discover.DiscoverRouteConfig) string {
+	baseURL, path, queryParams, err := requesthelpers.SplitTargetURL(target)
 	if err != nil {
 		return target
 	}
-	resp, err := client.Do(req)
-	if err != nil {
+
+	httpRequest := common.HttpRequest{
+		BaseUrl: baseURL,
+		Path:    path,
+		Method:  common.HttpMethodHead,
+		Params: &common.HttpRequestParams{
+			Query: queryParams,
+		},
+	}
+
+	sendConfig := common.SendHttpRequestConfig{
+		Request:      &httpRequest,
+		MaxRedirects: config.MaxRedirects,
+		VerifyTls:    config.VerifyTls,
+		Timeout:      config.Timeout,
+		// IgnoreCrossDomainRedirects is the transport-layer flag — a strict
+		// hostname-string equality check. The route allowlist (IsURLAllowed /
+		// IsSubdomain) handles cross-domain scoping at discover time and is
+		// subdomain-aware. Match legacy HEAD-resolve behavior so apex → www
+		// and other in-scope hostname-changing redirects still resolve.
+		IgnoreCrossDomainRedirects: false,
+		UserAgent:                  config.UserAgent,
+		RequestMethod:              common.RequestMethodStandard,
+	}
+
+	response, err := request.SendRequest(ctx, sendConfig)
+	if err != nil || response == nil || response.Response == nil {
 		return target
 	}
-	defer resp.Body.Close() //nolint:errcheck
-	if resp.Request != nil && resp.Request.URL != nil {
-		return strings.TrimRight(resp.Request.URL.String(), "/")
+	if chain := response.Response.RedirectChain; len(chain) > 0 {
+		return strings.TrimRight(chain[len(chain)-1], "/")
 	}
 	return target
 }
@@ -327,7 +352,7 @@ func PerformRouteCapture(ctx context.Context, config discover.DiscoverRouteConfi
 	// Extract routes from explicit bundle URLs once before spidering (not per page)
 	if len(config.BundleUrls) > 0 {
 		log.Info("Extracting routes from explicit bundle URLs")
-		effectiveBase := resolveEffectiveTarget(ctx, config.Target, config.Timeout)
+		effectiveBase := resolveEffectiveTarget(ctx, config.Target, config)
 		bundleRoutes, _, bundleErrors := capturerouteextractors.ExtractBundleURLRoutes(ctx, config.BundleUrls, effectiveBase, config)
 		allRoutes = append(allRoutes, bundleRoutes...)
 		errors = append(errors, bundleErrors...)

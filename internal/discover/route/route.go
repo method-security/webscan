@@ -53,11 +53,16 @@ func resolveEffectiveTarget(ctx context.Context, target string, config discover.
 	}
 
 	sendConfig := common.SendHttpRequestConfig{
-		Request:                    &httpRequest,
-		MaxRedirects:               config.MaxRedirects,
-		VerifyTls:                  config.VerifyTls,
-		Timeout:                    config.Timeout,
-		IgnoreCrossDomainRedirects: config.IgnoreCrossDomain,
+		Request:      &httpRequest,
+		MaxRedirects: config.MaxRedirects,
+		VerifyTls:    config.VerifyTls,
+		Timeout:      config.Timeout,
+		// IgnoreCrossDomainRedirects is the transport-layer flag — a strict
+		// hostname-string equality check. The route allowlist (IsURLAllowed /
+		// IsSubdomain) handles cross-domain scoping at discover time and is
+		// subdomain-aware. Match legacy HEAD-resolve behavior so apex → www
+		// and other in-scope hostname-changing redirects still resolve.
+		IgnoreCrossDomainRedirects: false,
 		UserAgent:                  config.UserAgent,
 		RequestMethod:              common.RequestMethodStandard,
 	}

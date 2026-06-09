@@ -49,11 +49,17 @@ func fetchJSResource(ctx context.Context, fullURL string, routeCaptureConfig dis
 	}
 
 	requestConfig := common.SendHttpRequestConfig{
-		Request:                    &httpRequest,
-		MaxRedirects:               routeCaptureConfig.MaxRedirects,
-		VerifyTls:                  routeCaptureConfig.VerifyTls,
-		Timeout:                    routeCaptureConfig.Timeout,
-		IgnoreCrossDomainRedirects: routeCaptureConfig.IgnoreCrossDomain,
+		Request:      &httpRequest,
+		MaxRedirects: routeCaptureConfig.MaxRedirects,
+		VerifyTls:    routeCaptureConfig.VerifyTls,
+		Timeout:      routeCaptureConfig.Timeout,
+		// IgnoreCrossDomainRedirects is the transport-layer flag — a strict
+		// hostname-string equality check. The route allowlist (IsURLAllowed /
+		// IsSubdomain) already handles cross-domain scoping at discover time
+		// and is subdomain-aware. Match legacy http.Get redirect-following so
+		// apex → www and other in-scope hostname-changing redirects still
+		// resolve.
+		IgnoreCrossDomainRedirects: false,
 		UserAgent:                  routeCaptureConfig.UserAgent,
 		RequestMethod:              common.RequestMethodStandard,
 	}

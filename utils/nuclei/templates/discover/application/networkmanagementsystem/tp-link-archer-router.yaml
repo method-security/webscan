@@ -25,7 +25,7 @@ http:
       - type: dsl
         dsl:
           - 'status_code == 200 && !contains(tolower(body), "omada") && !contains(tolower(body), "tp-link eap") && (contains(tolower(body), "userrpm") || contains(tolower(body), "loginrpm.htm")) && contains(tolower(body), "tp-link")'
-          - 'status_code == 200 && !contains(tolower(body), "omada") && !contains(tolower(body), "tp-link eap") && contains(tolower(body), "tp-link") && (contains(tolower(body), "archer") || contains(tolower(body), "tl-wr") || contains(tolower(body), "tl-mr") || contains(tolower(body), "tl-wdr"))'
+          - 'status_code == 200 && !contains(tolower(body), "omada") && !contains(tolower(body), "tp-link eap") && contains(tolower(body), "tp-link") && (contains(tolower(body), "archer") || contains(tolower(body), "tl-wr") || contains(tolower(body), "tl-mr") || contains(tolower(body), "tl-wdr")) && (contains(tolower(body), "login") || contains(tolower(body), "router") || contains(tolower(body), "password") || contains(tolower(body), "admin"))'
           - 'status_code == 200 && !contains(tolower(body), "omada") && !contains(tolower(body), "tp-link eap") && contains(tolower(body), "tplink") && contains(tolower(body), "webpages/login")'
           - 'status_code == 200 && !contains(tolower(body), "omada") && contains(tolower(header), "set-cookie") && (contains(tolower(header), "sysauth=") || contains(tolower(header), "sysauth-https=")) && (contains(tolower(body), "tp-link") || contains(tolower(body), "tplink"))'
           - 'status_code == 200 && !contains(tolower(body), "omada") && !contains(tolower(body), "tp-link eap") && contains(tolower(body), "tp-link") && contains(tolower(body), "wireless router") && contains(tolower(body), "login")'

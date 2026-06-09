@@ -78,7 +78,6 @@ func buildHTTPRequest(config discover.DiscoverRequestConfig) (*common.HttpReques
 		Path:    path,
 		Method:  config.HttpMethod,
 		Params:  params,
-		SentAt:  time.Now(),
 	}
 
 	return request, nil

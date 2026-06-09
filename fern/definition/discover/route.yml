@@ -34,7 +34,7 @@ types:
     properties:
       baseURL: string
       path: string
-      method: optional<http.HttpMethod>
+      method: http.HttpMethod
       queryParams: optional<list<RouteQueryParam>>
       bodyParams: optional<list<RouteBodyParam>>
       evidence: optional<string>

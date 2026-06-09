@@ -171,7 +171,7 @@ func extractRoutesFromPatterns(content string, baseURL string, routeCaptureConfi
 			route := &discover.RouteDetails{
 				BaseUrl: routeBaseURL,
 				Path:    routePath,
-				Method:  common.HttpMethod(method).Ptr(),
+				Method:  common.HttpMethod(method),
 			}
 
 			// Apply path templating if the path has dynamic segments
@@ -393,7 +393,7 @@ func (v *visitor) handleVariableStatement(node *ast.VariableStatement) {
 						route := &discover.RouteDetails{
 							BaseUrl:      routeBaseURL,
 							Path:         routePath,
-							Method:       common.HttpMethodGet.Ptr(),
+							Method:       common.HttpMethodGet,
 							Evidence:     &evidence,
 							PathTemplate: &tmpl,
 						}
@@ -502,7 +502,7 @@ func (v *visitor) addRoute(urlStr, method string, bodyParams []*discover.RouteBo
 	route := &discover.RouteDetails{
 		BaseUrl:     routeBaseURL,
 		Path:        routePath,
-		Method:      common.HttpMethod(method).Ptr(),
+		Method:      common.HttpMethod(method),
 		BodyParams:  bodyParams,
 		QueryParams: queryParams,
 	}
@@ -523,6 +523,10 @@ func fetchSourceMapRoutes(ctx context.Context, sourceMapURL string, baseURL stri
 	routes := []*discover.RouteDetails{}
 	urls := []string{}
 	errors := []string{}
+
+	if routeCaptureConfig.IgnoreCrossDomain && !discoverroutehelpers.IsSubdomain(baseURL, sourceMapURL) {
+		return routes, urls, errors
+	}
 
 	resp, err := http.Get(sourceMapURL) //nolint:noctx
 	if err != nil {
@@ -615,12 +619,11 @@ func ExtractScriptRoutes(ctx context.Context, doc *goquery.Document, baseURL str
 				return
 			}
 
-			// If onlybaseURLs is set, only request script src that are relative
-			if routeCaptureConfig.IgnoreCrossDomain && discoverroutehelpers.IsAbsoluteURL(src) {
+			fullURL := discoverroutehelpers.ResolveURL(baseURL, src)
+
+			if routeCaptureConfig.IgnoreCrossDomain && !discoverroutehelpers.IsSubdomain(baseURL, fullURL) {
 				return
 			}
-
-			fullURL := discoverroutehelpers.ResolveURL(baseURL, src)
 
 			// Check if the URL is allowed
 			if !discoverroutehelpers.IsURLAllowed(baseURL, fullURL, routeCaptureConfig.IgnoreCrossDomain, routeCaptureConfig.CollectStaticAssets) {
@@ -710,6 +713,10 @@ func ExtractBundleURLRoutes(ctx context.Context, bundleURLs []string, baseURL st
 
 		// Resolve relative bundle URLs
 		fullURL := discoverroutehelpers.ResolveURL(baseURL, bundleURL)
+
+		if !discoverroutehelpers.IsURLAllowed(baseURL, fullURL, routeCaptureConfig.IgnoreCrossDomain, routeCaptureConfig.CollectStaticAssets) {
+			continue
+		}
 
 		// Fetch the JS bundle
 		resp, err := http.Get(fullURL) //nolint:noctx

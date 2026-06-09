@@ -7,8 +7,10 @@ info:
   metadata:
     method-application-type: NETWORK_EDGE_APPLICATION
     method-module-name: PALO_ALTO_GLOBALPROTECT
+    method-sub-module-name: SSL_VPN_PORTAL
+    method-detection-state: DETECTED
     cpe: cpe:2.3:a:paloaltonetworks:globalprotect:*:*:*:*:*:*:*:*
-  tags: discovery,palo-alto,globalprotect,vpn,network-edge
+  tags: discovery,vpn,palo-alto,globalprotect,network-edge
 http:
   - method: GET
     path:
@@ -18,8 +20,32 @@ http:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
+    matchers-condition: or
     matchers:
-      - type: dsl
-        dsl:
-          - 'contains(tolower(body), "globalprotect") && (contains(tolower(body), "login.esp") || contains(tolower(body), "pan_form") || contains(tolower(body), "panos"))'
-          - 'contains(tolower(body), "palo alto networks") && contains(tolower(body), "globalprotect")'
+      - type: word
+        part: body
+        words:
+          - "GlobalProtect"
+        case-insensitive: true
+        condition: and
+      - type: word
+        part: body
+        words:
+          - "Palo Alto Networks"
+          - "globalprotect"
+        case-insensitive: true
+        condition: and
+      - type: word
+        part: header
+        words:
+          - "PHPSESSID="
+          - "SESSID="
+          - "GP_PREF="
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "<title>GlobalProtect</title>"
+          - "<title>GlobalProtect Portal</title>"
+          - "<title>Palo Alto Networks</title>"
+        case-insensitive: true

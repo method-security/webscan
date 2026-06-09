@@ -30,11 +30,13 @@ types:
       - WEB_SERVER
   ApplicationDetectionState:
     enum:
+      - DETECTED
       - DEFAULT_PAGE
       - UNAUTHENTICATED
       - MISCONFIGURED
       - EXPOSED_ADMIN
       - VULNERABLE_VERSION
+      - VERSIONED
       - DEBUGGING_ENABLED
   ApplicationResourceConfigType:
     discriminated: false

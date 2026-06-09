@@ -1,0 +1,24 @@
+id: siemens-pcs7-web-detect
+info:
+  name: Siemens PCS 7 Web Detection
+  author: method-security
+  severity: info
+  description: Detects Siemens PCS 7 web interfaces using Siemens, PCS 7, and web runtime/login markers.
+  metadata:
+    method-application-type: INDUSTRIAL_CONTROL_SYSTEM
+    method-module-name: SIEMENS_PCS7_WEB
+    cpe: cpe:2.3:a:siemens:simatic_pcs_7:*:*:*:*:*:*:*:*
+  tags: discovery,ics,ot,siemens,pcs7
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/Runtime/"
+      - "{{BaseURL}}/PCS7/"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'contains(tolower(body), "siemens") && contains(tolower(body), "pcs 7") && contains(tolower(body), "web") && (contains(tolower(body), "login") || contains(tolower(body), "runtime") || contains(tolower(body), "<title>pcs 7") || contains(tolower(body), "<title>siemens pcs 7"))'

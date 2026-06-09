@@ -1,0 +1,24 @@
+id: siemens-wincc-unified-detect
+info:
+  name: Siemens WinCC Unified Detection
+  author: method-security
+  severity: info
+  description: Detects Siemens WinCC Unified web interfaces using Siemens, WinCC Unified, and runtime/login markers.
+  metadata:
+    method-application-type: INDUSTRIAL_CONTROL_SYSTEM
+    method-module-name: SIEMENS_WINCC_UNIFIED
+    cpe: cpe:2.3:a:siemens:wincc_unified:*:*:*:*:*:*:*:*
+  tags: discovery,ics,ot,siemens,wincc-unified,hmi
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/Runtime/"
+      - "{{BaseURL}}/WinCCUnified/"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'contains(tolower(body), "siemens") && contains(tolower(body), "wincc unified") && (contains(tolower(body), "login") || contains(tolower(body), "runtime") || contains(tolower(body), "<title>wincc unified"))'

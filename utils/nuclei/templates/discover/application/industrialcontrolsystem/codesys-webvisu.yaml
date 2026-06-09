@@ -1,14 +1,14 @@
-id: codesys-webvisu-gateway-runtime-detect
+id: codesys-webvisu-detect
 info:
-  name: CODESYS WebVisu / Gateway / PLC Runtime Detection
+  name: CODESYS WebVisu Detection
   author: method-security
   severity: info
-  description: Detects CODESYS WebVisu, Gateway, and CODESYS-based PLC runtime web interfaces using strict CODESYS and WebVisu-specific page markers.
+  description: Detects CODESYS WebVisu web visualization interfaces using CODESYS and WebVisu-specific page markers.
   metadata:
     method-application-type: INDUSTRIAL_CONTROL_SYSTEM
-    method-module-name: CODESYS_WEBVISU_GATEWAY_RUNTIME
-    cpe: cpe:2.3:a:codesys:codesys_runtime_system:*:*:*:*:*:*:*:*
-  tags: discovery,ics,ot,plc,codesys,webvisu,gateway
+    method-module-name: CODESYS_WEBVISU
+    cpe: cpe:2.3:a:codesys:codesys_webvisu:*:*:*:*:*:*:*:*
+  tags: discovery,ics,ot,plc,codesys,webvisu
 http:
   - method: GET
     path:

@@ -21,8 +21,8 @@ http:
     matchers:
       - type: dsl
         dsl:
-          - 'contains(tolower(body), "niagara framework") && contains(tolower(body), "tridium") && (contains(tolower(body), "login") || contains(tolower(body), "station") || contains(tolower(body), "web launcher") || contains(tolower(body), "<title"))'
+          - 'contains(tolower(body), "niagara framework") && contains(tolower(body), "tridium") && (contains(tolower(body), "login") || contains(tolower(body), "station") || contains(tolower(body), "web launcher") || contains(tolower(body), "<title>niagara"))'
           - 'contains(tolower(body), "tridium") && contains(tolower(body), "niagara") && (contains(tolower(body), "login") || contains(tolower(body), "station") || contains(tolower(body), "web launcher") || contains(tolower(body), "module://webeditors"))'
-          - 'contains(tolower(body), "powered by niagara") && contains(tolower(body), "tridium") && (contains(tolower(body), "login") || contains(tolower(body), "<title") || contains(tolower(body), "web launcher"))'
+          - 'contains(tolower(body), "powered by niagara") && contains(tolower(body), "tridium") && (contains(tolower(body), "login") || contains(tolower(body), "<title>niagara") || contains(tolower(body), "web launcher"))'
           - 'contains(tolower(body), "module://webeditors") && contains(tolower(body), "niagara")'
           - 'contains(tolower(body), "niagara web launcher") && contains(tolower(body), "tridium")'

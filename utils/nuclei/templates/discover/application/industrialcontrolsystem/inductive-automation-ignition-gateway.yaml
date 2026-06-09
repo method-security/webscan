@@ -22,7 +22,7 @@ http:
       - type: dsl
         dsl:
           - 'contains(tolower(body), "ignition gateway") && contains(tolower(body), "inductive automation") && (contains(tolower(body), "/web/home") || contains(tolower(body), "/system/gwinfo") || contains(tolower(body), "gateway status") || contains(tolower(body), "<title>ignition gateway"))'
-          - 'contains(tolower(body), "ignition") && contains(tolower(body), "gateway") && contains(tolower(body), "inductiveautomation") && (contains(tolower(body), "/web/home") || contains(tolower(body), "/system/gwinfo") || contains(tolower(body), "<title"))'
+          - 'contains(tolower(body), "ignition") && contains(tolower(body), "gateway") && contains(tolower(body), "inductiveautomation") && (contains(tolower(body), "/web/home") || contains(tolower(body), "/system/gwinfo") || contains(tolower(body), "<title>ignition"))'
           - 'contains(tolower(body), "inductive automation") && contains(tolower(body), "/system/gwinfo")'
           - 'contains(tolower(body), "ignition") && contains(tolower(body), "gateway status") && contains(tolower(body), "inductive automation")'
           - 'contains(tolower(header), "ignition") && contains(tolower(body), "inductive automation")'

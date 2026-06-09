@@ -1,0 +1,27 @@
+id: codesys-webvisu-gateway-runtime-detect
+info:
+  name: CODESYS WebVisu / Gateway / PLC Runtime Detection
+  author: method-security
+  severity: info
+  description: Detects CODESYS WebVisu, Gateway, and CODESYS-based PLC runtime web interfaces using strict CODESYS and WebVisu-specific page markers.
+  metadata:
+    method-application-type: INDUSTRIAL_CONTROL_SYSTEM
+    method-module-name: CODESYS_WEBVISU_GATEWAY_RUNTIME
+    cpe: cpe:2.3:a:codesys:codesys_runtime_system:*:*:*:*:*:*:*:*
+  tags: discovery,ics,ot,plc,codesys,webvisu,gateway
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/webvisu.htm"
+      - "{{BaseURL}}/WebVisu.htm"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'contains(tolower(body), "codesys") && contains(tolower(body), "webvisu") && (contains(tolower(body), "webvisu.htm") || contains(tolower(body), ".app") || contains(tolower(body), ".visu") || contains(tolower(body), "plc"))'
+          - 'contains(tolower(body), "3s-smart software solutions") && contains(tolower(body), "webvisu")'
+          - 'contains(tolower(body), "codesys webvisu") && (contains(tolower(body), ".app") || contains(tolower(body), ".visu"))'
+          - 'contains(tolower(header), "codesys") && contains(tolower(body), "webvisu")'

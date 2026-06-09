@@ -1,0 +1,28 @@
+id: tridium-niagara-bms-console-detect
+info:
+  name: Tridium Niagara BMS Web Console Detection
+  author: method-security
+  severity: info
+  description: Detects Tridium Niagara and Niagara-based building management web consoles using Niagara Framework and Tridium-specific page markers.
+  metadata:
+    method-application-type: INDUSTRIAL_CONTROL_SYSTEM
+    method-module-name: TRIDIUM_NIAGARA_BMS_CONSOLE
+    cpe: cpe:2.3:a:tridium:niagara:*:*:*:*:*:*:*:*
+  tags: discovery,ics,ot,bms,tridium,niagara,building-automation
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/login"
+      - "{{BaseURL}}/ord"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'contains(tolower(body), "niagara framework") && contains(tolower(body), "tridium") && (contains(tolower(body), "login") || contains(tolower(body), "station") || contains(tolower(body), "web launcher") || contains(tolower(body), "<title"))'
+          - 'contains(tolower(body), "tridium") && contains(tolower(body), "niagara") && (contains(tolower(body), "login") || contains(tolower(body), "station") || contains(tolower(body), "web launcher") || contains(tolower(body), "module://webeditors"))'
+          - 'contains(tolower(body), "powered by niagara") && contains(tolower(body), "tridium") && (contains(tolower(body), "login") || contains(tolower(body), "<title") || contains(tolower(body), "web launcher"))'
+          - 'contains(tolower(body), "module://webeditors") && contains(tolower(body), "niagara")'
+          - 'contains(tolower(body), "niagara web launcher") && contains(tolower(body), "tridium")'

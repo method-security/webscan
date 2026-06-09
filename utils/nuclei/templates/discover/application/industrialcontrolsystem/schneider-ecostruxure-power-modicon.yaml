@@ -1,0 +1,28 @@
+id: schneider-ecostruxure-power-modicon-detect
+info:
+  name: Schneider Electric EcoStruxure PME / Power Operation / Modicon Web Detection
+  author: method-security
+  severity: info
+  description: Detects Schneider Electric EcoStruxure Power Monitoring Expert, Power Operation, and Modicon controller web interfaces using Schneider and product-specific page markers.
+  metadata:
+    method-application-type: INDUSTRIAL_CONTROL_SYSTEM
+    method-module-name: SCHNEIDER_ECOSTRUXURE_POWER_MODICON
+    cpe: cpe:2.3:a:schneider-electric:ecostruxure_power_monitoring_expert:*:*:*:*:*:*:*:*
+  tags: discovery,ics,ot,schneider,ecostruxure,pme,power-operation,modicon
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/WebReach/"
+      - "{{BaseURL}}/PowerMonitoring/"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'contains(tolower(body), "schneider electric") && contains(tolower(body), "power monitoring expert") && (contains(tolower(body), "webreach") || contains(tolower(body), "ion") || contains(tolower(body), "login") || contains(tolower(body), "<title>power monitoring expert"))'
+          - 'contains(tolower(body), "schneider electric") && contains(tolower(body), "ecostruxure power monitoring") && (contains(tolower(body), "webreach") || contains(tolower(body), "ion") || contains(tolower(body), "login") || contains(tolower(body), "<title"))'
+          - 'contains(tolower(body), "schneider electric") && contains(tolower(body), "ecostruxure power operation") && (contains(tolower(body), "login") || contains(tolower(body), "runtime") || contains(tolower(body), "<title"))'
+          - 'contains(tolower(body), "webreach") && contains(tolower(body), "ion") && contains(tolower(body), "schneider")'
+          - 'contains(tolower(body), "schneider electric") && contains(tolower(body), "modicon") && (contains(tolower(body), "plc") || contains(tolower(body), "controller"))'

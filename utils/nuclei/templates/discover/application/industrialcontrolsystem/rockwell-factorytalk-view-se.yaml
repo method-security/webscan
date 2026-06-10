@@ -1,0 +1,28 @@
+id: rockwell-factorytalk-view-se-detect
+info:
+  name: Rockwell FactoryTalk View SE Detection
+  author: method-security
+  severity: info
+  description: Detects Rockwell FactoryTalk View SE web interfaces.
+  metadata:
+    method-application-type: INDUSTRIAL_CONTROL_SYSTEM
+    method-module-name: ROCKWELL_FACTORYTALK_VIEW_SE
+    cpe: cpe:2.3:a:rockwellautomation:factorytalk_view_se:*:*:*:*:*:*:*:*
+  tags: discovery,ics,ot,rockwell,factorytalk,view-se
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/FactoryTalk/"
+      - "{{BaseURL}}/RSViewSE/"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "<title>FactoryTalk View SE"
+          - "Rockwell Automation"
+        condition: and
+        case-insensitive: true

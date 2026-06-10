@@ -1,0 +1,28 @@
+id: schneider-power-operation-detect
+info:
+  name: Schneider Electric EcoStruxure Power Operation Detection
+  author: method-security
+  severity: info
+  description: Detects Schneider Electric EcoStruxure Power Operation web interfaces using a Power Operation title marker.
+  metadata:
+    method-application-type: INDUSTRIAL_CONTROL_SYSTEM
+    method-module-name: SCHNEIDER_POWER_OPERATION
+    cpe: cpe:2.3:a:schneider-electric:ecostruxure_power_operation:*:*:*:*:*:*:*:*
+  tags: discovery,ics,ot,schneider,ecostruxure,power-operation
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/PowerOperation/"
+      - "{{BaseURL}}/Runtime/"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "Schneider Electric"
+          - "<title>EcoStruxure Power Operation"
+        condition: and
+        case-insensitive: true

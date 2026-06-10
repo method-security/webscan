@@ -38,8 +38,6 @@ http:
       - type: word
         part: header
         words:
-          - "PHPSESSID="
-          - "SESSID="
           - "GP_PREF="
         case-insensitive: true
       - type: word

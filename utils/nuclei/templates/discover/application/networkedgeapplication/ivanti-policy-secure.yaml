@@ -40,7 +40,6 @@ http:
         part: header
         words:
           - "ADMINDSID="
-          - "DSSIGNIN="
         case-insensitive: true
       - type: word
         part: body

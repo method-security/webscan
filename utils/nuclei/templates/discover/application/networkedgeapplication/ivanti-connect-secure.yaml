@@ -47,5 +47,4 @@ http:
         words:
           - "<title>Ivanti Connect Secure</title>"
           - "<title>Pulse Connect Secure</title>"
-          - "<title>Pulse Secure</title>"
         case-insensitive: true

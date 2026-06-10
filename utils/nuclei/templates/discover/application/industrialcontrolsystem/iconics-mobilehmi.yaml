@@ -3,7 +3,7 @@ info:
   name: ICONICS MobileHMI Detection
   author: method-security
   severity: info
-  description: Detects ICONICS MobileHMI web interfaces using MobileHMI-specific route/login markers.
+  description: Detects ICONICS MobileHMI web interfaces using ICONICS and MobileHMI path markers.
   metadata:
     method-application-type: INDUSTRIAL_CONTROL_SYSTEM
     method-module-name: ICONICS_MOBILEHMI
@@ -19,6 +19,10 @@ http:
     max-redirects: 5
     stop-at-first-match: true
     matchers:
-      - type: dsl
-        dsl:
-          - 'contains(tolower(body), "iconics") && contains(tolower(body), "mobilehmi") && (contains(tolower(body), "login") || contains(tolower(body), "<title>mobilehmi") || contains(tolower(body), "<title>iconics mobilehmi") || contains(tolower(body), "/mobilehmi/"))'
+      - type: word
+        part: body
+        words:
+          - "ICONICS"
+          - "<title>MobileHMI"
+        condition: and
+        case-insensitive: true

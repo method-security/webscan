@@ -3,7 +3,7 @@ info:
   name: Schneider Electric Modicon Web Detection
   author: method-security
   severity: info
-  description: Detects Schneider Electric Modicon controller web interfaces using Schneider, Modicon, and controller/PLC markers.
+  description: Detects Schneider Electric Modicon controller web interfaces using Modicon web server markers.
   metadata:
     method-application-type: INDUSTRIAL_CONTROL_SYSTEM
     method-module-name: SCHNEIDER_MODICON_WEB
@@ -19,6 +19,11 @@ http:
     max-redirects: 5
     stop-at-first-match: true
     matchers:
-      - type: dsl
-        dsl:
-          - 'contains(tolower(body), "schneider electric") && contains(tolower(body), "modicon") && (contains(tolower(body), "plc") || contains(tolower(body), "controller"))'
+      - type: word
+        part: body
+        words:
+          - "Schneider Electric"
+          - "Modicon"
+          - "Web Server"
+        condition: and
+        case-insensitive: true

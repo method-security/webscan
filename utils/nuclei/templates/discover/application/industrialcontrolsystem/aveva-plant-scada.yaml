@@ -3,7 +3,7 @@ info:
   name: AVEVA Plant SCADA Detection
   author: method-security
   severity: info
-  description: Detects AVEVA Plant SCADA web interfaces using Plant SCADA-specific runtime/login markers.
+  description: Detects AVEVA Plant SCADA web interfaces using an AVEVA Plant SCADA title marker.
   metadata:
     method-application-type: INDUSTRIAL_CONTROL_SYSTEM
     method-module-name: AVEVA_PLANT_SCADA
@@ -19,6 +19,8 @@ http:
     max-redirects: 5
     stop-at-first-match: true
     matchers:
-      - type: dsl
-        dsl:
-          - 'contains(tolower(body), "aveva plant scada") && (contains(tolower(body), "login") || contains(tolower(body), "runtime") || contains(tolower(body), "<title>aveva plant scada"))'
+      - type: word
+        part: body
+        words:
+          - "<title>AVEVA Plant SCADA"
+        case-insensitive: true

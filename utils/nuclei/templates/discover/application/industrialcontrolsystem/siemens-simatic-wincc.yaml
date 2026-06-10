@@ -19,7 +19,10 @@ http:
     max-redirects: 5
     stop-at-first-match: true
     matchers:
-      - type: dsl
-        dsl:
-          - 'contains(tolower(body), "siemens") && contains(tolower(body), "simatic wincc") && (contains(tolower(body), "login") || contains(tolower(body), "/portal/portal.mwsl") || contains(tolower(body), "<title>simatic wincc") || contains(tolower(body), "<title>siemens simatic wincc"))'
-          - 'contains(tolower(body), "/portal/portal.mwsl") && contains(tolower(body), "wincc") && contains(tolower(body), "siemens")'
+      - type: word
+        part: body
+        words:
+          - "Siemens"
+          - "SIMATIC WinCC"
+        condition: and
+        case-insensitive: true

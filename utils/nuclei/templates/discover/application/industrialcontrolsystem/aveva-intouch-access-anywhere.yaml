@@ -18,8 +18,17 @@ http:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
+    matchers-condition: or
     matchers:
-      - type: dsl
-        dsl:
-          - 'contains(tolower(body), "intouch access anywhere") && (contains(tolower(body), "wonderware") || contains(tolower(body), "aveva")) && (contains(tolower(body), "accessanywhere") || contains(tolower(body), "start.html") || contains(tolower(body), "login") || contains(tolower(body), "<title>intouch access anywhere"))'
-          - 'contains(tolower(body), "accessanywhere") && contains(tolower(body), "intouch") && (contains(tolower(body), "wonderware") || contains(tolower(body), "aveva"))'
+      - type: word
+        part: body
+        words:
+          - "InTouch Access Anywhere"
+          - "AccessAnywhere"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "<title>InTouch Access Anywhere"
+        case-insensitive: true

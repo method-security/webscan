@@ -26,6 +26,7 @@ http:
         part: body
         words:
           - "GlobalProtect"
+          - "/global-protect"
         case-insensitive: true
         condition: and
       - type: word

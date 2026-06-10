@@ -41,7 +41,6 @@ http:
         part: header
         words:
           - "NSC_"
-          - "ns_af="
         case-insensitive: true
       - type: word
         part: body

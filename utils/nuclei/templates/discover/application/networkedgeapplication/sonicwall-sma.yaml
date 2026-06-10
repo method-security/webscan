@@ -27,6 +27,7 @@ http:
         part: body
         words:
           - "SonicWall"
+          - "Virtual Office"
         case-insensitive: true
         condition: and
       - type: word
@@ -40,5 +41,5 @@ http:
         words:
           - "<title>SonicWall</title>"
           - "<title>SonicWALL</title>"
-          - "<title>Virtual Office</title>"
+          - "<title>SonicWall Virtual Office</title>"
         case-insensitive: true

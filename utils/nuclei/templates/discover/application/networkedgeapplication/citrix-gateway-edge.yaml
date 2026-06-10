@@ -37,11 +37,9 @@ http:
           - "citrix"
         case-insensitive: true
         condition: and
-      - type: word
-        part: header
-        words:
-          - "NSC_"
-        case-insensitive: true
+      - type: dsl
+        dsl:
+          - 'contains(tolower(all_headers), "nsc_") && (contains(tolower(body), "citrix") || contains(tolower(body), "netscaler"))'
       - type: dsl
         dsl:
           - 'contains(tolower(all_headers), "ns_af") && contains(tolower(body), "citrix")'

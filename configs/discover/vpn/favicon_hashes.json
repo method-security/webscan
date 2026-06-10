@@ -1,0 +1,82 @@
+{
+    "favicon_hashes": {
+        "-1439222863": {
+            "vendor": "ivanti",
+            "product": "ivanti-connect-secure",
+            "builds": ["22.x", "9.x"],
+            "notes": "All current ICS / Pulse Secure builds. Shodan: http.favicon.hash:-1439222863"
+        },
+        "-1292923998": {
+            "vendor": "citrix",
+            "product": "netscaler-gateway",
+            "builds": ["12.1.x", "13.0.x"],
+            "notes": "Primary Citrix ADC / NetScaler Gateway favicon. Shodan: http.favicon.hash:-1292923998"
+        },
+        "-1166125415": {
+            "vendor": "citrix",
+            "product": "netscaler-gateway",
+            "builds": ["13.1.x", "14.1.x"],
+            "notes": "Secondary Citrix Gateway favicon variant (newer UI). Shodan: http.favicon.hash:-1292923998,-1166125415"
+        },
+        "945408572": {
+            "vendor": "fortinet",
+            "product": "fortigate-sslvpn",
+            "builds": ["7.4.x", "7.2.x", "7.0.x"],
+            "notes": "FortiGate SSL-VPN portal favicon (7.x series). Shodan: http.favicon.hash:945408572"
+        },
+        "-1621579836": {
+            "vendor": "fortinet",
+            "product": "fortigate-sslvpn",
+            "builds": ["6.4.x", "6.2.x", "6.0.x"],
+            "notes": "FortiGate SSL-VPN portal favicon (6.x series). Shodan: http.favicon.hash:-1621579836"
+        },
+        "1384678339": {
+            "vendor": "fortinet",
+            "product": "fortigate-sslvpn",
+            "builds": ["7.4.4", "7.4.3"],
+            "notes": "FortiGate SSL-VPN portal favicon (7.4.3+ specific variant). Shodan: http.favicon.hash:1384678339"
+        },
+        "-631559155": {
+            "vendor": "paloalto",
+            "product": "globalprotect",
+            "builds": ["11.x", "10.2.x", "10.1.x"],
+            "notes": "GlobalProtect portal favicon. Shodan: http.favicon.hash:-631559155"
+        },
+        "873381299": {
+            "vendor": "paloalto",
+            "product": "pan-os",
+            "builds": ["10.x", "9.x", "8.1.x"],
+            "notes": "PAN-OS management web interface favicon. Shodan: http.favicon.hash:873381299"
+        },
+        "-1114661872": {
+            "vendor": "paloalto",
+            "product": "globalprotect",
+            "builds": ["10.0.x", "9.1.x"],
+            "notes": "GlobalProtect portal older favicon variant. Shodan: http.favicon.hash:-1114661872"
+        },
+        "631108382": {
+            "vendor": "sonicwall",
+            "product": "sma",
+            "builds": ["12.x", "10.x"],
+            "notes": "SonicWall SMA / SSL-VPN primary favicon. Shodan: http.favicon.hash:631108382"
+        },
+        "363324987": {
+            "vendor": "sonicwall",
+            "product": "sma",
+            "builds": ["9.x", "8.x"],
+            "notes": "SonicWall SMA legacy (Dell-era) favicon. Shodan: http.favicon.hash:363324987"
+        },
+        "-1153950306": {
+            "vendor": "sonicwall",
+            "product": "sma",
+            "builds": ["12.4.x"],
+            "notes": "SonicWall SMA variant favicon (12.4.x series). Shodan: http.favicon.hash:-1153950306"
+        },
+        "-2012355198": {
+            "vendor": "sonicwall",
+            "product": "sonicwall-nsa",
+            "builds": ["7.x", "6.5.x"],
+            "notes": "SonicWall NSA / TZ (network appliance) UI favicon. Shodan: http.favicon.hash:-2012355198"
+        }
+    }
+}

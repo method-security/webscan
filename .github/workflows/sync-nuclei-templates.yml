@@ -37,12 +37,6 @@ jobs:
         run: |
           git clone --depth 1 https://github.com/projectdiscovery/nuclei-templates.git /tmp/nuclei-templates
 
-      - name: Setup Go
-        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # ratchet:actions/setup-go@v6
-        with:
-          go-version: "1.26"
-          cache: true
-
       - name: Sync CVE templates
         id: sync_templates
         run: |
@@ -80,18 +74,10 @@ jobs:
           echo -e "${YEAR_COUNTS}" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Generate embedded scan asset archives
-        run: go generate ./configs
-        env:
-          GOCACHE: ${{ runner.temp }}/go-build
-
       - name: Check for changes
         id: check_changes
         run: |
-          git diff --quiet -- \
-            utils/nuclei/templates/pentest/scan/cve/ \
-            configs/embedded/configs.tar.gz \
-            utils/nuclei/templates/embedded/templates.tar.gz || echo "changes=true" >> $GITHUB_OUTPUT
+          git diff --quiet utils/nuclei/templates/pentest/scan/cve/ || echo "changes=true" >> $GITHUB_OUTPUT
 
       - name: Create Pull Request
         if: steps.check_changes.outputs.changes == 'true'
@@ -115,7 +101,7 @@ jobs:
             - **Total templates synced:** ${{ steps.sync_templates.outputs.template_count }}
             - **Source:** https://github.com/projectdiscovery/nuclei-templates/tree/main/http/cves
             - **Target:** `utils/nuclei/templates/pentest/scan/cve/`
-            - **Embedded archive:** regenerated and committed with `go generate ./configs`
+            - **Embedded archive:** generated during CI/build with `go generate ./configs`
 
             ### Templates by Year
             ${{ steps.sync_templates.outputs.year_counts }}
@@ -124,7 +110,7 @@ jobs:
             - [ ] Review new/updated CVE templates for relevance
             - [ ] Verify template syntax is valid
             - [ ] Ensure no sensitive data in templates
-            - [ ] Confirm CI verified the embedded template archive is checked in and current
+            - [ ] Confirm CI generated the embedded template archive successfully
 
             ### Notes
             This sync includes all CVE years to capture updates to older CVEs when new POCs become available.

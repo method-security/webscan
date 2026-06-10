@@ -28,21 +28,11 @@ jobs:
       - name: Install Dependencies
         run: sudo apt-get update && sudo apt-get install -y libpcap-dev
 
-      - name: Verify embedded scan asset archives
+      - name: Generate embedded Nuclei template archive
         run: |
           go generate ./configs
-          for archive in configs/embedded/configs.tar.gz utils/nuclei/templates/embedded/templates.tar.gz; do
-            if ! git ls-files --error-unmatch "$archive" >/dev/null 2>&1; then
-              echo "$archive is not checked in."
-              exit 1
-            fi
-            if [ ! -s "$archive" ]; then
-              echo "$archive was not generated."
-              exit 1
-            fi
-          done
-          if ! git diff --exit-code -- configs/embedded/configs.tar.gz utils/nuclei/templates/embedded/templates.tar.gz; then
-            echo "Embedded scan asset archives are stale. Run go generate ./configs and commit the updated archives."
+          if [ ! -s utils/nuclei/templates/embedded/templates.tar.gz ]; then
+            echo "utils/nuclei/templates/embedded/templates.tar.gz was not generated."
             exit 1
           fi
         env:

@@ -31,6 +31,20 @@ http:
         case-insensitive: true
         condition: and
       - type: word
+        part: body
+        words:
+          - "SonicWall"
+          - "Secure Mobile Access"
+        case-insensitive: true
+        condition: and
+      - type: word
+        part: body
+        words:
+          - "SonicWall"
+          - "SMA"
+        case-insensitive: true
+        condition: and
+      - type: word
         part: header
         words:
           - "swap="

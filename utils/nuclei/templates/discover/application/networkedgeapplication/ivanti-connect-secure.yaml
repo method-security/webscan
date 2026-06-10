@@ -30,6 +30,13 @@ http:
           - "Ivanti Connect Secure"
         case-insensitive: true
       - type: word
+        part: body
+        words:
+          - "/dana-na/"
+          - "ivehost"
+        case-insensitive: true
+        condition: and
+      - type: word
         part: header
         words:
           - "DSSIGNIN="

@@ -18,11 +18,13 @@ http:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
+    matchers-condition: and
     matchers:
+      - type: status
+        status:
+          - 200
       - type: word
         part: body
         words:
-          - "Siemens"
-          - "<title>SIMATIC HMI"
-        condition: and
+          - "<title>Siemens SIMATIC HMI"
         case-insensitive: true

@@ -22,5 +22,7 @@ http:
       - type: word
         part: body
         words:
-          - "<title>FactoryTalk ViewPoint"
+          - "<title>FTVP"
+          - "ViewPoint.aspx"
+        condition: and
         case-insensitive: true

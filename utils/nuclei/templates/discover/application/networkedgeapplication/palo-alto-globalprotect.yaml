@@ -19,7 +19,36 @@ http:
     max-redirects: 5
     stop-at-first-match: true
     matchers:
-      - type: dsl
-        dsl:
-          - 'contains(tolower(body), "globalprotect") && (contains(tolower(body), "login.esp") || contains(tolower(body), "pan_form") || contains(tolower(body), "panos"))'
-          - 'contains(tolower(body), "palo alto networks") && contains(tolower(body), "globalprotect")'
+      - type: word
+        part: body
+        words:
+          - "globalprotect"
+          - "login.esp"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "GlobalProtect Portal"
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "globalprotect"
+          - "pan_form"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "globalprotect"
+          - "panos"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "palo alto networks"
+          - "globalprotect"
+        condition: and
+        case-insensitive: true

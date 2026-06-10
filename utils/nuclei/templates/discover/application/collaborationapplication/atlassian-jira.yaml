@@ -19,8 +19,13 @@ http:
     max-redirects: 5
     stop-at-first-match: true
     matchers:
-      - type: dsl
-        dsl:
-          - 'contains(tolower(body), "atlassian jira")'
-          - 'contains(tolower(body), "jira") && contains(tolower(body), "jira.webresources")'
-          - 'contains(tolower(body), "com.atlassian.jira") && contains(tolower(body), "jira")'
+      - type: word
+        part: body
+        words:
+          - "jira.webresources"
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "com.atlassian.jira"
+        case-insensitive: true

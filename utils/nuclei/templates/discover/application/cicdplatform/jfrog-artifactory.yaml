@@ -15,9 +15,13 @@ http:
       - "{{BaseURL}}/ui/login/"
       - "{{BaseURL}}/ui/favicon.ico"
     stop-at-first-match: true
+    matchers-condition: and
     matchers:
+      - type: status
+        status:
+          - 200
       - type: dsl
         dsl:
-          - 'status_code==200 && contains(body, "<title>JFrog")'
-          - 'status_code==200 && ("-595620639" == mmh3(base64_py(body)))'
+          - 'contains(body, "<title>JFrog")'
+          - '("-595620639" == mmh3(base64_py(body)))'
         condition: or

@@ -20,8 +20,31 @@ http:
     max-redirects: 5
     stop-at-first-match: true
     matchers:
-      - type: dsl
-        dsl:
-          - 'contains(tolower(body), "f5 networks") && (contains(tolower(body), "my.policy") || contains(tolower(body), "vdesk"))'
-          - 'contains(tolower(body), "big-ip") && contains(tolower(body), "access policy")'
-          - 'contains(tolower(header), "lastmrh_session") && contains(tolower(body), "f5")'
+      - type: word
+        part: body
+        words:
+          - "f5 networks"
+          - "my.policy"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "f5 networks"
+          - "vdesk"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "big-ip"
+          - "access policy"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: all
+        words:
+          - "lastmrh_session"
+          - "f5"
+        condition: and
+        case-insensitive: true

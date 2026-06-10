@@ -20,9 +20,13 @@ http:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
+    matchers-condition: and
     matchers:
+      - type: status
+        status:
+          - 200
       - type: dsl
         dsl:
-          - 'status_code == 200 && contains(tolower(body), "citrix storefront")'
-          - 'status_code == 200 && contains(tolower(body), "receiver/images/common") && (contains(tolower(body), "ctxs.") || contains(tolower(body), "_ctxstxt"))'
-          - 'status_code == 200 && contains(tolower(body), "citrix workspace") && contains(tolower(body), "receiver/images/common") && contains(tolower(body), "ctxs")'
+          - 'contains(tolower(body), "citrix storefront")'
+          - 'contains(tolower(body), "receiver/images/common") && (contains(tolower(body), "ctxs.") || contains(tolower(body), "_ctxstxt"))'
+          - 'contains(tolower(body), "citrix workspace") && contains(tolower(body), "receiver/images/common") && contains(tolower(body), "ctxs")'

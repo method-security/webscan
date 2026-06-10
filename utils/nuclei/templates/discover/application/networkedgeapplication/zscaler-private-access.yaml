@@ -19,7 +19,16 @@ http:
     max-redirects: 5
     stop-at-first-match: true
     matchers:
-      - type: dsl
-        dsl:
-          - 'contains(tolower(body), "zscaler private access")'
-          - 'contains(tolower(body), "zscaler") && contains(tolower(body), "zpa") && contains(tolower(body), "login")'
+      - type: word
+        part: body
+        words:
+          - "zscaler private access"
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "zscaler"
+          - "zpa"
+          - "login"
+        condition: and
+        case-insensitive: true

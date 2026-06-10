@@ -19,9 +19,13 @@ http:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
+    matchers-condition: and
     matchers:
+      - type: status
+        status:
+          - 200
       - type: dsl
         dsl:
-          - 'status_code == 200 && !contains(tolower(body), "gitlab community edition") && contains(tolower(body), "j-web") && contains(tolower(body), "juniper")'
-          - 'status_code == 200 && !contains(tolower(body), "gitlab community edition") && contains(tolower(body), "junos") && contains(tolower(body), "jweb")'
-          - 'status_code == 200 && !contains(tolower(body), "gitlab community edition") && contains(tolower(body), "juniper networks") && contains(tolower(body), "jsdm")'
+          - 'contains(tolower(body), "j-web") && contains(tolower(body), "juniper")'
+          - 'contains(tolower(body), "junos") && contains(tolower(body), "jweb")'
+          - 'contains(tolower(body), "juniper networks") && contains(tolower(body), "jsdm")'

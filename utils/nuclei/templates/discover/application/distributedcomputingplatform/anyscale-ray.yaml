@@ -37,8 +37,10 @@ http:
           - "Ray Actor Dashboard"
           - "Ray Task Dashboard"
           - "Ray Cluster Status"
+        case-insensitive: true
       - type: regex
         part: body
         regex:
           - '(?i)<title[^>]*>.*Anyscale.*Ray.*(Dashboard|Console|Platform).*</title>'
+          - '(?i)<title[^>]*>.*Ray\s+Dashboard.*</title>'
           - '(?i)Anyscale.*Ray.*(Serve|Jobs|Actor|Task).*Dashboard'

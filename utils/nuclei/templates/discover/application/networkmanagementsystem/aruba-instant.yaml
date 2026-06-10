@@ -18,10 +18,14 @@ http:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
+    matchers-condition: and
     matchers:
+      - type: status
+        status:
+          - 200
       - type: dsl
         dsl:
-          - 'status_code == 200 && contains(tolower(body), "<title>aruba instant on")'
-          - 'status_code == 200 && contains(tolower(body), "aruba instant") && contains(tolower(body), "login")'
-          - 'status_code == 200 && contains(tolower(body), "arubanetworks") && contains(tolower(body), "instant") && contains(tolower(body), "virtual controller")'
-          - 'status_code == 200 && contains(tolower(body), "instant ui") && contains(tolower(body), "aruba")'
+          - 'contains(tolower(body), "<title>aruba instant on")'
+          - 'contains(tolower(body), "aruba instant") && contains(tolower(body), "login")'
+          - 'contains(tolower(body), "arubanetworks") && contains(tolower(body), "instant") && contains(tolower(body), "virtual controller")'
+          - 'contains(tolower(body), "instant ui") && contains(tolower(body), "aruba")'

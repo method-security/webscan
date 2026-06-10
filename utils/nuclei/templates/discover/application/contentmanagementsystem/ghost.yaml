@@ -29,6 +29,7 @@ http:
         part: body
         words:
           - "powered by ghost"
+          - "ghost-content"
         case-insensitive: true
       - type: regex
         part: body

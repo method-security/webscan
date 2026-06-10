@@ -12,10 +12,10 @@ info:
 requests:
   - method: GET
     path:
+      - "{{BaseURL}}"
       - "{{BaseURL}}/api/fdm/latest/"
       - "{{BaseURL}}/ui/login"
       - "{{BaseURL}}/ui/"
-      - "{{BaseURL}}/"
     redirects: true
     max-redirects: 5
     stop-at-first-match: true

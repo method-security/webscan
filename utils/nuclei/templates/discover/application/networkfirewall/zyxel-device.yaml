@@ -19,7 +19,6 @@ http:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
-    matchers-condition: or
     matchers:
       - type: word
         part: header
@@ -60,9 +59,3 @@ http:
         part: body
         regex:
           - '(?i)<title[^>]*>.*(Zyxel|ZyWALL).*(Login|Management|Configuration).*</title>'
-      - type: dsl
-        dsl:
-          - '(contains(tolower(body), "download master") || contains(tolower(body), "main_login.asp") || contains(tolower(body), "basic_operation_mode.asp")) && contains(tolower(header), "zyxel")'
-      - type: dsl
-        dsl:
-          - '(contains(tolower(header), "server: zyxel") || contains(tolower(header), "www-authenticate") && contains(tolower(header), "zyxel")) && (contains(tolower(body), "login") || contains(tolower(body), "password"))'

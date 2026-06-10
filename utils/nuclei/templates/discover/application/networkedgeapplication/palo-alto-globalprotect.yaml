@@ -46,5 +46,4 @@ http:
         words:
           - "<title>GlobalProtect</title>"
           - "<title>GlobalProtect Portal</title>"
-          - "<title>Palo Alto Networks</title>"
         case-insensitive: true

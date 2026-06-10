@@ -46,7 +46,5 @@ http:
       - type: word
         part: body
         words:
-          - "<title>SonicWall</title>"
-          - "<title>SonicWALL</title>"
           - "<title>SonicWall Virtual Office</title>"
         case-insensitive: true

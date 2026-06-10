@@ -42,6 +42,9 @@ http:
         words:
           - "NSC_"
         case-insensitive: true
+      - type: dsl
+        dsl:
+          - 'contains(tolower(all_headers), "ns_af") && contains(tolower(body), "citrix")'
       - type: word
         part: body
         words:

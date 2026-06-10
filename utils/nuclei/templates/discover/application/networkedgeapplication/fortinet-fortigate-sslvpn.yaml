@@ -44,5 +44,7 @@ http:
         part: body
         words:
           - "<title>FortiGate</title>"
-          - "<title>Fortinet</title>"
         case-insensitive: true
+      - type: dsl
+        dsl:
+          - 'contains(to_lower(header), "fgtlanguage=") && contains(to_lower(body), "remote/login")'

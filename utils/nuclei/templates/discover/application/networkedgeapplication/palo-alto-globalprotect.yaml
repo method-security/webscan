@@ -47,3 +47,6 @@ http:
           - "<title>GlobalProtect</title>"
           - "<title>GlobalProtect Portal</title>"
         case-insensitive: true
+      - type: dsl
+        dsl:
+          - 'contains(to_lower(body), "login.esp") && (contains(to_lower(body), "pan_form") || contains(to_lower(body), "panos") || contains(to_lower(body), "globalprotect"))'

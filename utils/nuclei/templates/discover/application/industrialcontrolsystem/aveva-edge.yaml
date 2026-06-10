@@ -1,0 +1,26 @@
+id: aveva-edge-detect
+info:
+  name: AVEVA Edge Detection
+  author: method-security
+  severity: info
+  description: Detects AVEVA Edge SCADA web interfaces using an AVEVA Edge title marker.
+  metadata:
+    method-application-type: INDUSTRIAL_CONTROL_SYSTEM
+    method-module-name: AVEVA_EDGE
+    cpe: cpe:2.3:a:aveva:aveva_edge:*:*:*:*:*:*:*:*
+  tags: discovery,ics,ot,aveva,edge,scada
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/AVEVAEdge/"
+      - "{{BaseURL}}/Runtime/"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "<title>AVEVA Edge"
+        case-insensitive: true

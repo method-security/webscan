@@ -1,0 +1,28 @@
+id: iconics-hyper-historian-detect
+info:
+  name: ICONICS Hyper Historian Detection
+  author: method-security
+  severity: info
+  description: Detects ICONICS Hyper Historian web interfaces using ICONICS and Hyper Historian path markers.
+  metadata:
+    method-application-type: INDUSTRIAL_CONTROL_SYSTEM
+    method-module-name: ICONICS_HYPER_HISTORIAN
+    cpe: cpe:2.3:a:iconics:hyper_historian:*:*:*:*:*:*:*:*
+  tags: discovery,ics,ot,iconics,hyper-historian
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/HyperHistorian/"
+      - "{{BaseURL}}/HyperHistorian/Login.aspx"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "ICONICS"
+          - "<title>Hyper Historian"
+        condition: and
+        case-insensitive: true

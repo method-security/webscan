@@ -1,0 +1,26 @@
+id: mitsubishi-mc-works64-detect
+info:
+  name: Mitsubishi Electric MC Works64 Detection
+  author: method-security
+  severity: info
+  description: Detects Mitsubishi Electric MC Works64 web interfaces using an MC Works64 title marker.
+  metadata:
+    method-application-type: INDUSTRIAL_CONTROL_SYSTEM
+    method-module-name: MITSUBISHI_MC_WORKS64
+    cpe: cpe:2.3:a:mitsubishielectric:mc_works64:*:*:*:*:*:*:*:*
+  tags: discovery,ics,ot,mitsubishi,mc-works64,iconics
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/MCWorks64/"
+      - "{{BaseURL}}/MCWorks64/Login.aspx"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "<title>Mitsubishi Electric MC Works64"
+        case-insensitive: true

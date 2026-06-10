@@ -1,0 +1,36 @@
+id: tridium-niagara-bms-console-detect
+info:
+  name: Tridium Niagara BMS Web Console Detection
+  author: method-security
+  severity: info
+  description: Detects Tridium Niagara and Niagara-based building management web consoles using Niagara Framework and Tridium-specific page markers.
+  metadata:
+    method-application-type: INDUSTRIAL_CONTROL_SYSTEM
+    method-module-name: TRIDIUM_NIAGARA_BMS_CONSOLE
+    cpe: cpe:2.3:a:tridium:niagara:*:*:*:*:*:*:*:*
+  tags: discovery,ics,ot,bms,tridium,niagara,building-automation
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/login"
+      - "{{BaseURL}}/ord"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "Niagara Framework"
+          - "Tridium"
+          - "<title>"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "module://webEditors"
+          - "Niagara"
+        condition: and
+        case-insensitive: true

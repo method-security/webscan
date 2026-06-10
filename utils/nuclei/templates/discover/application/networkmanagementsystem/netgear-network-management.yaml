@@ -22,6 +22,6 @@ http:
     matchers:
       - type: dsl
         dsl:
-          - 'status_code == 200 && !contains(tolower(body), "gitlab community edition") && contains(tolower(body), "netgear") && contains(tolower(body), "prosafe") && contains(tolower(body), "login")'
-          - 'status_code == 200 && !contains(tolower(body), "gitlab community edition") && contains(tolower(body), "netgear") && contains(tolower(body), "smart managed") && contains(tolower(body), "switch")'
-          - 'status_code == 200 && !contains(tolower(body), "gitlab community edition") && contains(tolower(body), "netgear") && contains(tolower(body), "base/main_login.html")'
+          - 'status_code == 200 && contains(tolower(body), "netgear") && contains(tolower(body), "prosafe") && contains(tolower(body), "login")'
+          - 'status_code == 200 && contains(tolower(body), "netgear") && contains(tolower(body), "smart managed") && contains(tolower(body), "switch")'
+          - 'status_code == 200 && contains(tolower(body), "netgear") && contains(tolower(body), "base/main_login.html")'

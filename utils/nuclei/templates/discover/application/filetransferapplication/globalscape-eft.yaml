@@ -19,8 +19,17 @@ http:
     max-redirects: 5
     stop-at-first-match: true
     matchers:
-      - type: dsl
-        dsl:
-          - 'status_code == 200 && contains(tolower(body), "eft web transfer client")'
-          - 'status_code == 200 && contains(tolower(body), "eftclient") && contains(tolower(body), "globalscape")'
-          - 'status_code == 200 && contains(tolower(body), "/eftclient/") && contains(tolower(body), "account/login.htm")'
+      - type: word
+        part: body
+        words:
+          - "EFT Web Transfer Client"
+          - "EFTClient"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "EFTClient"
+          - "Globalscape"
+        condition: and
+        case-insensitive: true

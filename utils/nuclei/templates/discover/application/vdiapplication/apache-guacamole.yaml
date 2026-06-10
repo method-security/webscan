@@ -20,9 +20,29 @@ http:
     max-redirects: 5
     stop-at-first-match: true
     matchers:
-      - type: dsl
-        dsl:
-          - 'contains(tolower(body), "apache guacamole")'
-          - 'contains(tolower(body), "guacamole-client") && contains(tolower(body), "app.js")'
-          - 'contains(tolower(body), "guacamole") && contains(tolower(body), "api/tokens")'
-          - 'contains(tolower(body), "guacamole-logo") && contains(tolower(body), "guacamole")'
+      - type: word
+        part: body
+        words:
+          - "Apache Guacamole"
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "guacamole-client"
+          - "app.js"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "guacamole"
+          - "api/tokens"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "guacamole-logo"
+          - "guacamole"
+        condition: and
+        case-insensitive: true

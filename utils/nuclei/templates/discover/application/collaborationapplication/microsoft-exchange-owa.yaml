@@ -19,8 +19,24 @@ http:
     max-redirects: 5
     stop-at-first-match: true
     matchers:
-      - type: dsl
-        dsl:
-          - 'contains(tolower(header), "x-owa-version") || contains(tolower(header), "x-feserver")'
-          - 'contains(tolower(body), "owa/auth") && contains(tolower(body), "microsoft exchange")'
-          - 'contains(tolower(body), "owalgnbdy") && contains(tolower(body), "outlook")'
+      - type: word
+        part: header
+        words:
+          - "x-owa-version"
+          - "x-feserver"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "owa/auth"
+          - "microsoft exchange"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "owalgnbdy"
+          - "outlook"
+        condition: and
+        case-insensitive: true

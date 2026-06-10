@@ -20,8 +20,22 @@ http:
     max-redirects: 5
     stop-at-first-match: true
     matchers:
-      - type: dsl
-        dsl:
-          - 'contains(tolower(header), "microsoftsharepointteamservices")'
-          - 'contains(tolower(body), "sharepoint") && contains(tolower(body), "/_layouts/15/")'
-          - 'contains(tolower(body), "msapplication-tileimage") && contains(tolower(body), "sharepoint")'
+      - type: word
+        part: header
+        words:
+          - "microsoftsharepointteamservices"
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "sharepoint"
+          - "/_layouts/15/"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "msapplication-tileimage"
+          - "sharepoint"
+        condition: and
+        case-insensitive: true

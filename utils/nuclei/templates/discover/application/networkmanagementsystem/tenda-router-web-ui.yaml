@@ -21,6 +21,6 @@ http:
     matchers:
       - type: dsl
         dsl:
-          - 'status_code == 200 && !contains(tolower(body), "gitlab community edition") && !contains(tolower(body), "included with your linksys smart wi-fi") && !contains(tolower(body), "data.sloss.xyz/cloud.js") && !contains(tolower(body), "<title>gpon home gateway") && contains(tolower(body), "<title>tenda") && contains(tolower(body), "login/auth")'
-          - 'status_code == 200 && !contains(tolower(body), "data.sloss.xyz/cloud.js") && !contains(tolower(body), "<title>gpon home gateway") && contains(tolower(header), "server: goahead-webs") && contains(tolower(body), "tenda") && contains(tolower(body), "login")'
-          - 'status_code == 200 && !contains(tolower(body), "included with your linksys smart wi-fi") && !contains(tolower(body), "data.sloss.xyz/cloud.js") && !contains(tolower(body), "<title>gpon home gateway") && contains(tolower(body), "tenda") && contains(tolower(body), "goform") && contains(tolower(body), "password")'
+          - 'status_code == 200 && contains(tolower(body), "<title>tenda") && contains(tolower(body), "login/auth")'
+          - 'status_code == 200 && contains(tolower(header), "server: goahead-webs") && contains(tolower(body), "tenda") && contains(tolower(body), "login")'
+          - 'status_code == 200 && contains(tolower(body), "tenda") && contains(tolower(body), "goform") && contains(tolower(body), "password")'

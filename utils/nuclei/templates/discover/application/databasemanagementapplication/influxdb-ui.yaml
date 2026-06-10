@@ -21,7 +21,7 @@ http:
     matchers:
       - type: dsl
         dsl:
-          - 'status_code == 200 && !contains(tolower(body), "gitlab community edition") && contains(tolower(body), "<title>influxdb") && contains(tolower(body), "/assets/")'
+          - 'status_code == 200 && contains(tolower(body), "<title>influxdb") && contains(tolower(body), "/assets/")'
           - 'status_code == 200 && contains(tolower(header), "x-influxdb-version") && contains(tolower(header), "x-influxdb-build") && contains(tolower(body), "<title>influxdb")'
-          - 'status_code == 200 && !contains(tolower(body), "gitlab community edition") && contains(tolower(body), "influxdb") && contains(tolower(body), "window.influx")'
-          - 'status_code == 200 && !contains(tolower(body), "gitlab community edition") && contains(tolower(body), "influxdata") && contains(tolower(body), "signin") && contains(tolower(body), "orgs")'
+          - 'status_code == 200 && contains(tolower(body), "influxdb") && contains(tolower(body), "window.influx")'
+          - 'status_code == 200 && contains(tolower(body), "influxdata") && contains(tolower(body), "signin") && contains(tolower(body), "orgs")'

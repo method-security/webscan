@@ -21,6 +21,6 @@ http:
     matchers:
       - type: dsl
         dsl:
-          - 'status_code == 200 && !contains(tolower(body), "gitlab community edition") && contains(tolower(body), "pgadmin 4") && contains(tolower(body), "csrf_token") && contains(tolower(body), "email")'
-          - 'status_code == 200 && !contains(tolower(body), "gitlab community edition") && contains(tolower(body), "pgadmin.browser") && contains(tolower(body), "pgadmin")'
-          - 'status_code == 200 && !contains(tolower(body), "gitlab community edition") && contains(tolower(body), "<title>pgadmin") && contains(tolower(body), "/static/js")'
+          - 'status_code == 200 && contains(tolower(body), "pgadmin 4") && contains(tolower(body), "csrf_token") && contains(tolower(body), "email")'
+          - 'status_code == 200 && contains(tolower(body), "pgadmin.browser") && contains(tolower(body), "pgadmin")'
+          - 'status_code == 200 && contains(tolower(body), "<title>pgadmin") && contains(tolower(body), "/static/js")'

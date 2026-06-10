@@ -19,8 +19,18 @@ http:
     max-redirects: 5
     stop-at-first-match: true
     matchers:
-      - type: dsl
-        dsl:
-          - 'contains(tolower(body), "atlassian confluence")'
-          - 'contains(tolower(body), "confluence") && contains(tolower(body), "/s/") && contains(tolower(body), "com.atlassian.confluence")'
-          - 'contains(tolower(body), "confluence-base-url") && contains(tolower(body), "confluence")'
+      - type: word
+        part: body
+        words:
+          - "confluence"
+          - "/s/"
+          - "com.atlassian.confluence"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "confluence-base-url"
+          - "confluence"
+        condition: and
+        case-insensitive: true

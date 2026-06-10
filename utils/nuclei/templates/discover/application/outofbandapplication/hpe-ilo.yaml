@@ -21,15 +21,55 @@ http:
     max-redirects: 5
     stop-at-first-match: true
     matchers:
-      - type: dsl
-        dsl:
-          - 'contains(tolower(body), "integrated lights-out") && (contains(tolower(body), "hewlett packard") || contains(tolower(body), "hpe") || contains(tolower(body), "hp"))'
-          - 'contains(tolower(body), "hpe ilo") || contains(tolower(body), "hp ilo")'
-          - 'contains(body, "\"Oem\"") && contains(body, "\"Hpe\"") && contains(body, "\"RedfishVersion\"")'
-          - 'contains(tolower(body), "platform=\":ilo:\"") && contains(tolower(body), "hewlett-packard")'
-          - 'contains(tolower(header), "hp-ilo") || contains(tolower(header), "hpe-ilo")'
+      - type: word
+        part: body
+        words:
+          - "integrated lights-out"
+          - "hewlett packard"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "integrated lights-out"
+          - "hewlett-packard"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "integrated lights-out"
+          - "hpe"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "hpe ilo"
+          - "hp ilo"
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "\"Oem\""
+          - "\"Hpe\""
+          - "\"RedfishVersion\""
+        condition: and
+      - type: word
+        part: body
+        words:
+          - "platform=\":ilo:\""
+          - "hewlett-packard"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: header
+        words:
+          - "hp-ilo"
+          - "hpe-ilo"
+        case-insensitive: true
       - type: regex
         part: body
         regex:
-          - '(?i)<title[^>]*>.*(?:HPE?|Hewlett Packard).*iLO.*</title>'
-          - '(?i)<title[^>]*>.*Integrated\s+Lights-Out.*</title>'
+          - '(?i)<title[^>]*>.*(?:HPE|HP|Hewlett[ -]Packard)\s+iLO\b.*</title>'
+          - '(?i)<title[^>]*>.*\biLO\b.*(?:HPE|HP|Hewlett[ -]Packard).*</title>'

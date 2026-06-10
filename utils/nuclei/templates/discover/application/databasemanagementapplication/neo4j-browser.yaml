@@ -21,6 +21,6 @@ http:
     matchers:
       - type: dsl
         dsl:
-          - 'status_code == 200 && !contains(tolower(header), "amazons3") && contains(tolower(body), "<title>neo4j browser") && contains(tolower(body), "assets/images/device-icons") && contains(tolower(body), "<div id=\"mount\"")'
-          - 'status_code == 200 && !contains(tolower(header), "amazons3") && contains(tolower(body), "neo4j browser") && contains(tolower(body), "favicons/safari-pinned-tab.svg") && contains(tolower(body), "<div id=\"mount\"")'
-          - 'status_code == 200 && !contains(tolower(header), "amazons3") && contains(tolower(body), "neo4j-browser") && contains(tolower(body), "neo4j") && contains(tolower(body), "<div id=\"mount\"")'
+          - 'status_code == 200 && contains(tolower(body), "<title>neo4j browser") && contains(tolower(body), "assets/images/device-icons") && contains(tolower(body), "<div id=\"mount\"")'
+          - 'status_code == 200 && contains(tolower(body), "neo4j browser") && contains(tolower(body), "favicons/safari-pinned-tab.svg") && contains(tolower(body), "<div id=\"mount\"")'
+          - 'status_code == 200 && contains(tolower(body), "neo4j-browser") && contains(tolower(body), "neo4j") && contains(tolower(body), "<div id=\"mount\"")'

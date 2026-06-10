@@ -1,0 +1,70 @@
+id: cisco-ios-xr-web-management-detect
+info:
+  name: Cisco IOS XR Web Management Detection
+  author: method-security
+  severity: info
+  description: Detects Cisco IOS XR device web management interfaces using IOS XR-specific management titles and administrative path markers.
+  metadata:
+    method-application-type: NETWORK_MANAGEMENT_SYSTEM
+    method-module-name: CISCO_IOS_XR
+    cpe: cpe:2.3:o:cisco:ios_xr:*:*:*:*:*:*:*:*
+  tags: discovery,cisco,ios-xr,web-management,network-management
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/login.html"
+      - "{{BaseURL}}/exec/show/log/CR"
+      - "{{BaseURL}}/level/15/exec/-"
+      - "{{BaseURL}}/cgi-bin/webcm"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: regex
+        part: body
+        regex:
+          - '(?i)<title[^>]*>.*Cisco.*IOS\s*XR.*(Management|Configuration|Administration).*Interface.*</title>'
+          - '(?i)Cisco\s+IOS\s*XR\s+(Configuration|Management|Web\s+Interface)'
+      - type: word
+        part: body
+        words:
+          - "Cisco IOS XR"
+          - "/exec/show/"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "Cisco IOSXR"
+          - "/exec/show/"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "Cisco IOS XR"
+          - "/level/15/"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "Cisco IOSXR"
+          - "/level/15/"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "Cisco IOS XR"
+          - "cgi-bin/webcm"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "Cisco IOSXR"
+          - "cgi-bin/webcm"
+        condition: and
+        case-insensitive: true

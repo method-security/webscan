@@ -23,10 +23,7 @@ http:
       - type: word
         part: body
         words:
-          - "<title"
-          - "Proficy WebSpace"
-          - "BRAND_NAME_PRODUCT"
-        condition: and
+          - "<title>Proficy WebSpace"
         case-insensitive: true
       - type: word
         part: all

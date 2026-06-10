@@ -18,9 +18,13 @@ http:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
+    matchers-condition: and
     matchers:
+      - type: status
+        status:
+          - 200
       - type: dsl
         dsl:
-          - 'status_code == 200 && contains(tolower(body), "<title>tenda") && contains(tolower(body), "login/auth")'
-          - 'status_code == 200 && contains(tolower(header), "server: goahead-webs") && contains(tolower(body), "tenda") && contains(tolower(body), "login")'
-          - 'status_code == 200 && contains(tolower(body), "tenda") && contains(tolower(body), "goform") && contains(tolower(body), "password")'
+          - 'contains(tolower(body), "<title>tenda") && contains(tolower(body), "login/auth")'
+          - 'contains(tolower(header), "server: goahead-webs") && contains(tolower(body), "tenda") && contains(tolower(body), "login")'
+          - 'contains(tolower(body), "tenda") && contains(tolower(body), "goform") && contains(tolower(body), "password")'

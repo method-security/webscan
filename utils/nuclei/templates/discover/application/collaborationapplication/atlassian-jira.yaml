@@ -22,14 +22,10 @@ http:
       - type: word
         part: body
         words:
-          - "jira"
           - "jira.webresources"
-        condition: and
         case-insensitive: true
       - type: word
         part: body
         words:
           - "com.atlassian.jira"
-          - "jira"
-        condition: and
         case-insensitive: true

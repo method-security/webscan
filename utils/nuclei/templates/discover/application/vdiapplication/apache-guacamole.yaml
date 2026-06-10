@@ -43,6 +43,4 @@ http:
         part: body
         words:
           - "guacamole-logo"
-          - "guacamole"
-        condition: and
         case-insensitive: true

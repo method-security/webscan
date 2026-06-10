@@ -36,8 +36,6 @@ http:
         part: all
         words:
           - "moveitisapi"
-          - "moveit"
-        condition: and
         case-insensitive: true
       - type: regex
         part: body

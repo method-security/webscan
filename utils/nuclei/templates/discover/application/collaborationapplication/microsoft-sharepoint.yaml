@@ -28,13 +28,6 @@ http:
       - type: word
         part: body
         words:
-          - "sharepoint"
-          - "/_layouts/15/"
-        condition: and
-        case-insensitive: true
-      - type: word
-        part: body
-        words:
           - "msapplication-tileimage"
           - "sharepoint"
         condition: and

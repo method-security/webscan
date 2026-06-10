@@ -19,9 +19,13 @@ http:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
+    matchers-condition: and
     matchers:
+      - type: status
+        status:
+          - 200
       - type: dsl
         dsl:
-          - 'status_code == 200 && contains(tolower(body), "<title") && contains(tolower(body), "ruckus") && (contains(tolower(body), "zonedirector") || contains(tolower(body), "smartzone") || contains(tolower(body), "unleashed"))'
-          - 'status_code == 200 && contains(tolower(body), "ruckus wireless") && contains(tolower(body), "admin") && contains(tolower(body), "login")'
-          - 'status_code == 200 && contains(tolower(body), "ruckus") && contains(tolower(body), "smartzone") && contains(tolower(body), "/wsg/")'
+          - 'contains(tolower(body), "<title") && contains(tolower(body), "ruckus") && (contains(tolower(body), "zonedirector") || contains(tolower(body), "smartzone") || contains(tolower(body), "unleashed"))'
+          - 'contains(tolower(body), "ruckus wireless") && contains(tolower(body), "admin") && contains(tolower(body), "login")'
+          - 'contains(tolower(body), "ruckus") && contains(tolower(body), "smartzone") && contains(tolower(body), "/wsg/")'

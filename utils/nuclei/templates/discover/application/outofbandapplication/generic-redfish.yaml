@@ -17,9 +17,13 @@ http:
     redirects: true
     max-redirects: 3
     stop-at-first-match: true
+    matchers-condition: and
     matchers:
+      - type: status
+        status:
+          - 200
       - type: dsl
         dsl:
-          - 'status_code == 200 && contains(tolower(header), "application/json") && contains(body, "\"RedfishVersion\"") && contains(body, "\"@odata.id\"")'
-          - 'status_code == 200 && contains(body, "\"@odata.type\"") && contains(body, "#ServiceRoot") && contains(body, "\"Systems\"") && contains(body, "\"Managers\"")'
-          - 'status_code == 200 && contains(body, "\"v1\"") && contains(body, "\"redfish\"") && contains(body, "\"SessionService\"")'
+          - 'contains(tolower(header), "application/json") && contains(body, "\"RedfishVersion\"") && contains(body, "\"@odata.id\"")'
+          - 'contains(body, "\"@odata.type\"") && contains(body, "#ServiceRoot") && contains(body, "\"Systems\"") && contains(body, "\"Managers\"")'
+          - 'contains(body, "\"v1\"") && contains(body, "\"redfish\"") && contains(body, "\"SessionService\"")'

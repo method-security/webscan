@@ -36,7 +36,6 @@ http:
           - "Ray Jobs Dashboard"
           - "Ray Actor Dashboard"
           - "Ray Task Dashboard"
-          - "Ray Dashboard"
           - "Ray Cluster Status"
         case-insensitive: true
       - type: regex

@@ -18,11 +18,15 @@ http:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
+    matchers-condition: and
     matchers:
+      - type: status
+        status:
+          - 200
       - type: dsl
         dsl:
-          - 'status_code == 200 && contains(tolower(header), "server: couchdb") && contains(tolower(body), "<title>project fauxton") && contains(tolower(body), "dashboard")'
-          - 'status_code == 200 && contains(tolower(header), "server: couchdb") && contains(tolower(body), "fauxton") && contains(tolower(body), "bundle")'
-          - 'status_code == 200 && contains(tolower(body), "window.fauxton") && contains(tolower(body), "_utils")'
-          - 'status_code == 200 && contains(tolower(body), "fauxton") && contains(tolower(body), "_utils") && contains(tolower(body), "requirejs")'
-          - 'status_code == 200 && contains(tolower(body), "<title>apache couchdb") && contains(tolower(body), "window.fauxton")'
+          - 'contains(tolower(header), "server: couchdb") && contains(tolower(body), "<title>project fauxton") && contains(tolower(body), "dashboard")'
+          - 'contains(tolower(header), "server: couchdb") && contains(tolower(body), "fauxton") && contains(tolower(body), "bundle")'
+          - 'contains(tolower(body), "window.fauxton") && contains(tolower(body), "_utils")'
+          - 'contains(tolower(body), "fauxton") && contains(tolower(body), "_utils") && contains(tolower(body), "requirejs")'
+          - 'contains(tolower(body), "<title>apache couchdb") && contains(tolower(body), "window.fauxton")'

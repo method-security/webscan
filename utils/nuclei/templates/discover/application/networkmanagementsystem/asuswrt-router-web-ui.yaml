@@ -18,10 +18,14 @@ http:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
+    matchers-condition: and
     matchers:
+      - type: status
+        status:
+          - 200
       - type: dsl
         dsl:
-          - 'status_code == 200 && contains(tolower(body), "<title>asus wireless router")'
-          - 'status_code == 200 && contains(tolower(body), "asus wireless router")'
-          - 'status_code == 200 && contains(tolower(body), "asuswrt") && contains(tolower(body), "main_login.asp")'
-          - 'status_code == 200 && contains(tolower(body), "asus router") && contains(tolower(body), "asus_token")'
+          - 'contains(tolower(body), "<title>asus wireless router")'
+          - 'contains(tolower(body), "asus wireless router")'
+          - 'contains(tolower(body), "asuswrt") && contains(tolower(body), "main_login.asp")'
+          - 'contains(tolower(body), "asus router") && contains(tolower(body), "asus_token")'

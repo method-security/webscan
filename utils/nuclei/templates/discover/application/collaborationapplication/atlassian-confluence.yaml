@@ -22,15 +22,5 @@ http:
       - type: word
         part: body
         words:
-          - "confluence"
-          - "/s/"
           - "com.atlassian.confluence"
-        condition: and
-        case-insensitive: true
-      - type: word
-        part: body
-        words:
-          - "confluence-base-url"
-          - "confluence"
-        condition: and
         case-insensitive: true

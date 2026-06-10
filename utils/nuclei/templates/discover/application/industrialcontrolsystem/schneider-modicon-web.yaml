@@ -23,7 +23,6 @@ http:
         part: body
         words:
           - "Schneider Electric"
-          - "Modicon"
           - "<title>Modicon M340"
         condition: and
         case-insensitive: true

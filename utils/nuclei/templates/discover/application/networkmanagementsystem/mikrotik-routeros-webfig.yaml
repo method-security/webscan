@@ -18,9 +18,13 @@ http:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
+    matchers-condition: and
     matchers:
+      - type: status
+        status:
+          - 200
       - type: dsl
         dsl:
-          - 'status_code == 200 && contains(tolower(body), "routeros") && contains(tolower(body), "webfig")'
-          - 'status_code == 200 && contains(tolower(body), "mikrotik") && contains(tolower(body), "webfig")'
-          - 'status_code == 200 && contains(tolower(body), "mikrotik") && contains(tolower(body), "routeros") && contains(tolower(body), "winbox")'
+          - 'contains(tolower(body), "routeros") && contains(tolower(body), "webfig")'
+          - 'contains(tolower(body), "mikrotik") && contains(tolower(body), "webfig")'
+          - 'contains(tolower(body), "mikrotik") && contains(tolower(body), "routeros") && contains(tolower(body), "winbox")'

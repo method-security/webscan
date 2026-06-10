@@ -85,7 +85,7 @@ If updating the fern yaml configuration you need to [install](https://buildwithf
 
 ### Updating Embedded Scan Assets
 
-Nuclei templates and bundled scan configuration are stored in plaintext under `utils/nuclei/templates/` and `configs/`, but the release binary embeds compressed archives generated from those directories. After changing Nuclei templates, wordlists, fingerprints, or other embedded scan assets, regenerate the archives before building or opening a PR:
+Nuclei templates and bundled scan configuration are stored in plaintext under `utils/nuclei/templates/` and `configs/`, but the release binary embeds compressed archives generated from those directories. After changing Nuclei templates, wordlists, fingerprints, or other embedded scan assets, regenerate the archives before building:
 
 ```bash
 go generate ./configs
@@ -96,7 +96,7 @@ This updates:
 - `configs/embedded/configs.tar.gz`
 - `utils/nuclei/templates/embedded/templates.tar.gz`
 
-Commit both the plaintext asset changes and the regenerated archive changes. Do not edit the `.tar.gz` files by hand. The weekly Nuclei CVE template sync workflow regenerates the template archive automatically.
+Commit plaintext asset changes and any tracked regenerated archive changes. `utils/nuclei/templates/embedded/templates.tar.gz` is generated locally and in CI, but is not committed. Do not edit `.tar.gz` files by hand.
 
 ### Note:
 This tool runs on a headless-shell base image to support chrome/chromium browser automation. The dockerfile uses debian-based install tools. 

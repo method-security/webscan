@@ -19,11 +19,15 @@ http:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
+    matchers-condition: and
     matchers:
+      - type: status
+        status:
+          - 200
       - type: dsl
         dsl:
-          - 'status_code == 200 && contains(tolower(body), "d-link") && contains(tolower(body), "login") && (contains(tolower(body), "dir-") || contains(tolower(body), "dsl-") || contains(tolower(body), "dap-"))'
-          - 'status_code == 200 && contains(tolower(body), "d-link systems") && contains(tolower(body), "login") && contains(tolower(body), "password")'
-          - 'status_code == 200 && contains(tolower(body), "main_login.asp") && contains(tolower(body), "d-link")'
-          - 'status_code == 200 && contains(tolower(body), "<title>d-link corporation") && contains(tolower(body), "wireless router") && contains(tolower(body), "login")'
-          - 'status_code == 200 && (contains(tolower(body), "<title>d-link dsl-") || contains(tolower(body), "<title>d-link router management system") || contains(tolower(body), "<title>d-link : unified services router") || contains(tolower(body), "<title>d-link voip wireless router"))'
+          - 'contains(tolower(body), "d-link") && contains(tolower(body), "login") && (contains(tolower(body), "dir-") || contains(tolower(body), "dsl-") || contains(tolower(body), "dap-"))'
+          - 'contains(tolower(body), "d-link systems") && contains(tolower(body), "login") && contains(tolower(body), "password")'
+          - 'contains(tolower(body), "main_login.asp") && contains(tolower(body), "d-link")'
+          - 'contains(tolower(body), "<title>d-link corporation") && contains(tolower(body), "wireless router") && contains(tolower(body), "login")'
+          - '(contains(tolower(body), "<title>d-link dsl-") || contains(tolower(body), "<title>d-link router management system") || contains(tolower(body), "<title>d-link : unified services router") || contains(tolower(body), "<title>d-link voip wireless router"))'

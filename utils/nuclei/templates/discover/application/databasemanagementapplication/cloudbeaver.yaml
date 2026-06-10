@@ -18,9 +18,13 @@ http:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
+    matchers-condition: and
     matchers:
+      - type: status
+        status:
+          - 200
       - type: dsl
         dsl:
-          - 'status_code == 200 && contains(tolower(body), "<title>cloudbeaver community") && contains(tolower(body), "data-version=") && contains(tolower(body), "_root_uri_")'
-          - 'status_code == 200 && contains(tolower(body), "<title>cloudbeaver") && contains(tolower(body), "app-loading-screen") && contains(tolower(body), "manifest.webmanifest")'
-          - 'status_code == 200 && contains(tolower(body), "cloudbeaver") && contains(tolower(body), "app-loading-screen") && (contains(tolower(body), "assets/main") || contains(tolower(body), "styles/main"))'
+          - 'contains(tolower(body), "<title>cloudbeaver community") && contains(tolower(body), "data-version=") && contains(tolower(body), "_root_uri_")'
+          - 'contains(tolower(body), "<title>cloudbeaver") && contains(tolower(body), "app-loading-screen") && contains(tolower(body), "manifest.webmanifest")'
+          - 'contains(tolower(body), "cloudbeaver") && contains(tolower(body), "app-loading-screen") && (contains(tolower(body), "assets/main") || contains(tolower(body), "styles/main"))'

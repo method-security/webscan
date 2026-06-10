@@ -19,9 +19,33 @@ http:
     max-redirects: 5
     stop-at-first-match: true
     matchers:
-      - type: dsl
-        dsl:
-          - 'status_code == 200 && contains(tolower(body), "<title>influxdb") && contains(tolower(body), "/assets/")'
-          - 'status_code == 200 && contains(tolower(header), "x-influxdb-version") && contains(tolower(header), "x-influxdb-build") && contains(tolower(body), "<title>influxdb")'
-          - 'status_code == 200 && contains(tolower(body), "influxdb") && contains(tolower(body), "window.influx")'
-          - 'status_code == 200 && contains(tolower(body), "influxdata") && contains(tolower(body), "signin") && contains(tolower(body), "orgs")'
+      - type: word
+        part: body
+        words:
+          - "<title>influxdb"
+          - "/assets/"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: all
+        words:
+          - "x-influxdb-version"
+          - "x-influxdb-build"
+          - "<title>influxdb"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "influxdb"
+          - "window.influx"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "influxdata"
+          - "signin"
+          - "orgs"
+        condition: and
+        case-insensitive: true

@@ -3,14 +3,14 @@ info:
   name: TP-Link SOHO Router Web Management Detection
   author: method-security
   severity: info
-  description: Detects TP-Link consumer SOHO router web management interfaces for Archer, TL-WR, and Deco product lines using TP-Link-specific login paths, cookie names, and pre-auth firmware disclosure endpoints.
+  description: Detects TP-Link consumer SOHO router web management interfaces for Archer and TL-WR product lines using TP-Link-specific login paths, cookie names, and pre-auth firmware disclosure endpoints.
   metadata:
     method-application-type: NETWORK_MANAGEMENT_SYSTEM
     method-module-name: TPLINK
     method-sub-module-name: ARCHER
     method-detection-state: EXPOSED_ADMIN
     cpe: cpe:2.3:o:tp-link:archer_firmware:*:*:*:*:*:*:*:*
-  tags: discovery,soho,tp-link,tplink,archer,tl-wr,deco,router,network-management
+  tags: discovery,soho,tp-link,tplink,archer,tl-wr,router,network-management
 http:
   - method: GET
     path:

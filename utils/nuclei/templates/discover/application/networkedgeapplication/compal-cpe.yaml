@@ -3,7 +3,7 @@ info:
   name: Compal ODM ISP CPE Detection
   author: method-security
   severity: info
-  description: Detects Compal-manufactured ISP customer premises equipment (cable modems/gateways) by ODM-specific CH7-prefix model designators, JavaScript paths, and firmware tells — independent of ISP rebranding (Comcast XB3/XB6, Charter CH7465, Shaw). Compal CH7000-family cable gateways are widely deployed across North American ISPs.
+  description: Detects Compal-manufactured ISP customer premises equipment (cable modems/gateways) by ODM-specific CH7-prefix model designators, compal brand strings, DOCSIS signals, and firmware tells. Matches pages that expose Compal ODM tells directly; ISP-rebranded UIs are covered when CH7xxx model designators or compal strings appear in the response body.
   metadata:
     method-application-type: NETWORK_EDGE_APPLICATION
     method-module-name: ISP_CPE

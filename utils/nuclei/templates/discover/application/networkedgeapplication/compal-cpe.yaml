@@ -25,7 +25,7 @@ http:
         dsl:
           - 'status_code == 200 && contains(tolower(body), "compal") && (contains(tolower(body), "login") || contains(tolower(body), "gateway") || contains(tolower(body), "modem"))'
           - 'status_code == 200 && (contains(tolower(body), "ch7465") || contains(tolower(body), "ch7485") || contains(tolower(body), "ch7466") || contains(tolower(body), "ch7486") || contains(tolower(body), "ch7464") || contains(tolower(body), "ch7467")) && (contains(tolower(body), "login") || contains(tolower(body), "gateway"))'
-          - 'status_code == 200 && contains(tolower(body), "compal") && (contains(tolower(body), "docsis") || contains(tolower(body), "cable modem"))'
+          - 'status_code == 200 && contains(tolower(body), "compal") && (contains(tolower(body), "docsis") || contains(tolower(body), "cable modem")) && (contains(tolower(body), "login") || contains(tolower(body), "password") || contains(tolower(body), "gateway"))'
           - 'status_code == 200 && contains(tolower(body), "/frontend/") && contains(tolower(body), "compal") && contains(tolower(body), "login")'
     extractors:
       - type: regex

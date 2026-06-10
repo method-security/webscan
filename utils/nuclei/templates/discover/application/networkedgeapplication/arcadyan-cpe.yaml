@@ -26,7 +26,7 @@ http:
           - 'status_code == 200 && contains(tolower(body), "arcadyan") && (contains(tolower(body), "login") || contains(tolower(body), "gateway") || contains(tolower(body), "modem") || contains(tolower(body), "router"))'
           - 'status_code == 200 && contains(tolower(header), "x-powered-by") && contains(tolower(header), "arcadyan") && (contains(tolower(body), "login") || contains(tolower(body), "gateway") || contains(tolower(body), "modem") || contains(tolower(body), "router"))'
           - 'status_code == 200 && (contains(tolower(body), "arcadyan.css") || contains(tolower(body), "arcadyan.js") || contains(tolower(body), "/arcadyan/")) && (contains(tolower(body), "login") || contains(tolower(body), "gateway"))'
-          - 'status_code == 200 && (contains(tolower(body), "arv7519") || contains(tolower(body), "arv752") || contains(tolower(body), "vgv7") || contains(tolower(body), "arv4510") || contains(tolower(body), "vdv23xx")) && (contains(tolower(body), "login") || contains(tolower(body), "modem"))'
+          - 'status_code == 200 && (contains(tolower(body), "arv7519") || contains(tolower(body), "arv752") || contains(tolower(body), "vgv7") || contains(tolower(body), "arv4510") || contains(tolower(body), "vdv23")) && (contains(tolower(body), "login") || contains(tolower(body), "modem"))'
           - 'status_code == 200 && contains(tolower(body), "/cgi-bin/wbm/") && (contains(tolower(body), "arcadyan") || contains(tolower(body), "gateway") || contains(tolower(body), "modem"))'
     extractors:
       - type: regex

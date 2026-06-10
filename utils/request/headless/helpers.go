@@ -3,6 +3,8 @@ package headless
 import (
 	// Standard
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
@@ -16,7 +18,10 @@ import (
 	common "github.com/Method-Security/webscan/generated/go/common"
 	// Utils
 	utils "github.com/Method-Security/webscan/utils"
+	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
+
 	// External
+	goquery "github.com/PuerkitoBio/goquery"
 	rod "github.com/go-rod/rod"
 	proto "github.com/go-rod/rod/lib/proto"
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
@@ -39,18 +44,14 @@ func NewNetworkHeaderCapture() *NetworkHeaderCapture {
 func (n *NetworkHeaderCapture) SetHeaders(headers map[string][]string) {
 	n.mutex.Lock()
 	defer n.mutex.Unlock()
-	n.Headers = headers
+	n.Headers = cloneHeaders(headers)
 }
 
 // GetHeaders safely gets headers
 func (n *NetworkHeaderCapture) GetHeaders() map[string][]string {
 	n.mutex.RLock()
 	defer n.mutex.RUnlock()
-	result := make(map[string][]string)
-	for k, v := range n.Headers {
-		result[k] = v
-	}
-	return result
+	return cloneHeaders(n.Headers)
 }
 
 // setupHeaderInterception sets up network event monitoring to capture response headers
@@ -70,7 +71,7 @@ func setupHeaderInterception(page *rod.Page) *NetworkHeaderCapture {
 	go page.EachEvent(
 		func(e *proto.NetworkResponseReceived) {
 			// Only capture headers for main document responses
-			if e.Type == proto.NetworkResourceTypeDocument {
+			if e.Type == proto.NetworkResourceTypeDocument && e.Response != nil && !isInternalBrowserURL(e.Response.URL) {
 				headers := make(map[string][]string)
 				for key, value := range e.Response.Headers {
 					// Convert gson.JSON to string
@@ -84,8 +85,82 @@ func setupHeaderInterception(page *rod.Page) *NetworkHeaderCapture {
 	return headerCapture
 }
 
+func loadNetworkResourceBody(page *rod.Page, resourceURL string) ([]byte, map[string][]string, int, error) {
+	result, err := proto.NetworkLoadNetworkResource{
+		FrameID: page.FrameID,
+		URL:     resourceURL,
+		Options: &proto.NetworkLoadNetworkResourceOptions{
+			DisableCache:       true,
+			IncludeCredentials: true,
+		},
+	}.Call(page)
+	if err != nil {
+		return nil, nil, 0, err
+	}
+	if result == nil || result.Resource == nil {
+		return nil, nil, 0, fmt.Errorf("network resource load returned no resource")
+	}
+	resource := result.Resource
+	if !resource.Success {
+		if resource.NetErrorName != "" {
+			return nil, nil, 0, fmt.Errorf("network resource load failed: %s", resource.NetErrorName)
+		}
+		return nil, nil, 0, fmt.Errorf("network resource load failed")
+	}
+
+	headers := make(map[string][]string)
+	for key, value := range resource.Headers {
+		headers[key] = []string{value.Str()}
+	}
+
+	statusCode := 0
+	if resource.HTTPStatusCode != nil {
+		statusCode = int(*resource.HTTPStatusCode)
+	}
+
+	if resource.Stream == "" {
+		return nil, headers, statusCode, nil
+	}
+	defer func() {
+		_ = proto.IOClose{Handle: resource.Stream}.Call(page)
+	}()
+
+	body, err := readIOStream(page, resource.Stream)
+	if err != nil {
+		return nil, headers, statusCode, err
+	}
+	return body, headers, statusCode, nil
+}
+
+func readIOStream(page *rod.Page, handle proto.IOStreamHandle) ([]byte, error) {
+	var body []byte
+	chunkSize := 64 * 1024
+	for {
+		readResult, err := proto.IORead{
+			Handle: handle,
+			Size:   &chunkSize,
+		}.Call(page)
+		if err != nil {
+			return nil, err
+		}
+		if readResult.Base64Encoded {
+			chunk, err := base64.StdEncoding.DecodeString(readResult.Data)
+			if err != nil {
+				return nil, err
+			}
+			body = append(body, chunk...)
+		} else {
+			body = append(body, []byte(readResult.Data)...)
+		}
+		if readResult.EOF {
+			break
+		}
+	}
+	return body, nil
+}
+
 // handleNavigation sets up tracking for top-level frame navigations
-func handleNavigation(ctx context.Context, page *rod.Page, redirectChain *[]string, requestComplete chan struct{}, once *sync.Once, maxRedirects int, redirectError chan error) {
+func handleNavigation(ctx context.Context, page *rod.Page, redirectChain *[]string, redirectChainMu *sync.Mutex, requestComplete chan struct{}, once *sync.Once, maxRedirects int, redirectError chan error) {
 	log := svc1log.FromContext(ctx)
 
 	// Use a simple completion flag to prevent further event processing
@@ -99,48 +174,64 @@ func handleNavigation(ctx context.Context, page *rod.Page, redirectChain *[]stri
 
 	// Set up event listeners for navigation events and network redirects
 	go page.EachEvent(
+		func(e *proto.NetworkRequestWillBeSent) {
+			if e.Type != proto.NetworkResourceTypeDocument || e.RedirectResponse == nil {
+				return
+			}
+			if e.RedirectResponse.Status < 300 || e.RedirectResponse.Status >= 400 {
+				return
+			}
+
+			locationURL := e.Request.URL
+			if location := headerValue(e.RedirectResponse.Headers, "location"); location != "" {
+				locationURL = resolveRedirectLocation(e.RedirectResponse.URL, location)
+			}
+			log.Debug("Captured HTTP redirect request", svc1log.SafeParam("from", e.RedirectResponse.URL), svc1log.SafeParam("to", locationURL), svc1log.SafeParam("status", e.RedirectResponse.Status))
+
+			redirectChainMu.Lock()
+			added, err := appendRedirectURLLocked(redirectChain, locationURL, maxRedirects)
+			if err != nil {
+				redirectChainMu.Unlock()
+				log.Info("Max redirects reached", svc1log.SafeParam("maxRedirects", strconv.Itoa(maxRedirects)))
+				signalRedirectError(err, redirectError, requestComplete, once, &completed)
+				return
+			}
+			redirectChainMu.Unlock()
+			if added {
+				log.Debug("Added redirect URL to chain", svc1log.SafeParam("url", locationURL))
+			}
+		},
 		// Capture HTTP redirect responses at the network level
 		func(e *proto.NetworkResponseReceived) {
-
 			// Only capture redirect responses for the main document
 			if e.Type == proto.NetworkResourceTypeDocument && e.Response.Status >= 300 && e.Response.Status < 400 {
-				// Check if request is already complete
-				if atomic.LoadInt32(&completed) == 1 {
-					return
-				}
-
 				// Extract the Location header from the redirect response
-				if location, exists := e.Response.Headers["location"]; exists && location.Str() != "" {
-					locationURL := location.Str()
+				if location := headerValue(e.Response.Headers, "location"); location != "" {
+					locationURL := resolveRedirectLocation(e.Response.URL, location)
 					log.Debug("Captured HTTP redirect", svc1log.SafeParam("from", e.Response.URL), svc1log.SafeParam("to", locationURL), svc1log.SafeParam("status", e.Response.Status))
 
-					// Add the redirect destination to the chain if not already present
-					exists := false
-					for _, url := range *redirectChain {
-						if url == locationURL {
-							exists = true
-							break
-						}
+					redirectChainMu.Lock()
+					added, err := appendRedirectURLLocked(redirectChain, locationURL, maxRedirects)
+					if err != nil {
+						redirectChainMu.Unlock()
+						log.Info("Max redirects reached", svc1log.SafeParam("maxRedirects", strconv.Itoa(maxRedirects)))
+						signalRedirectError(err, redirectError, requestComplete, once, &completed)
+						return
 					}
-					if !exists {
-						*redirectChain = append(*redirectChain, locationURL)
+					redirectChainMu.Unlock()
+					if added {
 						log.Debug("Added redirect URL to chain", svc1log.SafeParam("url", locationURL))
 					}
 				}
 			}
 		},
 		func(e *proto.PageFrameNavigated) {
-			// Check if request is already complete
-			if atomic.LoadInt32(&completed) == 1 {
-				return
-			}
-
 			if e.Frame.ParentID == "" && e.Frame.URL != "" && !utils.IsStaticAsset(e.Frame.URL) {
 				// Check for Chrome error pages
 				if strings.HasPrefix(e.Frame.URL, "chrome-error://") {
 					log.Warn("Navigation resulted in Chrome error page, indicating network/connection failure",
 						svc1log.SafeParam("errorURL", e.Frame.URL),
-						svc1log.SafeParam("originalURL", (*redirectChain)[0]))
+						svc1log.SafeParam("originalURL", firstRedirectURL(redirectChain, redirectChainMu)))
 					// Still complete the request even on error pages
 					once.Do(func() {
 						atomic.StoreInt32(&completed, 1)
@@ -149,50 +240,26 @@ func handleNavigation(ctx context.Context, page *rod.Page, redirectChain *[]stri
 					return
 				}
 
-				// Check if URL is already in chain
-				exists := false
-				for _, url := range *redirectChain {
-					if url == e.Frame.URL {
-						exists = true
-						break
-					}
+				redirectChainMu.Lock()
+				added, err := appendRedirectURLLocked(redirectChain, e.Frame.URL, maxRedirects)
+				if err != nil {
+					redirectChainMu.Unlock()
+					log.Info("Max redirects reached", svc1log.SafeParam("maxRedirects", strconv.Itoa(maxRedirects)))
+					signalRedirectError(err, redirectError, requestComplete, once, &completed)
+					return
 				}
-				if !exists {
-					// Check if this is just a trailing slash redirect
-					if len(*redirectChain) > 0 {
-						lastURL := (*redirectChain)[len(*redirectChain)-1]
-						if utils.IsTrailingSlashRedirect(lastURL, e.Frame.URL) {
-							log.Info("Detected trailing slash redirect, not counting as redirect",
-								svc1log.SafeParam("from", lastURL),
-								svc1log.SafeParam("to", e.Frame.URL))
-							// Update the last URL in the chain but don't add a new entry
-							(*redirectChain)[len(*redirectChain)-1] = e.Frame.URL
-							once.Do(func() {
-								atomic.StoreInt32(&completed, 1)
-								close(requestComplete)
-							})
-							return
-						}
-					}
+				chain := strings.Join(*redirectChain, " -> ")
+				redirectChainMu.Unlock()
 
-					// Check if we've exceeded max redirects
-					// Count actual redirects (excluding initial URL)
-					actualRedirects := len(*redirectChain)
-					if actualRedirects > maxRedirects && maxRedirects >= 0 {
-						log.Info("Max redirects reached", svc1log.SafeParam("maxRedirects", strconv.Itoa(maxRedirects)), svc1log.SafeParam("actualRedirects", strconv.Itoa(actualRedirects)))
-						once.Do(func() {
-							atomic.StoreInt32(&completed, 1)
-							redirectError <- fmt.Errorf("max redirects (%d) exceeded", maxRedirects)
-							close(requestComplete)
-						})
-						return
-					}
-					*redirectChain = append(*redirectChain, e.Frame.URL)
+				if added {
 					log.Info("Top-level frame navigated", svc1log.SafeParam("url", e.Frame.URL))
+					log.Info("Updated redirect chain", svc1log.SafeParam("chain", chain))
 					once.Do(func() {
 						atomic.StoreInt32(&completed, 1)
 						close(requestComplete)
 					})
+				} else {
+					log.Debug("Ignoring already-seen top-level frame navigation", svc1log.SafeParam("url", e.Frame.URL))
 				}
 			}
 		},
@@ -240,6 +307,245 @@ func handleNavigation(ctx context.Context, page *rod.Page, redirectChain *[]stri
 			}
 		},
 	)()
+}
+
+func signalRedirectError(err error, redirectError chan error, requestComplete chan struct{}, once *sync.Once, completed *int32) {
+	select {
+	case redirectError <- err:
+	default:
+	}
+	once.Do(func() {
+		atomic.StoreInt32(completed, 1)
+		close(requestComplete)
+	})
+}
+
+func appendRedirectURLLocked(redirectChain *[]string, redirectURL string, maxRedirects int) (bool, error) {
+	if chainContainsURL(*redirectChain, redirectURL) {
+		return false, nil
+	}
+
+	if len(*redirectChain) > 0 {
+		lastURL := (*redirectChain)[len(*redirectChain)-1]
+		if utils.IsTrailingSlashRedirect(lastURL, redirectURL) {
+			(*redirectChain)[len(*redirectChain)-1] = redirectURL
+			return false, nil
+		}
+	}
+
+	actualRedirects := len(*redirectChain) - 1
+	if actualRedirects >= maxRedirects && maxRedirects >= 0 {
+		return false, fmt.Errorf("max redirects (%d) exceeded", maxRedirects)
+	}
+
+	*redirectChain = append(*redirectChain, redirectURL)
+	return true, nil
+}
+
+func headerValue(headers proto.NetworkHeaders, name string) string {
+	for key, value := range headers {
+		if strings.EqualFold(key, name) {
+			return value.Str()
+		}
+	}
+	return ""
+}
+
+func resolveRedirectLocation(responseURL, location string) string {
+	base, err := url.Parse(responseURL)
+	if err != nil {
+		return location
+	}
+	next, err := base.Parse(location)
+	if err != nil {
+		return location
+	}
+	return next.String()
+}
+
+func firstRedirectURL(redirectChain *[]string, redirectChainMu *sync.Mutex) string {
+	redirectChainMu.Lock()
+	defer redirectChainMu.Unlock()
+	if len(*redirectChain) == 0 {
+		return ""
+	}
+	return (*redirectChain)[0]
+}
+
+func chainContainsURL(chain []string, candidate string) bool {
+	normalizedCandidate := normalizeDefaultPort(candidate)
+	for _, existing := range chain {
+		if normalizeDefaultPort(existing) == normalizedCandidate {
+			return true
+		}
+	}
+	return false
+}
+
+func normalizeDefaultPort(raw string) string {
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return raw
+	}
+	if port := parsed.Port(); port != "" && isDefaultPort(strings.ToLower(parsed.Scheme), port) {
+		hostname := parsed.Hostname()
+		if strings.Contains(hostname, ":") {
+			hostname = "[" + hostname + "]"
+		}
+		parsed.Host = hostname
+	}
+	return parsed.String()
+}
+
+func isDefaultPort(scheme, port string) bool {
+	return (scheme == "http" && port == "80") || (scheme == "https" && port == "443")
+}
+
+func cloneHeaders(headers map[string][]string) map[string][]string {
+	result := make(map[string][]string, len(headers))
+	for key, values := range headers {
+		result[key] = append([]string(nil), values...)
+	}
+	return result
+}
+
+func isInternalBrowserURL(raw string) bool {
+	return raw == "" ||
+		raw == "about:blank" ||
+		strings.HasPrefix(raw, "chrome://") ||
+		strings.HasPrefix(raw, "chrome-error://") ||
+		strings.HasPrefix(raw, "chrome-extension://") ||
+		strings.HasPrefix(raw, "devtools://")
+}
+
+func isChromePDFViewerHTML(htmlContent string) bool {
+	content := strings.ToLower(htmlContent)
+	return strings.Contains(content, `type="application/pdf"`)
+}
+
+func isChromeStaticAssetViewerHTML(htmlContent string) bool {
+	if isChromePDFViewerHTML(htmlContent) {
+		return true
+	}
+	if !shouldParseStaticAssetViewerHTML(htmlContent) {
+		return false
+	}
+
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlContent))
+	if err != nil {
+		return false
+	}
+	body := doc.Find("body")
+	if body.Length() != 1 {
+		return false
+	}
+	children := body.Children()
+	if children.Length() != 1 {
+		return false
+	}
+
+	media := children.First()
+	switch strings.ToLower(goquery.NodeName(media)) {
+	case "img":
+		_, ok := media.Attr("src")
+		return ok
+	case "video", "audio":
+		if _, ok := media.Attr("src"); ok {
+			return true
+		}
+		return media.Find("source[src]").Length() > 0
+	default:
+		return false
+	}
+}
+
+func shouldParseStaticAssetViewerHTML(htmlContent string) bool {
+	const maxViewerShellHTMLBytes = 256 * 1024
+	if htmlContent == "" || len(htmlContent) > maxViewerShellHTMLBytes {
+		return false
+	}
+
+	content := strings.ToLower(htmlContent)
+	mediaTags := strings.Count(content, "<img") +
+		strings.Count(content, "<video") +
+		strings.Count(content, "<audio")
+	return mediaTags == 1
+}
+
+func shouldLoadStaticResource(htmlContent, constructedURL, finalURL string) bool {
+	if utils.IsStaticAsset(constructedURL) || utils.IsStaticAsset(finalURL) {
+		return true
+	}
+	return isChromeStaticAssetViewerHTML(htmlContent)
+}
+
+func isValidStaticResourceBody(body []byte) bool {
+	return len(body) > 0 && (requesthelpers.IsDetectedBinaryBody(body) || json.Valid(body))
+}
+
+func headersForLoadedStaticResource(existingHeaders, loadedHeaders map[string][]string, body []byte) map[string][]string {
+	headers := existingHeaders
+	if len(loadedHeaders) > 0 {
+		headers = loadedHeaders
+	}
+	return cloneHeadersWithBodyMetadata(headers, body)
+}
+
+func cloneHeadersWithBodyMetadata(headers map[string][]string, body []byte) map[string][]string {
+	cloned := cloneHeadersWithoutContentEncoding(headers)
+	contentType := detectLoadedStaticResourceContentType(body)
+	contentLength := strconv.Itoa(len(body))
+	replacedContentType := false
+	replacedContentLength := false
+	for key := range cloned {
+		switch {
+		case strings.EqualFold(key, "Content-Type"):
+			cloned[key] = []string{contentType}
+			replacedContentType = true
+		case strings.EqualFold(key, "Content-Length"):
+			cloned[key] = []string{contentLength}
+			replacedContentLength = true
+		}
+	}
+	if !replacedContentType {
+		cloned["Content-Type"] = []string{contentType}
+	}
+	if !replacedContentLength {
+		cloned["Content-Length"] = []string{contentLength}
+	}
+	return cloned
+}
+
+func detectLoadedStaticResourceContentType(body []byte) string {
+	if json.Valid(body) {
+		return "application/json"
+	}
+	return requesthelpers.DetectContentTypeFromBytes(body)
+}
+
+func cloneHeadersWithoutContentEncoding(headers map[string][]string) map[string][]string {
+	cloned := cloneHeaders(headers)
+	for key := range cloned {
+		if strings.EqualFold(key, "Content-Encoding") {
+			delete(cloned, key)
+		}
+	}
+	return cloned
+}
+
+func cloneHeadersWithContentType(headers map[string][]string, contentType string) map[string][]string {
+	cloned := cloneHeadersWithoutContentEncoding(headers)
+	replaced := false
+	for key := range cloned {
+		if strings.EqualFold(key, "Content-Type") {
+			cloned[key] = []string{contentType}
+			replaced = true
+		}
+	}
+	if !replaced {
+		cloned["Content-Type"] = []string{contentType}
+	}
+	return cloned
 }
 
 // performNavigation handles the actual page navigation based on config
@@ -431,7 +737,7 @@ func isCrossDomainRedirect(originalURL, redirectURL string) bool {
 	if err != nil {
 		return false
 	}
-	return parsedOriginal.Host != resolved.Host
+	return parsedOriginal.Hostname() != resolved.Hostname()
 }
 
 // cleanErrMsg extracts meaningful error message from navigation errors

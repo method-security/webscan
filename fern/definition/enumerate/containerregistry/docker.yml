@@ -1,5 +1,6 @@
 imports:
   http: ../../common/http.yml
+  method: ../../common/method.yml
 types:
   # Config Struct
   EnumerateDockerConfig:
@@ -10,6 +11,7 @@ types:
       sleep: integer
       jitter: integer
       threads: integer
+      userAgent: method.UserAgentPreset
   # Docker Registry V2 API Response Objects
   DockerManifestDescriptor:
     properties:

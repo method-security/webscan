@@ -1,0 +1,29 @@
+id: check-point-mobile-access-detect
+info:
+  name: Check Point Mobile Access Portal Detection
+  author: method-security
+  severity: info
+  description: Detects Check Point Mobile Access SSL VPN portals using SSLVPN paths, Mobile Access branding, and Check Point-specific client markers.
+  metadata:
+    method-application-type: NETWORK_EDGE_APPLICATION
+    method-module-name: CHECK_POINT_MOBILE_ACCESS
+    cpe: cpe:2.3:a:checkpoint:mobile_access:*:*:*:*:*:*:*:*
+  tags: discovery,checkpoint,check-point,mobile-access,ssl-vpn,network-edge
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/sslvpn/Login/Login"
+      - "{{BaseURL}}/sslvpn/Login/Login.html"
+      - "{{BaseURL}}/sslvpn/Portal"
+      - "{{BaseURL}}/SNX/INSTALL/snx_install.sh"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'contains(tolower(body), "check point") && contains(tolower(body), "mobile access")'
+          - 'contains(tolower(body), "check point") && contains(tolower(body), "ssl network extender")'
+          - 'contains(tolower(body), "checkpoint") && contains(tolower(body), "/sslvpn/") && contains(tolower(body), "login")'
+          - 'contains(tolower(header), "cpcvpn") && (contains(tolower(body), "check point") || contains(tolower(body), "checkpoint"))'

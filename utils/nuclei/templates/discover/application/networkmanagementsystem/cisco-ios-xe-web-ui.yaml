@@ -1,0 +1,27 @@
+id: cisco-ios-xe-web-ui-detect
+info:
+  name: Cisco IOS XE Web UI Detection
+  author: method-security
+  severity: info
+  description: Detects Cisco IOS XE Web UI management consoles using IOS XE-specific login and webui markers.
+  metadata:
+    method-application-type: NETWORK_MANAGEMENT_SYSTEM
+    method-module-name: CISCO_IOS_XE
+    cpe: cpe:2.3:o:cisco:ios_xe:*:*:*:*:*:*:*:*
+  tags: discovery,cisco,ios-xe,web-ui,network-management
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/webui/"
+      - "{{BaseURL}}/webui/login"
+      - "{{BaseURL}}/webui/login.html"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'status_code == 200 && !contains(tolower(body), "gitlab community edition") && contains(tolower(body), "cisco ios xe") && contains(tolower(body), "webui")'
+          - 'status_code == 200 && !contains(tolower(body), "gitlab community edition") && contains(tolower(body), "cisco") && contains(tolower(body), "ios-xe") && contains(tolower(body), "web ui")'
+          - 'status_code == 200 && !contains(tolower(body), "gitlab community edition") && contains(tolower(body), "cisco systems") && contains(tolower(body), "/webui/login/prop.js") && contains(tolower(body), "/webui/login/redirect.js")'

@@ -1,0 +1,26 @@
+id: redis-commander-detect
+info:
+  name: Redis Commander Detection
+  author: method-security
+  severity: info
+  description: Detects Redis Commander web administration interfaces using Redis Commander-specific UI and asset markers.
+  metadata:
+    method-application-type: DATABASE_MANAGEMENT_APPLICATION
+    method-module-name: REDIS_COMMANDER
+    cpe: cpe:2.3:a:redis_commander:redis_commander:*:*:*:*:*:*:*:*
+  tags: discovery,database,admin,redis,redis-commander
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/login"
+      - "{{BaseURL}}/redis"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'status_code == 200 && contains(tolower(body), "<title>redis commander")'
+          - 'status_code == 200 && contains(tolower(body), "redis commander") && contains(tolower(body), "redis-commander")'
+          - 'status_code == 200 && contains(tolower(body), "redis commander") && contains(tolower(body), "connections") && contains(tolower(body), "keys")'

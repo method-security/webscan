@@ -1,0 +1,28 @@
+id: couchdb-fauxton-detect
+info:
+  name: Apache CouchDB Fauxton Detection
+  author: method-security
+  severity: info
+  description: Detects Apache CouchDB Fauxton database administration UI using Fauxton-specific paths and assets.
+  metadata:
+    method-application-type: DATABASE_MANAGEMENT_APPLICATION
+    method-module-name: COUCHDB_FAUXTON
+    cpe: cpe:2.3:a:apache:couchdb:*:*:*:*:*:*:*:*
+  tags: discovery,database,admin,couchdb,fauxton
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/_utils/"
+      - "{{BaseURL}}/_utils/#login"
+      - "{{BaseURL}}"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'status_code == 200 && contains(tolower(header), "server: couchdb") && contains(tolower(body), "<title>project fauxton") && contains(tolower(body), "dashboard")'
+          - 'status_code == 200 && contains(tolower(header), "server: couchdb") && contains(tolower(body), "fauxton") && contains(tolower(body), "bundle")'
+          - 'status_code == 200 && contains(tolower(body), "window.fauxton") && contains(tolower(body), "_utils")'
+          - 'status_code == 200 && contains(tolower(body), "fauxton") && contains(tolower(body), "_utils") && contains(tolower(body), "requirejs")'
+          - 'status_code == 200 && contains(tolower(body), "<title>apache couchdb") && contains(tolower(body), "window.fauxton")'

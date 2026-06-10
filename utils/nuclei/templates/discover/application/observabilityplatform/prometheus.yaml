@@ -1,0 +1,84 @@
+id: prometheus-detect
+info:
+  name: Prometheus Detection
+  author: method-security
+  severity: info
+  description: Detects Prometheus servers by validating health, build info, and graph/query UI endpoints.
+  metadata:
+    method-application-type: OBSERVABILITY_PLATFORM
+    method-module-name: PROMETHEUS
+    cpe: cpe:2.3:a:prometheus:prometheus:*:*:*:*:*:*:*:*
+  tags: discovery,prometheus,observability,monitoring,observability-platform
+flow: http(1) && (http(2) || http(3))
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/-/healthy"
+    redirects: true
+    max-redirects: 5
+    matchers-condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+        internal: true
+      - type: word
+        part: body
+        words:
+          - "Prometheus Server is Healthy."
+        internal: true
+  - method: GET
+    path:
+      - "{{BaseURL}}/api/v1/status/buildinfo"
+    redirects: true
+    max-redirects: 5
+    matchers-condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+      - type: word
+        part: header
+        words:
+          - "application/json"
+        case-insensitive: true
+      - type: regex
+        part: body
+        regex:
+          - '"status"\s*:\s*"success"'
+      - type: regex
+        part: body
+        regex:
+          - '"data"\s*:\s*\{[^}]*"version"\s*:\s*"[0-9]+(?:\.[0-9]+){1,3}(?:[-+][^"]+)?"'
+      - type: regex
+        part: body
+        regex:
+          - '"revision"\s*:\s*"[0-9a-f]{7,40}"'
+  - method: GET
+    path:
+      - "{{BaseURL}}/graph"
+      - "{{BaseURL}}/query"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers-condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+      - type: word
+        part: header
+        words:
+          - "text/html"
+        case-insensitive: true
+      - type: regex
+        part: body
+        regex:
+          - "(?i)<title>Prometheus Time Series Collection and Processing Server</title>"
+      - type: word
+        part: body
+        words:
+          - "Prometheus"
+          - "static"
+        case-insensitive: true
+        condition: and

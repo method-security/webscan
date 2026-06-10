@@ -12,14 +12,21 @@ types:
       - CLOUD_BUCKET
       - CONTAINER_REGISTRY
       - CONTENT_MANAGEMENT_SYSTEM
+      - COLLABORATION_APPLICATION
+      - DATABASE_MANAGEMENT_APPLICATION
       - FILE_TRANSFER_APPLICATION
       - DISTRIBUTED_COMPUTING_PLATFORM
       - HARDWARE_MANAGEMENT_SYSTEM
       - HYPERVISOR
+      - INDUSTRIAL_CONTROL_SYSTEM
       - KUBE
       - NETWORK_CONTROLLER
+      - NETWORK_EDGE_APPLICATION
       - NETWORK_FIREWALL
       - NETWORK_MANAGEMENT_SYSTEM
+      - OBSERVABILITY_PLATFORM
+      - OUT_OF_BAND_APPLICATION
+      - SECRET_MANAGEMENT_APPLICATION
       - VDI_APPLICATION
       - WEB_SERVER
   ApplicationDetectionState:
@@ -45,6 +52,7 @@ types:
       proxy: optional<string>
       verboseLogs: boolean
       globalRateLimit: integer
+      globalTimeout: integer
   # Application Fingerprint Attempt Struct
   ApplicationFingerprintAttempt:
     properties:

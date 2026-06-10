@@ -1,0 +1,22 @@
+id: vault-detect
+info:
+  name: HashiCorp Vault Detection
+  author: method-security
+  severity: info
+  description: Detects HashiCorp Vault using the unauthenticated sys/health API and Vault cluster identity fields.
+  metadata:
+    method-application-type: SECRET_MANAGEMENT_APPLICATION
+    method-module-name: VAULT
+    cpe: cpe:2.3:a:hashicorp:vault:*:*:*:*:*:*:*:*
+  tags: discovery,vault,hashicorp,secrets,secret-management
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/v1/sys/health"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'contains(tolower(header), "x-vault-cluster") || (contains(tolower(body), "\"initialized\"") && contains(tolower(body), "\"sealed\"") && (contains(tolower(body), "\"cluster_name\"") || contains(tolower(body), "\"cluster_id\"")))'

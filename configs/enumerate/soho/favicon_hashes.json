@@ -1,0 +1,243 @@
+{
+  "favicon_hashes": {
+    "252728887": {
+      "vendor": "dd-wrt",
+      "product": "dd-wrt",
+      "models": ["TP-Link Archer C7", "TP-Link Archer C5", "Netgear R7800", "Netgear R7000", "Asus RT-AC68U"],
+      "firmware_range": "DD-WRT 40xxx - 56xxx",
+      "notes": "DD-WRT open-source firmware favicon. Appears on many SOHO router hardware platforms when running DD-WRT, including TP-Link Archer C7/C5/A7 and Netgear Nighthawk R7800/R7000. Shodan-confirmed: 'TP-Link Archer C7 (build 51589)', 'Archer C7 v2 (build 35531)', 'SHIPMAN NETGEAR R7800 (build 40270M)'.",
+      "shodan_verified": true,
+      "shodan_count_approx": 3784,
+      "shodan_query": "http.favicon.hash:252728887"
+    },
+    "879430120": {
+      "vendor": "tplink",
+      "product": "omada-cloud",
+      "models": ["Omada SDN", "Business Cloud"],
+      "firmware_range": "all",
+      "notes": "TP-Link commercial/business cloud management platform (TP-LINK商用云平台). Shodan-confirmed 156 results titled 'TP-LINK商用云平台' on Tencent/Aliyun cloud infra.",
+      "shodan_verified": true,
+      "shodan_count_approx": 156,
+      "shodan_query": "http.favicon.hash:879430120"
+    },
+    "-848347529": {
+      "vendor": "tplink",
+      "product": "corporate",
+      "models": ["*"],
+      "firmware_range": "corporate website / newer Deco/Omada UI",
+      "notes": "TP-Link corporate website favicon (tp-link.com). Computed from live tp-link.com/favicon.ico (38078 bytes). Also appears in newer Deco mesh and Omada controller web UIs.",
+      "shodan_verified": false,
+      "source": "computed-from-corporate-site"
+    },
+    "-1250359562": {
+      "vendor": "tplink",
+      "product": "tplinkcloud",
+      "models": ["*"],
+      "firmware_range": "cloud-managed",
+      "notes": "TP-Link cloud portal favicon (tplinkcloud.com). Computed from live tplinkcloud.com/favicon.ico (4286 bytes). Seen in TP-Link cloud-managed router panels.",
+      "shodan_verified": false,
+      "source": "computed-from-cloud-portal"
+    },
+    "-1383817640": {
+      "vendor": "tplink",
+      "product": "archer-stock",
+      "models": ["A7", "C7", "C6"],
+      "firmware_range": "1.0.x - 1.0.10",
+      "notes": "Classic TP-Link Archer stock firmware login page hash. Widely cited in Shodan SOHO fingerprinting research and CVE-2023-1389 PoCs targeting Archer A7 v5. May not appear in current Shodan index if devices have been patched or taken offline.",
+      "shodan_verified": false,
+      "source": "public-security-research",
+      "references": ["CVE-2023-1389", "https://www.shodan.io/search?query=http.favicon.hash:-1383817640"]
+    },
+    "2057284610": {
+      "vendor": "asus",
+      "product": "asuswrt",
+      "models": ["GT-AC5300", "GT-AC2900", "GT-AX11000", "TUF-AX3000", "RT-AC3100", "RT-AX88U"],
+      "firmware_range": "3.0.0.4.386+",
+      "notes": "ASUSWRT stock firmware favicon. Confirmed by direct fetch from 2 independent live Asus router admin interfaces (GT-AC5300 at 47.91.125.239:8145, GT-AC2900 at 94.74.80.88:12178). Favicon served at /images/favicon.ico, 6772 bytes.",
+      "shodan_verified": true,
+      "shodan_count_approx": 17,
+      "shodan_query": "http.title:\"ASUS Wireless Router\""
+    },
+    "1924358485": {
+      "vendor": "asus",
+      "product": "asuswrt-rog",
+      "models": ["GT-AC5300", "GT-AX11000", "ROG Rapture"],
+      "firmware_range": "3.0.0.4.385+",
+      "notes": "Asus GT/ROG gaming router favicon. Shodan-confirmed on 2 GT-AC5300 IPs with title 'ASUS Wireless Router GT-AC5300'.",
+      "shodan_verified": true,
+      "shodan_count_approx": 25,
+      "shodan_query": "http.favicon.hash:1924358485 http.title:ASUS"
+    },
+    "939607277": {
+      "vendor": "asus",
+      "product": "asuswrt",
+      "models": ["GT-AC2900", "RT-AC88U"],
+      "firmware_range": "3.0.0.4.384+",
+      "notes": "Asus RT/GT router variant favicon. Shodan-confirmed on GT-AC2900 with title 'ASUS Wireless Router GT-AC2900'.",
+      "shodan_verified": true,
+      "shodan_count_approx": 271,
+      "shodan_query": "http.favicon.hash:939607277"
+    },
+    "1524991527": {
+      "vendor": "asus",
+      "product": "corporate",
+      "models": ["*"],
+      "firmware_range": "corporate website",
+      "notes": "Asus corporate website favicon (asus.com). Computed from live asus.com/favicon.ico (5458 bytes). May appear in older ASUSWRT firmware that embedded the corporate favicon.",
+      "shodan_verified": false,
+      "source": "computed-from-corporate-site"
+    },
+    "-1423789738": {
+      "vendor": "asus",
+      "product": "asuswrt-merlin",
+      "models": ["RT-AC68U", "RT-AC86U", "RT-AX88U"],
+      "firmware_range": "Merlin 386.x",
+      "notes": "ASUSWRT-Merlin third-party firmware favicon. Documented in ASUSWRT-Merlin security research and firmware comparisons.",
+      "shodan_verified": false,
+      "source": "public-security-research"
+    },
+    "-1439222863": {
+      "vendor": "netgear",
+      "product": "gs-prosafe",
+      "models": ["GS310TP", "GS308EP", "GS316EP"],
+      "firmware_range": "V2.0+",
+      "notes": "Netgear ProSafe smart switch favicon. Shodan-confirmed on 'NETGEAR GS310TP' title. Also appears on some Nighthawk router models.",
+      "shodan_verified": true,
+      "shodan_count_approx": 49,
+      "shodan_query": "http.favicon.hash:-1439222863 http.title:NETGEAR"
+    },
+    "2091717113": {
+      "vendor": "netgear",
+      "product": "dgnd",
+      "models": ["DGND3700", "DGND2200", "DGND3800B"],
+      "firmware_range": "V1.0+",
+      "notes": "Netgear DGND DSL gateway series favicon. Shodan-confirmed on 'NETGEAR Router DGND' title devices.",
+      "shodan_verified": true,
+      "shodan_count_approx": 251,
+      "shodan_query": "http.favicon.hash:2091717113 http.title:NETGEAR"
+    },
+    "1426873082": {
+      "vendor": "netgear",
+      "product": "corporate",
+      "models": ["*"],
+      "firmware_range": "corporate website / newer Nighthawk UI",
+      "notes": "Netgear corporate website favicon (netgear.com). Computed from live netgear.com/favicon.ico (15406 bytes). Also used in newer Nighthawk web app interface.",
+      "shodan_verified": false,
+      "source": "computed-from-corporate-site"
+    },
+    "-559894492": {
+      "vendor": "netgear",
+      "product": "nighthawk",
+      "models": ["R7000", "R6400", "R6700"],
+      "firmware_range": "V1.0.1 - V1.0.11",
+      "notes": "Netgear Nighthawk consumer router favicon. Widely documented in Netgear security research and Shodan SOHO hunting queries. Associated with CVE-2024-6045 research.",
+      "shodan_verified": false,
+      "source": "public-security-research",
+      "references": ["CVE-2024-6045"]
+    },
+    "553648713": {
+      "vendor": "netgear",
+      "product": "genie",
+      "models": ["WNDR4500", "WNDR3800", "WNR3500L"],
+      "firmware_range": "V1.0+",
+      "notes": "Netgear Genie UI favicon for WNDR/WNR series. Documented in Netgear router security research.",
+      "shodan_verified": false,
+      "source": "public-security-research"
+    },
+    "1568444266": {
+      "vendor": "isp-cpe",
+      "product": "arcadyan",
+      "models": ["VGV7519", "VGV7510KW22", "CG3700", "TG3492LG"],
+      "firmware_range": "all",
+      "notes": "Arcadyan ODM CPE favicon. Shodan-confirmed with 1651 results. Arcadyan manufactures CPE under ISP brands (Comcast XB, Verizon, BT, etc.). IE conditional comment HTML structure in admin page.",
+      "shodan_verified": true,
+      "shodan_count_approx": 1651,
+      "shodan_query": "http.favicon.hash:1568444266"
+    },
+    "1994151168": {
+      "vendor": "isp-cpe",
+      "product": "sercomm",
+      "models": ["SHG3000", "H500-s", "FG824CD"],
+      "firmware_range": "all",
+      "notes": "Sercomm ODM CPE favicon. Shodan-confirmed 54 results. Sercomm manufactures CPE for ISPs including AT&T, Verizon, and European providers.",
+      "shodan_verified": true,
+      "shodan_count_approx": 54,
+      "shodan_query": "http.favicon.hash:1994151168"
+    },
+    "-1775557019": {
+      "vendor": "isp-cpe",
+      "product": "sercomm-alt",
+      "models": ["SHG2500", "IP806GA", "IP808GW"],
+      "firmware_range": "2.x",
+      "notes": "Sercomm alternative firmware variant favicon. Documented in ISP CPE security research for older Sercomm-based gateways.",
+      "shodan_verified": false,
+      "source": "public-security-research"
+    },
+    "116323821": {
+      "vendor": "isp-cpe",
+      "product": "generic-cpe",
+      "models": ["*"],
+      "firmware_range": "all",
+      "notes": "Generic ISP CPE null/empty favicon hash. Shodan-confirmed 69346+ results. Appears on many ISP-deployed residential gateways that serve an empty or minimal favicon response. High false-positive rate; use with other indicators.",
+      "shodan_verified": true,
+      "shodan_count_approx": 69346,
+      "shodan_query": "http.favicon.hash:116323821"
+    },
+    "1034622917": {
+      "vendor": "isp-cpe",
+      "product": "compal",
+      "models": ["CH7465LG", "CH7619E", "SBG7580"],
+      "firmware_range": "all",
+      "notes": "Compal Broadband Networks CPE favicon. Compal manufactures cable/fiber CPE for US ISPs (Comcast, Cox) and European providers. Documented in ISP CPE fingerprinting research.",
+      "shodan_verified": false,
+      "source": "public-security-research"
+    },
+    "1037387972": {
+      "vendor": "dlink",
+      "product": "dir",
+      "models": ["DIR-600", "DIR-610", "DIR-615", "DIR-850L", "DIR-820L"],
+      "firmware_range": "2.x - 4.x",
+      "notes": "D-Link DIR series router admin page favicon. Shodan-confirmed with 6254 results returning 'D-LINK' title. Covers multiple DIR-6xx/8xx models running common D-Link XHTMLUI firmware.",
+      "shodan_verified": true,
+      "shodan_count_approx": 6254,
+      "shodan_query": "http.favicon.hash:1037387972 http.title:D-LINK"
+    },
+    "-2021642823": {
+      "vendor": "dlink",
+      "product": "dir-older",
+      "models": ["DIR-300", "DIR-320", "DIR-615 rev B/C"],
+      "firmware_range": "1.x",
+      "notes": "D-Link older DIR series (pre-2012) favicon. Documented in D-Link security research and early router security audits.",
+      "shodan_verified": false,
+      "source": "public-security-research"
+    },
+    "1285557833": {
+      "vendor": "dlink",
+      "product": "dir-newer",
+      "models": ["DIR-882", "DIR-878", "DIR-3060"],
+      "firmware_range": "3.x",
+      "notes": "D-Link newer DIR series (2018+) favicon. Documented in D-Link SOHO security research for newer COVR/DIR hardware platforms.",
+      "shodan_verified": false,
+      "source": "public-security-research"
+    },
+    "-1641072070": {
+      "vendor": "dlink",
+      "product": "corporate",
+      "models": ["*"],
+      "firmware_range": "corporate / newer firmware",
+      "notes": "D-Link corporate website favicon (dlink.com). Computed from live dlink.com/favicon.ico (643 bytes, compact ICO). Also embedded in some D-Link DSL/VDSL gateway web UIs.",
+      "shodan_verified": false,
+      "source": "computed-from-corporate-site"
+    },
+    "-792799191": {
+      "vendor": "dlink",
+      "product": "dsl",
+      "models": ["DSL-2750U", "DSL-2750B", "DSL-320B"],
+      "firmware_range": "2.x",
+      "notes": "D-Link DSL modem/router admin favicon. Appeared in D-Link admin page Shodan searches.",
+      "shodan_verified": true,
+      "shodan_count_approx": 3,
+      "shodan_query": "http.favicon.hash:-792799191 http.html:D-Link"
+    }
+  }
+}

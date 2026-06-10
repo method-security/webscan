@@ -15,6 +15,8 @@ import (
 	common "github.com/Method-Security/webscan/generated/go/common"
 	// Utils
 	utils "github.com/Method-Security/webscan/utils"
+	useragent "github.com/Method-Security/webscan/utils/useragent"
+
 	// External
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
@@ -47,6 +49,8 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 		}
 	}
 
+	resolvedUserAgent := useragent.Resolve(config.UserAgent)
+
 	// Handle Redirects (Runs once if MaxRedirects == 0 which is for requests that don't follow redirects)
 	currentURL := url
 	for redirects := 0; redirects <= config.MaxRedirects; redirects++ {
@@ -67,6 +71,11 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 			req.Header.Set(k, v)
 		}
 
+		// Set a realistic User-Agent if the caller didn't provide one
+		if req.Header.Get("User-Agent") == "" {
+			req.Header.Set("User-Agent", resolvedUserAgent)
+		}
+
 		// Send Request
 		resp, err := client.Do(req)
 		if err != nil {
@@ -76,6 +85,14 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 
 		// Check if Response is not a redirect, return
 		if resp.StatusCode < 300 || resp.StatusCode >= 400 {
+			// Trailing-slash redirects update currentURL without adding a new
+			// redirectChain entry (they are not counted as real redirects).
+			// Update the last chain entry in-place so the chain length stays
+			// accurate and callers get the true canonical URL without a
+			// spurious extra hop.
+			if currentURL != redirectChain[len(redirectChain)-1] {
+				redirectChain[len(redirectChain)-1] = currentURL
+			}
 			return resp, redirectChain, nil
 		}
 
@@ -83,6 +100,9 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 		location := resp.Header.Get("Location")
 		if location == "" {
 			log.Debug("No location header found returning response", svc1log.SafeParam("url", currentURL), svc1log.SafeParam("status", resp.StatusCode))
+			if currentURL != redirectChain[len(redirectChain)-1] {
+				redirectChain[len(redirectChain)-1] = currentURL
+			}
 			return resp, redirectChain, nil
 		}
 
@@ -96,7 +116,7 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 		// Check if redirect is cross-domain and should be blocked
 		if config.IgnoreCrossDomainRedirects {
 			originalURL, parseErr := neturl.Parse(url)
-			if parseErr == nil && originalURL.Host != nextURL.Host {
+			if parseErr == nil && originalURL.Hostname() != nextURL.Hostname() {
 				log.Info("Blocking cross-domain redirect", svc1log.SafeParam("from", currentURL), svc1log.SafeParam("to", nextURL.String()))
 				err = resp.Body.Close()
 				if err != nil {

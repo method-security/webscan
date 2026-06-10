@@ -3,10 +3,9 @@ package discoverroute
 import (
 	// Standard
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
-	"net/url"
 	"regexp"
 	"strings"
 
@@ -15,12 +14,184 @@ import (
 	discover "github.com/Method-Security/webscan/generated/go/discover"
 	discoverroutehelpers "github.com/Method-Security/webscan/internal/discover/route/helpers"
 
+	// Utils
+	request "github.com/Method-Security/webscan/utils/request"
+	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
+
 	// External
 	goquery "github.com/PuerkitoBio/goquery"
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 	ast "github.com/robertkrimen/otto/ast"
 	parser "github.com/robertkrimen/otto/parser"
 )
+
+// fetchJSResource issues a GET against fullURL using utils/request in standard
+// mode so the request honors the surrounding DiscoverRouteConfig knobs
+// (VerifyTls, UserAgent, Timeout, MaxRedirects). Returns the response body
+// bytes, raw response headers, the HTTP status code and an error.
+//
+// TODO(aitf-71-followup): plumb headless/browserbase support so JS bundle and
+// source map fetches can run through the configured request method instead of
+// always going via the standard transport.
+func fetchJSResource(ctx context.Context, fullURL string, routeCaptureConfig discover.DiscoverRouteConfig) ([]byte, map[string][]string, int, error) {
+	baseURL, path, queryParams, err := requesthelpers.SplitTargetURL(fullURL)
+	if err != nil {
+		return nil, nil, 0, fmt.Errorf("failed to parse URL %s: %w", fullURL, err)
+	}
+
+	httpRequest := common.HttpRequest{
+		BaseUrl: baseURL,
+		Path:    path,
+		Method:  common.HttpMethodGet,
+		Params: &common.HttpRequestParams{
+			Query: queryParams,
+		},
+	}
+
+	requestConfig := common.SendHttpRequestConfig{
+		Request:      &httpRequest,
+		MaxRedirects: routeCaptureConfig.MaxRedirects,
+		VerifyTls:    routeCaptureConfig.VerifyTls,
+		Timeout:      routeCaptureConfig.Timeout,
+		// IgnoreCrossDomainRedirects is the transport-layer flag — a strict
+		// hostname-string equality check. The route allowlist (IsURLAllowed /
+		// IsSubdomain) already handles cross-domain scoping at discover time
+		// and is subdomain-aware. Match legacy http.Get redirect-following so
+		// apex → www and other in-scope hostname-changing redirects still
+		// resolve.
+		IgnoreCrossDomainRedirects: false,
+		UserAgent:                  routeCaptureConfig.UserAgent,
+		RequestMethod:              common.RequestMethodStandard,
+	}
+
+	response, err := request.SendRequest(ctx, requestConfig)
+	if err != nil {
+		return nil, nil, 0, err
+	}
+	if response == nil || response.Response == nil {
+		return nil, nil, 0, fmt.Errorf("empty response from %s", fullURL)
+	}
+
+	statusCode := 0
+	if response.Response.StatusCode != nil {
+		statusCode = *response.Response.StatusCode
+	}
+
+	body, err := responseBodyRawBytes(response.Response.ResponseBody)
+	if err != nil {
+		return nil, response.Response.ResponseHeaders, statusCode, fmt.Errorf("decode response body from %s: %w", fullURL, err)
+	}
+
+	return body, response.Response.ResponseHeaders, statusCode, nil
+}
+
+// responseBodyRawBytes returns the raw octets of a Body struct, handling
+// binary (base64-encoded), text, and json kinds the way JS bundle / source
+// map fetches need. The default helper
+// `requesthelpers.GetResponseBodyStringFromBodyStruct` returns the literal
+// base64 *text* for `binary` bodies, which silently corrupts JS / JSON
+// served as `application/octet-stream`. This helper base64-decodes binary
+// bodies and returns the underlying bytes so downstream parsers see the
+// real content.
+func responseBodyRawBytes(body *common.Body) ([]byte, error) {
+	if body == nil {
+		return []byte{}, nil
+	}
+	switch body.Kind {
+	case "binary":
+		if body.Binary == nil {
+			return []byte{}, nil
+		}
+		decoded, err := base64.StdEncoding.DecodeString(body.Binary.Base64)
+		if err != nil {
+			return nil, fmt.Errorf("base64 decode binary body: %w", err)
+		}
+		return decoded, nil
+	case "text":
+		if body.Text == nil {
+			return []byte{}, nil
+		}
+		return []byte(body.Text.Value), nil
+	case "json":
+		if body.Json == nil {
+			return []byte{}, nil
+		}
+		return []byte(body.Json.Data), nil
+	}
+	// For form/multipart/unknown kinds, fall back to the legacy helper to
+	// avoid behavior changes outside the JS/source-map fetch surface.
+	if str := requesthelpers.GetResponseBodyStringFromBodyStruct(body); str != nil {
+		return []byte(*str), nil
+	}
+	return []byte{}, nil
+}
+
+// firstHeaderValue returns the first value for the given header name from the
+// canonical multi-value header map produced by utils/request. The lookup is
+// case-insensitive to match net/http semantics.
+func firstHeaderValue(headers map[string][]string, name string) string {
+	if headers == nil {
+		return ""
+	}
+	for k, v := range headers {
+		if strings.EqualFold(k, name) && len(v) > 0 {
+			return v[0]
+		}
+	}
+	return ""
+}
+
+// sourceMap represents the structure of a JavaScript source map.
+type sourceMap struct {
+	Sources        []string  `json:"sources"`
+	SourcesContent []*string `json:"sourcesContent"`
+}
+
+// allCapsVarPattern matches ALL_CAPS variable names (at least two chars).
+var allCapsVarPattern = regexp.MustCompile(`^[A-Z][A-Z0-9_]+$`)
+
+// numericSegmentPattern matches purely numeric path segments.
+var numericSegmentPattern = regexp.MustCompile(`^\d+$`)
+
+// uuidSegmentPattern matches UUID-like segments (8-4-4-4-12 hex).
+var uuidSegmentPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+
+// longHexSegmentPattern matches long hex strings (16+ hex chars) that are not UUIDs.
+var longHexSegmentPattern = regexp.MustCompile(`^[0-9a-fA-F]{16,}$`)
+
+// normalizePathTemplate replaces dynamic path segments with placeholder tokens.
+// - Numeric segments become <id>
+// - UUID segments become <uuid>
+// - Long hex strings (16+ chars) become <hash>
+func normalizePathTemplate(path string) string {
+	if path == "" || path == "/" {
+		return path
+	}
+	segments := strings.Split(path, "/")
+	for i, seg := range segments {
+		if uuidSegmentPattern.MatchString(seg) {
+			segments[i] = "<uuid>"
+		} else if longHexSegmentPattern.MatchString(seg) {
+			segments[i] = "<hash>"
+		} else if numericSegmentPattern.MatchString(seg) {
+			segments[i] = "<id>"
+		}
+	}
+	return strings.Join(segments, "/")
+}
+
+// hasTemplateSegments returns true if any segment in the path is dynamic (numeric/uuid/hex).
+func hasTemplateSegments(path string) bool {
+	if path == "" {
+		return false
+	}
+	for _, seg := range strings.Split(path, "/") {
+		if uuidSegmentPattern.MatchString(seg) || longHexSegmentPattern.MatchString(seg) || numericSegmentPattern.MatchString(seg) {
+			return true
+		}
+	}
+	return false
+}
 
 // Common API call patterns in JavaScript
 var apiPatterns = []struct {
@@ -94,7 +265,7 @@ func extractRoutesFromPatterns(content string, baseURL string, routeCaptureConfi
 			fullURL := discoverroutehelpers.ResolveURL(baseURL, urlStr)
 
 			// Check if the URL is allowed
-			if !discoverroutehelpers.IsURLAllowed(baseURL, fullURL, routeCaptureConfig.IgnoreBaseUrlMatch, routeCaptureConfig.CollectStaticAssets) {
+			if !discoverroutehelpers.IsURLAllowed(baseURL, fullURL, routeCaptureConfig.IgnoreCrossDomain, routeCaptureConfig.CollectStaticAssets) {
 				continue
 			}
 
@@ -105,7 +276,7 @@ func extractRoutesFromPatterns(content string, baseURL string, routeCaptureConfi
 				continue
 			}
 
-			parsedURL, err := url.Parse(urlNoQuery)
+			routeBaseURL, routePath, err := discoverroutehelpers.SplitURLBaseAndPath(urlNoQuery)
 			if err != nil {
 				errors = append(errors, err.Error())
 				continue
@@ -117,9 +288,15 @@ func extractRoutesFromPatterns(content string, baseURL string, routeCaptureConfi
 			}
 
 			route := &discover.RouteDetails{
-				BaseUrl: baseURL,
-				Path:    parsedURL.Path,
-				Method:  common.HttpMethod(method).Ptr(),
+				BaseUrl: routeBaseURL,
+				Path:    routePath,
+				Method:  common.HttpMethod(method),
+			}
+
+			// Apply path templating if the path has dynamic segments
+			if hasTemplateSegments(routePath) {
+				tmpl := normalizePathTemplate(routePath)
+				route.PathTemplate = &tmpl
 			}
 
 			routes = append(routes, route)
@@ -223,7 +400,16 @@ func extractScriptContentRoutes(ctx context.Context, scriptContent string, baseU
 	}
 
 	// If parsing succeeds, use AST traversal
-	ast.Walk(&visitor{routes: &routes, urls: urls, baseURL: baseURL, baseURLsOnly: routeCaptureConfig.IgnoreBaseUrlMatch, captureStaticAssets: routeCaptureConfig.CollectStaticAssets, errors: &errors}, program)
+	v := &visitor{
+		routes:              &routes,
+		urls:                urls,
+		baseURL:             baseURL,
+		baseURLsOnly:        routeCaptureConfig.IgnoreCrossDomain,
+		captureStaticAssets: routeCaptureConfig.CollectStaticAssets,
+		errors:              &errors,
+		symbolTable:         make(map[string]string),
+	}
+	ast.Walk(v, program)
 
 	return discoverroutehelpers.MergeWebRoutes(routes), discoverroutehelpers.SetToListString(urls), errors
 }
@@ -236,6 +422,36 @@ type visitor struct {
 	baseURLsOnly        bool
 	captureStaticAssets bool
 	errors              *[]string
+	symbolTable         map[string]string   // current (innermost) scope
+	scopeStack          []map[string]string // outer scopes, index 0 = outermost
+}
+
+// pushScope creates a new inner scope for function bodies.
+func (v *visitor) pushScope() {
+	v.scopeStack = append(v.scopeStack, v.symbolTable)
+	v.symbolTable = make(map[string]string)
+}
+
+// popScope restores the enclosing scope after leaving a function.
+func (v *visitor) popScope() {
+	if len(v.scopeStack) == 0 {
+		return
+	}
+	v.symbolTable = v.scopeStack[len(v.scopeStack)-1]
+	v.scopeStack = v.scopeStack[:len(v.scopeStack)-1]
+}
+
+// lookupSymbol resolves a name from the innermost scope outward.
+func (v *visitor) lookupSymbol(name string) (string, bool) {
+	if val, ok := v.symbolTable[name]; ok {
+		return val, true
+	}
+	for i := len(v.scopeStack) - 1; i >= 0; i-- {
+		if val, ok := v.scopeStack[i][name]; ok {
+			return val, true
+		}
+	}
+	return "", false
 }
 
 // Enter method for the visitor to process each node
@@ -243,12 +459,93 @@ func (v *visitor) Enter(n ast.Node) ast.Visitor {
 	switch node := n.(type) {
 	case *ast.CallExpression:
 		v.handleCallExpression(node)
+	case *ast.VariableStatement:
+		v.handleVariableStatement(node)
+	case *ast.FunctionLiteral:
+		// Push a new scope for every function body.
+		// otto's Walk visits the *FunctionLiteral inside both function expressions
+		// (var f = function(){}) and function declarations (function foo(){}),
+		// so this case covers all function-scoping boundaries.
+		_ = node
+		v.pushScope()
 	}
 	return v
 }
 
 // Exit method (required by the ast.Visitor interface)
-func (v *visitor) Exit(n ast.Node) {}
+func (v *visitor) Exit(n ast.Node) {
+	switch n.(type) {
+	case *ast.FunctionLiteral:
+		v.popScope()
+	}
+}
+
+// handleVariableStatement processes variable statements to build a symbol table.
+// It also emits routes for ALL_CAPS variables that look like API paths (Feature 2 + 3).
+func (v *visitor) handleVariableStatement(node *ast.VariableStatement) {
+	for _, expr := range node.List {
+		varExpr, ok := expr.(*ast.VariableExpression)
+		if !ok || varExpr.Initializer == nil {
+			continue
+		}
+		varName := varExpr.Name
+
+		strVal := v.resolveExpressionToString(varExpr.Initializer)
+		if strVal == "" {
+			continue
+		}
+
+		// Store in symbol table
+		v.symbolTable[varName] = strVal
+
+		// Feature 3: ALL_CAPS variable with API path value
+		if allCapsVarPattern.MatchString(varName) && strings.HasPrefix(strVal, "/") {
+			// Resolve and emit a route
+			fullURL := discoverroutehelpers.ResolveURL(v.baseURL, strVal)
+			if discoverroutehelpers.IsURLAllowed(v.baseURL, fullURL, v.baseURLsOnly, v.captureStaticAssets) {
+				urlNoQuery, err := discoverroutehelpers.URLRemoveQueryParams(fullURL)
+				if err == nil {
+					routeBaseURL, routePath, err := discoverroutehelpers.SplitURLBaseAndPath(urlNoQuery)
+					if err == nil {
+						evidence := "CONST:" + varName
+						tmpl := normalizePathTemplate(routePath)
+						route := &discover.RouteDetails{
+							BaseUrl:      routeBaseURL,
+							Path:         routePath,
+							Method:       common.HttpMethodGet,
+							Evidence:     &evidence,
+							PathTemplate: &tmpl,
+						}
+						*v.routes = append(*v.routes, route)
+						v.urls[fullURL] = struct{}{}
+					}
+				}
+			}
+		}
+	}
+}
+
+// resolveExpressionToString attempts to evaluate an AST expression to a string value.
+// Handles string literals, identifiers (via symbolTable), and binary "+" concatenations.
+func (v *visitor) resolveExpressionToString(expr ast.Expression) string {
+	switch e := expr.(type) {
+	case *ast.StringLiteral:
+		return e.Value
+	case *ast.Identifier:
+		if val, ok := v.lookupSymbol(e.Name); ok {
+			return val
+		}
+	case *ast.BinaryExpression:
+		if e.Operator.String() == "+" {
+			left := v.resolveExpressionToString(e.Left)
+			right := v.resolveExpressionToString(e.Right)
+			if left != "" && right != "" {
+				return left + right
+			}
+		}
+	}
+	return ""
+}
 
 // handleCallExpression processes function calls like fetch(), $.ajax(), XMLHttpRequest, etc.
 func (v *visitor) handleCallExpression(node *ast.CallExpression) {
@@ -268,16 +565,17 @@ func (v *visitor) processFetchCall(node *ast.CallExpression) {
 		return
 	}
 
-	// First argument is the URL
-	urlArg, ok := node.ArgumentList[0].(*ast.StringLiteral)
-	if !ok {
+	// First argument is the URL — resolve via symbol table if needed
+	urlStr := v.resolveExpressionToString(node.ArgumentList[0])
+	if urlStr == "" {
 		return
 	}
-	urlStr := urlArg.Value
+
+	fullURL := discoverroutehelpers.ResolveURL(v.baseURL, urlStr)
 
 	// Check if the URL is allowed
 	// Only consider URLs that are part of the base URL if specified
-	if !discoverroutehelpers.IsURLAllowed(v.baseURL, urlStr, v.baseURLsOnly, v.baseURLsOnly) {
+	if !discoverroutehelpers.IsURLAllowed(v.baseURL, fullURL, v.baseURLsOnly, v.captureStaticAssets) {
 		return
 	}
 
@@ -302,7 +600,7 @@ func (v *visitor) processFetchCall(node *ast.CallExpression) {
 		}
 	}
 
-	v.addRoute(urlStr, method, bodyParams, queryParams)
+	v.addRoute(fullURL, method, bodyParams, queryParams)
 }
 
 // addRoute adds a route to the list
@@ -314,22 +612,97 @@ func (v *visitor) addRoute(urlStr, method string, bodyParams []*discover.RouteBo
 		return
 	}
 
-	parsedURL, err := url.Parse(urlNoQuery)
+	routeBaseURL, routePath, err := discoverroutehelpers.SplitURLBaseAndPath(urlNoQuery)
 	if err != nil {
 		*v.errors = append(*v.errors, err.Error())
 		return
 	}
 
 	route := &discover.RouteDetails{
-		BaseUrl:     v.baseURL,
-		Path:        parsedURL.Path,
-		Method:      common.HttpMethod(method).Ptr(),
+		BaseUrl:     routeBaseURL,
+		Path:        routePath,
+		Method:      common.HttpMethod(method),
 		BodyParams:  bodyParams,
 		QueryParams: queryParams,
 	}
 
+	// Apply path templating if the path has dynamic segments
+	if hasTemplateSegments(routePath) {
+		tmpl := normalizePathTemplate(routePath)
+		route.PathTemplate = &tmpl
+	}
+
 	*v.routes = append(*v.routes, route)
 	v.urls[urlStr] = struct{}{}
+}
+
+// fetchSourceMapRoutes fetches a source map from the given URL, parses it, and extracts routes
+// from each sourcesContent entry. Routes are tagged with evidence = "sourcemap:<source_name>".
+func fetchSourceMapRoutes(ctx context.Context, sourceMapURL string, baseURL string, routeCaptureConfig discover.DiscoverRouteConfig) ([]*discover.RouteDetails, []string, []string) {
+	routes := []*discover.RouteDetails{}
+	urls := []string{}
+	errors := []string{}
+
+	if routeCaptureConfig.IgnoreCrossDomain && !discoverroutehelpers.IsSubdomain(baseURL, sourceMapURL) {
+		return routes, urls, errors
+	}
+
+	bodyBytes, _, statusCode, err := fetchJSResource(ctx, sourceMapURL, routeCaptureConfig)
+	if err != nil {
+		errors = append(errors, fmt.Sprintf("Failed to fetch source map %s: %s", sourceMapURL, err))
+		return routes, urls, errors
+	}
+
+	if statusCode != 200 {
+		errors = append(errors, fmt.Sprintf("Failed to fetch source map %s: status %d", sourceMapURL, statusCode))
+		return routes, urls, errors
+	}
+
+	var sm sourceMap
+	if err := json.Unmarshal(bodyBytes, &sm); err != nil {
+		errors = append(errors, fmt.Sprintf("Failed to parse source map %s: %s", sourceMapURL, err))
+		return routes, urls, errors
+	}
+
+	for i, contentPtr := range sm.SourcesContent {
+		if contentPtr == nil || *contentPtr == "" {
+			continue
+		}
+		content := *contentPtr
+
+		// Determine evidence tag from the parallel sources[] entry
+		sourceName := ""
+		if i < len(sm.Sources) {
+			sourceName = sm.Sources[i]
+		}
+
+		contentRoutes, contentUrls, contentErrors := extractScriptContentRoutes(ctx, content, baseURL, routeCaptureConfig)
+		// Tag each extracted route with source map evidence
+		for _, route := range contentRoutes {
+			if sourceName != "" {
+				evidence := "sourcemap:" + sourceName
+				route.Evidence = &evidence
+			}
+			// Apply path templating
+			if route.PathTemplate == nil && hasTemplateSegments(route.Path) {
+				tmpl := normalizePathTemplate(route.Path)
+				route.PathTemplate = &tmpl
+			}
+		}
+		routes = append(routes, contentRoutes...)
+		urls = append(urls, contentUrls...)
+		errors = append(errors, contentErrors...)
+	}
+
+	return routes, urls, errors
+}
+
+// shouldFetchSourceMaps returns true when source map fetching is enabled (default: true).
+func shouldFetchSourceMaps(routeCaptureConfig discover.DiscoverRouteConfig) bool {
+	if routeCaptureConfig.FetchSourceMaps == nil {
+		return true
+	}
+	return *routeCaptureConfig.FetchSourceMaps
 }
 
 // ExtractScriptRoutes finds script elements with a src attribute, fetches the JavaScript data, parses it, and extracts routes.
@@ -339,7 +712,14 @@ func ExtractScriptRoutes(ctx context.Context, doc *goquery.Document, baseURL str
 	urls := make(map[string]struct{})
 	errors := []string{}
 
+	bundleCount := 0
+
 	doc.Find("script[src]").Each(func(i int, s *goquery.Selection) {
+		// Honor MaxBundles limit
+		if routeCaptureConfig.MaxBundles != nil && *routeCaptureConfig.MaxBundles > 0 && bundleCount >= *routeCaptureConfig.MaxBundles {
+			return
+		}
+
 		src, exists := s.Attr("src")
 		if exists && src != "" {
 			// Only process JavaScript files
@@ -347,43 +727,31 @@ func ExtractScriptRoutes(ctx context.Context, doc *goquery.Document, baseURL str
 				return
 			}
 
-			// If onlybaseURLs is set, only request script src that are relative
-			if !routeCaptureConfig.IgnoreBaseUrlMatch && discoverroutehelpers.IsAbsoluteURL(src) {
-				return
-			}
-
 			fullURL := discoverroutehelpers.ResolveURL(baseURL, src)
 
+			if routeCaptureConfig.IgnoreCrossDomain && !discoverroutehelpers.IsSubdomain(baseURL, fullURL) {
+				return
+			}
+
 			// Check if the URL is allowed
-			if !discoverroutehelpers.IsURLAllowed(baseURL, fullURL, routeCaptureConfig.IgnoreBaseUrlMatch, routeCaptureConfig.CollectStaticAssets) {
+			if !discoverroutehelpers.IsURLAllowed(baseURL, fullURL, routeCaptureConfig.IgnoreCrossDomain, routeCaptureConfig.CollectStaticAssets) {
 				return
 			}
 
-			// Fetch the JavaScript content
-			resp, err := http.Get(fullURL)
-			if err != nil {
-				errors = append(errors, err.Error())
-				return
-			}
-			defer func() {
-				if cerr := resp.Body.Close(); cerr != nil {
-					err = cerr
-				}
-			}()
+			// Fetch the JavaScript content via utils/request so the surrounding
+			// DiscoverRouteConfig (TLS, UA, timeout) is honored.
+			bodyBytes, respHeaders, statusCode, err := fetchJSResource(ctx, fullURL, routeCaptureConfig)
 			if err != nil {
 				errors = append(errors, err.Error())
 				return
 			}
 
-			if resp.StatusCode != 200 {
-				errors = append(errors, fmt.Sprintf("Failed to get %s: %s", fullURL, resp.Status))
+			if statusCode != 200 {
+				errors = append(errors, fmt.Sprintf("Failed to get %s: status %d", fullURL, statusCode))
 				return
 			}
-			bodyBytes, err := io.ReadAll(resp.Body)
-			if err != nil {
-				errors = append(errors, err.Error())
-				return
-			}
+
+			bundleCount++
 			scriptContent := string(bodyBytes)
 
 			// Extract routes from the JavaScript content
@@ -393,8 +761,103 @@ func ExtractScriptRoutes(ctx context.Context, doc *goquery.Document, baseURL str
 				urls[u] = struct{}{}
 			}
 			errors = append(errors, contentErrors...)
+
+			// Feature 1: Source map ingestion
+			if shouldFetchSourceMaps(routeCaptureConfig) {
+				// Check response headers for a source map URL
+				sourceMapURL := firstHeaderValue(respHeaders, "SourceMap")
+				if sourceMapURL == "" {
+					sourceMapURL = firstHeaderValue(respHeaders, "X-SourceMap")
+				}
+				// Fallback: try <bundle_url>.map
+				if sourceMapURL == "" {
+					mapBase := strings.SplitN(fullURL, "?", 2)[0]
+					mapBase = strings.SplitN(mapBase, "#", 2)[0]
+					sourceMapURL = mapBase + ".map"
+				} else {
+					// Resolve relative source map URLs against the bundle URL
+					sourceMapURL = discoverroutehelpers.ResolveURL(fullURL, sourceMapURL)
+				}
+
+				smRoutes, smURLs, smErrors := fetchSourceMapRoutes(ctx, sourceMapURL, baseURL, routeCaptureConfig)
+				routes = append(routes, smRoutes...)
+				for _, u := range smURLs {
+					urls[u] = struct{}{}
+				}
+				errors = append(errors, smErrors...)
+			}
 		}
 	})
+
+	return discoverroutehelpers.MergeWebRoutes(routes), discoverroutehelpers.SetToListString(urls), errors
+}
+
+// ExtractBundleURLRoutes processes a list of explicit JS bundle URLs and extracts routes from each.
+// Returns a slice of RouteDetails, a slice of URLs, and a slice of errors.
+func ExtractBundleURLRoutes(ctx context.Context, bundleURLs []string, baseURL string, routeCaptureConfig discover.DiscoverRouteConfig) ([]*discover.RouteDetails, []string, []string) {
+	routes := []*discover.RouteDetails{}
+	urls := make(map[string]struct{})
+	errors := []string{}
+
+	bundleCount := 0
+	for _, bundleURL := range bundleURLs {
+		// Honor MaxBundles limit (count successful fetches only, consistent with ExtractScriptRoutes)
+		if routeCaptureConfig.MaxBundles != nil && *routeCaptureConfig.MaxBundles > 0 && bundleCount >= *routeCaptureConfig.MaxBundles {
+			break
+		}
+
+		// Resolve relative bundle URLs
+		fullURL := discoverroutehelpers.ResolveURL(baseURL, bundleURL)
+
+		if !discoverroutehelpers.IsURLAllowed(baseURL, fullURL, routeCaptureConfig.IgnoreCrossDomain, routeCaptureConfig.CollectStaticAssets) {
+			continue
+		}
+
+		// Fetch the JS bundle via utils/request so the surrounding
+		// DiscoverRouteConfig (TLS, UA, timeout) is honored.
+		bodyBytes, respHeaders, statusCode, err := fetchJSResource(ctx, fullURL, routeCaptureConfig)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("Failed to fetch bundle %s: %s", fullURL, err))
+			continue
+		}
+
+		if statusCode != 200 {
+			errors = append(errors, fmt.Sprintf("Failed to fetch bundle %s: status %d", fullURL, statusCode))
+			continue
+		}
+
+		bundleCount++
+		scriptContent := string(bodyBytes)
+
+		contentRoutes, contentUrls, contentErrors := extractScriptContentRoutes(ctx, scriptContent, baseURL, routeCaptureConfig)
+		routes = append(routes, contentRoutes...)
+		for _, u := range contentUrls {
+			urls[u] = struct{}{}
+		}
+		errors = append(errors, contentErrors...)
+
+		// Feature 1: Source map ingestion for explicit bundles
+		if shouldFetchSourceMaps(routeCaptureConfig) {
+			sourceMapURL := firstHeaderValue(respHeaders, "SourceMap")
+			if sourceMapURL == "" {
+				sourceMapURL = firstHeaderValue(respHeaders, "X-SourceMap")
+			}
+			if sourceMapURL == "" {
+				mapBase := strings.SplitN(fullURL, "?", 2)[0]
+				mapBase = strings.SplitN(mapBase, "#", 2)[0]
+				sourceMapURL = mapBase + ".map"
+			} else {
+				sourceMapURL = discoverroutehelpers.ResolveURL(fullURL, sourceMapURL)
+			}
+
+			smRoutes, smURLs, smErrors := fetchSourceMapRoutes(ctx, sourceMapURL, baseURL, routeCaptureConfig)
+			routes = append(routes, smRoutes...)
+			for _, u := range smURLs {
+				urls[u] = struct{}{}
+			}
+			errors = append(errors, smErrors...)
+		}
+	}
 
 	return discoverroutehelpers.MergeWebRoutes(routes), discoverroutehelpers.SetToListString(urls), errors
 }

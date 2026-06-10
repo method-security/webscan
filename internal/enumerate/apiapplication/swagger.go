@@ -66,27 +66,24 @@ func isSwaggerUIPage(htmlContent string) bool {
 // Base spec paths without extensions - extensions will be added dynamically
 var baseSpecPaths = []string{
 	"/swagger",
+	"/openapi",
 	"/api-docs",
+	"/v3/api-docs",
 	"/api/swagger",
+	"/api/openapi",
+	"/api/v3/api-docs",
 	"/api/v1/swagger",
+	"/api/v1/openapi",
 	"/api/v2/swagger",
-	"/api/v3/swagger",
+	"/api/v2/openapi",
 	"/swagger/v1",
 	"/swagger/v2",
-	"/swagger/v3",
-	"/openapi",
-	"/api/openapi",
-	"/api/v1/openapi",
-	"/api/v2/openapi",
-	"/api/v3/openapi",
 	"/v1/swagger",
+	"/v1/openapi",
 	"/v2/swagger",
-	"/v3/swagger",
+	"/v2/openapi",
 	"/docs/swagger",
 	"/docs/openapi",
-	"/swagger-ui/swagger",
-	"/swagger-ui/openapi",
-	"/static/openapi",
 }
 
 // Spec file extensions to try (in order of preference)
@@ -112,7 +109,7 @@ func generateSpecPaths() []string {
 	return paths
 }
 
-func createSendHTTPRequestConfig(baseURL, path string, timeout int, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig) common.SendHttpRequestConfig {
+func createSendHTTPRequestConfig(baseURL, path string, timeout int, userAgent common.UserAgentPreset, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig) common.SendHttpRequestConfig {
 	request := common.HttpRequest{
 		BaseUrl: baseURL,
 		Path:    path,
@@ -124,6 +121,7 @@ func createSendHTTPRequestConfig(baseURL, path string, timeout int, requestMetho
 		MaxRedirects:       1,
 		VerifyTls:          false,
 		Timeout:            timeout,
+		UserAgent:          userAgent,
 		RequestMethod:      requestMethod,
 		HeadlessConfig:     headlessConfig,
 		BrowserbaseConfig:  nil,
@@ -212,7 +210,7 @@ func isLikelySpecURL(url string) bool {
 // findOpenAPISpec attempts to locate a valid OpenAPI/Swagger specification
 // First checks if target is a Swagger UI page, then uses headless if needed,
 // otherwise falls back to trying common endpoint paths.
-func findOpenAPISpec(ctx context.Context, target string, timeout int, headlessPath string) (string, []byte, map[string]interface{}, error) {
+func findOpenAPISpec(ctx context.Context, target string, timeout int, headlessPath string, userAgent common.UserAgentPreset) (string, []byte, map[string]interface{}, error) {
 	baseURL, parsedTargetPath, _, err := requesthelpers.SplitTargetURL(target)
 	if err != nil {
 		return "", nil, nil, fmt.Errorf("failed to split target URL: %w", err)
@@ -223,7 +221,7 @@ func findOpenAPISpec(ctx context.Context, target string, timeout int, headlessPa
 	}
 
 	// STEP 1: Make a standard request to check if target is a Swagger UI page
-	requestConfig := createSendHTTPRequestConfig(baseURL, parsedTargetPath, timeout, common.RequestMethodStandard, nil)
+	requestConfig := createSendHTTPRequestConfig(baseURL, parsedTargetPath, timeout, userAgent, common.RequestMethodStandard, nil)
 	response, err := request.SendRequest(ctx, requestConfig)
 
 	if err == nil && response.Response != nil && response.Response.StatusCode != nil &&
@@ -239,7 +237,7 @@ func findOpenAPISpec(ctx context.Context, target string, timeout int, headlessPa
 					MinDomStabalizeTime: 5,
 				}
 
-				headlessRequestConfig := createSendHTTPRequestConfig(baseURL, parsedTargetPath, timeout, common.RequestMethodHeadless, headlessConfig)
+				headlessRequestConfig := createSendHTTPRequestConfig(baseURL, parsedTargetPath, timeout, userAgent, common.RequestMethodHeadless, headlessConfig)
 				headlessResponse, err := request.SendRequest(ctx, headlessRequestConfig)
 
 				if err == nil && headlessResponse.Response != nil && headlessResponse.Response.StatusCode != nil &&
@@ -264,7 +262,7 @@ func findOpenAPISpec(ctx context.Context, target string, timeout int, headlessPa
 							}
 
 							// Make request to the extracted spec URL
-							specRequestConfig := createSendHTTPRequestConfig(baseURL, specPath, timeout, common.RequestMethodStandard, nil)
+							specRequestConfig := createSendHTTPRequestConfig(baseURL, specPath, timeout, userAgent, common.RequestMethodStandard, nil)
 							specResponse, err := request.SendRequest(ctx, specRequestConfig)
 							if err != nil {
 								continue
@@ -289,7 +287,7 @@ func findOpenAPISpec(ctx context.Context, target string, timeout int, headlessPa
 
 						// If no extracted URLs worked, try common paths as fallback
 						for _, path := range generateSpecPaths() {
-							specRequestConfig := createSendHTTPRequestConfig(baseURL, path, timeout, common.RequestMethodStandard, nil)
+							specRequestConfig := createSendHTTPRequestConfig(baseURL, path, timeout, userAgent, common.RequestMethodStandard, nil)
 							specResponse, err := request.SendRequest(ctx, specRequestConfig)
 							if err != nil {
 								continue
@@ -325,7 +323,7 @@ func findOpenAPISpec(ctx context.Context, target string, timeout int, headlessPa
 		}
 
 		// Create a request config for the Swagger/OpenAPI spec and send the request
-		requestConfig := createSendHTTPRequestConfig(baseURL, fmt.Sprintf("%s%s", parsedTargetPath, path), timeout, common.RequestMethodStandard, nil)
+		requestConfig := createSendHTTPRequestConfig(baseURL, fmt.Sprintf("%s%s", parsedTargetPath, path), timeout, userAgent, common.RequestMethodStandard, nil)
 		request, err := request.SendRequest(ctx, requestConfig)
 		if err != nil {
 			continue // Try next path on request failure
@@ -362,7 +360,7 @@ func PerformAppEnumerateSwagger(ctx context.Context, config enumerateapiapplicat
 	target := strings.TrimSuffix(config.Target, "/")
 
 	// Try to find a valid Swagger/OpenAPI spec
-	swaggerURL, bodyBytes, docType, err := findOpenAPISpec(ctx, target, config.Timeout, headlessPath)
+	swaggerURL, bodyBytes, docType, err := findOpenAPISpec(ctx, target, config.Timeout, headlessPath, config.UserAgent)
 	if err != nil {
 		report.Errors = append(report.Errors, err.Error())
 		return report
@@ -773,11 +771,11 @@ func convertSecurityDefinitionsV3(securityDefinitions map[string]*v3.SecuritySch
 	return schemes
 }
 
-func convertOAuthFlowV3(flows *v3.OAuthFlows) *enumerateapiapplicationfern.OAuthFlow {
+func convertOAuthFlowV3(flows *v3.OAuthFlows) *enumerateapiapplicationfern.OauthFlow {
 	if flows == nil {
 		return nil
 	}
-	return &enumerateapiapplicationfern.OAuthFlow{
+	return &enumerateapiapplicationfern.OauthFlow{
 		Implicit:          convertOAuthFlowDetailsV3(flows.Implicit),
 		Password:          convertOAuthFlowDetailsV3(flows.Password),
 		ClientCredentials: convertOAuthFlowDetailsV3(flows.ClientCredentials),
@@ -785,11 +783,11 @@ func convertOAuthFlowV3(flows *v3.OAuthFlows) *enumerateapiapplicationfern.OAuth
 	}
 }
 
-func convertOAuthFlowDetailsV3(flow *v3.OAuthFlow) *enumerateapiapplicationfern.OAuthFlowDetails {
+func convertOAuthFlowDetailsV3(flow *v3.OAuthFlow) *enumerateapiapplicationfern.OauthFlowDetails {
 	if flow == nil {
 		return nil
 	}
-	return &enumerateapiapplicationfern.OAuthFlowDetails{
+	return &enumerateapiapplicationfern.OauthFlowDetails{
 		AuthorizationUrl: &flow.AuthorizationUrl,
 		TokenUrl:         &flow.TokenUrl,
 		RefreshUrl:       &flow.RefreshUrl,

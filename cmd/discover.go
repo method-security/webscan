@@ -16,9 +16,11 @@ import (
 	discoverdirectory "github.com/Method-Security/webscan/internal/discover/directory"
 	discoverpage "github.com/Method-Security/webscan/internal/discover/page"
 	discoverpagehelpers "github.com/Method-Security/webscan/internal/discover/page/helpers"
+	discoverrequest "github.com/Method-Security/webscan/internal/discover/request"
 	discoverroute "github.com/Method-Security/webscan/internal/discover/route"
 	discoversaas "github.com/Method-Security/webscan/internal/discover/saas/active"
 	discoversaashelpers "github.com/Method-Security/webscan/internal/discover/saas/active/helpers"
+	discoverwordlist "github.com/Method-Security/webscan/internal/discover/wordlist"
 
 	// Utils
 	nucleihelpers "github.com/Method-Security/webscan/utils/nuclei/helpers"
@@ -39,7 +41,7 @@ func (a *WebScan) InitDiscoverCommand() {
 	}
 
 	// General Discover Flags
-	discoverCmd.PersistentFlags().Bool("ignore-cross-domain-redirects", false, "If true, do not follow redirects to a different domain and treat them as errors")
+	discoverCmd.PersistentFlags().Bool("ignore-cross-domain-redirects", true, "If true, do not follow redirects to a different domain and treat them as errors")
 
 	// Application Command
 	discoverApplicationCmd := &cobra.Command{
@@ -91,9 +93,14 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			globalTimeout, err := cmd.Flags().GetInt("global-timeout")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
 
 			// Create config
-			config, err := getDiscoverApplicationConfig(targets, resourceType, timeout, threads, proxy, verboseLogs, globalRateLimit)
+			config, err := getDiscoverApplicationConfig(targets, resourceType, timeout, threads, proxy, verboseLogs, globalRateLimit, globalTimeout)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -115,7 +122,10 @@ func (a *WebScan) InitDiscoverCommand() {
 	discoverApplicationCmd.Flags().Int("threads", 25, "Number of concurrent threads for scanning")
 	discoverApplicationCmd.Flags().String("proxy", "", "Optional HTTP proxy URL")
 	discoverApplicationCmd.Flags().Bool("verbose-logs", false, "Verbose logs")
-	discoverApplicationCmd.Flags().Int("global-rate-limit", 0, "Global rate limit (requests per second, 0 means no limit)")
+	discoverApplicationCmd.Flags().Int("global-rate-limit", 10, "Global rate limit in requests per second")
+	discoverApplicationCmd.Flags().Int("global-timeout", 0, "Maximum total scan time in seconds")
+	// TODO: Add --user-agent flag here once the nuclei runner supports UserAgentPreset.
+	// Skipped for now because application discovery uses nuclei, not the standard HTTP client.
 
 	// Mark Required Flags
 	_ = discoverApplicationCmd.MarkFlagRequired("targets")
@@ -257,8 +267,16 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+
+			// Get User Agent flag
+			userAgentPreset, err := requesthelpers.GetUserAgentFlag(cmd)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
 			// Set config
-			config := getDiscoverDirectoryConfig(targets, paths, wordlistType, wordlistSize, httpMethods, responseCodes, ignoreBaseContentMatch, verifyTLS, threshold, timeout, ignoreCrossDomainRedirects, maxRedirectsBaselineRequest, threads, maxRuntime, retries, sleep, jitter)
+			config := getDiscoverDirectoryConfig(targets, paths, wordlistType, wordlistSize, httpMethods, responseCodes, ignoreBaseContentMatch, verifyTLS, threshold, timeout, ignoreCrossDomainRedirects, maxRedirectsBaselineRequest, threads, maxRuntime, retries, sleep, jitter, userAgentPreset)
 
 			// Generate a report
 			rep, err := discoverdirectory.RunDirectoryDiscovery(cmd.Context(), config)
@@ -273,7 +291,7 @@ func (a *WebScan) InitDiscoverCommand() {
 	discoverDirectoryCmd.Flags().StringSlice("targets", []string{}, "Targets to be scanned")
 	// Directory Discovery Flags
 	discoverDirectoryCmd.Flags().StringSlice("paths", []string{}, "Paths to scan")
-	discoverDirectoryCmd.Flags().String("wordlist-type", "", "Type of wordlist to use automatically (directories, files)")
+	discoverDirectoryCmd.Flags().String("wordlist-type", "", "Type of wordlist to use automatically (DIRECTORIES, FILES)")
 	discoverDirectoryCmd.Flags().String("wordlist-size", "", "Size of wordlist to use (TINY, SMALL, MEDIUM, LARGE)")
 	discoverDirectoryCmd.Flags().StringSlice("http-methods", []string{"GET"}, "HTTP methods to use (e.g. GET,POST,PUT)")
 	// Config Flags
@@ -281,13 +299,15 @@ func (a *WebScan) InitDiscoverCommand() {
 	discoverDirectoryCmd.Flags().Bool("ignore-base-content-match", true, "Ignores valid responses with identical size and word length to the base path, typically signifying a web backend redirect")
 	discoverDirectoryCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
 	discoverDirectoryCmd.Flags().Float64("threshold", 0.25, "Threshold for successful results")
-	discoverDirectoryCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
+	discoverDirectoryCmd.Flags().Int("timeout", 20, "Timeout per request in seconds")
 	discoverDirectoryCmd.Flags().Int("max-redirects-baseline-request", 10, "Maximum number of redirects to follow for the baseline request")
-	discoverDirectoryCmd.Flags().Int("max-runtime", 0, "Maximum time to run the engagement (seconds) (Default is 0, which will run indefinitely)")
-	discoverDirectoryCmd.Flags().Int("threads", 0, "Number of threads to use")
+	discoverDirectoryCmd.Flags().Int("max-runtime", 650, "Maximum time to run the engagement in seconds")
+	discoverDirectoryCmd.Flags().Int("threads", 25, "Number of threads to use")
 	discoverDirectoryCmd.Flags().Int("retries", 0, "Number of times to retry a request if it fails")
 	discoverDirectoryCmd.Flags().Int("sleep", 0, "Number of seconds to sleep between requests")
 	discoverDirectoryCmd.Flags().Int("jitter", 0, "Jitter percentage (0-100) to apply random variance to sleep delay")
+	// User Agent Flag
+	discoverDirectoryCmd.Flags().String("user-agent", "RANDOM", "User-Agent preset (RANDOM, CHROME, FIREFOX, SAFARI, EDGE)")
 
 	// Mark Required Flags
 	_ = discoverDirectoryCmd.MarkFlagRequired("targets")
@@ -354,9 +374,22 @@ func (a *WebScan) InitDiscoverCommand() {
 				return
 			}
 
+			// Get User Agent flag
+			userAgentPreset, err := requesthelpers.GetUserAgentFlag(cmd)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
 			// Get Request Method flag
 			requestMethodConfig, err := requesthelpers.GetRequestMethodFlags(cmd)
 			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Validate user-agent compatibility with the chosen request method
+			if err := requesthelpers.ValidateUserAgentWithRequestMethod(userAgentPreset, requestMethodConfig.RequestMethodEnum, cmd.Flags().Changed("user-agent")); err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
@@ -374,7 +407,7 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Set Config
-			config := getDiscoverPageConfig(target, sensitiveContentDetection, sensitiveContentFingerprintsPath, responseCodes, maxRedirects, verifyTLS, timeout, ignoreCrossDomainRedirects, takeScreenshot, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
+			config := getDiscoverPageConfig(target, sensitiveContentDetection, sensitiveContentFingerprintsPath, responseCodes, maxRedirects, verifyTLS, timeout, ignoreCrossDomainRedirects, takeScreenshot, userAgentPreset, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
 
 			// Load sensitive content fingerprints if sensitive content detection is enabled and no fingerprints are found, return an error
 			var sensitiveContentFingerprints *discover.SensitiveContentFingerprints
@@ -401,15 +434,17 @@ func (a *WebScan) InitDiscoverCommand() {
 	// Target Flags
 	discoverPageCmd.Flags().String("target", "", "URL target to capture and analyze")
 	// Config Flags
-	discoverPageCmd.Flags().Bool("sensitive-content-detection", false, "Enable sensitive content detection")
-	discoverPageCmd.Flags().String("sensitive-content-fingerprints-path", "", "Path to a custom sensitive content fingerprints file (uses built-in fingerprints by default)")
+	discoverPageCmd.Flags().Bool("sensitive-content-detection", true, "Enable sensitive content detection")
+	discoverPageCmd.Flags().String("sensitive-content-fingerprints-path", "", "Path to a custom sensitive content fingerprints file")
 	discoverPageCmd.Flags().String("response-codes", "200-299", "Response codes to consider as valid responses")
 	discoverPageCmd.Flags().Bool("screenshot", false, "Capture a screenshot of the page")
 	discoverPageCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
 	discoverPageCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
-	discoverPageCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
+	discoverPageCmd.Flags().Int("timeout", 180, "Timeout per request in seconds")
+	// User Agent Flag
+	discoverPageCmd.Flags().String("user-agent", "RANDOM", "User-Agent preset (RANDOM, CHROME, FIREFOX, SAFARI, EDGE)")
 	// Request Method Flags for all capture subcommands
-	discoverPageCmd.Flags().String("request-method", "STANDARD", "Request method to use (standard, headless, browserbase)")
+	discoverPageCmd.Flags().String("request-method", "HEADLESS", "Request method to use (standard, headless, browserbase)")
 	discoverPageCmd.Flags().String("headless-path", "", "Path to headless browser executable")
 	discoverPageCmd.Flags().Int("min-dom-stabalize-time", 20, "Minimum time to wait for DOM stabilization in seconds")
 	discoverPageCmd.Flags().String("browserbase-token", "", "Browserbase API token for cloud browser access")
@@ -422,6 +457,153 @@ func (a *WebScan) InitDiscoverCommand() {
 
 	// Add Command to 'Discover' Command
 	discoverCmd.AddCommand(discoverPageCmd)
+
+	// Request Command
+	discoverRequestCmd := &cobra.Command{
+		Use:   "request",
+		Short: "Send a freeform HTTP request to a target",
+		Long:  `Send a freeform HTTP request to a target URL and capture the full HTTP response along with TLS certificate details.`,
+		Run: func(cmd *cobra.Command, args []string) {
+			defer a.OutputSignal.PanicHandler(cmd.Context())
+
+			// Target flag
+			target, err := cmd.Flags().GetString("target")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// HTTP Method flag
+			httpMethodStr, err := cmd.Flags().GetString("http-method")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			httpMethod, err := common.NewHttpMethodFromString(strings.ToUpper(httpMethodStr))
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Header flag (repeated)
+			headerPairs, err := cmd.Flags().GetStringArray("header")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			headers := requesthelpers.ParseHeaderPairs(headerPairs)
+
+			// JSON body flag
+			jsonBodyStr, err := cmd.Flags().GetString("json-body")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			var jsonBody *string
+			if jsonBodyStr != "" {
+				jsonBody = &jsonBodyStr
+			}
+
+			// Text body flag
+			textBodyStr, err := cmd.Flags().GetString("text-body")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			var textBody *string
+			if textBodyStr != "" {
+				textBody = &textBodyStr
+			}
+
+			// Form data flag (repeated)
+			formDataPairs, err := cmd.Flags().GetStringArray("form-data")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			formData := requesthelpers.ParseFormDataPairs(formDataPairs)
+
+			// Config flags
+			maxRedirects, err := cmd.Flags().GetInt("max-redirects")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			followRedirects, err := cmd.Flags().GetBool("follow-redirects")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			verifyTLS, err := cmd.Flags().GetBool("verify-tls")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			timeout, err := cmd.Flags().GetInt("timeout")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			ignoreCrossDomainRedirects, err := cmd.Flags().GetBool("ignore-cross-domain-redirects")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Get User Agent flag
+			userAgentPreset, err := requesthelpers.GetUserAgentFlag(cmd)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// If follow-redirects is false, set maxRedirects to 0
+			if !followRedirects {
+				maxRedirects = 0
+			}
+
+			// Build config
+			config := discover.DiscoverRequestConfig{
+				Target:                     target,
+				HttpMethod:                 httpMethod,
+				Headers:                    headers,
+				JsonBody:                   jsonBody,
+				TextBody:                   textBody,
+				FormData:                   formData,
+				MaxRedirects:               maxRedirects,
+				FollowRedirects:            followRedirects,
+				VerifyTls:                  verifyTLS,
+				Timeout:                    timeout,
+				UserAgent:                  userAgentPreset,
+				IgnoreCrossDomainRedirects: ignoreCrossDomainRedirects,
+			}
+
+			// Generate report
+			report := discoverrequest.PerformRequest(cmd.Context(), config)
+			a.OutputSignal.Content = report
+		},
+	}
+	// Target Flags
+	discoverRequestCmd.Flags().String("target", "", "URL to send the HTTP request to")
+	// Request Flags
+	discoverRequestCmd.Flags().String("http-method", "GET", "HTTP method (GET,POST,PUT,DELETE,PATCH,HEAD,OPTIONS)")
+	discoverRequestCmd.Flags().StringArray("header", []string{}, "Request headers as 'Key: Value' pairs (repeatable)")
+	discoverRequestCmd.Flags().String("json-body", "", "Request body as JSON string")
+	discoverRequestCmd.Flags().String("text-body", "", "Request body as plain text")
+	discoverRequestCmd.Flags().StringArray("form-data", []string{}, "Form data as 'key=value' pairs (repeatable)")
+	// Config Flags
+	discoverRequestCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
+	discoverRequestCmd.Flags().Bool("follow-redirects", true, "Follow HTTP redirects")
+	discoverRequestCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates")
+	discoverRequestCmd.Flags().Int("timeout", 30, "Request timeout in seconds")
+	// User Agent Flag
+	discoverRequestCmd.Flags().String("user-agent", "RANDOM", "User-Agent preset (RANDOM, CHROME, FIREFOX, SAFARI, EDGE)")
+
+	// Mark Required Flags
+	_ = discoverRequestCmd.MarkFlagRequired("target")
+
+	// Add Command to 'Discover' Command
+	discoverCmd.AddCommand(discoverRequestCmd)
 
 	// Probe Command
 	discoverProbeCmd := &cobra.Command{
@@ -484,6 +666,13 @@ func (a *WebScan) InitDiscoverCommand() {
 				return
 			}
 
+			// Get User Agent flag
+			userAgentPreset, err := requesthelpers.GetUserAgentFlag(cmd)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
 			// Get Request Method flags
 			requestMethodConfig, err := requesthelpers.GetRequestMethodFlags(cmd)
 			if err != nil {
@@ -491,8 +680,14 @@ func (a *WebScan) InitDiscoverCommand() {
 				return
 			}
 
+			// Validate user-agent compatibility with the chosen request method
+			if err := requesthelpers.ValidateUserAgentWithRequestMethod(userAgentPreset, requestMethodConfig.RequestMethodEnum, cmd.Flags().Changed("user-agent")); err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
 			// Set Config
-			config := getDiscoverProbeConfig(targets, protocol, maxRedirects, verifyTLS, timeout, sleep, jitter, ignoreCrossDomainRedirects, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
+			config := getDiscoverProbeConfig(targets, protocol, maxRedirects, verifyTLS, timeout, sleep, jitter, ignoreCrossDomainRedirects, userAgentPreset, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
 
 			// Generate report
 			report, err := discoverprobe.PerformWebProbe(cmd.Context(), config, requestMethodConfig.BrowserbaseSecrets)
@@ -512,6 +707,8 @@ func (a *WebScan) InitDiscoverCommand() {
 	discoverProbeCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
 	discoverProbeCmd.Flags().Int("sleep", 0, "Number of seconds to sleep between requests")
 	discoverProbeCmd.Flags().Int("jitter", 0, "Jitter percentage (0-100) to apply random variance to sleep delay")
+	// User Agent Flag
+	discoverProbeCmd.Flags().String("user-agent", "RANDOM", "User-Agent preset (RANDOM, CHROME, FIREFOX, SAFARI, EDGE)")
 	// Request Method Flags
 	discoverProbeCmd.Flags().String("request-method", "STANDARD", "Request method to use (standard, headless, browserbase)")
 	discoverProbeCmd.Flags().String("headless-path", "", "Path to headless browser executable")
@@ -543,7 +740,7 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Get Config flags
-			ignoreBaseURLMatch, err := cmd.Flags().GetBool("ignore-base-url-match")
+			ignoreCrossDomain, err := cmd.Flags().GetBool("ignore-cross-domain")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -597,7 +794,8 @@ func (a *WebScan) InitDiscoverCommand() {
 				return
 			}
 
-			ignoreCrossDomainRedirects, err := cmd.Flags().GetBool("ignore-cross-domain-redirects")
+			// Get User Agent flag
+			userAgentPreset, err := requesthelpers.GetUserAgentFlag(cmd)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -610,8 +808,36 @@ func (a *WebScan) InitDiscoverCommand() {
 				return
 			}
 
+			// Validate user-agent compatibility with the chosen request method
+			if err := requesthelpers.ValidateUserAgentWithRequestMethod(userAgentPreset, requestMethodConfig.RequestMethodEnum, cmd.Flags().Changed("user-agent")); err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Get JS route enhancement flags
+			bundleURLs, err := cmd.Flags().GetStringSlice("bundle-urls")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			fetchSourceMaps, err := cmd.Flags().GetBool("fetch-source-maps")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			maxBundles, err := cmd.Flags().GetInt("max-bundles")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			maxRoutes, err := cmd.Flags().GetInt("max-routes")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
 			// Set Config
-			config := getDiscoverRouteConfig(target, ignoreBaseURLMatch, collectStaticAssets, spiderDepth, maxRedirects, verifyTLS, timeout, sleep, jitter, ignoreCrossDomainRedirects, threads, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
+			config := getDiscoverRouteConfig(target, ignoreCrossDomain, collectStaticAssets, spiderDepth, maxRedirects, verifyTLS, timeout, sleep, jitter, threads, userAgentPreset, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig, bundleURLs, fetchSourceMaps, maxBundles, maxRoutes)
 
 			// Generate a report
 			report := discoverroute.PerformRouteCapture(cmd.Context(), config, requestMethodConfig.BrowserbaseSecrets)
@@ -621,23 +847,30 @@ func (a *WebScan) InitDiscoverCommand() {
 	// Target Flags
 	discoverRouteCmd.Flags().String("target", "", "URL target to discover routes from")
 	// Config Flags
-	discoverRouteCmd.Flags().Bool("ignore-base-url-match", false, "Add route even if it does not share the target's base URL")
+	discoverRouteCmd.Flags().Bool("ignore-cross-domain", true, "Ignore routes that do not share the target's base URL")
 	discoverRouteCmd.Flags().Bool("collect-static-assets", false, "Collect static assets from route discovery")
-	discoverRouteCmd.Flags().Int("spider-depth", 3, "Maximum depth for route spidering")
-	discoverRouteCmd.Flags().Int("max-redirects", 100, "Maximum number of redirects to follow")
+	discoverRouteCmd.Flags().Int("spider-depth", 1, "Maximum depth for route spidering")
+	discoverRouteCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
 	discoverRouteCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
-	discoverRouteCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
+	discoverRouteCmd.Flags().Int("timeout", 90, "Timeout per request in seconds")
 	discoverRouteCmd.Flags().Int("threads", 0, "Number of concurrent threads for scanning")
 	discoverRouteCmd.Flags().Int("sleep", 0, "Number of seconds to sleep between requests")
 	discoverRouteCmd.Flags().Int("jitter", 0, "Jitter percentage (0-100) to apply random variance to sleep delay")
+	// User Agent Flag
+	discoverRouteCmd.Flags().String("user-agent", "RANDOM", "User-Agent preset (RANDOM, CHROME, FIREFOX, SAFARI, EDGE)")
 	// Request Method Flags
-	discoverRouteCmd.Flags().String("request-method", "STANDARD", "Request method to use (standard, headless, browserbase)")
+	discoverRouteCmd.Flags().String("request-method", "HEADLESS", "Request method to use (standard, headless, browserbase)")
 	discoverRouteCmd.Flags().String("headless-path", "", "Path to headless browser executable")
 	discoverRouteCmd.Flags().Int("min-dom-stabalize-time", 20, "Minimum time to wait for DOM stabilization in seconds")
 	discoverRouteCmd.Flags().String("browserbase-token", "", "Browserbase API token for cloud browser access")
 	discoverRouteCmd.Flags().String("browserbase-project", "", "Browserbase project ID")
 	discoverRouteCmd.Flags().Bool("browserbase-proxy", false, "Use Browserbase proxy for requests")
 	discoverRouteCmd.Flags().StringSlice("browserbase-countries", []string{}, "List of countries to use for Browserbase proxy")
+	// JS route discovery enhancement flags
+	discoverRouteCmd.Flags().StringSlice("bundle-urls", []string{}, "Explicit JS bundle URLs to scan for routes")
+	discoverRouteCmd.Flags().Bool("fetch-source-maps", true, "Fetch and scan source maps for additional routes")
+	discoverRouteCmd.Flags().Int("max-bundles", 0, "Maximum number of JS bundles to process (0 = unlimited)")
+	discoverRouteCmd.Flags().Int("max-routes", 0, "Maximum number of routes to collect (0 = unlimited)")
 
 	// Mark Required Flags
 	_ = discoverRouteCmd.MarkFlagRequired("target")
@@ -767,8 +1000,20 @@ func (a *WebScan) InitDiscoverCommand() {
 				return
 			}
 
+			userAgentPreset, err := requesthelpers.GetUserAgentFlag(cmd)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Validate user-agent compatibility with the chosen request method
+			if err := requesthelpers.ValidateUserAgentWithRequestMethod(userAgentPreset, requestMethodEnum, cmd.Flags().Changed("user-agent")); err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
 			// Get the config
-			config := getDiscoverSaasConfig(orgs, saasCompanies, ssoCompanies, maxRedirects, verifyTLS, timeout, sleep, jitter, threads, requestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
+			config := getDiscoverSaasConfig(orgs, saasCompanies, ssoCompanies, maxRedirects, verifyTLS, timeout, sleep, jitter, threads, userAgentPreset, requestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
 
 			// Generate the report
 			report, err := discoversaas.LaunchDiscoverSaas(cmd.Context(), config, *filteredSaasFingerprints, *filteredSsoFingerprints, requestMethodConfig.BrowserbaseSecrets)
@@ -788,10 +1033,11 @@ func (a *WebScan) InitDiscoverCommand() {
 	discoverSaasCmd.Flags().StringSlice("sso-companies", []string{}, "The specific SSO companies to use for discovery (Must be present in the SSO fingerprints file)")
 	discoverSaasCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
 	discoverSaasCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
-	discoverSaasCmd.Flags().Int("timeout", 30, "Timeout in seconds for the capture")
-	discoverSaasCmd.Flags().Int("threads", 0, "Number of concurrent threads for discovery (default: number of CPUs)")
+	discoverSaasCmd.Flags().Int("timeout", 90, "Timeout in seconds for the capture")
+	discoverSaasCmd.Flags().Int("threads", 25, "Number of concurrent threads for discovery")
 	discoverSaasCmd.Flags().Int("sleep", 0, "Number of seconds to sleep between requests")
 	discoverSaasCmd.Flags().Int("jitter", 0, "Jitter percentage (0-100) to apply random variance to sleep delay")
+	discoverSaasCmd.Flags().String("user-agent", "RANDOM", "User-Agent preset (RANDOM, CHROME, FIREFOX, SAFARI, EDGE)")
 	// Request Method Flags for all capture subcommands
 	discoverSaasCmd.Flags().String("request-method", "HEADLESS", "Request method (headless, browserbase)")
 	discoverSaasCmd.Flags().String("headless-path", "", "Path to a headless browser executable")
@@ -806,12 +1052,130 @@ func (a *WebScan) InitDiscoverCommand() {
 	// Add Command to 'Discover' Command
 	discoverCmd.AddCommand(discoverSaasCmd)
 
+	// Wordlist Command
+	discoverWordlistCmd := &cobra.Command{
+		Use:   "wordlist",
+		Short: "Generate a wordlist from web content (CeWL-style)",
+		Long:  `Crawl a target website and extract unique words from page content to build a custom wordlist, similar to CeWL.`,
+		Run: func(cmd *cobra.Command, args []string) {
+			defer a.OutputSignal.PanicHandler(cmd.Context())
+
+			// Get Target flag
+			target, err := cmd.Flags().GetString("target")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Get Config flags
+			minWordLength, err := cmd.Flags().GetInt("min-word-length")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			spiderDepth, err := cmd.Flags().GetInt("spider-depth")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			includeMetadata, err := cmd.Flags().GetBool("include-metadata")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			includeComments, err := cmd.Flags().GetBool("include-comments")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			includeAltText, err := cmd.Flags().GetBool("include-alt-text")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			ignoreCrossDomain, err := cmd.Flags().GetBool("ignore-cross-domain")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			verifyTLS, err := cmd.Flags().GetBool("verify-tls")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			timeout, err := cmd.Flags().GetInt("timeout")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			threads, err := cmd.Flags().GetInt("threads")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			sleep, err := cmd.Flags().GetInt("sleep")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			jitter, err := cmd.Flags().GetInt("jitter")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			if jitter > 0 && sleep <= 0 {
+				a.OutputSignal.AddError(fmt.Errorf("jitter requires sleep > 0"))
+				return
+			}
+			if jitter < 0 || jitter > 100 {
+				a.OutputSignal.AddError(fmt.Errorf("jitter must be between 0 and 100"))
+				return
+			}
+
+			// Get User Agent flag
+			userAgentPreset, err := requesthelpers.GetUserAgentFlag(cmd)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Set Config
+			config := getDiscoverWordlistConfig(target, minWordLength, spiderDepth, includeMetadata, includeComments, includeAltText, ignoreCrossDomain, verifyTLS, timeout, threads, sleep, jitter, userAgentPreset)
+
+			// Generate a report
+			report := discoverwordlist.PerformWordlistCapture(cmd.Context(), config)
+			a.OutputSignal.Content = report
+		},
+	}
+	// Target Flags
+	discoverWordlistCmd.Flags().String("target", "", "URL target to crawl for wordlist generation")
+	// Config Flags
+	discoverWordlistCmd.Flags().Int("min-word-length", 5, "Minimum word length to include in wordlist")
+	discoverWordlistCmd.Flags().Int("spider-depth", 2, "Maximum depth for web spidering")
+	discoverWordlistCmd.Flags().Bool("include-metadata", false, "Include words from meta tag content")
+	discoverWordlistCmd.Flags().Bool("include-comments", false, "Include words from HTML comments")
+	discoverWordlistCmd.Flags().Bool("include-alt-text", false, "Include words from image alt attributes")
+	discoverWordlistCmd.Flags().Bool("ignore-cross-domain", true, "Ignore links that lead to a different domain")
+	discoverWordlistCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
+	discoverWordlistCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
+	discoverWordlistCmd.Flags().Int("threads", 5, "Number of concurrent threads for crawling")
+	discoverWordlistCmd.Flags().Int("sleep", 0, "Number of seconds to sleep between requests")
+	discoverWordlistCmd.Flags().Int("jitter", 0, "Jitter percentage (0-100) to apply random variance to sleep delay")
+	// User Agent Flag
+	discoverWordlistCmd.Flags().String("user-agent", "RANDOM", "User-Agent preset (RANDOM, CHROME, FIREFOX, SAFARI, EDGE)")
+
+	// Mark Required Flags
+	_ = discoverWordlistCmd.MarkFlagRequired("target")
+
+	// Add Command to 'Discover' Command
+	discoverCmd.AddCommand(discoverWordlistCmd)
+
 	// Add Command to Root Command
 	a.RootCmd.AddCommand(discoverCmd)
 }
 
 // getDiscoverApplicationConfig builds the config for application fingerprinting discovery.
-func getDiscoverApplicationConfig(targets []string, resource string, timeout int, threads int, proxy string, verboseLogs bool, globalRateLimit int) (*discover.DiscoverApplicationConfig, error) {
+func getDiscoverApplicationConfig(targets []string, resource string, timeout int, threads int, proxy string, verboseLogs bool, globalRateLimit int, globalTimeout int) (*discover.DiscoverApplicationConfig, error) {
 	resourceEnum, err := getDiscoverApplicationResourceConfigTypeFromString(resource)
 	if err != nil {
 		return nil, fmt.Errorf("invalid resource type: %s", resource)
@@ -825,12 +1189,13 @@ func getDiscoverApplicationConfig(targets []string, resource string, timeout int
 		Proxy:           &proxy,
 		VerboseLogs:     verboseLogs,
 		GlobalRateLimit: max(0, globalRateLimit),
+		GlobalTimeout:   max(0, globalTimeout),
 	}
 	return config, nil
 }
 
 // getDiscoverPageConfig builds the config for page capture and analysis.
-func getDiscoverPageConfig(target string, sensitiveContentDetection bool, sensitiveContentFingerprintsPath string, responseCodes string, maxRedirects int, verifyTLS bool, timeout int, ignoreCrossDomainRedirects bool, takeScreenshot bool, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) discover.DiscoverPageConfig {
+func getDiscoverPageConfig(target string, sensitiveContentDetection bool, sensitiveContentFingerprintsPath string, responseCodes string, maxRedirects int, verifyTLS bool, timeout int, ignoreCrossDomainRedirects bool, takeScreenshot bool, userAgent common.UserAgentPreset, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) discover.DiscoverPageConfig {
 	config := discover.DiscoverPageConfig{
 		Target:                     target,
 		ResponseCodes:              responseCodes,
@@ -840,6 +1205,7 @@ func getDiscoverPageConfig(target string, sensitiveContentDetection bool, sensit
 		Timeout:                    max(timeout, 0),
 		IgnoreCrossDomainRedirects: ignoreCrossDomainRedirects,
 		Screenshot:                 takeScreenshot,
+		UserAgent:                  userAgent,
 		RequestMethod:              requestMethod,
 		HeadlessConfig:             headlessConfig,
 		BrowserbaseConfig:          browserbaseConfig,
@@ -851,7 +1217,7 @@ func getDiscoverPageConfig(target string, sensitiveContentDetection bool, sensit
 }
 
 // getDiscoverProbeConfig builds the config for probe discovery.
-func getDiscoverProbeConfig(targets []string, protocol string, maxRedirects int, verifyTLS bool, timeout int, sleep int, jitter int, ignoreCrossDomainRedirects bool, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) *discover.DiscoverProbeConfig {
+func getDiscoverProbeConfig(targets []string, protocol string, maxRedirects int, verifyTLS bool, timeout int, sleep int, jitter int, ignoreCrossDomainRedirects bool, userAgent common.UserAgentPreset, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) *discover.DiscoverProbeConfig {
 	config := &discover.DiscoverProbeConfig{
 		Targets:                    targets,
 		MaxRedirects:               maxRedirects,
@@ -860,6 +1226,7 @@ func getDiscoverProbeConfig(targets []string, protocol string, maxRedirects int,
 		Sleep:                      max(sleep, 0),
 		Jitter:                     max(jitter, 0),
 		IgnoreCrossDomainRedirects: ignoreCrossDomainRedirects,
+		UserAgent:                  userAgent,
 		RequestMethod:              requestMethod,
 		HeadlessConfig:             headlessConfig,
 		BrowserbaseConfig:          browserbaseConfig,
@@ -884,28 +1251,45 @@ func getDiscoverProbeConfig(targets []string, protocol string, maxRedirects int,
 }
 
 // getDiscoverRouteConfig builds the config for route discovery.
-func getDiscoverRouteConfig(target string, ignoreBaseURLMatch bool, collectStaticAssets bool, spiderDepth int, maxRedirects int, verifyTLS bool, timeout int, sleep int, jitter int, ignoreCrossDomainRedirects bool, threads int, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) discover.DiscoverRouteConfig {
+func getDiscoverRouteConfig(target string, ignoreCrossDomain bool, collectStaticAssets bool, spiderDepth int, maxRedirects int, verifyTLS bool, timeout int, sleep int, jitter int, threads int, userAgent common.UserAgentPreset, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig, bundleURLs []string, fetchSourceMaps bool, maxBundles int, maxRoutes int) discover.DiscoverRouteConfig {
 	config := discover.DiscoverRouteConfig{
-		Target:                     target,
-		CollectStaticAssets:        collectStaticAssets,
-		IgnoreBaseUrlMatch:         ignoreBaseURLMatch,
-		SpiderDepth:                spiderDepth,
-		MaxRedirects:               maxRedirects,
-		VerifyTls:                  verifyTLS,
-		Timeout:                    max(timeout, 0),
-		Sleep:                      max(sleep, 0),
-		Jitter:                     max(jitter, 0),
-		IgnoreCrossDomainRedirects: ignoreCrossDomainRedirects,
-		Threads:                    max(threads, 0),
-		RequestMethod:              requestMethod,
-		HeadlessConfig:             headlessConfig,
-		BrowserbaseConfig:          browserbaseConfig,
+		Target:              target,
+		CollectStaticAssets: collectStaticAssets,
+		IgnoreCrossDomain:   ignoreCrossDomain,
+		SpiderDepth:         spiderDepth,
+		MaxRedirects:        maxRedirects,
+		VerifyTls:           verifyTLS,
+		Timeout:             max(timeout, 0),
+		Sleep:               max(sleep, 0),
+		Jitter:              max(jitter, 0),
+		Threads:             max(threads, 0),
+		UserAgent:           userAgent,
+		RequestMethod:       requestMethod,
+		HeadlessConfig:      headlessConfig,
+		BrowserbaseConfig:   browserbaseConfig,
+		FetchSourceMaps:     &fetchSourceMaps,
 	}
+
+	// Only set BundleUrls if any were provided
+	if len(bundleURLs) > 0 {
+		config.BundleUrls = bundleURLs
+	}
+
+	// Only set MaxBundles if non-zero
+	if maxBundles > 0 {
+		config.MaxBundles = &maxBundles
+	}
+
+	// Only set MaxRoutes if non-zero
+	if maxRoutes > 0 {
+		config.MaxRoutes = &maxRoutes
+	}
+
 	return config
 }
 
 // getDiscoverSaasConfig builds the config for SaaS active discovery.
-func getDiscoverSaasConfig(orgs []string, saasCompanies []string, ssoCompanies []string, maxRedirects int, verifyTLS bool, timeout int, sleep int, jitter int, threads int, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) discover.DiscoverSaasConfig {
+func getDiscoverSaasConfig(orgs []string, saasCompanies []string, ssoCompanies []string, maxRedirects int, verifyTLS bool, timeout int, sleep int, jitter int, threads int, userAgent common.UserAgentPreset, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) discover.DiscoverSaasConfig {
 	config := discover.DiscoverSaasConfig{
 		Orgs:              orgs,
 		SaasCompanies:     saasCompanies,
@@ -916,6 +1300,7 @@ func getDiscoverSaasConfig(orgs []string, saasCompanies []string, ssoCompanies [
 		Sleep:             max(sleep, 0),
 		Jitter:            max(jitter, 0),
 		Threads:           max(threads, 0),
+		UserAgent:         userAgent,
 		RequestMethod:     requestMethod,
 		HeadlessConfig:    headlessConfig,
 		BrowserbaseConfig: browserbaseConfig,
@@ -924,7 +1309,7 @@ func getDiscoverSaasConfig(orgs []string, saasCompanies []string, ssoCompanies [
 }
 
 // getDiscoverDirectoryConfig builds the config for directory discovery.
-func getDiscoverDirectoryConfig(targets []string, paths []string, wordlistType string, wordlistSize string, httpMethods []common.HttpMethod, responseCodes string, ignoreBaseContentMatch bool, verifyTLS bool, threshold float64, timeout int, ignoreCrossDomainRedirects bool, maxRedirectsBaselineRequest int, threads int, maxRuntime int, retries int, sleep int, jitter int) discover.DiscoverDirectoryConfig {
+func getDiscoverDirectoryConfig(targets []string, paths []string, wordlistType string, wordlistSize string, httpMethods []common.HttpMethod, responseCodes string, ignoreBaseContentMatch bool, verifyTLS bool, threshold float64, timeout int, ignoreCrossDomainRedirects bool, maxRedirectsBaselineRequest int, threads int, maxRuntime int, retries int, sleep int, jitter int, userAgent common.UserAgentPreset) discover.DiscoverDirectoryConfig {
 	config := discover.DiscoverDirectoryConfig{
 		Targets:                     targets,
 		Paths:                       paths,
@@ -941,6 +1326,7 @@ func getDiscoverDirectoryConfig(targets []string, paths []string, wordlistType s
 		Retries:                     retries,
 		Sleep:                       sleep,
 		Jitter:                      jitter,
+		UserAgent:                   userAgent,
 	}
 
 	// Set wordlist type and size if provided
@@ -979,4 +1365,23 @@ func getDiscoverApplicationResourceConfigTypeFromString(resource string) (discov
 	return discover.ApplicationResourceConfigType{
 		ApplicationResourceType: resourceEnum,
 	}, nil
+}
+
+// getDiscoverWordlistConfig builds the config for wordlist generation.
+func getDiscoverWordlistConfig(target string, minWordLength int, spiderDepth int, includeMetadata bool, includeComments bool, includeAltText bool, ignoreCrossDomain bool, verifyTLS bool, timeout int, threads int, sleep int, jitter int, userAgent common.UserAgentPreset) discover.DiscoverWordlistConfig {
+	return discover.DiscoverWordlistConfig{
+		Target:            target,
+		MinWordLength:     max(minWordLength, 1),
+		SpiderDepth:       max(spiderDepth, 1),
+		IncludeMetadata:   includeMetadata,
+		IncludeComments:   includeComments,
+		IncludeAltText:    includeAltText,
+		IgnoreCrossDomain: ignoreCrossDomain,
+		VerifyTls:         verifyTLS,
+		Timeout:           max(timeout, 0),
+		Threads:           max(threads, 0),
+		Sleep:             max(sleep, 0),
+		Jitter:            max(jitter, 0),
+		UserAgent:         userAgent,
+	}
 }

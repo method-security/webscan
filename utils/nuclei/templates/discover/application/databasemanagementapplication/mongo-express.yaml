@@ -1,0 +1,26 @@
+id: mongo-express-detect
+info:
+  name: Mongo Express Detection
+  author: method-security
+  severity: info
+  description: Detects mongo-express web database administration interfaces using mongo-express-specific titles and routes.
+  metadata:
+    method-application-type: DATABASE_MANAGEMENT_APPLICATION
+    method-module-name: MONGO_EXPRESS
+    cpe: cpe:2.3:a:mongo-express:mongo-express:*:*:*:*:*:*:*:*
+  tags: discovery,database,admin,mongodb,mongo-express
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/db/admin/"
+      - "{{BaseURL}}/status"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'status_code == 200 && contains(tolower(body), "mongo express") && contains(tolower(body), "database")'
+          - 'status_code == 200 && contains(tolower(body), "<title>mongo express") && contains(tolower(body), "/db/")'
+          - 'status_code == 200 && contains(tolower(body), "powered by mongo-express")'

@@ -10,6 +10,8 @@ import (
 	common "github.com/Method-Security/webscan/generated/go/common"
 	// Utils
 	headless "github.com/Method-Security/webscan/utils/request/headless"
+	useragent "github.com/Method-Security/webscan/utils/useragent"
+
 	// External
 	proto "github.com/go-rod/rod/lib/proto"
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
@@ -40,6 +42,18 @@ func CaptureScreenshot(ctx context.Context, browser *headless.Requester, sendHTT
 	if err != nil {
 		log.Error("Failed to create page for screenshot", svc1log.SafeParam("error", err))
 		return nil, err
+	}
+
+	// Apply the same user-agent override the HTML SendRequest path uses so a
+	// single --user-agent invocation produces consistent UAs across the HTML
+	// fetch and the screenshot navigation.
+	if sendHTTPRequestConfig.UserAgent != "" && sendHTTPRequestConfig.UserAgent != common.UserAgentPresetRandom {
+		uaString := useragent.Resolve(sendHTTPRequestConfig.UserAgent)
+		if uaErr := page.SetUserAgent(&proto.NetworkSetUserAgentOverride{UserAgent: uaString}); uaErr != nil {
+			log.Warn("Failed to set user-agent override for screenshot", svc1log.SafeParam("error", uaErr.Error()))
+		} else {
+			log.Info("Set user-agent override for screenshot", svc1log.SafeParam("preset", string(sendHTTPRequestConfig.UserAgent)))
+		}
 	}
 
 	// Navigate to the URL

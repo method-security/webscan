@@ -1,0 +1,28 @@
+id: iconics-mobilehmi-detect
+info:
+  name: ICONICS MobileHMI Detection
+  author: method-security
+  severity: info
+  description: Detects ICONICS MobileHMI web interfaces using ICONICS and MobileHMI path markers.
+  metadata:
+    method-application-type: INDUSTRIAL_CONTROL_SYSTEM
+    method-module-name: ICONICS_MOBILEHMI
+    cpe: cpe:2.3:a:iconics:mobilehmi:*:*:*:*:*:*:*:*
+  tags: discovery,ics,ot,iconics,mobilehmi
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/MobileHMI/"
+      - "{{BaseURL}}/MobileHMI/Login.aspx"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "ICONICS"
+          - "<title>MobileHMI"
+        condition: and
+        case-insensitive: true

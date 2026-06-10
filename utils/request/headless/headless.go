@@ -17,6 +17,7 @@ import (
 	// Utils
 	utils "github.com/Method-Security/webscan/utils"
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
+	useragent "github.com/Method-Security/webscan/utils/useragent"
 
 	// External
 	rod "github.com/go-rod/rod"
@@ -122,6 +123,7 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 		requestComplete = make(chan struct{})
 		browsersErr     = make(chan error, 1)
 		redirectChain   = []string{*constructedURL}
+		redirectChainMu sync.Mutex
 		browserErr      error
 		statusCode      int
 	)
@@ -152,9 +154,23 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 			svc1log.SafeParam("domStabilizeTime", b.MinDOMStabalizeTimeSeconds),
 			svc1log.SafeParam("totalPageTimeout", int(pageTimeout.Seconds())))
 
+		// Apply user-agent override only when an explicit non-random preset was
+		// supplied. We never override on RANDOM/empty because every browser
+		// signal beyond the UA string (navigator.platform, client hints, JS
+		// runtime) still identifies as Chromium; a mismatched UA string would
+		// be an obvious fingerprint tell.
+		if config.UserAgent != "" && config.UserAgent != common.UserAgentPresetRandom {
+			uaString := useragent.Resolve(config.UserAgent)
+			if uaErr := page.SetUserAgent(&proto.NetworkSetUserAgentOverride{UserAgent: uaString}); uaErr != nil {
+				log.Warn("Failed to set user-agent override", svc1log.SafeParam("error", uaErr.Error()))
+			} else {
+				log.Info("Set user-agent override", svc1log.SafeParam("preset", string(config.UserAgent)))
+			}
+		}
+
 		// Setup request monitoring and navigate
 		headerCapture := setupHeaderInterception(page)
-		handleNavigation(ctx, page, &redirectChain, requestComplete, &once, config.MaxRedirects, browsersErr)
+		handleNavigation(ctx, page, &redirectChain, &redirectChainMu, requestComplete, &once, config.MaxRedirects, browsersErr)
 
 		navErr := performNavigation(ctx, page, constructedURL, config)
 		if navErr != nil {
@@ -173,13 +189,27 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 			}
 			return
 		case <-requestComplete:
-			log.Info("Request complete, redirect chain", svc1log.SafeParam("chain", strings.Join(redirectChain, " -> ")))
+			redirectChainMu.Lock()
+			chain := strings.Join(redirectChain, " -> ")
+			redirectChainMu.Unlock()
+			log.Info("Request complete, redirect chain", svc1log.SafeParam("chain", chain))
+			select {
+			case err := <-browsersErr:
+				if err != nil {
+					log.Error("Redirect error occurred", svc1log.SafeParam("error", err.Error()))
+					browserErr = err
+				}
+			default:
+			}
 		case <-ctx.Done():
+			redirectChainMu.Lock()
+			chain := strings.Join(redirectChain, " -> ")
+			redirectChainMu.Unlock()
 			if ctx.Err() == context.DeadlineExceeded {
 				log.Warn("Request timed out",
 					svc1log.SafeParam("url", *constructedURL),
 					svc1log.SafeParam("timeout", config.Timeout),
-					svc1log.SafeParam("redirectChain", strings.Join(redirectChain, " -> ")))
+					svc1log.SafeParam("redirectChain", chain))
 				browserErr = fmt.Errorf("request timeout after %d seconds", config.Timeout)
 			} else {
 				log.Warn("Request cancelled",
@@ -193,6 +223,22 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 		// =========================================================================================
 		// RESPONSE PROCESSING
 		// =========================================================================================
+
+		// Wait for page to fully load and for client-side routers/auth flows to
+		// settle before reading finalURL or HTML.
+		err = waitForPageLoad(page, b.MinDOMStabalizeTimeSeconds, log)
+		if err != nil {
+			log.Warn("Page stabilization warning", svc1log.SafeParam("error", err.Error()))
+		}
+		select {
+		case err := <-browsersErr:
+			if err != nil {
+				log.Error("Redirect error occurred during stabilization", svc1log.SafeParam("error", err.Error()))
+				browserErr = err
+				return
+			}
+		default:
+		}
 
 		// Batch JavaScript evaluations for better performance
 		batchJS := `() => {
@@ -210,7 +256,6 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 
 		batchResult, err := page.Eval(batchJS)
 		var finalURL string
-		var responseHeaders map[string][]string
 		var isErrorPage bool
 
 		if err != nil {
@@ -251,31 +296,28 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 			}
 		}
 
-		// Always use the reliable headers extraction method
-		responseHeaders = getResponseHeaders(ctx, page, headerCapture)
-
 		// Redirect Chain
 		if finalURL != "" && !utils.IsStaticAsset(finalURL) {
-			exists := false
-			for _, url := range redirectChain {
-				if url == finalURL {
-					exists = true
-					break
-				}
+			redirectChainMu.Lock()
+			added, redirectErr := appendRedirectURLLocked(&redirectChain, finalURL, config.MaxRedirects)
+			if redirectErr != nil {
+				redirectChainMu.Unlock()
+				browserErr = redirectErr
+				return
 			}
-			if !exists {
-				redirectChain = append(redirectChain, finalURL)
+			if added {
+				chain := strings.Join(redirectChain, " -> ")
+				redirectChainMu.Unlock()
 				log.Info("Adding final URL to chain", svc1log.SafeParam("url", finalURL))
-				log.Info("Updated redirect chain", svc1log.SafeParam("chain", strings.Join(redirectChain, " -> ")))
+				log.Info("Updated redirect chain", svc1log.SafeParam("chain", chain))
+			} else {
+				redirectChainMu.Unlock()
 			}
 		}
+		redirectChainMu.Lock()
 		redirectChain = filterRedirectChain(redirectChain)
-
-		// Wait for page to fully load (optimized)
-		err = waitForPageLoad(page, b.MinDOMStabalizeTimeSeconds, log)
-		if err != nil {
-			log.Warn("Page stabilization warning", svc1log.SafeParam("error", err.Error()))
-		}
+		responseRedirectChain := append([]string(nil), redirectChain...)
+		redirectChainMu.Unlock()
 
 		log.Info("Final URL", svc1log.SafeParam("url", finalURL))
 
@@ -285,26 +327,62 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 			browserErr = fmt.Errorf("navigation failed: Chrome error page detected")
 		}
 
+		// Use the latest captured main-document headers after stabilization so
+		// headers, finalURL, and HTML describe the same terminal document.
+		responseHeaders := getResponseHeaders(ctx, page, headerCapture)
+
 		// Extract response body
-		var responseBody string
-		if statusCode >= 200 && statusCode < 300 {
-			htmlContent, err := page.HTML()
-			if err != nil {
-				errStr := err.Error()
+		var responseBody []byte
+		if browserErr == nil && statusCode >= 200 && statusCode < 300 {
+			htmlContent, htmlErr := page.HTML()
+			htmlCaptured := false
+			if htmlErr != nil {
+				errStr := htmlErr.Error()
 				if strings.Contains(errStr, "Execution context was destroyed") || strings.Contains(errStr, "-32000") {
 					log.Info("Execution context destroyed while getting HTML content (likely due to redirect)")
 				} else {
-					log.Error("Failed to get HTML content", svc1log.SafeParam("error", err.Error()))
+					log.Error("Failed to get HTML content", svc1log.SafeParam("error", htmlErr.Error()))
 				}
-				responseBody = ""
+				responseBody = nil
+				responseHeaders = cloneHeadersWithContentType(responseHeaders, "text/html")
 			} else {
-				responseBody = htmlContent
+				htmlCaptured = true
+				responseBody = []byte(htmlContent)
+				responseHeaders = cloneHeadersWithoutContentEncoding(responseHeaders)
+			}
+			if shouldLoadStaticResource(htmlContent, *constructedURL, finalURL) {
+				resourceURL := finalURL
+				if resourceURL == "" || isInternalBrowserURL(resourceURL) {
+					resourceURL = *constructedURL
+				}
+				loadedBody, loadedHeaders, loadedStatusCode, err := loadNetworkResourceBody(page, resourceURL)
+				if err == nil && isValidStaticResourceBody(loadedBody) {
+					responseBody = loadedBody
+					responseHeaders = headersForLoadedStaticResource(responseHeaders, loadedHeaders, loadedBody)
+					if loadedStatusCode > 0 {
+						statusCode = loadedStatusCode
+					}
+				} else if err != nil {
+					log.Info("Failed to load static resource body, falling back to page HTML", svc1log.SafeParam("error", cleanErrMsg(err)))
+					if !htmlCaptured {
+						browserErr = fmt.Errorf("failed to capture static resource body: HTML extraction failed (%s); static resource load failed (%s)", cleanErrMsg(htmlErr), cleanErrMsg(err))
+						return
+					}
+					responseHeaders = cloneHeadersWithContentType(responseHeaders, "text/html")
+				} else {
+					log.Info("Loaded static resource did not validate, falling back to page HTML")
+					if !htmlCaptured {
+						browserErr = fmt.Errorf("failed to capture static resource body: HTML extraction failed (%s); loaded static resource did not validate as binary", cleanErrMsg(htmlErr))
+						return
+					}
+					responseHeaders = cloneHeadersWithContentType(responseHeaders, "text/html")
+				}
 			}
 		}
 		// Build final response
-		response := requesthelpers.CreateHTTPResponse(
+		response := requesthelpers.CreateHTTPResponseFromBytes(
 			statusCode,
-			redirectChain,
+			responseRedirectChain,
 			responseHeaders,
 			responseBody,
 		)
@@ -324,13 +402,15 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 	}
 
 	// Check for cross-domain redirect after navigation completes
-	if finalErr == nil && config.IgnoreCrossDomainRedirects && len(redirectChain) > 1 {
-		originalURL := redirectChain[0]
-		for _, chainURL := range redirectChain[1:] {
-			if isCrossDomainRedirect(originalURL, chainURL) {
-				log.Info("Cross-domain redirect detected in redirect chain", svc1log.SafeParam("from", originalURL), svc1log.SafeParam("to", chainURL))
-				return common.HttpRequestResponse{Request: config.Request}, fmt.Errorf("cross-domain redirect blocked: %s -> %s", originalURL, chainURL)
-			}
+	redirectChainMu.Lock()
+	finalRedirectChain := append([]string(nil), redirectChain...)
+	redirectChainMu.Unlock()
+	if finalErr == nil && config.IgnoreCrossDomainRedirects && len(finalRedirectChain) > 1 {
+		originalURL := finalRedirectChain[0]
+		finalURL := finalRedirectChain[len(finalRedirectChain)-1]
+		if isCrossDomainRedirect(originalURL, finalURL) {
+			log.Info("Cross-domain redirect detected in redirect chain", svc1log.SafeParam("from", originalURL), svc1log.SafeParam("to", finalURL))
+			return common.HttpRequestResponse{Request: config.Request}, fmt.Errorf("cross-domain redirect blocked: %s -> %s", originalURL, finalURL)
 		}
 	}
 

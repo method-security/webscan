@@ -141,10 +141,15 @@ func (sk *PrivateKey) UnmarshalBinary(data []byte) error {
 	return nil
 }
 
+// Returns seed used to generate PrivateKey, and nil if not retained.
+func (sk *PrivateKey) Seed() []byte {
+	return (*internal.PrivateKey)(sk).Seed()
+}
+
 // Sign signs the given message.
 //
 // opts.HashFunc() must return zero, which can be achieved by passing
-// crypto.Hash(0) for opts.  rand is ignored.  Will only return an error
+// crypto.Hash(0) or nil for opts.  rand is ignored.  Will only return an error
 // if opts.HashFunc() is non-zero.
 //
 // This function is used to make PrivateKey implement the crypto.Signer
@@ -154,7 +159,7 @@ func (sk *PrivateKey) Sign(rand io.Reader, msg []byte, opts crypto.SignerOpts) (
 	sig []byte, err error) {
 	var ret [SignatureSize]byte
 
-	if opts.HashFunc() != crypto.Hash(0) {
+	if opts != nil && opts.HashFunc() != crypto.Hash(0) {
 		return nil, errors.New("dilithium: cannot sign hashed message")
 	}
 	SignTo(sk, msg, ret[:])

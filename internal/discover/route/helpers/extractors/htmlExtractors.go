@@ -41,7 +41,7 @@ func ExtractFormRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig
 		fullURL := discoverroutehelpers.ResolveURL(baseURL, action)
 
 		// Check if the URL is allowed
-		if !discoverroutehelpers.IsURLAllowed(baseURL, fullURL, routeCaptureConfig.IgnoreBaseUrlMatch, routeCaptureConfig.CollectStaticAssets) {
+		if !discoverroutehelpers.IsURLAllowed(baseURL, fullURL, routeCaptureConfig.IgnoreCrossDomain, routeCaptureConfig.CollectStaticAssets) {
 			return
 		}
 
@@ -51,8 +51,13 @@ func ExtractFormRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig
 			errors = append(errors, err.Error())
 			return
 		}
-		routeVar.BaseUrl = baseURL
-		routeVar.Path = urlNoQuery
+		routeBaseURL, routePath, err := discoverroutehelpers.SplitURLBaseAndPath(urlNoQuery)
+		if err != nil {
+			errors = append(errors, err.Error())
+			return
+		}
+		routeVar.BaseUrl = routeBaseURL
+		routeVar.Path = routePath
 		urls[urlNoQuery] = struct{}{}
 
 		// Extract method attribute
@@ -62,13 +67,7 @@ func ExtractFormRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig
 		} else {
 			method = strings.ToUpper(method)
 		}
-		routeVar.Method = common.HttpMethod(method).Ptr()
-
-		// Get the path from the full URL and set it
-		parsedURL, err := url.Parse(fullURL)
-		if err == nil {
-			routeVar.Path = parsedURL.Path
-		}
+		routeVar.Method = common.HttpMethod(method)
 
 		// Collect input names
 		var queryParams []*discover.RouteQueryParam
@@ -134,22 +133,22 @@ func ExtractAnchorRoutes(doc *goquery.Document, baseURL string, routeCaptureConf
 			}
 
 			// Check if the URL is allowed
-			if !discoverroutehelpers.IsURLAllowed(baseURL, fullURL, routeCaptureConfig.IgnoreBaseUrlMatch, routeCaptureConfig.CollectStaticAssets) {
+			if !discoverroutehelpers.IsURLAllowed(baseURL, fullURL, routeCaptureConfig.IgnoreCrossDomain, routeCaptureConfig.CollectStaticAssets) {
 				return
 			}
 			urls[urlNoQuery] = struct{}{}
 
-			// Get the path from the full URL without query params
-			parsedURL, err := url.Parse(urlNoQuery)
+			// Get the origin and path from the full URL without query params
+			routeBaseURL, routePath, err := discoverroutehelpers.SplitURLBaseAndPath(urlNoQuery)
 			if err != nil {
 				errors = append(errors, err.Error())
 				return
 			}
 
 			routeVar := &discover.RouteDetails{
-				BaseUrl: baseURL,
-				Path:    parsedURL.Path,
-				Method:  common.HttpMethodGet.Ptr(), // Anchor links are accessed via GET
+				BaseUrl: routeBaseURL,
+				Path:    routePath,
+				Method:  common.HttpMethodGet, // Anchor links are accessed via GET
 			}
 
 			// Add query parameters if any were found
@@ -178,8 +177,9 @@ func ExtractLinkRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig
 
 			// Skip if this is a static asset
 			if utils.IsStaticAsset(fullURL) {
-				// Only add to URLs if we're not ignoring static assets
-				if routeCaptureConfig.CollectStaticAssets {
+				// Only collect static assets that are in scope.
+				if routeCaptureConfig.CollectStaticAssets &&
+					discoverroutehelpers.IsURLAllowed(baseURL, fullURL, routeCaptureConfig.IgnoreCrossDomain, routeCaptureConfig.CollectStaticAssets) {
 					urls[fullURL] = struct{}{}
 				}
 				return
@@ -193,23 +193,23 @@ func ExtractLinkRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig
 			}
 
 			// Check if the URL is allowed
-			if !discoverroutehelpers.IsURLAllowed(baseURL, fullURL, routeCaptureConfig.IgnoreBaseUrlMatch, routeCaptureConfig.CollectStaticAssets) {
+			if !discoverroutehelpers.IsURLAllowed(baseURL, fullURL, routeCaptureConfig.IgnoreCrossDomain, routeCaptureConfig.CollectStaticAssets) {
 				return
 			}
 
 			urls[urlNoQuery] = struct{}{}
 
-			// Get the path from the full URL
-			parsedURL, err := url.Parse(urlNoQuery)
+			// Get the origin and path from the full URL
+			routeBaseURL, routePath, err := discoverroutehelpers.SplitURLBaseAndPath(urlNoQuery)
 			if err != nil {
 				errors = append(errors, err.Error())
 				return
 			}
 
 			routeVar := &discover.RouteDetails{
-				BaseUrl: baseURL,
-				Path:    parsedURL.Path,
-				Method:  common.HttpMethodGet.Ptr(), // Link elements are accessed via GET
+				BaseUrl: routeBaseURL,
+				Path:    routePath,
+				Method:  common.HttpMethodGet, // Link elements are accessed via GET
 			}
 
 			routes = append(routes, routeVar)

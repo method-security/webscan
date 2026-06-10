@@ -4,6 +4,7 @@ import (
 	// Standard
 	"errors"
 	// Generated
+	common "github.com/Method-Security/webscan/generated/go/common"
 	enumerateapiapplicationfern "github.com/Method-Security/webscan/generated/go/enumerate/apiapplication"
 	enumeratecmsdrupalfern "github.com/Method-Security/webscan/generated/go/enumerate/cms/drupal"
 	enumeratecmswordpressfern "github.com/Method-Security/webscan/generated/go/enumerate/cms/wordpress"
@@ -22,6 +23,8 @@ import (
 	"github.com/Method-Security/webscan/configs"
 	// Utils
 	utils "github.com/Method-Security/webscan/utils"
+	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
+
 	// External
 	cobra "github.com/spf13/cobra"
 )
@@ -72,6 +75,8 @@ func (a *WebScan) InitEnumerateCommand() {
 
 	// Target Flags
 	enumerateAPIApplicationGraphqlCmd.Flags().String("target", "", "URL target to perform GraphQL enumeration against")
+	// TODO: Add --user-agent flag here once graphql is migrated to the standard HTTP client.
+	// Skipped for now because graphql uses http.Post directly instead of SendHTTPRequest.
 
 	// Mark required flags
 	_ = enumerateAPIApplicationGraphqlCmd.MarkFlagRequired("target")
@@ -108,9 +113,17 @@ func (a *WebScan) InitEnumerateCommand() {
 				return
 			}
 
+			// User Agent flag
+			userAgentPreset, err := requesthelpers.GetUserAgentFlag(cmd)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
 			config := enumerateapiapplicationfern.EnumerateSwaggerConfig{
-				Target:  target,
-				Timeout: timeout,
+				Target:    target,
+				Timeout:   timeout,
+				UserAgent: userAgentPreset,
 			}
 
 			// Generate report
@@ -123,6 +136,8 @@ func (a *WebScan) InitEnumerateCommand() {
 	// Config Flags
 	enumerateAPIApplicationSwaggerCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
 	enumerateAPIApplicationSwaggerCmd.Flags().String("headless-path", "", "Path to headless browser executable")
+	// User Agent Flag
+	enumerateAPIApplicationSwaggerCmd.Flags().String("user-agent", "RANDOM", "User-Agent preset (RANDOM, CHROME, FIREFOX, SAFARI, EDGE)")
 
 	_ = enumerateAPIApplicationSwaggerCmd.MarkFlagRequired("target")
 
@@ -178,8 +193,15 @@ func (a *WebScan) InitEnumerateCommand() {
 				return
 			}
 
+			// User Agent flag
+			userAgentPreset, err := requesthelpers.GetUserAgentFlag(cmd)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
 			// Set Config
-			config := getEnumerateKubeConfig(target, verifyTLS, timeout, sleep, jitter)
+			config := getEnumerateKubeConfig(target, verifyTLS, timeout, sleep, jitter, userAgentPreset)
 
 			// Generate report
 			report := enumeratekube.PerformAppEnumerateKube(cmd.Context(), &config)
@@ -193,6 +215,8 @@ func (a *WebScan) InitEnumerateCommand() {
 	enumerateKubeCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
 	enumerateKubeCmd.Flags().Int("sleep", 0, "Number of seconds to sleep between requests")
 	enumerateKubeCmd.Flags().Int("jitter", 0, "Jitter percentage (0-100) to apply random variance to sleep delay")
+	// User Agent Flag
+	enumerateKubeCmd.Flags().String("user-agent", "RANDOM", "User-Agent preset (RANDOM, CHROME, FIREFOX, SAFARI, EDGE)")
 
 	// Mark required flags
 	_ = enumerateKubeCmd.MarkFlagRequired("target")
@@ -313,8 +337,15 @@ func (a *WebScan) InitEnumerateCommand() {
 				return
 			}
 
+			// User Agent flag
+			userAgentPreset, err := requesthelpers.GetUserAgentFlag(cmd)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
 			// Generate config
-			config := getEnumerateWordpressPluginsConfig(targets, plugins, PluginsFileSizeEnum, verifyTLS, timeout, sleep, jitter, threads)
+			config := getEnumerateWordpressPluginsConfig(targets, plugins, PluginsFileSizeEnum, verifyTLS, timeout, sleep, jitter, threads, userAgentPreset)
 
 			// Generate report
 			report := enumeratecms.PerformAppEnumerateCMSWordpressPlugins(cmd.Context(), config)
@@ -331,7 +362,9 @@ func (a *WebScan) InitEnumerateCommand() {
 	enumerateCMSWordpressPluginsCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
 	enumerateCMSWordpressPluginsCmd.Flags().Int("sleep", 0, "Number of seconds to sleep between requests")
 	enumerateCMSWordpressPluginsCmd.Flags().Int("jitter", 0, "Jitter percentage (0-100) to apply random variance to sleep delay")
-	enumerateCMSWordpressPluginsCmd.Flags().Int("threads", 0, "Number of concurrent threads for scanning")
+	enumerateCMSWordpressPluginsCmd.Flags().Int("threads", 50, "Number of concurrent threads for scanning")
+	// User Agent Flag
+	enumerateCMSWordpressPluginsCmd.Flags().String("user-agent", "RANDOM", "User-Agent preset (RANDOM, CHROME, FIREFOX, SAFARI, EDGE)")
 
 	// Mark required flags
 	_ = enumerateCMSWordpressPluginsCmd.MarkFlagRequired("targets")
@@ -447,8 +480,15 @@ func (a *WebScan) InitEnumerateCommand() {
 				return
 			}
 
+			// User Agent flag
+			userAgentPreset, err := requesthelpers.GetUserAgentFlag(cmd)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
 			// Generate config
-			config := getEnumerateDrupalModulesConfig(targets, modules, modulesFileSizeEnum, verifyTLS, timeout, sleep, jitter, threads)
+			config := getEnumerateDrupalModulesConfig(targets, modules, modulesFileSizeEnum, verifyTLS, timeout, sleep, jitter, threads, userAgentPreset)
 
 			// Generate report
 			report := enumeratecms.PerformAppEnumerateCMSDrupalModules(cmd.Context(), config)
@@ -465,7 +505,9 @@ func (a *WebScan) InitEnumerateCommand() {
 	enumerateCMSDrupalModulesCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
 	enumerateCMSDrupalModulesCmd.Flags().Int("sleep", 0, "Number of seconds to sleep between requests")
 	enumerateCMSDrupalModulesCmd.Flags().Int("jitter", 0, "Jitter percentage (0-100) to apply random variance to sleep delay")
-	enumerateCMSDrupalModulesCmd.Flags().Int("threads", 0, "Number of concurrent threads for scanning")
+	enumerateCMSDrupalModulesCmd.Flags().Int("threads", 50, "Number of concurrent threads for scanning")
+	// User Agent Flag
+	enumerateCMSDrupalModulesCmd.Flags().String("user-agent", "RANDOM", "User-Agent preset (RANDOM, CHROME, FIREFOX, SAFARI, EDGE)")
 
 	// Mark required flags
 	_ = enumerateCMSDrupalModulesCmd.MarkFlagRequired("targets")
@@ -543,8 +585,15 @@ func (a *WebScan) InitEnumerateCommand() {
 				return
 			}
 
+			// User Agent flag
+			userAgentPreset, err := requesthelpers.GetUserAgentFlag(cmd)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
 			// Generate config
-			config := getEnumerateGeneralRateLimitConfig(targets, maxRequests, sleep, jitter, verifyTLS, timeout, threads)
+			config := getEnumerateGeneralRateLimitConfig(targets, maxRequests, sleep, jitter, verifyTLS, timeout, threads, userAgentPreset)
 
 			// Generate report
 			report := enumerategeneral.PerformGeneralRatelimit(cmd.Context(), &config)
@@ -554,12 +603,14 @@ func (a *WebScan) InitEnumerateCommand() {
 	// Target Flags
 	enumerateGeneralRatelimitCmd.Flags().StringSlice("targets", []string{}, "URL targets to perform rate limit enumeration against")
 	// Config Flags
-	enumerateGeneralRatelimitCmd.Flags().Int("max-requests", 10, "Maximum number of requests to send")
+	enumerateGeneralRatelimitCmd.Flags().Int("max-requests", 100, "Maximum number of requests to send")
 	enumerateGeneralRatelimitCmd.Flags().Int("sleep", 0, "Time window between requests in seconds")
 	enumerateGeneralRatelimitCmd.Flags().Int("jitter", 0, "Jitter percentage (0-100) to apply random variance to sleep delay")
 	enumerateGeneralRatelimitCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
-	enumerateGeneralRatelimitCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
-	enumerateGeneralRatelimitCmd.Flags().Int("threads", 0, "Number of concurrent threads for scanning")
+	enumerateGeneralRatelimitCmd.Flags().Int("timeout", 5, "Timeout per request in seconds")
+	enumerateGeneralRatelimitCmd.Flags().Int("threads", 100, "Number of concurrent threads for scanning")
+	// User Agent Flag
+	enumerateGeneralRatelimitCmd.Flags().String("user-agent", "RANDOM", "User-Agent preset (RANDOM, CHROME, FIREFOX, SAFARI, EDGE)")
 
 	// Mark required flags
 	_ = enumerateGeneralRatelimitCmd.MarkFlagRequired("targets")
@@ -629,8 +680,15 @@ func (a *WebScan) InitEnumerateCommand() {
 				return
 			}
 
+			// User Agent flag
+			userAgentPreset, err := requesthelpers.GetUserAgentFlag(cmd)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
 			// Generate config
-			config := getEnumerateDockerConfig(targets, verifyTLS, timeout, sleep, jitter, threads)
+			config := getEnumerateDockerConfig(targets, verifyTLS, timeout, sleep, jitter, threads, userAgentPreset)
 
 			// Generate report
 			report := enumeratedocker.PerformAppEnumerateContainerRegistryDocker(cmd.Context(), &config)
@@ -644,7 +702,9 @@ func (a *WebScan) InitEnumerateCommand() {
 	enumerateContainerRegistryDockerCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
 	enumerateContainerRegistryDockerCmd.Flags().Int("sleep", 0, "Number of seconds to sleep between requests")
 	enumerateContainerRegistryDockerCmd.Flags().Int("jitter", 0, "Jitter percentage (0-100) to apply random variance to sleep delay")
-	enumerateContainerRegistryDockerCmd.Flags().Int("threads", 25, "Number of concurrent manifest requests per repository")
+	enumerateContainerRegistryDockerCmd.Flags().Int("threads", 50, "Number of concurrent manifest requests per repository")
+	// User Agent Flag
+	enumerateContainerRegistryDockerCmd.Flags().String("user-agent", "RANDOM", "User-Agent preset (RANDOM, CHROME, FIREFOX, SAFARI, EDGE)")
 
 	// Mark required flags
 	_ = enumerateContainerRegistryDockerCmd.MarkFlagRequired("targets")
@@ -660,7 +720,7 @@ func (a *WebScan) InitEnumerateCommand() {
 }
 
 // getEnumerateWordpressPluginsConfig builds the config for WordPress plugin enumeration.
-func getEnumerateWordpressPluginsConfig(targets []string, plugins []string, PluginsFileSizeEnum enumeratecmswordpressfern.PluginsFileSize, verifyTLS bool, timeout int, sleep int, jitter int, threads int) enumeratecmswordpressfern.EnumerateWordpressPluginsConfig {
+func getEnumerateWordpressPluginsConfig(targets []string, plugins []string, PluginsFileSizeEnum enumeratecmswordpressfern.PluginsFileSize, verifyTLS bool, timeout int, sleep int, jitter int, threads int, userAgent common.UserAgentPreset) enumeratecmswordpressfern.EnumerateWordpressPluginsConfig {
 	config := enumeratecmswordpressfern.EnumerateWordpressPluginsConfig{
 		Targets:         targets,
 		Plugins:         plugins,
@@ -670,24 +730,26 @@ func getEnumerateWordpressPluginsConfig(targets []string, plugins []string, Plug
 		Sleep:           max(sleep, 0),
 		Jitter:          max(jitter, 0),
 		Threads:         max(threads, 0),
+		UserAgent:       userAgent,
 	}
 	return config
 }
 
 // getEnumerateKubeConfig builds the config for Kubernetes enumeration.
-func getEnumerateKubeConfig(target string, verifyTLS bool, timeout int, sleep int, jitter int) enumeratekubefern.EnumerateKubeConfig {
+func getEnumerateKubeConfig(target string, verifyTLS bool, timeout int, sleep int, jitter int, userAgent common.UserAgentPreset) enumeratekubefern.EnumerateKubeConfig {
 	config := enumeratekubefern.EnumerateKubeConfig{
 		Target:    target,
 		VerifyTls: verifyTLS,
 		Timeout:   max(timeout, 0),
 		Sleep:     max(sleep, 0),
 		Jitter:    max(jitter, 0),
+		UserAgent: userAgent,
 	}
 	return config
 }
 
 // getEnumerateGeneralRateLimitConfig builds the config for general rate limit enumeration.
-func getEnumerateGeneralRateLimitConfig(targets []string, maxRequests int, sleep int, jitter int, verifyTLS bool, timeout int, threads int) enumerategeneralfern.EnumerateRateLimitConfig {
+func getEnumerateGeneralRateLimitConfig(targets []string, maxRequests int, sleep int, jitter int, verifyTLS bool, timeout int, threads int, userAgent common.UserAgentPreset) enumerategeneralfern.EnumerateRateLimitConfig {
 	config := enumerategeneralfern.EnumerateRateLimitConfig{
 		Targets:     targets,
 		MaxRequests: maxRequests,
@@ -696,12 +758,13 @@ func getEnumerateGeneralRateLimitConfig(targets []string, maxRequests int, sleep
 		VerifyTls:   verifyTLS,
 		Timeout:     max(timeout, 0),
 		Threads:     max(threads, 0),
+		UserAgent:   userAgent,
 	}
 	return config
 }
 
 // getEnumerateDockerConfig builds the config for Docker registry enumeration.
-func getEnumerateDockerConfig(targets []string, verifyTLS bool, timeout int, sleep int, jitter int, threads int) enumeratedockerfern.EnumerateDockerConfig {
+func getEnumerateDockerConfig(targets []string, verifyTLS bool, timeout int, sleep int, jitter int, threads int, userAgent common.UserAgentPreset) enumeratedockerfern.EnumerateDockerConfig {
 	config := enumeratedockerfern.EnumerateDockerConfig{
 		Targets:   targets,
 		VerifyTls: verifyTLS,
@@ -709,12 +772,13 @@ func getEnumerateDockerConfig(targets []string, verifyTLS bool, timeout int, sle
 		Sleep:     max(sleep, 0),
 		Jitter:    max(jitter, 0),
 		Threads:   max(threads, 1),
+		UserAgent: userAgent,
 	}
 	return config
 }
 
 // getEnumerateDrupalModulesConfig builds the config for Drupal module enumeration.
-func getEnumerateDrupalModulesConfig(targets []string, modules []string, modulesFileSizeEnum enumeratecmsdrupalfern.ModulesFileSize, verifyTLS bool, timeout int, sleep int, jitter int, threads int) enumeratecmsdrupalfern.EnumerateDrupalModulesConfig {
+func getEnumerateDrupalModulesConfig(targets []string, modules []string, modulesFileSizeEnum enumeratecmsdrupalfern.ModulesFileSize, verifyTLS bool, timeout int, sleep int, jitter int, threads int, userAgent common.UserAgentPreset) enumeratecmsdrupalfern.EnumerateDrupalModulesConfig {
 	config := enumeratecmsdrupalfern.EnumerateDrupalModulesConfig{
 		Targets:         targets,
 		Modules:         modules,
@@ -724,6 +788,7 @@ func getEnumerateDrupalModulesConfig(targets []string, modules []string, modules
 		Sleep:           max(sleep, 0),
 		Jitter:          max(jitter, 0),
 		Threads:         max(threads, 0),
+		UserAgent:       userAgent,
 	}
 	return config
 }

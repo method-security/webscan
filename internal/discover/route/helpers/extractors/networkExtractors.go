@@ -20,7 +20,7 @@ import (
 
 // ExtractNetworkRoutes uses a headless browser to capture network requests and extract route details from them.
 // Returns a slice of RouteDetails, a slice of URLs, and a slice of errors.
-func ExtractNetworkRoutes(ctx context.Context, browser *headless.Requester, target string, baseURLsOnly bool, captureStaticAssets bool) ([]*discover.RouteDetails, []string, []string) {
+func ExtractNetworkRoutes(ctx context.Context, browser *headless.Requester, target string, ignoreCrossDomain bool, captureStaticAssets bool) ([]*discover.RouteDetails, []string, []string) {
 	// Get the logger from the context
 	log := svc1log.FromContext(ctx)
 
@@ -103,8 +103,7 @@ func ExtractNetworkRoutes(ctx context.Context, browser *headless.Requester, targ
 			continue
 		}
 
-		// Skip requests that don't match the base domain when baseURLsOnly is true
-		if !discoverroutehelpers.IsURLAllowed(target, reqURL.String(), baseURLsOnly, captureStaticAssets) {
+		if !discoverroutehelpers.IsURLAllowed(target, reqURL.String(), ignoreCrossDomain, captureStaticAssets) {
 			log.Debug("Skipping URL", svc1log.SafeParam("url", reqURL.String()), svc1log.SafeParam("target", target))
 			continue
 		}
@@ -116,19 +115,19 @@ func ExtractNetworkRoutes(ctx context.Context, browser *headless.Requester, targ
 			continue
 		}
 
-		// Get the path from the full URL
-		parsedURL, err := url.Parse(urlNoQuery)
+		// Get the origin and path from the full URL
+		routeBaseURL, routePath, err := discoverroutehelpers.SplitURLBaseAndPath(urlNoQuery)
 		if err != nil {
 			errors = append(errors, err.Error())
 			continue
 		}
 
 		// Build WebRoute object
-		log.Info("Building WebRoute object", svc1log.SafeParam("url", urlNoQuery), svc1log.SafeParam("path", parsedURL.Path), svc1log.SafeParam("method", request.Method))
+		log.Info("Building WebRoute object", svc1log.SafeParam("url", urlNoQuery), svc1log.SafeParam("path", routePath), svc1log.SafeParam("method", request.Method))
 		webRoute := &discover.RouteDetails{
-			BaseUrl: urlNoQuery,
-			Path:    parsedURL.Path,
-			Method:  common.HttpMethod(request.Method).Ptr(),
+			BaseUrl: routeBaseURL,
+			Path:    routePath,
+			Method:  common.HttpMethod(request.Method),
 		}
 
 		// Capture query parameters

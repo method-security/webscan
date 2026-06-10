@@ -1,0 +1,26 @@
+id: neo4j-browser-detect
+info:
+  name: Neo4j Browser Detection
+  author: method-security
+  severity: info
+  description: Detects Neo4j Browser database administration UI using Neo4j Browser-specific titles and static assets.
+  metadata:
+    method-application-type: DATABASE_MANAGEMENT_APPLICATION
+    method-module-name: NEO4J_BROWSER
+    cpe: cpe:2.3:a:neo4j:neo4j:*:*:*:*:*:*:*:*
+  tags: discovery,database,admin,neo4j,browser
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/browser/"
+      - "{{BaseURL}}/browser"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'status_code == 200 && !contains(tolower(header), "amazons3") && contains(tolower(body), "<title>neo4j browser") && contains(tolower(body), "assets/images/device-icons") && contains(tolower(body), "<div id=\"mount\"")'
+          - 'status_code == 200 && !contains(tolower(header), "amazons3") && contains(tolower(body), "neo4j browser") && contains(tolower(body), "favicons/safari-pinned-tab.svg") && contains(tolower(body), "<div id=\"mount\"")'
+          - 'status_code == 200 && !contains(tolower(header), "amazons3") && contains(tolower(body), "neo4j-browser") && contains(tolower(body), "neo4j") && contains(tolower(body), "<div id=\"mount\"")'

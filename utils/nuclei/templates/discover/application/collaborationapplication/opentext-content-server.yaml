@@ -1,0 +1,26 @@
+id: opentext-content-server-detect
+info:
+  name: OpenText Content Server Detection
+  author: method-security
+  severity: info
+  description: Detects OpenText Content Server collaboration portals using cs.exe paths, OpenText branding, and Content Server-specific cookies.
+  metadata:
+    method-application-type: COLLABORATION_APPLICATION
+    method-module-name: OPENTEXT_CONTENT_SERVER
+    cpe: cpe:2.3:a:opentext:content_server:*:*:*:*:*:*:*:*
+  tags: discovery,opentext,content-server,collaboration
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/otcs/cs.exe"
+      - "{{BaseURL}}/cs/cs.exe"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'contains(tolower(body), "opentext") && contains(tolower(body), "content server")'
+          - 'contains(tolower(body), "llcookie") && contains(tolower(body), "content server")'
+          - 'contains(tolower(header), "llcookie") && contains(tolower(body), "opentext")'

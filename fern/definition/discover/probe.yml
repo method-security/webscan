@@ -13,6 +13,7 @@ types:
       sleep: integer
       jitter: integer
       ignoreCrossDomainRedirects: boolean
+      userAgent: method.UserAgentPreset
       requestMethod: method.RequestMethod
       headlessConfig: optional<method.HeadlessRequestConfig>
       browserbaseConfig: optional<method.BrowserbaseRequestConfig>

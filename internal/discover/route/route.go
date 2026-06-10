@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -29,6 +30,53 @@ import (
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
+// resolveEffectiveTarget follows HTTP redirects for target and returns the final URL.
+// Falls back to target if the HEAD request fails. Routes the HEAD through
+// utils/request so it honors VerifyTls, UserAgent and Timeout from the
+// surrounding DiscoverRouteConfig.
+//
+// TODO(aitf-71-followup): support headless/browserbase modes; today this
+// always uses the standard transport regardless of config.RequestMethod.
+func resolveEffectiveTarget(ctx context.Context, target string, config discover.DiscoverRouteConfig) string {
+	baseURL, path, queryParams, err := requesthelpers.SplitTargetURL(target)
+	if err != nil {
+		return target
+	}
+
+	httpRequest := common.HttpRequest{
+		BaseUrl: baseURL,
+		Path:    path,
+		Method:  common.HttpMethodHead,
+		Params: &common.HttpRequestParams{
+			Query: queryParams,
+		},
+	}
+
+	sendConfig := common.SendHttpRequestConfig{
+		Request:      &httpRequest,
+		MaxRedirects: config.MaxRedirects,
+		VerifyTls:    config.VerifyTls,
+		Timeout:      config.Timeout,
+		// IgnoreCrossDomainRedirects is the transport-layer flag — a strict
+		// hostname-string equality check. The route allowlist (IsURLAllowed /
+		// IsSubdomain) handles cross-domain scoping at discover time and is
+		// subdomain-aware. Match legacy HEAD-resolve behavior so apex → www
+		// and other in-scope hostname-changing redirects still resolve.
+		IgnoreCrossDomainRedirects: false,
+		UserAgent:                  config.UserAgent,
+		RequestMethod:              common.RequestMethodStandard,
+	}
+
+	response, err := request.SendRequest(ctx, sendConfig)
+	if err != nil || response == nil || response.Response == nil {
+		return target
+	}
+	if chain := response.Response.RedirectChain; len(chain) > 0 {
+		return strings.TrimRight(chain[len(chain)-1], "/")
+	}
+	return target
+}
+
 // ExtractRedirectRoutes analyzes redirect chain URLs to extract routes with parameters
 func ExtractRedirectRoutes(redirectChain []string, baseURL string, routeCaptureConfig discover.DiscoverRouteConfig) ([]*discover.RouteDetails, []string, []string) {
 	routes := []*discover.RouteDetails{}
@@ -49,7 +97,7 @@ func ExtractRedirectRoutes(redirectChain []string, baseURL string, routeCaptureC
 		}
 
 		// Check if the URL is allowed
-		if !discoverroutehelpers.IsURLAllowed(baseURL, redirectURL, routeCaptureConfig.IgnoreBaseUrlMatch, routeCaptureConfig.CollectStaticAssets) {
+		if !discoverroutehelpers.IsURLAllowed(baseURL, redirectURL, routeCaptureConfig.IgnoreCrossDomain, routeCaptureConfig.CollectStaticAssets) {
 			continue
 		}
 
@@ -66,7 +114,7 @@ func ExtractRedirectRoutes(redirectChain []string, baseURL string, routeCaptureC
 			continue
 		}
 
-		parsedCleanURL, err := url.Parse(urlNoQuery)
+		routeBaseURL, routePath, err := discoverroutehelpers.SplitURLBaseAndPath(urlNoQuery)
 		if err != nil {
 			errors = append(errors, fmt.Sprintf("Failed to parse clean redirect URL %s: %s", urlNoQuery, err))
 			continue
@@ -75,9 +123,9 @@ func ExtractRedirectRoutes(redirectChain []string, baseURL string, routeCaptureC
 		urls[urlNoQuery] = struct{}{}
 
 		routeVar := &discover.RouteDetails{
-			BaseUrl:     baseURL,
-			Path:        parsedCleanURL.Path,
-			Method:      common.HttpMethodGet.Ptr(), // Redirects are typically GET
+			BaseUrl:     routeBaseURL,
+			Path:        routePath,
+			Method:      common.HttpMethodGet, // Redirects are typically GET
 			QueryParams: queryParams,
 		}
 
@@ -90,14 +138,17 @@ func ExtractRedirectRoutes(redirectChain []string, baseURL string, routeCaptureC
 // buildAllParameterURLs creates URLs for ALL discovered parameter values (no sampling)
 func buildAllParameterURLs(route *discover.RouteDetails) []string {
 	var allURLs []string
-	baseURL := route.BaseUrl + route.Path
-
-	if route.QueryParams == nil || len(route.QueryParams) == 0 {
+	if route == nil || route.QueryParams == nil || len(route.QueryParams) == 0 {
 		return allURLs
 	}
 
+	baseURL := route.BaseUrl + route.Path
+
 	// Build URLs with ALL discovered parameter values - no sampling or limits
 	for _, param := range route.QueryParams {
+		if param == nil {
+			continue
+		}
 		if param.ExampleValues != nil && len(param.ExampleValues) > 0 {
 			// Test EVERY value for this parameter to ensure complete coverage
 			for _, value := range param.ExampleValues {
@@ -132,7 +183,8 @@ func createSendHTTPRequestConfigWithQuery(baseURL, path string, queryParams map[
 		MaxRedirects:               config.MaxRedirects,
 		VerifyTls:                  config.VerifyTls,
 		Timeout:                    config.Timeout,
-		IgnoreCrossDomainRedirects: config.IgnoreCrossDomainRedirects,
+		IgnoreCrossDomainRedirects: config.IgnoreCrossDomain,
+		UserAgent:                  config.UserAgent,
 		RequestMethod:              config.RequestMethod,
 		HeadlessConfig:             config.HeadlessConfig,
 		BrowserbaseConfig:          config.BrowserbaseConfig,
@@ -168,17 +220,14 @@ func extractRoutes(ctx context.Context, httpRequestResponse *common.HttpRequestR
 	redirectedURL := httpRequestResponse.Response.RedirectChain[len(httpRequestResponse.Response.RedirectChain)-1]
 	log.Info("Redirected URL", svc1log.SafeParam("url", redirectedURL))
 
-	// Parse the redirected URL to preserve query parameters
-	parsedRedirectedURL, err := url.Parse(redirectedURL)
+	// Use the full page URL for resolving relative paths, but keep BaseUrl output origin-only.
+	redirectedURLBase, _, err := discoverroutehelpers.SplitURLBaseAndPath(redirectedURL)
 	if err != nil {
-		errorMsg := fmt.Sprintf("Failed to parse redirected URL %s: %s", redirectedURL, err)
+		errorMsg := fmt.Sprintf("Failed to split redirected URL %s: %s", redirectedURL, err)
 		log.Error(errorMsg)
 		errors = append(errors, errorMsg)
 		return routes, discoverroutehelpers.SetToListString(urls), errors
 	}
-
-	// Extract base URL (without query parameters for route extraction context)
-	redirectedURLBase := fmt.Sprintf("%s://%s", parsedRedirectedURL.Scheme, parsedRedirectedURL.Host)
 
 	// Helper function to process errors with context
 	processErrors := func(source string, newErrors []string) {
@@ -189,35 +238,35 @@ func extractRoutes(ctx context.Context, httpRequestResponse *common.HttpRequestR
 
 	// Extract routes from form elements
 	log.Info("Extracting routes from form elements")
-	formRoutes, formUrls, formErrors := capturerouteextractors.ExtractFormRoutes(doc, redirectedURLBase, routeCaptureConfig)
+	formRoutes, formUrls, formErrors := capturerouteextractors.ExtractFormRoutes(doc, redirectedURL, routeCaptureConfig)
 	routes = append(routes, formRoutes...)
 	urls = discoverroutehelpers.AddListToSetString(urls, formUrls)
 	processErrors("Form Elements", formErrors)
 
 	// Extract routes from anchor elements
 	log.Info("Extracting routes from anchor elements")
-	anchorRoutes, anchorUrls, anchorErrors := capturerouteextractors.ExtractAnchorRoutes(doc, redirectedURLBase, routeCaptureConfig)
+	anchorRoutes, anchorUrls, anchorErrors := capturerouteextractors.ExtractAnchorRoutes(doc, redirectedURL, routeCaptureConfig)
 	routes = append(routes, anchorRoutes...)
 	urls = discoverroutehelpers.AddListToSetString(urls, anchorUrls)
 	processErrors("Anchor Elements", anchorErrors)
 
 	// Extract routes from link elements
 	log.Info("Extracting routes from link elements")
-	linkRoutes, linkUrls, linkErrors := capturerouteextractors.ExtractLinkRoutes(doc, redirectedURLBase, routeCaptureConfig)
+	linkRoutes, linkUrls, linkErrors := capturerouteextractors.ExtractLinkRoutes(doc, redirectedURL, routeCaptureConfig)
 	routes = append(routes, linkRoutes...)
 	urls = discoverroutehelpers.AddListToSetString(urls, linkUrls)
 	processErrors("Link Elements", linkErrors)
 
 	// Extract routes from script elements
 	log.Info("Extracting routes from script elements")
-	scriptRoutes, scriptUrls, scriptErrors := capturerouteextractors.ExtractScriptRoutes(ctx, doc, redirectedURLBase, routeCaptureConfig)
+	scriptRoutes, scriptUrls, scriptErrors := capturerouteextractors.ExtractScriptRoutes(ctx, doc, redirectedURL, routeCaptureConfig)
 	routes = append(routes, scriptRoutes...)
 	urls = discoverroutehelpers.AddListToSetString(urls, scriptUrls)
 	errors = append(errors, scriptErrors...)
 
 	// Extract routes from inline script elements
 	log.Info("Extracting routes from inline script elements")
-	inlineScriptRoutes, inlineScriptUrls, inlineScriptErrors := capturerouteextractors.ExtractInlineScriptRoutes(ctx, doc, redirectedURLBase, routeCaptureConfig)
+	inlineScriptRoutes, inlineScriptUrls, inlineScriptErrors := capturerouteextractors.ExtractInlineScriptRoutes(ctx, doc, redirectedURL, routeCaptureConfig)
 	routes = append(routes, inlineScriptRoutes...)
 	urls = discoverroutehelpers.AddListToSetString(urls, inlineScriptUrls)
 	errors = append(errors, inlineScriptErrors...)
@@ -250,7 +299,7 @@ func extractRoutes(ctx context.Context, httpRequestResponse *common.HttpRequestR
 		}
 
 		fullRedirectedURL := redirectedURL
-		networkRoutes, networkUrls, networkErrors := capturerouteextractors.ExtractNetworkRoutes(networkRouteCtx, browser, fullRedirectedURL, routeCaptureConfig.IgnoreBaseUrlMatch, routeCaptureConfig.CollectStaticAssets)
+		networkRoutes, networkUrls, networkErrors := capturerouteextractors.ExtractNetworkRoutes(networkRouteCtx, browser, fullRedirectedURL, routeCaptureConfig.IgnoreCrossDomain, routeCaptureConfig.CollectStaticAssets)
 		routes = append(routes, networkRoutes...)
 		urls = discoverroutehelpers.AddListToSetString(urls, networkUrls)
 		errors = append(errors, networkErrors...)
@@ -264,7 +313,7 @@ func extractRoutes(ctx context.Context, httpRequestResponse *common.HttpRequestR
 	staticAssets := make(map[string]struct{})
 	for url := range urls {
 		if routeCaptureConfig.CollectStaticAssets && utils.IsStaticAsset(url) {
-			if discoverroutehelpers.IsSubdomain(redirectedURLBase, url) || routeCaptureConfig.IgnoreBaseUrlMatch {
+			if discoverroutehelpers.IsSubdomain(redirectedURLBase, url) || !routeCaptureConfig.IgnoreCrossDomain {
 				staticAssets[url] = struct{}{}
 			}
 		}
@@ -299,6 +348,15 @@ func PerformRouteCapture(ctx context.Context, config discover.DiscoverRouteConfi
 
 	// Mutex to protect shared data structures
 	var mu sync.Mutex
+
+	// Extract routes from explicit bundle URLs once before spidering (not per page)
+	if len(config.BundleUrls) > 0 {
+		log.Info("Extracting routes from explicit bundle URLs")
+		effectiveBase := resolveEffectiveTarget(ctx, config.Target, config)
+		bundleRoutes, _, bundleErrors := capturerouteextractors.ExtractBundleURLRoutes(ctx, config.BundleUrls, effectiveBase, config)
+		allRoutes = append(allRoutes, bundleRoutes...)
+		errors = append(errors, bundleErrors...)
+	}
 
 	// Spider through Route URLs up to the specified depth
 	for len(urlsToVisit) > 0 && currentDepth < config.SpiderDepth {
@@ -350,11 +408,14 @@ func PerformRouteCapture(ctx context.Context, config discover.DiscoverRouteConfi
 					return
 				}
 
-				// Extract base URL
-				currentBaseURL := fmt.Sprintf("%s://%s", parsedURL.Scheme, parsedURL.Host)
+				// Extract base URL and path
+				currentBaseURL, currentPath, err := discoverroutehelpers.SplitURLBaseAndPath(targetURL)
+				if err != nil {
+					errChan <- fmt.Sprintf("error splitting URL %s: %s", targetURL, err)
+					return
+				}
 
-				// Separate path and query parameters
-				currentPath := parsedURL.Path
+				// Separate query parameters
 				var queryParams map[string]string
 				if parsedURL.RawQuery != "" {
 					queryParams = make(map[string]string)
@@ -400,6 +461,9 @@ func PerformRouteCapture(ctx context.Context, config discover.DiscoverRouteConfi
 
 				// Collect routes to spider
 				for _, route := range routes {
+					if route == nil {
+						continue
+					}
 					// Visit the base route (without parameters)
 					baseRouteURL := route.BaseUrl + route.Path
 					mu.Lock()
@@ -444,6 +508,21 @@ func PerformRouteCapture(ctx context.Context, config discover.DiscoverRouteConfi
 
 	// Remove duplicate Routes and Static Assets
 	report.Result.Routes = discoverroutehelpers.MergeWebRoutes(allRoutes)
+	sort.SliceStable(report.Result.Routes, func(i, j int) bool {
+		ri := report.Result.Routes[i]
+		rj := report.Result.Routes[j]
+		// Evidence-tagged routes survive MaxRoutes cap before untagged routes
+		hasEvi := ri.Evidence != nil
+		hasEvj := rj.Evidence != nil
+		if hasEvi != hasEvj {
+			return hasEvi // true means ri comes first
+		}
+		// Same evidence tier: lexical for determinism
+		return ri.BaseUrl+ri.Path < rj.BaseUrl+rj.Path
+	})
+	if config.MaxRoutes != nil && *config.MaxRoutes > 0 && len(report.Result.Routes) > *config.MaxRoutes {
+		report.Result.Routes = report.Result.Routes[:*config.MaxRoutes]
+	}
 	report.Result.StaticAssets = discoverroutehelpers.MergeStaticAssets(allStaticAssets)
 	report.Errors = append(report.Errors, errors...)
 	return report

@@ -31,6 +31,7 @@ func createSendHTTPRequestConfig(baseURL, path string, queryParams map[string]st
 		VerifyTls:                  config.VerifyTls,
 		Timeout:                    config.Timeout,
 		IgnoreCrossDomainRedirects: config.IgnoreCrossDomainRedirects,
+		UserAgent:                  config.UserAgent,
 		RequestMethod:              config.RequestMethod,
 		HeadlessConfig:             config.HeadlessConfig,
 		BrowserbaseConfig:          config.BrowserbaseConfig,

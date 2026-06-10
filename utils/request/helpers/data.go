@@ -13,6 +13,54 @@ import (
 	common "github.com/Method-Security/webscan/generated/go/common"
 )
 
+// FlattenHeaders converts a multi-value header map (map[string][]string) into a
+// single-value header map (map[string]string) by joining multiple values with a
+// comma. This is the format expected by SendHTTPRequest. Ranging over a nil map
+// is safe in Go so the caller does not need to nil-check before calling.
+func FlattenHeaders(headers map[string][]string) map[string]string {
+	flat := make(map[string]string, len(headers))
+	for k, v := range headers {
+		if len(v) > 0 {
+			flat[k] = strings.Join(v, ",")
+		}
+	}
+	return flat
+}
+
+// ParseHeaderPairs converts a slice of "Name: Value" strings (as supplied via a
+// repeated --header CLI flag) into a map[string]string. Pairs that do not
+// contain a colon are silently ignored. Leading and trailing whitespace is
+// trimmed from both the name and the value. Returns nil when pairs is empty.
+func ParseHeaderPairs(pairs []string) map[string]string {
+	if len(pairs) == 0 {
+		return nil
+	}
+	headers := make(map[string]string, len(pairs))
+	for _, pair := range pairs {
+		if kv := strings.SplitN(pair, ":", 2); len(kv) == 2 {
+			headers[strings.TrimSpace(kv[0])] = strings.TrimSpace(kv[1])
+		}
+	}
+	return headers
+}
+
+// ParseFormDataPairs converts a slice of "key=value" strings (as supplied via a
+// repeated --form-data CLI flag) into a map[string]string. Pairs that do not
+// contain an equals sign are silently ignored. Leading and trailing whitespace is
+// trimmed from both the key and the value. Returns nil when pairs is empty.
+func ParseFormDataPairs(pairs []string) map[string]string {
+	if len(pairs) == 0 {
+		return nil
+	}
+	form := make(map[string]string, len(pairs))
+	for _, pair := range pairs {
+		if kv := strings.SplitN(pair, "=", 2); len(kv) == 2 {
+			form[strings.TrimSpace(kv[0])] = strings.TrimSpace(kv[1])
+		}
+	}
+	return form
+}
+
 // RemoveScheme removes http:// or https:// from the beginning of a string
 func RemoveScheme(url string) string {
 	if strings.HasPrefix(url, "http://") {
@@ -183,6 +231,23 @@ func CreateBodyFromBytes(contentType string, bodyData []byte) *common.Body {
 	}
 }
 
+// DetectContentTypeFromBytes classifies body bytes using Go's content sniffing.
+func DetectContentTypeFromBytes(bodyData []byte) string {
+	return http.DetectContentType(bodyData)
+}
+
+// CreateBodyFromDetectedBytes classifies body bytes using Go's content sniffing.
+func CreateBodyFromDetectedBytes(bodyData []byte) *common.Body {
+	return CreateBodyFromBytes(DetectContentTypeFromBytes(bodyData), bodyData)
+}
+
+// IsDetectedBinaryBody reports whether body bytes classify the same way STANDARD
+// would classify a binary response when no Content-Type header is available.
+func IsDetectedBinaryBody(bodyData []byte) bool {
+	body := CreateBodyFromDetectedBytes(bodyData)
+	return body != nil && body.Kind == "binary"
+}
+
 // CreateHTTPResponseFromBytes creates an HttpResponse struct from HttpResponse data using byte array
 func CreateHTTPResponseFromBytes(statusCode int, redirectChain []string, headers map[string][]string, responseBody []byte) common.HttpResponse {
 	// Process headers to split comma-delimited values
@@ -201,8 +266,8 @@ func CreateHTTPResponseFromBytes(statusCode int, redirectChain []string, headers
 
 	// Get content type from headers
 	contentType := ""
-	if ct, ok := processedHeaders["Content-Type"]; ok && len(ct) > 0 {
-		contentType = ct[0]
+	if ct := GetHeaderValueFromHeaderMap(processedHeaders, "Content-Type"); ct != nil {
+		contentType = *ct
 	}
 
 	// If no content type is provided, try to detect it from string representation

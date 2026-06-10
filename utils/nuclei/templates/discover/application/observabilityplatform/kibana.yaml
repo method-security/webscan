@@ -1,0 +1,64 @@
+id: kibana-detect
+info:
+  name: Kibana Detection
+  author: method-security
+  severity: info
+  description: Detects Kibana instances by validating /api/status JSON and Kibana-specific frontend branding/bootstrap markers.
+  metadata:
+    method-application-type: OBSERVABILITY_PLATFORM
+    method-module-name: KIBANA
+    cpe: cpe:2.3:a:elastic:kibana:*:*:*:*:*:*:*:*
+  tags: discovery,kibana,elastic,observability,observability-platform
+flow: http(1) && http(2)
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/api/status"
+    redirects: true
+    max-redirects: 5
+    matchers-condition: and
+    matchers:
+      - type: dsl
+        internal: true
+        dsl:
+          - "status_code == 200 || status_code == 503"
+      - type: word
+        part: header
+        words:
+          - "application/json"
+        case-insensitive: true
+        internal: true
+      - type: regex
+        part: body
+        regex:
+          - '"version"\s*:\s*\{[^}]*"number"\s*:\s*"[0-9]+(?:\.[0-9]+){1,3}(?:[-+][^"]+)?"'
+        internal: true
+      - type: regex
+        part: body
+        regex:
+          - '"build_(?:hash|number|snapshot)"\s*:'
+        internal: true
+      - type: regex
+        part: body
+        regex:
+          - '"status"\s*:\s*\{'
+        internal: true
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/login"
+      - "{{BaseURL}}/app/home"
+      - "{{BaseURL}}/app/kibana"
+      - "{{BaseURL}}/spaces/enter"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers-condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+      - type: regex
+        part: body
+        regex:
+          - "(?i)(kbn-injected-metadata|__kbnPublicPath__|kbnBootstrap|data-test-subj=\"kibanaChrome\")"

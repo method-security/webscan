@@ -7,18 +7,22 @@ types:
     properties:
       target: string
       collectStaticAssets: boolean
-      ignoreBaseUrlMatch: boolean
+      ignoreCrossDomain: boolean
       spiderDepth: integer
       maxRedirects: integer
       verifyTls: boolean
       timeout: integer
       sleep: integer
       jitter: integer
-      ignoreCrossDomainRedirects: boolean
       threads: integer
+      userAgent: method.UserAgentPreset
       requestMethod: method.RequestMethod
       headlessConfig: optional<method.HeadlessRequestConfig>
       browserbaseConfig: optional<method.BrowserbaseRequestConfig>
+      bundleUrls: optional<list<string>>
+      fetchSourceMaps: optional<boolean>
+      maxBundles: optional<integer>
+      maxRoutes: optional<integer>
   # Report Struct
   RouteBodyParam:
     properties:
@@ -32,9 +36,11 @@ types:
     properties:
       baseURL: string
       path: string
-      method: optional<http.HttpMethod>
+      method: http.HttpMethod
       queryParams: optional<list<RouteQueryParam>>
       bodyParams: optional<list<RouteBodyParam>>
+      evidence: optional<string>
+      pathTemplate: optional<string>
   DiscoverRouteResult:
     properties:
       target: string

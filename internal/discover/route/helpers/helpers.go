@@ -52,9 +52,9 @@ func MergeWebRoutes(routes []*discover.RouteDetails) []*discover.RouteDetails {
 
 	for _, route := range routes {
 		// Create a unique key based on method and URL
-		method := string(common.HttpMethodGet)
-		if route.Method != nil {
-			method = string(*route.Method)
+		method := route.Method
+		if method == "" {
+			method = common.HttpMethodGet
 		}
 
 		// Normalize path: treat empty path "" and root path "/" as equivalent
@@ -71,6 +71,13 @@ func MergeWebRoutes(routes []*discover.RouteDetails) []*discover.RouteDetails {
 			existingRoute.QueryParams = MergeQueryParams(existingRoute.QueryParams, route.QueryParams)
 			// Merge BodyParams
 			existingRoute.BodyParams = MergeBodyParams(existingRoute.BodyParams, route.BodyParams)
+			// Prefer evidence-tagged fields (sourcemap/CONST beats untagged first-seen)
+			if existingRoute.Evidence == nil && route.Evidence != nil {
+				existingRoute.Evidence = route.Evidence
+			}
+			if existingRoute.PathTemplate == nil && route.PathTemplate != nil {
+				existingRoute.PathTemplate = route.PathTemplate
+			}
 		} else {
 			// Add new route to the map
 			// Create a copy to avoid modifying the original
@@ -194,6 +201,9 @@ func MergeBodyParams(params1 []*discover.RouteBodyParam, params2 []*discover.Rou
 func ParseQueryParams(reqURL *url.URL) []*discover.RouteQueryParam {
 	var queryParams []*discover.RouteQueryParam
 	for key, values := range reqURL.Query() {
+		if key == "" {
+			continue
+		}
 		queryParams = append(queryParams, &discover.RouteQueryParam{
 			Name:          key,
 			ExampleValues: values,
@@ -212,6 +222,9 @@ func ParseBodyParams(postData string) ([]*discover.RouteBodyParam, error) {
 		var jsonData map[string]interface{}
 		if err := json.Unmarshal([]byte(postData), &jsonData); err == nil {
 			for key, value := range jsonData {
+				if key == "" {
+					continue
+				}
 				// Stringify the value to ensure it's a string
 				valueStr, err := json.Marshal(value)
 				if err == nil {
@@ -231,6 +244,9 @@ func ParseBodyParams(postData string) ([]*discover.RouteBodyParam, error) {
 		formData, err := url.ParseQuery(postData)
 		if err == nil {
 			for key, values := range formData {
+				if key == "" {
+					continue
+				}
 				bodyParams = append(bodyParams, &discover.RouteBodyParam{
 					Name:          key,
 					ExampleValues: values,
@@ -268,21 +284,29 @@ func URLRemoveQueryParams(rawURL string) (string, error) {
 	return parsedURL.String(), nil
 }
 
-// IsURLAllowed checks if a target URL is allowed based on base URL, static asset rules, and domain matching.
-func IsURLAllowed(baseURL string, targetURL string, ignoreBaseURLMatch bool, collectStaticAssets bool) bool {
-	// First check to see if the targetURL is a static asset type
-	if collectStaticAssets {
-		if utils.IsStaticAsset(targetURL) {
-			return true // Allow static assets when ignoreStaticAssets is false
-		}
+// SplitURLBaseAndPath returns the URL origin and path as separate route fields.
+func SplitURLBaseAndPath(rawURL string) (string, string, error) {
+	parsedURL, err := url.Parse(rawURL)
+	if err != nil {
+		return "", "", err
 	}
 
-	if ignoreBaseURLMatch {
-		return true
+	baseURL := ""
+	if parsedURL.Scheme != "" && parsedURL.Host != "" {
+		baseURL = fmt.Sprintf("%s://%s", parsedURL.Scheme, parsedURL.Host)
+	} else if parsedURL.Host != "" {
+		baseURL = "//" + parsedURL.Host
 	}
 
-	// Check if targetDomain is the same as baseDomain or a subdomain
-	return IsSubdomain(baseURL, targetURL)
+	return strings.TrimRight(baseURL, "/"), parsedURL.Path, nil
+}
+
+// IsURLAllowed checks if a target URL is allowed based on base URL and domain matching.
+func IsURLAllowed(baseURL string, targetURL string, ignoreCrossDomain bool, _ bool) bool {
+	if ignoreCrossDomain {
+		return IsSubdomain(baseURL, targetURL)
+	}
+	return true
 }
 
 // ExtractDomain extracts the domain from a URL up to a specified domain level.

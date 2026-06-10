@@ -3,6 +3,8 @@ package discoverpage
 import (
 	// Standard
 	"context"
+	"fmt"
+
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
 	"github.com/Method-Security/webscan/generated/go/discover"
@@ -33,6 +35,7 @@ func getHTTPRequestConfig(baseURL string, path string, queryParams map[string]st
 		VerifyTls:                  config.VerifyTls,
 		Timeout:                    config.Timeout,
 		IgnoreCrossDomainRedirects: config.IgnoreCrossDomainRedirects,
+		UserAgent:                  config.UserAgent,
 		RequestMethod:              config.RequestMethod,
 		HeadlessConfig:             config.HeadlessConfig,
 		BrowserbaseConfig:          config.BrowserbaseConfig,
@@ -98,7 +101,12 @@ func PerformPageCapture(
 
 	// Check if response is valid and add request if status code is allowed
 	if httpRequestResponse != nil && httpRequestResponse.Response != nil && httpRequestResponse.Response.StatusCode != nil {
-		if _, exists := validCodes[*httpRequestResponse.Response.StatusCode]; exists {
+		if _, exists := validCodes[*httpRequestResponse.Response.StatusCode]; !exists {
+			log.Info("Page returned a response code not in the allowed list, skipping",
+				svc1log.SafeParam("target", config.Target),
+				svc1log.SafeParam("status_code", *httpRequestResponse.Response.StatusCode))
+			errors = append(errors, fmt.Sprintf("page %s returned status code %d which is not in the allowed response codes", config.Target, *httpRequestResponse.Response.StatusCode))
+		} else {
 			result.Request = httpRequestResponse
 
 			// If sensitive content detection is enabled, extract sensitive content from response body

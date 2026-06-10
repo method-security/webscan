@@ -70,6 +70,7 @@ func createRateLimitRequestConfig(baseURL, path string, queryParams map[string]s
 		MaxRedirects:       0,
 		VerifyTls:          config.VerifyTls,
 		Timeout:            config.Timeout,
+		UserAgent:          config.UserAgent,
 		RequestMethod:      common.RequestMethodStandard,
 		BrowserbaseSecrets: nil,
 		HeadlessConfig:     nil,

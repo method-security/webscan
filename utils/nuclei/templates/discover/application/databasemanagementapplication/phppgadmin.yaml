@@ -1,0 +1,27 @@
+id: phppgadmin-detect
+info:
+  name: phpPgAdmin Detection
+  author: method-security
+  severity: info
+  description: Detects phpPgAdmin PostgreSQL administration interfaces using phpPgAdmin-specific title and form markers.
+  metadata:
+    method-application-type: DATABASE_MANAGEMENT_APPLICATION
+    method-module-name: PHPPGADMIN
+    cpe: cpe:2.3:a:phppgadmin:phppgadmin:*:*:*:*:*:*:*:*
+  tags: discovery,database,admin,phppgadmin,postgresql
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/phppgadmin/"
+      - "{{BaseURL}}/phpPgAdmin/"
+      - "{{BaseURL}}/login.php"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'status_code == 200 && contains(tolower(body), "<title>phppgadmin") && contains(tolower(body), "<frameset") && contains(tolower(body), "browser.php") && contains(tolower(body), "intro.php")'
+          - 'status_code == 200 && contains(tolower(body), "themes/default/global.css") && contains(tolower(body), "images/themes/default/introduction.png") && contains(tolower(body), "browser.php")'
+          - 'status_code == 200 && contains(tolower(body), "appname") && contains(tolower(body), "phppgadmin") && contains(tolower(body), "servers.php") && contains(tolower(body), "browser.php")'

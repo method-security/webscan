@@ -25,7 +25,8 @@ builds:
 
 archives:
   - id: archive
-    format: tar.gz
+    formats:
+      - tar.gz
     name_template: >-
       {{ .ProjectName }}_{{ .Version }}_
       {{- if eq .Os "darwin" }}macOS
@@ -41,76 +42,35 @@ archives:
       - LICENSE
     format_overrides:
       - goos: windows
-        format: zip
+        formats:
+          - zip
 
 checksum:
   name_template: "{{ .ProjectName }}_checksums.txt"
 
-dockers:
-  - image_templates:
-      - "ghcr.io/method-security/webscan:{{ .Version }}-amd64"
-      - "ghcr.io/method-security/webscan:latest-amd64"
-      - "docker.io/methodsecurity/webscan:{{ .Version }}-amd64"
-      - "docker.io/methodsecurity/webscan:latest-amd64"
-    use: buildx
-    goos: linux
-    goarch: amd64
-    ids:
+dockers_v2:
+  - ids:
       - prebuilt
-    build_flag_templates:
-      - "--label=org.opencontainers.image.title={{ .ProjectName }}"
-      - "--label=org.opencontainers.image.description=An on-rails Webscan enumeration tool"
-      - "--label=org.opencontainers.image.vendor=Method Security"
-      - "--label=org.opencontainers.image.version={{ .Version }}"
-      - "--label=org.opencontainers.image.created={{ .Date }}"
-      - "--label=org.opencontainers.image.source=https://github.com/method-security/webscan"
-      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
-      - "--label=org.opencontainers.image.url=https://method.security"
-      - "--label=org.opencontainers.image.documentation=https://github.com/method-security/webscan"
-      - "--platform=linux/amd64"
-    extra_files:
-      - configs/
-  - image_templates:
-      - "ghcr.io/method-security/webscan:{{ .Version }}-arm64"
-      - "ghcr.io/method-security/webscan:latest-arm64"
-      - "docker.io/methodsecurity/webscan:{{ .Version }}-arm64"
-      - "docker.io/methodsecurity/webscan:latest-arm64"
-    use: buildx
-    goos: linux
-    goarch: arm64
-    ids:
-      - prebuilt
-    build_flag_templates:
-      - "--label=org.opencontainers.image.title={{ .ProjectName }}"
-      - "--label=org.opencontainers.image.description=An on-rails Webscan enumeration tool"
-      - "--label=org.opencontainers.image.vendor=Method Security"
-      - "--label=org.opencontainers.image.version={{ .Version }}"
-      - "--label=org.opencontainers.image.created={{ .Date }}"
-      - "--label=org.opencontainers.image.source=https://github.com/method-security/webscan"
-      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
-      - "--label=org.opencontainers.image.url=https://method.security"
-      - "--label=org.opencontainers.image.documentation=https://github.com/method-security/webscan"
-      - "--platform=linux/arm64"
-    extra_files:
-      - configs/
-
-docker_manifests:
-  - name_template: 'ghcr.io/method-security/webscan:{{ .Version }}'
-    image_templates:
-    - 'ghcr.io/method-security/webscan:{{ .Version }}-amd64'
-    - 'ghcr.io/method-security/webscan:{{ .Version }}-arm64'
-  - name_template: 'ghcr.io/method-security/webscan:latest'
-    image_templates:
-    - 'ghcr.io/method-security/webscan:{{ .Version }}-amd64'
-    - 'ghcr.io/method-security/webscan:{{ .Version }}-arm64'
-  - name_template: 'methodsecurity/webscan:{{ .Version }}'
-    image_templates:
-    - 'methodsecurity/webscan:{{ .Version }}-amd64'
-    - 'methodsecurity/webscan:{{ .Version }}-arm64'
-  - name_template: 'methodsecurity/webscan:latest'
-    image_templates:
-    - 'methodsecurity/webscan:{{ .Version }}-amd64'
-    - 'methodsecurity/webscan:{{ .Version }}-arm64'
+    images:
+      - "ghcr.io/method-security/webscan"
+      - "docker.io/methodsecurity/webscan"
+    tags:
+      - "{{ .Version }}"
+      - "latest"
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    labels:
+      "org.opencontainers.image.title": "{{ .ProjectName }}"
+      "org.opencontainers.image.description": "An on-rails Webscan enumeration tool"
+      "org.opencontainers.image.vendor": "Method Security"
+      "org.opencontainers.image.version": "{{ .Version }}"
+      "org.opencontainers.image.created": "{{ .Date }}"
+      "org.opencontainers.image.source": "https://github.com/method-security/webscan"
+      "org.opencontainers.image.revision": "{{ .FullCommit }}"
+      "org.opencontainers.image.url": "https://method.security"
+      "org.opencontainers.image.documentation": "https://github.com/method-security/webscan"
+    sbom: true
 
 sboms:
   - artifacts: archive
@@ -119,15 +79,10 @@ sboms:
 
 signs:
   - cmd: cosign
-    env:
-      - COSIGN_EXPERIMENTAL=1
-    signature: "${artifact}.sig"
-    certificate: '${artifact}.pem'
+    signature: "${artifact}.sigstore.json"
     args:
       - sign-blob
-      - "--oidc-issuer=https://token.actions.githubusercontent.com"
-      - "--output-certificate=${certificate}"
-      - "--output-signature=${signature}"
+      - "--bundle=${signature}"
       - "${artifact}"
       - "--yes"
     artifacts: all
@@ -135,8 +90,6 @@ signs:
 
 docker_signs:
   - cmd: cosign
-    env:
-      - COSIGN_EXPERIMENTAL=1
     artifacts: manifests
     output: true
     args:

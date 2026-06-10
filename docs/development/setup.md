@@ -32,6 +32,23 @@ If you'd like to clean this output up, you can run
 ./godelw clean
 ```
 
+## Updating embedded scan assets
+
+Nuclei templates, wordlists, fingerprints, and other bundled scan data live in plaintext under `utils/nuclei/templates/` and `configs/`. The binary embeds compressed archives generated from those directories so raw template strings are not stored directly in the executable.
+
+After changing any of those assets, regenerate the embedded archives:
+
+```bash
+go generate ./configs
+```
+
+This command refreshes:
+
+- `configs/embedded/configs.tar.gz`
+- `utils/nuclei/templates/embedded/templates.tar.gz`
+
+Commit the plaintext asset changes and the regenerated archive changes together. Do not edit the archive files directly.
+
 ## Testing releases locally
 
 We can use goreleaser locally as well to test our builds. As webscan uses [cosign](https://github.com/sigstore/cosign) to sign our artifacts and Docker containers during our CI pipeline, we'll want to skip this step when running locally.

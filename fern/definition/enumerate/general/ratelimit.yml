@@ -1,5 +1,6 @@
 imports:
   http: ../../common/http.yml
+  method: ../../common/method.yml
   wafdetect: ../../pentest/waf/detect.yml
 types:
   # Config Struct
@@ -12,6 +13,7 @@ types:
       verifyTls: boolean
       timeout: integer
       threads: integer
+      userAgent: method.UserAgentPreset
   # Report Struct
   RateLimitAttempt:
     properties:

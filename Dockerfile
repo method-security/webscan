@@ -4,7 +4,7 @@ FROM chromedp/headless-shell:129.0.6643.2
 RUN ln -s /headless-shell/headless-shell /usr/bin/chrome
 
 ARG CLI_NAME="webscan"
-ARG TARGETARCH
+ARG TARGETPLATFORM
 
 RUN apt-get update && apt-get install -y ca-certificates git
 
@@ -17,7 +17,7 @@ RUN \
   mkdir -p /opt/method/${CLI_NAME}/service/bin && \
   mkdir -p /mnt/output
 
-COPY ${CLI_NAME}                              /opt/method/${CLI_NAME}/service/bin/${CLI_NAME}
+COPY $TARGETPLATFORM/${CLI_NAME} /opt/method/${CLI_NAME}/service/bin/${CLI_NAME}
 
 RUN \
   adduser --disabled-password --gecos '' method && \

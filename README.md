@@ -83,6 +83,21 @@ webscan pentest waf detect --targets https://method.security --http-methods GET,
 ### Fern
 If updating the fern yaml configuration you need to [install](https://buildwithfern.com/learn/cli-reference/overview) Fern CLI. After installation you can execute `fern generate` to generate the updates.
 
+### Updating Embedded Scan Assets
+
+Nuclei templates and bundled scan configuration are stored in plaintext under `utils/nuclei/templates/` and `configs/`, but the release binary embeds compressed archives generated from those directories. After changing Nuclei templates, wordlists, fingerprints, or other embedded scan assets, regenerate the archives before building or opening a PR:
+
+```bash
+go generate ./configs
+```
+
+This updates:
+
+- `configs/embedded/configs.tar.gz`
+- `utils/nuclei/templates/embedded/templates.tar.gz`
+
+Commit both the plaintext asset changes and the regenerated archive changes. Do not edit the `.tar.gz` files by hand. The weekly Nuclei CVE template sync workflow regenerates the template archive automatically.
+
 ### Note:
 This tool runs on a headless-shell base image to support chrome/chromium browser automation. The dockerfile uses debian-based install tools. 
 

@@ -28,15 +28,5 @@ jobs:
       - name: Install Dependencies
         run: sudo apt-get update && sudo apt-get install -y libpcap-dev
 
-      - name: Generate embedded Nuclei template archive
-        run: |
-          go generate ./configs
-          if [ ! -s utils/nuclei/templates/embedded/templates.tar.gz ]; then
-            echo "utils/nuclei/templates/embedded/templates.tar.gz was not generated."
-            exit 1
-          fi
-        env:
-          GOCACHE: ${{ runner.temp }}/go-build
-
       - name: Godel Verify
         run: ./godelw verify

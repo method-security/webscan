@@ -8,7 +8,7 @@ info:
     method-application-type: NETWORK_EDGE_APPLICATION
     method-module-name: IVANTI_CONNECT_SECURE
     method-sub-module-name: SSL_VPN_PORTAL
-    method-detection-state: DETECTED
+    method-detection-state: DEFAULT_PAGE
     cpe: cpe:2.3:a:ivanti:connect_secure:*:*:*:*:*:*:*:*
   tags: discovery,vpn,ivanti,pulse,connect-secure,network-edge
 http:

@@ -31,7 +31,6 @@ types:
       - WEB_SERVER
   ApplicationDetectionState:
     enum:
-      - DETECTED
       - DEFAULT_PAGE
       - UNAUTHENTICATED
       - MISCONFIGURED

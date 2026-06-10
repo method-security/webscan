@@ -8,7 +8,7 @@ info:
     method-application-type: NETWORK_EDGE_APPLICATION
     method-module-name: PALO_ALTO_GLOBALPROTECT
     method-sub-module-name: SSL_VPN_PORTAL
-    method-detection-state: DETECTED
+    method-detection-state: DEFAULT_PAGE
     cpe: cpe:2.3:a:paloaltonetworks:globalprotect:*:*:*:*:*:*:*:*
   tags: discovery,vpn,palo-alto,globalprotect,network-edge
 http:

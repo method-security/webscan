@@ -8,7 +8,7 @@ info:
     method-application-type: NETWORK_MANAGEMENT_SYSTEM
     method-module-name: NETGEAR
     method-sub-module-name: NIGHTHAWK
-    method-detection-state: DETECTED
+    method-detection-state: EXPOSED_ADMIN
     cpe: cpe:2.3:o:netgear:nighthawk_firmware:*:*:*:*:*:*:*:*
   tags: discovery,soho,netgear,nighthawk,orbi,router,network-management
 http:

@@ -8,7 +8,7 @@ info:
     method-application-type: NETWORK_EDGE_APPLICATION
     method-module-name: ISP_CPE
     method-sub-module-name: ARCADYAN
-    method-detection-state: DETECTED
+    method-detection-state: EXPOSED_ADMIN
     cpe: cpe:2.3:o:arcadyan:*:*:*:*:*:*:*:*:*
   tags: discovery,soho,isp-cpe,arcadyan,tr069,network-edge
 http:

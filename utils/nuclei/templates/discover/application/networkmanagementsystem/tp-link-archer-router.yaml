@@ -8,7 +8,7 @@ info:
     method-application-type: NETWORK_MANAGEMENT_SYSTEM
     method-module-name: TPLINK
     method-sub-module-name: ARCHER
-    method-detection-state: DETECTED
+    method-detection-state: EXPOSED_ADMIN
     cpe: cpe:2.3:o:tp-link:archer_firmware:*:*:*:*:*:*:*:*
   tags: discovery,soho,tp-link,tplink,archer,tl-wr,deco,router,network-management
 http:

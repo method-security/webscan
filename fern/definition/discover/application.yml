@@ -37,8 +37,6 @@ types:
       - EXPOSED_ADMIN
       - VULNERABLE_VERSION
       - DEBUGGING_ENABLED
-      - DETECTED
-      - VERSIONED
   ApplicationResourceConfigType:
     discriminated: false
     union:

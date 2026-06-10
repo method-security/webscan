@@ -8,7 +8,7 @@ info:
     method-application-type: NETWORK_MANAGEMENT_SYSTEM
     method-module-name: NETGEAR
     method-sub-module-name: PROSAFE
-    method-detection-state: DETECTED
+    method-detection-state: EXPOSED_ADMIN
     cpe: cpe:2.3:h:netgear:*:*:*:*:*:*:*:*:*
   tags: discovery,soho,netgear,prosafe,switch,router,network-management
 http:

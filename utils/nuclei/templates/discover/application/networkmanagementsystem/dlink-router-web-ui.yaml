@@ -8,7 +8,7 @@ info:
     method-application-type: NETWORK_MANAGEMENT_SYSTEM
     method-module-name: DLINK
     method-sub-module-name: DIR_SERIES
-    method-detection-state: DETECTED
+    method-detection-state: EXPOSED_ADMIN
     cpe: cpe:2.3:h:dlink:*:*:*:*:*:*:*:*:*
   tags: discovery,soho,dlink,dir,covr,router,network-management
 http:

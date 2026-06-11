@@ -1,14 +1,13 @@
-id: dahua-web-service-detect
+id: dahua-oem-web-service-detect
 info:
-  name: Dahua Web Service Detection
+  name: Dahua/OEM Web Service Detection
   author: method-security
   severity: info
-  description: Detects Dahua camera, DVR, and NVR web interfaces using Dahua Web Service assets.
+  description: Detects Dahua-derived OEM camera, DVR, and NVR web interfaces using Web Service asset markers.
   metadata:
     method-application-type: INTERNET_OF_THINGS
-    method-module-name: DAHUA_WEB_SERVICE
-    cpe: cpe:2.3:h:dahua:*:*:*:*:*:*:*:*:*
-  tags: discovery,iot,camera,dvr,nvr,dahua
+    method-module-name: DAHUA_OEM_WEB_SERVICE
+  tags: discovery,iot,camera,dvr,nvr,dahua,oem
 http:
   - method: GET
     path:

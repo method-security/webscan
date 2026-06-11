@@ -6,7 +6,7 @@ info:
   description: Detects Hikvision camera and NVR web interfaces using the Hikvision doc/page login bootstrap.
   metadata:
     method-application-type: INTERNET_OF_THINGS
-    method-module-name: HIKVISION_CAMERA_WEB_UI
+    method-module-name: HIKVISION_CAMERA
     cpe: cpe:2.3:h:hikvision:*:*:*:*:*:*:*:*:*
   tags: discovery,iot,camera,nvr,hikvision
 http:
@@ -22,20 +22,6 @@ http:
       - type: word
         part: body
         words:
-          - "./doc/page/login.asp"
-          - "new Date()).getTime()"
-        condition: and
-        case-insensitive: true
-      - type: word
-        part: body
-        words:
-          - "doc/page/login.asp"
-          - "doc/script/LAB.min.js"
-          - "$LAB"
-        condition: and
-        case-insensitive: true
-      - type: word
-        part: body
-        words:
           - "Hikvision Digital Technology"
+          - "Camera"
         case-insensitive: true

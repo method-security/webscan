@@ -27,10 +27,3 @@ http:
           - "Advanced Computer Room Environment Monitoring"
         condition: and
         case-insensitive: true
-      - type: word
-        part: body
-        words:
-          - "<title>Room Alert Monitor</title>"
-          - "favicon-16x16.png"
-        condition: and
-        case-insensitive: true

@@ -281,7 +281,11 @@ func checkDrupalModuleInfoYml(ctx context.Context, baseURL, basePath string, con
 
 			if config.Sleep > 0 {
 				delay := utils.CalculateDelayWithJitter(config.Sleep, config.Jitter)
-				time.Sleep(delay)
+				select {
+				case <-time.After(delay):
+				case <-ctx.Done():
+					return modulesList, errors
+				}
 			}
 
 			statusCode := getResponseStatusCode(resp)
@@ -317,7 +321,11 @@ func checkDrupalModuleChangelogs(ctx context.Context, baseURL, basePath string, 
 
 			if config.Sleep > 0 {
 				delay := utils.CalculateDelayWithJitter(config.Sleep, config.Jitter)
-				time.Sleep(delay)
+				select {
+				case <-time.After(delay):
+				case <-ctx.Done():
+					return modulesList, errors
+				}
 			}
 
 			if getResponseStatusCode(resp) != 200 {
@@ -366,7 +374,11 @@ func checkDrupalModuleLicense(ctx context.Context, baseURL, basePath string, con
 
 			if config.Sleep > 0 {
 				delay := utils.CalculateDelayWithJitter(config.Sleep, config.Jitter)
-				time.Sleep(delay)
+				select {
+				case <-time.After(delay):
+				case <-ctx.Done():
+					return modulesList, errors
+				}
 			}
 
 			if getResponseStatusCode(resp) != 200 {
@@ -412,7 +424,11 @@ func checkDrupalModuleReadme(ctx context.Context, baseURL, basePath string, conf
 
 				if config.Sleep > 0 {
 					delay := utils.CalculateDelayWithJitter(config.Sleep, config.Jitter)
-					time.Sleep(delay)
+					select {
+					case <-time.After(delay):
+					case <-ctx.Done():
+						return modulesList, errors
+					}
 				}
 
 				if getResponseStatusCode(resp) != 200 {

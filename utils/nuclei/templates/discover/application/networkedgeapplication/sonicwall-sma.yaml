@@ -20,8 +20,25 @@ http:
     max-redirects: 5
     stop-at-first-match: true
     matchers:
-      - type: dsl
-        dsl:
-          - 'contains(tolower(body), "sonicwall") && contains(tolower(body), "virtual office")'
-          - 'contains(tolower(body), "sonicwall") && contains(tolower(body), "secure mobile access")'
-          - 'contains(tolower(body), "sonicwall") && contains(tolower(body), "sma") && contains(tolower(body), "login")'
+      - type: word
+        part: body
+        words:
+          - "sonicwall"
+          - "virtual office"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "sonicwall"
+          - "secure mobile access"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "sonicwall"
+          - "sma"
+          - "login"
+        condition: and
+        case-insensitive: true

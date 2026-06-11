@@ -47,7 +47,7 @@ This command refreshes:
 - `configs/embedded/configs.tar.gz`
 - `utils/nuclei/templates/embedded/templates.tar.gz`
 
-Commit the plaintext asset changes and the regenerated archive changes together. Do not edit the archive files directly.
+Commit plaintext asset changes and any tracked regenerated archive changes together. `utils/nuclei/templates/embedded/templates.tar.gz` is generated locally and in CI, but is not committed. Do not edit archive files directly.
 
 ## Testing releases locally
 

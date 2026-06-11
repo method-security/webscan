@@ -30,11 +30,10 @@ http:
         words:
           - "moveitisapi"
           - "stylesheet_MOVEit"
-          - "MOVEit Mobile"
           - "com.progress.moveit.transfer"
         case-insensitive: true
       - type: word
-        part: header
+        part: all
         words:
           - "moveitisapi"
         case-insensitive: true

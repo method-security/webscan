@@ -288,7 +288,11 @@ func PerformWordlistCapture(ctx context.Context, config discover.DiscoverWordlis
 				mu.Unlock()
 
 				if delay := utils.CalculateDelayWithJitter(config.Sleep, config.Jitter); delay > 0 {
-					time.Sleep(delay)
+					select {
+					case <-time.After(delay):
+					case <-ctx.Done():
+						return
+					}
 				}
 
 				log.Info("Fetching URL for wordlist", svc1log.SafeParam("url", targetURL))

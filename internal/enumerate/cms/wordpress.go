@@ -420,7 +420,11 @@ func checkReadmeFiles(ctx context.Context, url string, config *enumeratecmswordp
 		// Apply stealth delay between requests
 		if config.Sleep > 0 && i < len(config.Plugins)-1 {
 			delay := utils.CalculateDelayWithJitter(config.Sleep, config.Jitter)
-			time.Sleep(delay)
+			select {
+			case <-time.After(delay):
+			case <-ctx.Done():
+				return pluginsList, errors
+			}
 		}
 		if readmeRequest.Response != nil && readmeRequest.Response.StatusCode != nil && *readmeRequest.Response.StatusCode != 200 {
 			continue

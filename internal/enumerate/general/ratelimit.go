@@ -190,7 +190,11 @@ requestLoop:
 		// Enforce the calculated request interval for sequential timing
 		if config.Sleep > 0 {
 			delay := utils.CalculateDelayWithJitter(config.Sleep, config.Jitter)
-			time.Sleep(delay)
+			select {
+			case <-time.After(delay):
+			case <-ctx.Done():
+				return
+			}
 		}
 	}
 

@@ -173,7 +173,11 @@ func LaunchDiscoverSaas(ctx context.Context, config discover.DiscoverSaasConfig,
 						// Apply stealth delay between requests
 						if config.Sleep > 0 {
 							delay := utils.CalculateDelayWithJitter(config.Sleep, config.Jitter)
-							time.Sleep(delay)
+							select {
+							case <-time.After(delay):
+							case <-ctx.Done():
+								return
+							}
 						}
 
 						// Analyze the request

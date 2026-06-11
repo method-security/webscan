@@ -19,8 +19,24 @@ http:
     max-redirects: 5
     stop-at-first-match: true
     matchers:
-      - type: dsl
-        dsl:
-          - 'contains(tolower(body), "opentext") && contains(tolower(body), "content server")'
-          - 'contains(tolower(body), "llcookie") && contains(tolower(body), "content server")'
-          - 'contains(tolower(header), "llcookie") && contains(tolower(body), "opentext")'
+      - type: word
+        part: body
+        words:
+          - "opentext"
+          - "content server"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "llcookie"
+          - "content server"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: all
+        words:
+          - "llcookie"
+          - "opentext"
+        condition: and
+        case-insensitive: true

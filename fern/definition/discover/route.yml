@@ -20,9 +20,8 @@ types:
       headlessConfig: optional<method.HeadlessRequestConfig>
       browserbaseConfig: optional<method.BrowserbaseRequestConfig>
       bundleUrls: optional<list<string>>
-      fetchSourceMaps: optional<boolean>
-      maxBundles: optional<integer>
-      maxRoutes: optional<integer>
+      fetchSourceMaps: boolean
+      maxBundles: integer
   # Report Struct
   RouteBodyParam:
     properties:

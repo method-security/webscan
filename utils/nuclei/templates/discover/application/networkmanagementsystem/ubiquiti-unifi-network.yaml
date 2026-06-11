@@ -19,9 +19,13 @@ http:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
+    matchers-condition: and
     matchers:
+      - type: status
+        status:
+          - 200
       - type: dsl
         dsl:
-          - 'status_code == 200 && contains(tolower(body), "unifi network application") && contains(tolower(body), "ubiquiti")'
-          - 'status_code == 200 && contains(tolower(body), "unifi.ui.com") && contains(tolower(body), "network") && contains(tolower(body), "redirecting")'
-          - 'status_code == 200 && contains(tolower(body), "/manage/account/login") && contains(tolower(body), "unifi") && contains(tolower(body), "ubiquiti")'
+          - 'contains(tolower(body), "unifi network application") && contains(tolower(body), "ubiquiti")'
+          - 'contains(tolower(body), "unifi.ui.com") && contains(tolower(body), "network") && contains(tolower(body), "redirecting")'
+          - 'contains(tolower(body), "/manage/account/login") && contains(tolower(body), "unifi") && contains(tolower(body), "ubiquiti")'

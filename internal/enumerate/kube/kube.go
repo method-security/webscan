@@ -72,7 +72,14 @@ func PerformAppEnumerateKube(ctx context.Context, config *enumeratekubefern.Enum
 		// Apply stealth delay between requests
 		if config.Sleep > 0 && i < len(commonKubepaths)-1 {
 			delay := utils.CalculateDelayWithJitter(config.Sleep, config.Jitter)
-			time.Sleep(delay)
+			select {
+			case <-time.After(delay):
+			case <-ctx.Done():
+				report.Result.Target = config.Target
+				report.Result.Requests = requests
+				report.Errors = errors
+				return report
+			}
 		}
 	}
 

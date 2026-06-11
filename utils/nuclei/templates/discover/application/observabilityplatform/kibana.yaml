@@ -9,7 +9,7 @@ info:
     method-module-name: KIBANA
     cpe: cpe:2.3:a:elastic:kibana:*:*:*:*:*:*:*:*
   tags: discovery,kibana,elastic,observability,observability-platform
-flow: http(1) && http(2)
+flow: http(1) || http(2)
 http:
   - method: GET
     path:
@@ -62,3 +62,4 @@ http:
         part: body
         regex:
           - "(?i)(kbn-injected-metadata|__kbnPublicPath__|kbnBootstrap|data-test-subj=\"kibanaChrome\")"
+          - "(?i)<title[^>]*>\\s*Kibana\\s*</title>"

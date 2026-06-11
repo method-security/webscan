@@ -137,7 +137,13 @@ func PerformWebProbe(ctx context.Context, config *discover.DiscoverProbeConfig, 
 
 		if config.Sleep > 0 && i < len(config.Targets)-1 {
 			delay := utils.CalculateDelayWithJitter(config.Sleep, config.Jitter)
-			time.Sleep(delay)
+			select {
+			case <-time.After(delay):
+			case <-ctx.Done():
+				result.Targets = allResponses
+				report.Errors = errors
+				return report, nil
+			}
 		}
 	}
 

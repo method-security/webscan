@@ -21,9 +21,39 @@ http:
     max-redirects: 5
     stop-at-first-match: true
     matchers:
-      - type: dsl
-        dsl:
-          - 'contains(tolower(body), "check point") && contains(tolower(body), "mobile access")'
-          - 'contains(tolower(body), "check point") && contains(tolower(body), "ssl network extender")'
-          - 'contains(tolower(body), "checkpoint") && contains(tolower(body), "/sslvpn/") && contains(tolower(body), "login")'
-          - 'contains(tolower(header), "cpcvpn") && (contains(tolower(body), "check point") || contains(tolower(body), "checkpoint"))'
+      - type: word
+        part: body
+        words:
+          - "check point"
+          - "mobile access"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "check point"
+          - "ssl network extender"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "checkpoint"
+          - "/sslvpn/"
+          - "login"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: all
+        words:
+          - "cpcvpn"
+          - "check point"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: all
+        words:
+          - "cpcvpn"
+          - "checkpoint"
+        condition: and
+        case-insensitive: true

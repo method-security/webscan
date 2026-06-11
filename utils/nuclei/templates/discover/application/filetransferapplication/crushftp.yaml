@@ -19,8 +19,20 @@ http:
     max-redirects: 5
     stop-at-first-match: true
     matchers:
-      - type: dsl
-        dsl:
-          - 'contains(tolower(body), "crushftp")'
-          - 'contains(body, "WebInterface") && contains(tolower(body), "crush")'
-          - 'contains(tolower(body), "crushftpdrive") || contains(tolower(body), "crushftpwebinterface")'
+      - type: word
+        part: body
+        words:
+          - "CrushFTP"
+          - "WebInterface"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "CrushFTPDrive"
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "CrushFTPWebInterface"
+        case-insensitive: true

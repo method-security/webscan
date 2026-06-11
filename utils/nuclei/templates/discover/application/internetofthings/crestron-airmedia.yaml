@@ -1,0 +1,39 @@
+id: crestron-web-interface-detect
+info:
+  name: Crestron Web Interface Detection
+  author: method-security
+  severity: info
+  description: Detects Crestron room control and presentation web interfaces using Crestron web server and AirMedia markers.
+  metadata:
+    method-application-type: INTERNET_OF_THINGS
+    method-module-name: CRESTRON_WEB_INTERFACE
+    cpe: cpe:2.3:h:crestron:*:*:*:*:*:*:*:*:*
+  tags: discovery,iot,av,crestron,airmedia
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/index.html"
+      - "{{BaseURL}}/setup/"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: word
+        part: header
+        words:
+          - "Crestron Webserver"
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "<title>Crestron AirMedia</title>"
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "Crestron"
+          - "AirMedia"
+          - "apple-mobile-web-app-capable"
+        condition: and
+        case-insensitive: true

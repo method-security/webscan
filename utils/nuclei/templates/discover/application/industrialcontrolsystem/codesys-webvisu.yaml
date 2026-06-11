@@ -26,3 +26,8 @@ http:
           - "3S-Smart Software Solutions"
         condition: and
         case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "<title>CoDeSys WebVisualization"
+        case-insensitive: true

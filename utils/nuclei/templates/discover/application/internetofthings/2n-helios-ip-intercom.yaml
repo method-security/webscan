@@ -6,7 +6,7 @@ info:
   description: Detects 2N Helios IP intercom web interfaces using Helios IP titles and HIP server markers.
   metadata:
     method-application-type: INTERNET_OF_THINGS
-    method-module-name: 2N_HELIOS_IP_INTERCOM
+    method-module-name: TWO_N_HELIOS_IP_INTERCOM
     cpe: cpe:2.3:h:2n:helios_ip:*:*:*:*:*:*:*:*
   tags: discovery,iot,intercom,access-control,2n
 http:

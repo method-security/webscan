@@ -6,7 +6,7 @@ info:
   description: Detects Dahua-derived OEM camera, DVR, and NVR web interfaces using Web Service asset markers.
   metadata:
     method-application-type: INTERNET_OF_THINGS
-    method-module-name: DAHUA_OEM_WEB_SERVICE
+    method-module-name: DAHUA_WEB_SERVICE
   tags: discovery,iot,camera,dvr,nvr,dahua,oem
 http:
   - method: GET

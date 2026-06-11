@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
@@ -17,6 +18,7 @@ import (
 	discoversaashelpers "github.com/Method-Security/webscan/internal/discover/saas/active/helpers"
 
 	// Utils
+	utils "github.com/Method-Security/webscan/utils"
 	request "github.com/Method-Security/webscan/utils/request"
 	"github.com/Method-Security/webscan/utils/request/headless"
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
@@ -167,6 +169,16 @@ func LaunchDiscoverSaas(ctx context.Context, config discover.DiscoverSaasConfig,
 							return
 						}
 						saasRequest.Request = httpRequestResponse
+
+						// Apply stealth delay between requests
+						if config.Sleep > 0 {
+							delay := utils.CalculateDelayWithJitter(config.Sleep, config.Jitter)
+							select {
+							case <-time.After(delay):
+							case <-ctx.Done():
+								return
+							}
+						}
 
 						// Analyze the request
 						saasRequest.Findings = discoversaashelpers.AnalyzeSaasRequest(ctx, saasRequest, fingerprint, &ssoFingerprints)

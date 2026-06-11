@@ -10,6 +10,8 @@ types:
       maxRedirects: integer
       verifyTls: boolean
       timeout: integer
+      sleep: integer
+      jitter: integer
       ignoreCrossDomainRedirects: boolean
       userAgent: method.UserAgentPreset
       requestMethod: method.RequestMethod

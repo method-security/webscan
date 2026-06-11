@@ -8,12 +8,14 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
 	enumeratecmsdrupalfern "github.com/Method-Security/webscan/generated/go/enumerate/cms/drupal"
 
 	// Utils
+	utils "github.com/Method-Security/webscan/utils"
 	request "github.com/Method-Security/webscan/utils/request"
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
 )
@@ -277,6 +279,15 @@ func checkDrupalModuleInfoYml(ctx context.Context, baseURL, basePath string, con
 				continue
 			}
 
+			if config.Sleep > 0 {
+				delay := utils.CalculateDelayWithJitter(config.Sleep, config.Jitter)
+				select {
+				case <-time.After(delay):
+				case <-ctx.Done():
+					return modulesList, errors
+				}
+			}
+
 			statusCode := getResponseStatusCode(resp)
 			if statusCode != 403 && statusCode != 200 {
 				continue
@@ -306,6 +317,15 @@ func checkDrupalModuleChangelogs(ctx context.Context, baseURL, basePath string, 
 			if err != nil {
 				errors = append(errors, err.Error())
 				continue
+			}
+
+			if config.Sleep > 0 {
+				delay := utils.CalculateDelayWithJitter(config.Sleep, config.Jitter)
+				select {
+				case <-time.After(delay):
+				case <-ctx.Done():
+					return modulesList, errors
+				}
 			}
 
 			if getResponseStatusCode(resp) != 200 {
@@ -352,6 +372,15 @@ func checkDrupalModuleLicense(ctx context.Context, baseURL, basePath string, con
 				continue
 			}
 
+			if config.Sleep > 0 {
+				delay := utils.CalculateDelayWithJitter(config.Sleep, config.Jitter)
+				select {
+				case <-time.After(delay):
+				case <-ctx.Done():
+					return modulesList, errors
+				}
+			}
+
 			if getResponseStatusCode(resp) != 200 {
 				continue
 			}
@@ -391,6 +420,15 @@ func checkDrupalModuleReadme(ctx context.Context, baseURL, basePath string, conf
 				if err != nil {
 					errors = append(errors, err.Error())
 					continue
+				}
+
+				if config.Sleep > 0 {
+					delay := utils.CalculateDelayWithJitter(config.Sleep, config.Jitter)
+					select {
+					case <-time.After(delay):
+					case <-ctx.Done():
+						return modulesList, errors
+					}
 				}
 
 				if getResponseStatusCode(resp) != 200 {

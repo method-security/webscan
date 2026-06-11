@@ -14,7 +14,7 @@ import (
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
 	"github.com/Method-Security/webscan/generated/go/discover"
-	"github.com/Method-Security/webscan/utils"
+	utils "github.com/Method-Security/webscan/utils"
 
 	// Utils
 	request "github.com/Method-Security/webscan/utils/request"
@@ -435,6 +435,18 @@ func PerformRouteCapture(ctx context.Context, config discover.DiscoverRouteConfi
 				if err != nil {
 					errChan <- fmt.Sprintf("error performing request to %s: %s", targetURL, err)
 					return
+				}
+
+				// Apply stealth delay between requests. On ctx cancel, fall
+				// through to extraction so we don't discard the response we
+				// already paid the request cost for; the URL stays in
+				// visitedURLs intentionally (it has been fetched).
+				if config.Sleep > 0 {
+					delay := utils.CalculateDelayWithJitter(config.Sleep, config.Jitter)
+					select {
+					case <-time.After(delay):
+					case <-ctx.Done():
+					}
 				}
 
 				// Extract the routes and if enabled, static assets

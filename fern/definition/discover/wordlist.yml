@@ -13,6 +13,8 @@ types:
       verifyTls: boolean
       timeout: integer
       threads: integer
+      sleep: integer
+      jitter: integer
       userAgent: method.UserAgentPreset
   WordlistEntry:
     properties:

@@ -18,6 +18,7 @@ import (
 	// Internal
 	pentestwafdetect "github.com/Method-Security/webscan/internal/pentest/waf/detect"
 	// Utils
+	utils "github.com/Method-Security/webscan/utils"
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
 	standard "github.com/Method-Security/webscan/utils/request/standard"
 
@@ -186,8 +187,18 @@ requestLoop:
 			}
 		}(requestNumber)
 
-		// Enforce the calculated request interval for sequential timing
-		time.Sleep(time.Duration(config.Sleep) * time.Second)
+		// Enforce the calculated request interval for sequential timing.
+		// On ctx cancel, break the request-spawn loop (don't return) so
+		// in-flight goroutines + result collection below still run; otherwise
+		// we'd drop accumulated results.
+		if config.Sleep > 0 {
+			delay := utils.CalculateDelayWithJitter(config.Sleep, config.Jitter)
+			select {
+			case <-time.After(delay):
+			case <-ctx.Done():
+				break requestLoop
+			}
+		}
 	}
 
 	// Wait for all request goroutines to complete

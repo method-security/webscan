@@ -413,7 +413,7 @@ func headlessCaptureAttempts(method common.HttpMethod) int {
 }
 
 func sleepBeforeHeadlessRetry(ctx context.Context, attempt int) bool {
-	delay := time.Duration(attempt-1) * 250 * time.Millisecond
+	delay := 3 * time.Second
 	if delay <= 0 {
 		return true
 	}

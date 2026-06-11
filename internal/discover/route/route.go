@@ -437,13 +437,15 @@ func PerformRouteCapture(ctx context.Context, config discover.DiscoverRouteConfi
 					return
 				}
 
-				// Apply stealth delay between requests
+				// Apply stealth delay between requests. On ctx cancel, fall
+				// through to extraction so we don't discard the response we
+				// already paid the request cost for; the URL stays in
+				// visitedURLs intentionally (it has been fetched).
 				if config.Sleep > 0 {
 					delay := utils.CalculateDelayWithJitter(config.Sleep, config.Jitter)
 					select {
 					case <-time.After(delay):
 					case <-ctx.Done():
-						return
 					}
 				}
 

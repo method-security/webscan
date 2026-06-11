@@ -1,0 +1,37 @@
+id: dahua-web-service-detect
+info:
+  name: Dahua Web Service Detection
+  author: method-security
+  severity: info
+  description: Detects Dahua camera, DVR, and NVR web interfaces using Dahua Web Service assets.
+  metadata:
+    method-application-type: INTERNET_OF_THINGS
+    method-module-name: DAHUA_WEB_SERVICE
+    cpe: cpe:2.3:h:dahua:*:*:*:*:*:*:*:*:*
+  tags: discovery,iot,camera,dvr,nvr,dahua
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/login.html"
+      - "{{BaseURL}}/index.html"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "<title>WEB SERVICE</title>"
+          - "baseProj/images/favicon.ico"
+          - "projectPath.js"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "baseProj"
+          - "ext/ext-all.js"
+          - "WEB SERVICE"
+        condition: and
+        case-insensitive: true

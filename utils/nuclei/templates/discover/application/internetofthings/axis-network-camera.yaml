@@ -1,0 +1,38 @@
+id: axis-network-camera-detect
+info:
+  name: Axis Network Camera Detection
+  author: method-security
+  severity: info
+  description: Detects Axis network camera and video server web interfaces using Axis-specific page metadata.
+  metadata:
+    method-application-type: INTERNET_OF_THINGS
+    method-module-name: AXIS_NETWORK_CAMERA
+    cpe: cpe:2.3:h:axis:*:*:*:*:*:*:*:*:*
+  tags: discovery,iot,camera,axis
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/view/viewer_index.shtml"
+      - "{{BaseURL}}/axis-cgi/viewer/video.html"
+      - "{{BaseURL}}/axis-cgi/admin/param.cgi?action=list&group=Brand"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "Axis Communications AB"
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "AXIS"
+          - "Video Server"
+        condition: and
+        case-insensitive: true
+      - type: regex
+        part: body
+        regex:
+          - '(?i)<title>\s*AXIS\s*</title>[\s\S]{0,800}Axis Communications'

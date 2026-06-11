@@ -1,0 +1,32 @@
+id: trane-tracer-sc-detect
+info:
+  name: Trane Tracer SC Detection
+  author: method-security
+  severity: info
+  description: Detects Trane Tracer SC building automation controller web interfaces.
+  metadata:
+    method-application-type: INTERNET_OF_THINGS
+    method-module-name: TRANE_TRACER_SC
+    cpe: cpe:2.3:h:trane:tracer_sc:*:*:*:*:*:*:*:*
+  tags: discovery,iot,bms,hvac,trane
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/index.html"
+      - "{{BaseURL}}/login.html"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "<title>Tracer SC</title>"
+          - "hui/bootstrap.js"
+        condition: and
+        case-insensitive: true
+      - type: regex
+        part: body
+        regex:
+          - '(?i)<title>\s*Tracer\s+SC\s*</title>[\s\S]{0,600}hui/bootstrap\.js'

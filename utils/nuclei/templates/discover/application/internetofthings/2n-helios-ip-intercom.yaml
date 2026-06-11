@@ -1,0 +1,35 @@
+id: 2n-helios-ip-intercom-detect
+info:
+  name: 2N Helios IP Intercom Detection
+  author: method-security
+  severity: info
+  description: Detects 2N Helios IP intercom web interfaces using Helios IP titles and HIP server markers.
+  metadata:
+    method-application-type: INTERNET_OF_THINGS
+    method-module-name: 2N_HELIOS_IP_INTERCOM
+    cpe: cpe:2.3:h:2n:helios_ip:*:*:*:*:*:*:*:*
+  tags: discovery,iot,intercom,access-control,2n
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/login.htm"
+      - "{{BaseURL}}/api/system/info"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: regex
+        part: body
+        regex:
+          - '(?i)<title>\s*(2N(&reg;)?\s*)?Helios\s+IP\s*</title>'
+      - type: word
+        part: header
+        words:
+          - "Server: HIP"
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "2N Helios IP"
+        case-insensitive: true

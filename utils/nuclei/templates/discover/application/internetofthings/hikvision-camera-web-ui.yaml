@@ -24,4 +24,5 @@ http:
         words:
           - "Hikvision Digital Technology"
           - "Camera"
+        condition: and
         case-insensitive: true

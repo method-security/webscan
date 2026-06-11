@@ -505,7 +505,7 @@ func PerformRouteCapture(ctx context.Context, config discover.DiscoverRouteConfi
 	sort.SliceStable(report.Result.Routes, func(i, j int) bool {
 		ri := report.Result.Routes[i]
 		rj := report.Result.Routes[j]
-		// Evidence-tagged routes survive MaxRoutes cap before untagged routes
+		// Prefer evidence-tagged routes while keeping output deterministic.
 		hasEvi := ri.Evidence != nil
 		hasEvj := rj.Evidence != nil
 		if hasEvi != hasEvj {
@@ -514,9 +514,6 @@ func PerformRouteCapture(ctx context.Context, config discover.DiscoverRouteConfi
 		// Same evidence tier: lexical for determinism
 		return ri.BaseUrl+ri.Path < rj.BaseUrl+rj.Path
 	})
-	if config.MaxRoutes != nil && *config.MaxRoutes > 0 && len(report.Result.Routes) > *config.MaxRoutes {
-		report.Result.Routes = report.Result.Routes[:*config.MaxRoutes]
-	}
 	report.Result.StaticAssets = discoverroutehelpers.MergeStaticAssets(allStaticAssets)
 	report.Errors = append(report.Errors, errors...)
 	return report

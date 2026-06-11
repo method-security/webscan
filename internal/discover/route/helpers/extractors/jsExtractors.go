@@ -697,12 +697,8 @@ func fetchSourceMapRoutes(ctx context.Context, sourceMapURL string, baseURL stri
 	return routes, urls, errors
 }
 
-// shouldFetchSourceMaps returns true when source map fetching is enabled (default: true).
 func shouldFetchSourceMaps(routeCaptureConfig discover.DiscoverRouteConfig) bool {
-	if routeCaptureConfig.FetchSourceMaps == nil {
-		return true
-	}
-	return *routeCaptureConfig.FetchSourceMaps
+	return routeCaptureConfig.FetchSourceMaps
 }
 
 // ExtractScriptRoutes finds script elements with a src attribute, fetches the JavaScript data, parses it, and extracts routes.
@@ -712,11 +708,15 @@ func ExtractScriptRoutes(ctx context.Context, doc *goquery.Document, baseURL str
 	urls := make(map[string]struct{})
 	errors := []string{}
 
+	if routeCaptureConfig.MaxBundles == 0 {
+		return routes, discoverroutehelpers.SetToListString(urls), errors
+	}
+
 	bundleCount := 0
 
 	doc.Find("script[src]").Each(func(i int, s *goquery.Selection) {
 		// Honor MaxBundles limit
-		if routeCaptureConfig.MaxBundles != nil && *routeCaptureConfig.MaxBundles > 0 && bundleCount >= *routeCaptureConfig.MaxBundles {
+		if routeCaptureConfig.MaxBundles > 0 && bundleCount >= routeCaptureConfig.MaxBundles {
 			return
 		}
 
@@ -799,10 +799,14 @@ func ExtractBundleURLRoutes(ctx context.Context, bundleURLs []string, baseURL st
 	urls := make(map[string]struct{})
 	errors := []string{}
 
+	if routeCaptureConfig.MaxBundles == 0 {
+		return routes, discoverroutehelpers.SetToListString(urls), errors
+	}
+
 	bundleCount := 0
 	for _, bundleURL := range bundleURLs {
 		// Honor MaxBundles limit (count successful fetches only, consistent with ExtractScriptRoutes)
-		if routeCaptureConfig.MaxBundles != nil && *routeCaptureConfig.MaxBundles > 0 && bundleCount >= *routeCaptureConfig.MaxBundles {
+		if routeCaptureConfig.MaxBundles > 0 && bundleCount >= routeCaptureConfig.MaxBundles {
 			break
 		}
 

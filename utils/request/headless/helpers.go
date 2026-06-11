@@ -55,14 +55,16 @@ func (n *NetworkHeaderCapture) GetHeaders() map[string][]string {
 }
 
 // setupHeaderInterception sets up network event monitoring to capture response headers
-func setupHeaderInterception(page *rod.Page) *NetworkHeaderCapture {
+func setupHeaderInterception(page *rod.Page, log svc1log.Logger) *NetworkHeaderCapture {
 	headerCapture := NewNetworkHeaderCapture()
 
-	// Enable network domain to capture network events
-	page.MustEval(`() => {
+	// Keep the legacy JS fallback best-effort; network events are the primary source.
+	if _, err := page.Eval(`() => {
 		// Store for backward compatibility, but we'll use network events for actual capture
 		window.responseHeaders = new Map();
-	}`)
+	}`); err != nil {
+		log.Debug("Failed to initialize response header fallback", svc1log.SafeParam("error", cleanErrMsg(err)))
+	}
 
 	// Enable network domain
 	page.EnableDomain(proto.NetworkEnable{})
@@ -401,6 +403,91 @@ func isDefaultPort(scheme, port string) bool {
 	return (scheme == "http" && port == "80") || (scheme == "https" && port == "443")
 }
 
+func headlessCaptureAttempts(method common.HttpMethod) int {
+	switch method {
+	case "", common.HttpMethodGet, common.HttpMethodHead, common.HttpMethodOptions, common.HttpMethodTrace:
+		return 3
+	default:
+		return 1
+	}
+}
+
+func sleepBeforeHeadlessRetry(ctx context.Context, attempt int) bool {
+	delay := time.Duration(attempt-1) * 250 * time.Millisecond
+	if delay <= 0 {
+		return true
+	}
+
+	select {
+	case <-time.After(delay):
+		return true
+	case <-ctx.Done():
+		return false
+	}
+}
+
+func (b *Requester) restartOwnedBrowser(ctx context.Context, reason string) {
+	if b == nil || b.Browser == nil || !b.ownsBrowser {
+		return
+	}
+
+	log := svc1log.FromContext(ctx)
+	log.Warn("Restarting owned headless browser after transient failure", svc1log.SafeParam("reason", reason))
+	if err := b.Browser.Close(); err != nil {
+		log.Debug("Failed to close owned headless browser", svc1log.SafeParam("error", cleanErrMsg(err)))
+	}
+	b.Browser = nil
+	b.ownsBrowser = false
+}
+
+// ResetOwnedBrowser closes a browser launched by this requester so the next
+// operation can start from a fresh browser process. Caller-owned browsers and
+// externally supplied CDP clients are left untouched.
+func (b *Requester) ResetOwnedBrowser(ctx context.Context, reason string) {
+	b.restartOwnedBrowser(ctx, reason)
+}
+
+// IsTransientHeadlessError returns true for browser/network failures worth retrying
+// with a fresh page or, when owned by this requester, a fresh browser.
+func IsTransientHeadlessError(err error) bool {
+	if err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return false
+	}
+
+	errStr := strings.ToUpper(err.Error())
+	cleaned := strings.ToUpper(cleanErrMsg(err))
+	transientMarkers := []string{
+		"ERR_NETWORK_CHANGED",
+		"ERR_CONNECTION_RESET",
+		"ERR_CONNECTION_CLOSED",
+		"ERR_CONNECTION_ABORTED",
+		"ERR_CONNECTION_TIMED_OUT",
+		"ERR_TIMED_OUT",
+		"ERR_NAME_NOT_RESOLVED",
+		"ERR_INTERNET_DISCONNECTED",
+		"ERR_ADDRESS_UNREACHABLE",
+		"ERR_PROXY_CONNECTION_FAILED",
+		"ERR_TUNNEL_CONNECTION_FAILED",
+		"ERR_SOCKS_CONNECTION_FAILED",
+		"CONNECTION TIMEOUT",
+		"DNS RESOLUTION FAILED",
+		"NO INTERNET CONNECTION",
+		"ADDRESS UNREACHABLE",
+		"REQUEST TIMEOUT",
+		"NETWORK ROUTE CAPTURE TIMED OUT",
+		"CHROME ERROR PAGE DETECTED",
+		"TARGET CLOSED",
+		"CONNECTION CLOSED",
+		"WEBSOCKET",
+	}
+	for _, marker := range transientMarkers {
+		if strings.Contains(errStr, marker) || strings.Contains(cleaned, marker) {
+			return true
+		}
+	}
+	return false
+}
+
 func cloneHeaders(headers map[string][]string) map[string][]string {
 	result := make(map[string][]string, len(headers))
 	for key, values := range headers {
@@ -563,10 +650,10 @@ func performNavigation(ctx context.Context, page *rod.Page, constructedURL *stri
 		var navErr *rod.NavigationError
 		if errors.As(err, &navErr) {
 			log.Warn("Navigation encountered error but continuing", svc1log.SafeParam("error", navErr.Reason))
-			return nil // Don't fail - page might still be partially loaded
+			return err // Let the caller process partial state and decide whether to retry.
 		}
 		log.Warn("Navigation encountered error but continuing", svc1log.SafeParam("error", err.Error()))
-		return nil // Don't fail - page might still be partially loaded
+		return err // Let the caller process partial state and decide whether to retry.
 	}
 
 	// Skip the WaitLoad here - waitForPageLoad will handle this more efficiently
@@ -744,6 +831,14 @@ func isCrossDomainRedirect(originalURL, redirectURL string) bool {
 func cleanErrMsg(err error) string {
 	if err == nil {
 		return "unknown error"
+	}
+
+	var tryErr *rod.TryError
+	if errors.As(err, &tryErr) {
+		if valueErr, ok := tryErr.Value.(error); ok {
+			return cleanErrMsg(valueErr)
+		}
+		return fmt.Sprintf("%v", tryErr.Value)
 	}
 
 	// Check for rod.NavigationError

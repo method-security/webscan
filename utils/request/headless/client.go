@@ -14,6 +14,7 @@ type Requester struct {
 	PathToBrowser              *string
 	TimeoutSeconds             int
 	MinDOMStabalizeTimeSeconds int
+	ownsBrowser                bool
 }
 
 // NewRequester creates a new Requester with the given timeout and headless configuration.
@@ -42,8 +43,11 @@ func NewRequesterwithBrowser(timeout int, config *common.HeadlessRequestConfig) 
 
 // NewRequesterWithClient creates a new Requester using an existing rod cdp.Client.
 func NewRequesterWithClient(client *cdp.Client, timeout int, minDOMStabalizeTime int) *Requester {
+	browser := rod.New().Client(client)
+	_ = browser.Connect()
+
 	return &Requester{
-		Browser:                    rod.New().Client(client).MustConnect(),
+		Browser:                    browser,
 		PathToBrowser:              nil,
 		TimeoutSeconds:             timeout,
 		MinDOMStabalizeTimeSeconds: minDOMStabalizeTime,

@@ -78,12 +78,47 @@ func (b *Requester) InitializeBrowser(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("browser connection failed: %v", err)
 	}
+	b.ownsBrowser = true
 
 	return nil
 }
 
 // SendRequest navigates to a URL using the headless browser and captures the response
 func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpRequestConfig) (common.HttpRequestResponse, error) {
+	log := svc1log.FromContext(ctx)
+	attempts := headlessCaptureAttempts(config.Request.Method)
+	var lastReport common.HttpRequestResponse
+	var lastErr error
+
+	for attempt := 1; attempt <= attempts; attempt++ {
+		if attempt > 1 {
+			if !sleepBeforeHeadlessRetry(ctx, attempt) {
+				break
+			}
+		}
+
+		report, err := b.sendRequestOnce(ctx, config)
+		if err == nil {
+			return report, nil
+		}
+
+		lastReport = report
+		lastErr = err
+		if attempt == attempts || !IsTransientHeadlessError(err) || ctx.Err() != nil {
+			return report, err
+		}
+
+		log.Warn("Retrying transient headless capture failure",
+			svc1log.SafeParam("attempt", attempt+1),
+			svc1log.SafeParam("maxAttempts", attempts),
+			svc1log.SafeParam("error", cleanErrMsg(err)))
+		b.restartOwnedBrowser(ctx, cleanErrMsg(err))
+	}
+
+	return lastReport, lastErr
+}
+
+func (b *Requester) sendRequestOnce(ctx context.Context, config common.SendHttpRequestConfig) (common.HttpRequestResponse, error) {
 	// =========================================================================================
 	// SETUP
 	// =========================================================================================
@@ -125,6 +160,7 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 		redirectChain   = []string{*constructedURL}
 		redirectChainMu sync.Mutex
 		browserErr      error
+		navigationErr   error
 		statusCode      int
 	)
 
@@ -169,12 +205,12 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 		}
 
 		// Setup request monitoring and navigate
-		headerCapture := setupHeaderInterception(page)
+		headerCapture := setupHeaderInterception(page, log)
 		handleNavigation(ctx, page, &redirectChain, &redirectChainMu, requestComplete, &once, config.MaxRedirects, browsersErr)
 
-		navErr := performNavigation(ctx, page, constructedURL, config)
-		if navErr != nil {
-			log.Info("Unexpected navigation error, but continuing to extract data anyway", svc1log.SafeParam("error", cleanErrMsg(navErr)))
+		navigationErr = performNavigation(ctx, page, constructedURL, config)
+		if navigationErr != nil {
+			log.Info("Unexpected navigation error, but continuing to extract data anyway", svc1log.SafeParam("error", cleanErrMsg(navigationErr)))
 		}
 
 		// Wait for navigation completion or timeout
@@ -205,7 +241,13 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 			redirectChainMu.Lock()
 			chain := strings.Join(redirectChain, " -> ")
 			redirectChainMu.Unlock()
-			if ctx.Err() == context.DeadlineExceeded {
+			if navigationErr != nil {
+				log.Warn("Request did not complete after navigation error",
+					svc1log.SafeParam("url", *constructedURL),
+					svc1log.SafeParam("error", cleanErrMsg(navigationErr)),
+					svc1log.SafeParam("redirectChain", chain))
+				browserErr = navigationErr
+			} else if ctx.Err() == context.DeadlineExceeded {
 				log.Warn("Request timed out",
 					svc1log.SafeParam("url", *constructedURL),
 					svc1log.SafeParam("timeout", config.Timeout),
@@ -267,7 +309,7 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 				statusCode = 200
 			} else {
 				statusCode = getStatusCodeFromPage(page)
-				if statusCode == 0 && browserErr == nil {
+				if statusCode == 0 && browserErr == nil && navigationErr == nil {
 					statusCode = 200
 				}
 			}
@@ -290,7 +332,7 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 				} else if val, ok := resultMap["performanceStatus"]; ok && val.Int() > 0 {
 					statusCode = val.Int()
 				}
-				if statusCode == 0 && browserErr == nil {
+				if statusCode == 0 && browserErr == nil && navigationErr == nil {
 					statusCode = 200 // Default for successful navigation
 				}
 			}
@@ -324,7 +366,14 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 		// Check if Chrome error page using batch result
 		if isErrorPage {
 			log.Warn("Detected Chrome error page, treating as navigation failure")
-			browserErr = fmt.Errorf("navigation failed: Chrome error page detected")
+			if navigationErr != nil {
+				browserErr = navigationErr
+			} else {
+				browserErr = fmt.Errorf("navigation failed: Chrome error page detected")
+			}
+		}
+		if browserErr == nil && navigationErr != nil && statusCode == 0 {
+			browserErr = navigationErr
 		}
 
 		// Use the latest captured main-document headers after stabilization so
@@ -388,9 +437,9 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 		)
 		report.Response = &response
 	}); err != nil {
-		log.Error("Browser operation failed with panic", svc1log.SafeParam("error", err.Error()))
+		log.Error("Browser operation failed with panic", svc1log.SafeParam("error", cleanErrMsg(err)))
 		if browserErr == nil {
-			browserErr = fmt.Errorf("browser operation panicked: %v", err)
+			browserErr = fmt.Errorf("browser operation panicked: %w", err)
 		}
 	}
 

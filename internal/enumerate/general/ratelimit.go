@@ -187,13 +187,16 @@ requestLoop:
 			}
 		}(requestNumber)
 
-		// Enforce the calculated request interval for sequential timing
+		// Enforce the calculated request interval for sequential timing.
+		// On ctx cancel, break the request-spawn loop (don't return) so
+		// in-flight goroutines + result collection below still run; otherwise
+		// we'd drop accumulated results.
 		if config.Sleep > 0 {
 			delay := utils.CalculateDelayWithJitter(config.Sleep, config.Jitter)
 			select {
 			case <-time.After(delay):
 			case <-ctx.Done():
-				return
+				break requestLoop
 			}
 		}
 	}

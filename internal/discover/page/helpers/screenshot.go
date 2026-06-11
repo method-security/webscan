@@ -97,7 +97,6 @@ func captureScreenshotOnce(ctx context.Context, browser *headless.Requester, sen
 	err = page.Navigate(fullURL)
 	if err != nil {
 		log.Warn("Navigation encountered error but continuing", svc1log.SafeParam("error", err.Error()))
-		return nil, err
 	}
 
 	// Wait for the page to load

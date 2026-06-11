@@ -241,22 +241,26 @@ func (b *Requester) sendRequestOnce(ctx context.Context, config common.SendHttpR
 			redirectChainMu.Lock()
 			chain := strings.Join(redirectChain, " -> ")
 			redirectChainMu.Unlock()
-			if navigationErr != nil {
-				log.Warn("Request did not complete after navigation error",
-					svc1log.SafeParam("url", *constructedURL),
-					svc1log.SafeParam("error", cleanErrMsg(navigationErr)),
-					svc1log.SafeParam("redirectChain", chain))
-				browserErr = navigationErr
-			} else if ctx.Err() == context.DeadlineExceeded {
-				log.Warn("Request timed out",
+			if ctx.Err() == context.DeadlineExceeded {
+				logParams := []svc1log.Param{
 					svc1log.SafeParam("url", *constructedURL),
 					svc1log.SafeParam("timeout", config.Timeout),
-					svc1log.SafeParam("redirectChain", chain))
+					svc1log.SafeParam("redirectChain", chain),
+				}
+				if navigationErr != nil {
+					logParams = append(logParams, svc1log.SafeParam("navigationError", cleanErrMsg(navigationErr)))
+				}
+				log.Warn("Request timed out", logParams...)
 				browserErr = fmt.Errorf("request timeout after %d seconds", config.Timeout)
 			} else {
-				log.Warn("Request cancelled",
+				logParams := []svc1log.Param{
 					svc1log.SafeParam("url", *constructedURL),
-					svc1log.SafeParam("error", ctx.Err()))
+					svc1log.SafeParam("error", ctx.Err()),
+				}
+				if navigationErr != nil {
+					logParams = append(logParams, svc1log.SafeParam("navigationError", cleanErrMsg(navigationErr)))
+				}
+				log.Warn("Request cancelled", logParams...)
 				browserErr = fmt.Errorf("request cancelled: %v", ctx.Err())
 			}
 			return

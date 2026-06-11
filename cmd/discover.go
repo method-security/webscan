@@ -778,14 +778,9 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			maxRoutes, err := cmd.Flags().GetInt("max-routes")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
 
 			// Set Config
-			config := getDiscoverRouteConfig(target, ignoreCrossDomain, collectStaticAssets, spiderDepth, maxRedirects, verifyTLS, timeout, threads, userAgentPreset, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig, bundleURLs, fetchSourceMaps, maxBundles, maxRoutes)
+			config := getDiscoverRouteConfig(target, ignoreCrossDomain, collectStaticAssets, spiderDepth, maxRedirects, verifyTLS, timeout, threads, userAgentPreset, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig, bundleURLs, fetchSourceMaps, maxBundles)
 
 			// Generate a report
 			report := discoverroute.PerformRouteCapture(cmd.Context(), config, requestMethodConfig.BrowserbaseSecrets)
@@ -815,8 +810,7 @@ func (a *WebScan) InitDiscoverCommand() {
 	// JS route discovery enhancement flags
 	discoverRouteCmd.Flags().StringSlice("bundle-urls", []string{}, "Explicit JS bundle URLs to scan for routes")
 	discoverRouteCmd.Flags().Bool("fetch-source-maps", true, "Fetch and scan source maps for additional routes")
-	discoverRouteCmd.Flags().Int("max-bundles", 0, "Maximum number of JS bundles to process (0 = unlimited)")
-	discoverRouteCmd.Flags().Int("max-routes", 0, "Maximum number of routes to collect (0 = unlimited)")
+	discoverRouteCmd.Flags().Int("max-bundles", -1, "Maximum number of JS bundles to process (-1 = unlimited, 0 = disabled)")
 
 	// Mark Required Flags
 	_ = discoverRouteCmd.MarkFlagRequired("target")
@@ -1155,7 +1149,7 @@ func getDiscoverProbeConfig(targets []string, protocol string, maxRedirects int,
 }
 
 // getDiscoverRouteConfig builds the config for route discovery.
-func getDiscoverRouteConfig(target string, ignoreCrossDomain bool, collectStaticAssets bool, spiderDepth int, maxRedirects int, verifyTLS bool, timeout int, threads int, userAgent common.UserAgentPreset, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig, bundleURLs []string, fetchSourceMaps bool, maxBundles int, maxRoutes int) discover.DiscoverRouteConfig {
+func getDiscoverRouteConfig(target string, ignoreCrossDomain bool, collectStaticAssets bool, spiderDepth int, maxRedirects int, verifyTLS bool, timeout int, threads int, userAgent common.UserAgentPreset, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig, bundleURLs []string, fetchSourceMaps bool, maxBundles int) discover.DiscoverRouteConfig {
 	config := discover.DiscoverRouteConfig{
 		Target:              target,
 		CollectStaticAssets: collectStaticAssets,
@@ -1169,22 +1163,12 @@ func getDiscoverRouteConfig(target string, ignoreCrossDomain bool, collectStatic
 		RequestMethod:       requestMethod,
 		HeadlessConfig:      headlessConfig,
 		BrowserbaseConfig:   browserbaseConfig,
-		FetchSourceMaps:     &fetchSourceMaps,
+		FetchSourceMaps:     fetchSourceMaps,
+		MaxBundles:          maxBundles,
 	}
 
-	// Only set BundleUrls if any were provided
 	if len(bundleURLs) > 0 {
 		config.BundleUrls = bundleURLs
-	}
-
-	// Only set MaxBundles if non-zero
-	if maxBundles > 0 {
-		config.MaxBundles = &maxBundles
-	}
-
-	// Only set MaxRoutes if non-zero
-	if maxRoutes > 0 {
-		config.MaxRoutes = &maxRoutes
 	}
 
 	return config

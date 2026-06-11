@@ -1,6 +1,9 @@
 package headless
 
 import (
+	// Standard
+	"fmt"
+
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
 	// External
@@ -42,14 +45,16 @@ func NewRequesterwithBrowser(timeout int, config *common.HeadlessRequestConfig) 
 }
 
 // NewRequesterWithClient creates a new Requester using an existing rod cdp.Client.
-func NewRequesterWithClient(client *cdp.Client, timeout int, minDOMStabalizeTime int) *Requester {
+func NewRequesterWithClient(client *cdp.Client, timeout int, minDOMStabalizeTime int) (*Requester, error) {
 	browser := rod.New().Client(client)
-	_ = browser.Connect()
+	if err := browser.Connect(); err != nil {
+		return nil, fmt.Errorf("browser connection failed: %v", err)
+	}
 
 	return &Requester{
 		Browser:                    browser,
 		PathToBrowser:              nil,
 		TimeoutSeconds:             timeout,
 		MinDOMStabalizeTimeSeconds: minDOMStabalizeTime,
-	}
+	}, nil
 }

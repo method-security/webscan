@@ -106,6 +106,27 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 			return resp, redirectChain, nil
 		}
 
+		// Response is a 3xx with a Location header.  If the caller has used
+		// up its redirect budget — including MaxRedirects=0, which the
+		// helper's contract describes as "for requests that don't follow
+		// redirects" — return the redirect response as-is so the caller can
+		// inspect Location, Set-Cookie, and the status code.  Without this,
+		// any 3xx-with-Location on a MaxRedirects=0 call would surface as a
+		// "maximum redirects exceeded" error and the response would be
+		// inaccessible — breaking, e.g., wp-login.php success detection
+		// where the success signal IS the 302 to /wp-admin/.
+		if redirects >= config.MaxRedirects {
+			log.Debug("Redirect budget exhausted; returning redirect response as-is",
+				svc1log.SafeParam("url", currentURL),
+				svc1log.SafeParam("status", resp.StatusCode),
+				svc1log.SafeParam("location", location),
+				svc1log.SafeParam("maxRedirects", config.MaxRedirects))
+			if currentURL != redirectChain[len(redirectChain)-1] {
+				redirectChain[len(redirectChain)-1] = currentURL
+			}
+			return resp, redirectChain, nil
+		}
+
 		// Parse Redirect Location
 		nextURL, err := resp.Request.URL.Parse(location)
 		if err != nil {

@@ -1,0 +1,95 @@
+{
+    "js_bundle_hashes": {},
+    "known_bundle_paths": {
+        "fortinet-fortigate-sslvpn": {
+            "vendor": "fortinet",
+            "product": "fortigate-sslvpn",
+            "paths": [
+                {
+                    "bundle_path": "/remote/login",
+                    "method": "GET",
+                    "notes": "SSL-VPN login page HTML — full response varies per minor build. SHA-256 the response body."
+                },
+                {
+                    "bundle_path": "/remote/logout",
+                    "method": "GET",
+                    "notes": "SSL-VPN logout page — build-specific HTML."
+                }
+            ],
+            "active_builds": ["7.4.x", "7.2.x", "7.0.x", "6.4.x", "6.2.x"],
+            "populate_method": "curl -sk https://TARGET/remote/login | sha256sum"
+        },
+        "paloalto-globalprotect": {
+            "vendor": "paloalto",
+            "product": "globalprotect",
+            "paths": [
+                {
+                    "bundle_path": "/global-protect/portal/portal.esp",
+                    "method": "GET",
+                    "notes": "Portal login page HTML — contains build comment or meta tag. SHA-256 the response body."
+                },
+                {
+                    "bundle_path": "/global-protect/portal/css/login.css",
+                    "method": "GET",
+                    "notes": "Portal CSS; ETag on this file maps to PAN-OS version (see noperator/panos-scanner)."
+                }
+            ],
+            "active_builds": ["11.1.x", "10.2.x", "10.1.x", "10.0.x", "9.1.x"],
+            "populate_method": "curl -sk https://TARGET/global-protect/portal/portal.esp | sha256sum"
+        },
+        "ivanti-connect-secure": {
+            "vendor": "ivanti",
+            "product": "ivanti-connect-secure",
+            "paths": [
+                {
+                    "bundle_path": "/dana-na/auth/url_default/welcome.cgi",
+                    "method": "GET",
+                    "notes": "Build disclosure page; response body contains ProductVersion string and varies per build."
+                },
+                {
+                    "bundle_path": "/dana-cached/hc/HostCheckerInstaller.osx",
+                    "method": "GET",
+                    "notes": "macOS Host Checker installer; version embedded in plist <key>version</key>."
+                }
+            ],
+            "active_builds": ["22.7.x", "22.6.x", "22.5.x", "9.1.x"],
+            "populate_method": "curl -sk https://TARGET/dana-na/auth/url_default/welcome.cgi | sha256sum"
+        },
+        "citrix-netscaler-gateway": {
+            "vendor": "citrix",
+            "product": "netscaler-gateway",
+            "paths": [
+                {
+                    "bundle_path": "/vpn/js/rdx/core/lang/rdx_en.json",
+                    "method": "GET",
+                    "notes": "Client-side i18n JSON; GZIP mtime maps to exact build (fox-it/citrix-netscaler-triage). SHA-256 of raw response body."
+                },
+                {
+                    "bundle_path": "/vpn/index.html",
+                    "method": "GET",
+                    "notes": "VPN landing page; CSS href vhash suffix changes per build."
+                }
+            ],
+            "active_builds": ["14.1.x", "13.1.x", "13.0.x", "12.1.x"],
+            "populate_method": "curl -sk https://TARGET/vpn/js/rdx/core/lang/rdx_en.json | sha256sum"
+        },
+        "sonicwall-sma": {
+            "vendor": "sonicwall",
+            "product": "sma",
+            "paths": [
+                {
+                    "bundle_path": "/cgi-bin/welcome/VirtualOffice",
+                    "method": "GET",
+                    "notes": "SMA login page; HTML includes build string in JS variable or comment."
+                },
+                {
+                    "bundle_path": "/management/login.htm",
+                    "method": "GET",
+                    "notes": "SMA management portal login page; build-specific HTML."
+                }
+            ],
+            "active_builds": ["12.4.x", "12.1.x", "10.2.x"],
+            "populate_method": "curl -sk https://TARGET/cgi-bin/welcome/VirtualOffice | sha256sum"
+        }
+    }
+}

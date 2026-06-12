@@ -49,6 +49,7 @@ http:
           - "DSSIGNIN="
           - "DSID="
         case-insensitive: true
+        condition: and
       - type: word
         part: body
         words:

@@ -1,0 +1,29 @@
+id: avtech-room-alert-detect
+info:
+  name: AVTECH Room Alert Detection
+  author: method-security
+  severity: info
+  description: Detects AVTECH Room Alert environmental monitoring appliance web interfaces.
+  metadata:
+    method-application-type: INTERNET_OF_THINGS
+    method-module-name: AVTECH_ROOM_ALERT
+    cpe: cpe:2.3:h:avtech:room_alert:*:*:*:*:*:*:*:*
+  tags: discovery,iot,environmental-monitoring,avtech,room-alert
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/index.html"
+      - "{{BaseURL}}/status.htm"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "AVTECH Software, Inc."
+          - "Room Alert"
+          - "Advanced Computer Room Environment Monitoring"
+        condition: and
+        case-insensitive: true

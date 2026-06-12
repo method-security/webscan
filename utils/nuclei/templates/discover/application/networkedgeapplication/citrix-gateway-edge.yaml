@@ -21,8 +21,23 @@ http:
     max-redirects: 5
     stop-at-first-match: true
     matchers:
-      - type: dsl
-        dsl:
-          - 'contains(tolower(body), "citrix gateway") || contains(tolower(body), "netscaler gateway")'
-          - 'contains(tolower(body), "nsgateway") && contains(tolower(body), "citrix")'
-          - 'contains(tolower(header), "ns_af") && contains(tolower(body), "citrix")'
+      - type: word
+        part: body
+        words:
+          - "citrix gateway"
+          - "netscaler gateway"
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "nsgateway"
+          - "citrix"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: all
+        words:
+          - "ns_af"
+          - "citrix"
+        condition: and
+        case-insensitive: true

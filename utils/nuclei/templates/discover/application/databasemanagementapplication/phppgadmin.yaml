@@ -19,9 +19,13 @@ http:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
+    matchers-condition: and
     matchers:
+      - type: status
+        status:
+          - 200
       - type: dsl
         dsl:
-          - 'status_code == 200 && contains(tolower(body), "<title>phppgadmin") && contains(tolower(body), "<frameset") && contains(tolower(body), "browser.php") && contains(tolower(body), "intro.php")'
-          - 'status_code == 200 && contains(tolower(body), "themes/default/global.css") && contains(tolower(body), "images/themes/default/introduction.png") && contains(tolower(body), "browser.php")'
-          - 'status_code == 200 && contains(tolower(body), "appname") && contains(tolower(body), "phppgadmin") && contains(tolower(body), "servers.php") && contains(tolower(body), "browser.php")'
+          - 'contains(tolower(body), "<title>phppgadmin") && contains(tolower(body), "<frameset") && contains(tolower(body), "browser.php") && contains(tolower(body), "intro.php")'
+          - 'contains(tolower(body), "themes/default/global.css") && contains(tolower(body), "images/themes/default/introduction.png") && contains(tolower(body), "browser.php")'
+          - 'contains(tolower(body), "appname") && contains(tolower(body), "phppgadmin") && contains(tolower(body), "servers.php") && contains(tolower(body), "browser.php")'

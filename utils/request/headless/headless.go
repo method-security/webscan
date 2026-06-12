@@ -78,29 +78,108 @@ func (b *Requester) InitializeBrowser(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("browser connection failed: %v", err)
 	}
+	b.ownsBrowser = true
 
 	return nil
 }
 
 // SendRequest navigates to a URL using the headless browser and captures the response
 func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpRequestConfig) (common.HttpRequestResponse, error) {
+	log := svc1log.FromContext(ctx)
+	attempts := headlessCaptureAttempts(config.Request.Method)
+	var lastReport common.HttpRequestResponse
+	var lastErr error
+
+	for attempt := 1; attempt <= attempts; attempt++ {
+		if attempt > 1 {
+			if !sleepBeforeHeadlessRetry(ctx, attempt) {
+				break
+			}
+		}
+
+		report, err := b.sendRequestOnce(ctx, config)
+		if err == nil {
+			return report, nil
+		}
+
+		lastReport = report
+		lastErr = err
+		if attempt == attempts || !IsTransientHeadlessError(err) || ctx.Err() != nil {
+			return report, err
+		}
+
+		log.Warn("Retrying transient headless capture failure",
+			svc1log.SafeParam("attempt", attempt+1),
+			svc1log.SafeParam("maxAttempts", attempts),
+			svc1log.SafeParam("error", cleanErrMsg(err)))
+		b.restartOwnedBrowser(ctx, cleanErrMsg(err))
+	}
+
+	return lastReport, lastErr
+}
+
+// SendRequestWithScreenshot performs one headless navigation and captures both
+// the HTTP response artifact and a screenshot from the same stabilized page.
+func (b *Requester) SendRequestWithScreenshot(ctx context.Context, config common.SendHttpRequestConfig) (common.HttpRequestResponse, []byte, error) {
+	log := svc1log.FromContext(ctx)
+	attempts := headlessCaptureAttempts(config.Request.Method)
+	var lastReport common.HttpRequestResponse
+	var lastScreenshot []byte
+	var lastErr error
+
+	for attempt := 1; attempt <= attempts; attempt++ {
+		if attempt > 1 {
+			if !sleepBeforeHeadlessRetry(ctx, attempt) {
+				break
+			}
+		}
+
+		report, screenshot, err := b.sendRequestWithArtifactsOnce(ctx, config, true)
+		if err == nil {
+			return report, screenshot, nil
+		}
+
+		lastReport = report
+		lastScreenshot = screenshot
+		lastErr = err
+		if attempt == attempts || !IsTransientHeadlessError(err) || ctx.Err() != nil {
+			return report, screenshot, err
+		}
+
+		log.Warn("Retrying transient headless capture failure",
+			svc1log.SafeParam("attempt", attempt+1),
+			svc1log.SafeParam("maxAttempts", attempts),
+			svc1log.SafeParam("error", cleanErrMsg(err)))
+		b.restartOwnedBrowser(ctx, cleanErrMsg(err))
+	}
+
+	return lastReport, lastScreenshot, lastErr
+}
+
+func (b *Requester) sendRequestOnce(ctx context.Context, config common.SendHttpRequestConfig) (common.HttpRequestResponse, error) {
+	report, _, err := b.sendRequestWithArtifactsOnce(ctx, config, false)
+	return report, err
+}
+
+func (b *Requester) sendRequestWithArtifactsOnce(ctx context.Context, config common.SendHttpRequestConfig, captureScreenshot bool) (common.HttpRequestResponse, []byte, error) {
 	// =========================================================================================
 	// SETUP
 	// =========================================================================================
 	log := svc1log.FromContext(ctx)
 
 	report := common.HttpRequestResponse{Request: config.Request}
+	var screenshot []byte
 
 	constructedURL, err := standardhelpers.ConstructURL(ctx, config.Request)
 	if err != nil {
-		return report, fmt.Errorf("URL construction failed: %v", err)
+		return report, screenshot, fmt.Errorf("URL construction failed: %v", err)
 	}
 	log.Info("Requesting", svc1log.SafeParam("url", *constructedURL))
 
 	// Initialize browser if not already done
 	if b.Browser == nil {
 		if err := b.InitializeBrowser(ctx); err != nil {
-			return report, fmt.Errorf("browser initialization failed: %v", err) // Do not change, DD Metric is based on this error message
+			return report, screenshot, fmt.Errorf("browser initialization failed: %v", err) // Do not change, DD Metric is based on this error message
 		}
 		log.Info("Connected to browser")
 	}
@@ -110,7 +189,7 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 		err = b.Browser.IgnoreCertErrors(true)
 		if err != nil {
 			log.Warn("Failed to disable certificate error checking", svc1log.SafeParam("error", err.Error()))
-			return report, fmt.Errorf("failed to disable certificate error checking: %v", err)
+			return report, screenshot, fmt.Errorf("failed to disable certificate error checking: %v", err)
 		}
 		log.Info("Certificate error checking disabled")
 	}
@@ -125,6 +204,7 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 		redirectChain   = []string{*constructedURL}
 		redirectChainMu sync.Mutex
 		browserErr      error
+		navigationErr   error
 		statusCode      int
 	)
 
@@ -169,12 +249,12 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 		}
 
 		// Setup request monitoring and navigate
-		headerCapture := setupHeaderInterception(page)
+		headerCapture := setupHeaderInterception(page, log)
 		handleNavigation(ctx, page, &redirectChain, &redirectChainMu, requestComplete, &once, config.MaxRedirects, browsersErr)
 
-		navErr := performNavigation(ctx, page, constructedURL, config)
-		if navErr != nil {
-			log.Info("Unexpected navigation error, but continuing to extract data anyway", svc1log.SafeParam("error", cleanErrMsg(navErr)))
+		navigationErr = performNavigation(ctx, page, constructedURL, config)
+		if navigationErr != nil {
+			log.Info("Unexpected navigation error, but continuing to extract data anyway", svc1log.SafeParam("error", cleanErrMsg(navigationErr)))
 		}
 
 		// Wait for navigation completion or timeout
@@ -206,15 +286,25 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 			chain := strings.Join(redirectChain, " -> ")
 			redirectChainMu.Unlock()
 			if ctx.Err() == context.DeadlineExceeded {
-				log.Warn("Request timed out",
+				logParams := []svc1log.Param{
 					svc1log.SafeParam("url", *constructedURL),
 					svc1log.SafeParam("timeout", config.Timeout),
-					svc1log.SafeParam("redirectChain", chain))
+					svc1log.SafeParam("redirectChain", chain),
+				}
+				if navigationErr != nil {
+					logParams = append(logParams, svc1log.SafeParam("navigationError", cleanErrMsg(navigationErr)))
+				}
+				log.Warn("Request timed out", logParams...)
 				browserErr = fmt.Errorf("request timeout after %d seconds", config.Timeout)
 			} else {
-				log.Warn("Request cancelled",
+				logParams := []svc1log.Param{
 					svc1log.SafeParam("url", *constructedURL),
-					svc1log.SafeParam("error", ctx.Err()))
+					svc1log.SafeParam("error", ctx.Err()),
+				}
+				if navigationErr != nil {
+					logParams = append(logParams, svc1log.SafeParam("navigationError", cleanErrMsg(navigationErr)))
+				}
+				log.Warn("Request cancelled", logParams...)
 				browserErr = fmt.Errorf("request cancelled: %v", ctx.Err())
 			}
 			return
@@ -267,7 +357,7 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 				statusCode = 200
 			} else {
 				statusCode = getStatusCodeFromPage(page)
-				if statusCode == 0 && browserErr == nil {
+				if statusCode == 0 && browserErr == nil && navigationErr == nil {
 					statusCode = 200
 				}
 			}
@@ -290,7 +380,7 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 				} else if val, ok := resultMap["performanceStatus"]; ok && val.Int() > 0 {
 					statusCode = val.Int()
 				}
-				if statusCode == 0 && browserErr == nil {
+				if statusCode == 0 && browserErr == nil && navigationErr == nil {
 					statusCode = 200 // Default for successful navigation
 				}
 			}
@@ -324,7 +414,14 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 		// Check if Chrome error page using batch result
 		if isErrorPage {
 			log.Warn("Detected Chrome error page, treating as navigation failure")
-			browserErr = fmt.Errorf("navigation failed: Chrome error page detected")
+			if navigationErr != nil {
+				browserErr = navigationErr
+			} else {
+				browserErr = fmt.Errorf("navigation failed: Chrome error page detected")
+			}
+		}
+		if browserErr == nil && navigationErr != nil && statusCode == 0 {
+			browserErr = navigationErr
 		}
 
 		// Use the latest captured main-document headers after stabilization so
@@ -387,10 +484,24 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 			responseBody,
 		)
 		report.Response = &response
+
+		if captureScreenshot && browserErr == nil {
+			log.Info("Capturing screenshot from existing headless page")
+			img, screenshotErr := page.Screenshot(true, &proto.PageCaptureScreenshot{
+				Format: proto.PageCaptureScreenshotFormatPng,
+			})
+			if screenshotErr != nil {
+				log.Error("Failed to capture screenshot from existing page", svc1log.SafeParam("url", *constructedURL), svc1log.SafeParam("error", cleanErrMsg(screenshotErr)))
+				browserErr = fmt.Errorf("screenshot capture failed: %s", cleanErrMsg(screenshotErr))
+			} else {
+				screenshot = img
+				log.Info("Screenshot captured from existing headless page")
+			}
+		}
 	}); err != nil {
-		log.Error("Browser operation failed with panic", svc1log.SafeParam("error", err.Error()))
+		log.Error("Browser operation failed with panic", svc1log.SafeParam("error", cleanErrMsg(err)))
 		if browserErr == nil {
-			browserErr = fmt.Errorf("browser operation panicked: %v", err)
+			browserErr = fmt.Errorf("browser operation panicked: %w", err)
 		}
 	}
 
@@ -410,9 +521,9 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 		finalURL := finalRedirectChain[len(finalRedirectChain)-1]
 		if isCrossDomainRedirect(originalURL, finalURL) {
 			log.Info("Cross-domain redirect detected in redirect chain", svc1log.SafeParam("from", originalURL), svc1log.SafeParam("to", finalURL))
-			return common.HttpRequestResponse{Request: config.Request}, fmt.Errorf("cross-domain redirect blocked: %s -> %s", originalURL, finalURL)
+			return common.HttpRequestResponse{Request: config.Request}, screenshot, fmt.Errorf("cross-domain redirect blocked: %s -> %s", originalURL, finalURL)
 		}
 	}
 
-	return report, finalErr
+	return report, screenshot, finalErr
 }

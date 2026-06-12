@@ -18,7 +18,6 @@ http:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
-    matchers-condition: or
     matchers:
       - type: word
         part: body
@@ -26,9 +25,4 @@ http:
           - "InTouch Access Anywhere"
           - "AccessAnywhere"
         condition: and
-        case-insensitive: true
-      - type: word
-        part: body
-        words:
-          - "<title>InTouch Access Anywhere"
         case-insensitive: true

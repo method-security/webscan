@@ -20,6 +20,38 @@ import (
 
 // CaptureScreenshot uses a headless browser to capture a screenshot of the given URL and returns the image bytes.
 func CaptureScreenshot(ctx context.Context, browser *headless.Requester, sendHTTPRequestConfig *common.SendHttpRequestConfig) ([]byte, error) {
+	log := svc1log.FromContext(ctx)
+	const maxScreenshotAttempts = 3
+
+	var lastErr error
+	for attempt := 1; attempt <= maxScreenshotAttempts; attempt++ {
+		if attempt > 1 {
+			delay := time.Duration(attempt-1) * 250 * time.Millisecond
+			select {
+			case <-time.After(delay):
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
+			log.Warn("Retrying transient screenshot capture failure",
+				svc1log.SafeParam("attempt", attempt),
+				svc1log.SafeParam("maxAttempts", maxScreenshotAttempts))
+		}
+
+		img, err := captureScreenshotOnce(ctx, browser, sendHTTPRequestConfig)
+		if err == nil {
+			return img, nil
+		}
+		lastErr = err
+		if !headless.IsTransientHeadlessError(err) || ctx.Err() != nil {
+			return nil, err
+		}
+		browser.ResetOwnedBrowser(ctx, err.Error())
+	}
+
+	return nil, lastErr
+}
+
+func captureScreenshotOnce(ctx context.Context, browser *headless.Requester, sendHTTPRequestConfig *common.SendHttpRequestConfig) ([]byte, error) {
 	// Get the logger from the context
 	log := svc1log.FromContext(ctx)
 
@@ -43,6 +75,11 @@ func CaptureScreenshot(ctx context.Context, browser *headless.Requester, sendHTT
 		log.Error("Failed to create page for screenshot", svc1log.SafeParam("error", err))
 		return nil, err
 	}
+	defer func() {
+		if closeErr := page.Close(); closeErr != nil {
+			log.Debug("Failed to close screenshot page", svc1log.SafeParam("error", closeErr.Error()))
+		}
+	}()
 
 	// Apply the same user-agent override the HTML SendRequest path uses so a
 	// single --user-agent invocation produces consistent UAs across the HTML
@@ -85,12 +122,6 @@ func CaptureScreenshot(ctx context.Context, browser *headless.Requester, sendHTT
 		return nil, err
 	}
 	log.Info("Screenshot captured")
-
-	err = page.Close()
-	if err != nil {
-		log.Error("Failed to close page", svc1log.SafeParam("url", fmt.Sprintf("%s%s", sendHTTPRequestConfig.Request.BaseUrl, sendHTTPRequestConfig.Request.Path)), svc1log.SafeParam("error", err))
-		return nil, err
-	}
 
 	return img, nil
 }

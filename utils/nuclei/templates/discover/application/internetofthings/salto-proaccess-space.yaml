@@ -1,0 +1,33 @@
+id: salto-proaccess-space-detect
+info:
+  name: SALTO ProAccess Space Detection
+  author: method-security
+  severity: info
+  description: Detects SALTO ProAccess Space access-control web interfaces.
+  metadata:
+    method-application-type: INTERNET_OF_THINGS
+    method-module-name: SALTO_PROACCESS_SPACE
+    cpe: cpe:2.3:a:salto:proaccess_space:*:*:*:*:*:*:*:*
+  tags: discovery,iot,access-control,salto
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/login"
+      - "{{BaseURL}}/index.html"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "<title>Salto ProAccess Space</title>"
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "SALTO ProAccess Space"
+          - "data-critters-container"
+        condition: and
+        case-insensitive: true

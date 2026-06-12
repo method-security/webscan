@@ -9,6 +9,7 @@ types:
       targets: list<string>
       maxRequests: integer
       sleep: integer
+      jitter: integer
       verifyTls: boolean
       timeout: integer
       threads: integer

@@ -24,6 +24,8 @@ types:
       maxRedirects: integer
       verifyTls: boolean
       timeout: integer
+      sleep: integer
+      jitter: integer
       threads: integer
       requestMethod: method.RequestMethod
       headlessConfig: optional<method.HeadlessRequestConfig>

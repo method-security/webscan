@@ -30,13 +30,7 @@ http:
         words:
           - "moveitisapi"
           - "stylesheet_MOVEit"
-          - "MOVEit Mobile"
           - "com.progress.moveit.transfer"
-        case-insensitive: true
-      - type: word
-        part: header
-        words:
-          - "moveitisapi"
         case-insensitive: true
       - type: regex
         part: body
@@ -44,6 +38,3 @@ http:
           - '(?i)stylesheet_MOVEit[^"]*\.css'
           - '(?i)app-id=com\.progress\.moveit\.transfer'
           - '(?i)author.*Progress\s+Software\s+Corporation'
-      - type: dsl
-        dsl:
-          - 'status_code == 200 && contains(tolower(body), "moveit transfer") && (contains(tolower(body), "moveitisapi") || contains(tolower(body), "stylesheet_moveit") || contains(tolower(body), "com.progress.moveit.transfer") || contains(tolower(body), "human.aspx"))'

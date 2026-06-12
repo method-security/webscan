@@ -19,8 +19,23 @@ http:
     max-redirects: 5
     stop-at-first-match: true
     matchers:
-      - type: dsl
-        dsl:
-          - 'status_code == 200 && !contains(tolower(body), "gitlab community edition") && contains(tolower(body), "pgadmin 4") && contains(tolower(body), "csrf_token") && contains(tolower(body), "email")'
-          - 'status_code == 200 && !contains(tolower(body), "gitlab community edition") && contains(tolower(body), "pgadmin.browser") && contains(tolower(body), "pgadmin")'
-          - 'status_code == 200 && !contains(tolower(body), "gitlab community edition") && contains(tolower(body), "<title>pgadmin") && contains(tolower(body), "/static/js")'
+      - type: word
+        part: body
+        words:
+          - "pgadmin 4"
+          - "csrf_token"
+          - "email"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "pgadmin.browser"
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "<title>pgadmin"
+          - "/static/js"
+        condition: and
+        case-insensitive: true

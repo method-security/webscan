@@ -8,6 +8,8 @@ types:
       target: string
       verifyTls: boolean
       timeout: integer
+      sleep: integer
+      jitter: integer
       userAgent: method.UserAgentPreset
   EnumerateKubeResult:
     properties:

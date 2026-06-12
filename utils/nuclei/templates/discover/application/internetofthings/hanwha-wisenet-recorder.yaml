@@ -1,0 +1,37 @@
+id: hanwha-wisenet-recorder-detect
+info:
+  name: Hanwha Wisenet Recorder Detection
+  author: method-security
+  severity: info
+  description: Detects Hanwha Wisenet NVR and recorder web viewer interfaces.
+  metadata:
+    method-application-type: INTERNET_OF_THINGS
+    method-module-name: HANWHA_WISENET_RECORDER
+    cpe: cpe:2.3:h:hanwha-security:*:*:*:*:*:*:*:*:*
+  tags: discovery,iot,camera,nvr,wisenet,hanwha
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/index.html"
+      - "{{BaseURL}}/login.html"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "<title>Wisenet NVR</title>"
+          - "$.nvr.model_name"
+          - "MSG_LOGIN_FAIL"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "<title>Wisenet Recorder Webviewer</title>"
+          - "/uwa/static/css"
+          - "ffmpegAAC.js"
+        condition: and
+        case-insensitive: true

@@ -14,6 +14,7 @@ http:
     path:
       - "{{BaseURL}}"
       - "{{BaseURL}}/ProficyWebSpace/"
+      - "{{BaseURL}}/proficywebspace"
       - "{{BaseURL}}/WebSpace/"
     redirects: true
     max-redirects: 5
@@ -23,4 +24,11 @@ http:
         part: body
         words:
           - "<title>Proficy WebSpace"
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "Proficy WebSpace"
+          - "GE"
+        condition: and
         case-insensitive: true

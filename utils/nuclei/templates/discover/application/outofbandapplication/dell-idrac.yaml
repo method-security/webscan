@@ -39,7 +39,16 @@ http:
         part: body
         regex:
           - "(?i)\"idrac[^\"]+\":\"[0-9A-Za-z._-]+\""
-      - type: dsl
-        dsl:
-          - 'contains(tolower(body), "integrated dell remote access controller")'
-          - 'contains(tolower(body), "idrac") && contains(tolower(body), "redfish") && contains(tolower(body), "dell")'
+      - type: word
+        part: body
+        words:
+          - "integrated dell remote access controller"
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "idrac"
+          - "redfish"
+          - "dell"
+        condition: and
+        case-insensitive: true

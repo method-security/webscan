@@ -1,0 +1,43 @@
+id: hikvision-camera-web-ui-detect
+info:
+  name: Hikvision Camera Web UI Detection
+  author: method-security
+  severity: info
+  description: Detects Hikvision camera and NVR web interfaces using the Hikvision doc/page login bootstrap.
+  metadata:
+    method-application-type: INTERNET_OF_THINGS
+    method-module-name: HIKVISION_CAMERA
+    cpe: cpe:2.3:h:hikvision:*:*:*:*:*:*:*:*:*
+  tags: discovery,iot,camera,nvr,hikvision
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/doc/page/login.asp"
+      - "{{BaseURL}}/doc/page/login.asp?_=1"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "./doc/page/login.asp"
+          - "new Date()).getTime()"
+          - "Hikvision"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "doc/page/login.asp"
+          - "doc/script/LAB.min.js"
+          - "$LAB"
+          - "Hikvision"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "Hikvision Digital Technology"
+        case-insensitive: true

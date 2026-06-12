@@ -18,9 +18,13 @@ http:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
+    matchers-condition: and
     matchers:
+      - type: status
+        status:
+          - 200
       - type: dsl
         dsl:
-          - 'status_code == 200 && contains(tolower(body), "mongo express") && contains(tolower(body), "database")'
-          - 'status_code == 200 && contains(tolower(body), "<title>mongo express") && contains(tolower(body), "/db/")'
-          - 'status_code == 200 && contains(tolower(body), "powered by mongo-express")'
+          - 'contains(tolower(body), "mongo express") && contains(tolower(body), "database")'
+          - 'contains(tolower(body), "<title>mongo express") && contains(tolower(body), "/db/")'
+          - 'contains(tolower(body), "powered by mongo-express")'

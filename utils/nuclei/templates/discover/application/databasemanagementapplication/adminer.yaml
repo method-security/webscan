@@ -19,9 +19,13 @@ http:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
+    matchers-condition: and
     matchers:
+      - type: status
+        status:
+          - 200
       - type: dsl
         dsl:
-          - 'status_code == 200 && contains(tolower(body), "<title>login - adminer") && contains(tolower(body), "name=\"auth[server]\"")'
-          - 'status_code == 200 && contains(tolower(body), "name=\"auth[driver]\"") && contains(tolower(body), "name=\"auth[username]\"") && contains(tolower(body), "adminer")'
-          - 'status_code == 200 && contains(tolower(body), "adminer.css") && contains(tolower(body), "name=\"auth[password]\"")'
+          - 'contains(tolower(body), "<title>login - adminer") && contains(tolower(body), "name=\"auth[server]\"")'
+          - 'contains(tolower(body), "name=\"auth[driver]\"") && contains(tolower(body), "name=\"auth[username]\"") && contains(tolower(body), "adminer")'
+          - 'contains(tolower(body), "adminer.css") && contains(tolower(body), "name=\"auth[password]\"")'

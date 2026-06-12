@@ -4,6 +4,7 @@ import (
 	// Standard
 	"context"
 	"fmt"
+	"time"
 
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
@@ -68,26 +69,35 @@ func PerformPageCapture(
 	// Get request config
 	requestConfig := getHTTPRequestConfig(baseURL, path, queryParams, config, browserbaseSecrets)
 
-	// Perform screenshot capture if enabled
-	if config.Screenshot {
-		log.Info("Performing screenshot capture", svc1log.SafeParam("target", config.Target))
+	// Perform HTML capture
+	log.Info("Performing HTML capture", svc1log.SafeParam("target", config.Target))
+	var httpRequestResponse *common.HttpRequestResponse
+	if config.Screenshot && config.RequestMethod == common.RequestMethodHeadless {
+		log.Info("Performing combined HEADLESS screenshot and HTML capture", svc1log.SafeParam("target", config.Target))
+		requestCtx, requestCancel := context.WithTimeout(ctx, time.Duration(requestConfig.Timeout)*time.Second)
+		defer requestCancel()
+
 		requester := headless.NewRequester(config.Timeout, config.HeadlessConfig)
-		img, err := discoverpagehelpers.CaptureScreenshot(ctx, requester, &requestConfig)
+		response, img, err := requester.SendRequestWithScreenshot(requestCtx, requestConfig)
+		httpRequestResponse = &response
+		if len(img) > 0 {
+			result.Screenshot = &img
+		}
+		if err != nil {
+			errors = append(errors, err.Error())
+			if response.Response == nil {
+				report.Errors = errors
+				return &report
+			}
+		}
+	} else {
+		var err error
+		httpRequestResponse, err = discoverpagehelpers.PerformHTMLPageCapture(ctx, &requestConfig)
 		if err != nil {
 			errors = append(errors, err.Error())
 			report.Errors = errors
 			return &report
 		}
-		result.Screenshot = &img
-	}
-
-	// Perform HTML capture
-	log.Info("Performing HTML capture", svc1log.SafeParam("target", config.Target))
-	httpRequestResponse, err := discoverpagehelpers.PerformHTMLPageCapture(ctx, &requestConfig)
-	if err != nil {
-		errors = append(errors, err.Error())
-		report.Errors = errors
-		return &report
 	}
 
 	// Check if response code is in the allowed list

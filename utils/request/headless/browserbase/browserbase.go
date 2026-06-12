@@ -41,8 +41,14 @@ func NewBrowserbaseRequester(
 		return nil
 	}
 	client := cdp.New().Start(websocket)
+	headlessRequester, err := headless.NewRequesterWithClient(client, timeout, minDOMStabalizeTime)
+	if err != nil {
+		svc1log.FromContext(ctx).Error("Failed to connect to browserbase CDP session", svc1log.SafeParam("error", err.Error()))
+		return nil
+	}
+
 	return &Requester{
-		Requester: headless.NewRequesterWithClient(client, timeout, minDOMStabalizeTime),
+		Requester: headlessRequester,
 		Client:    browserbaseClient,
 	}
 }

@@ -17,6 +17,22 @@ http:
     max-redirects: 5
     stop-at-first-match: true
     matchers:
-      - type: dsl
-        dsl:
-          - 'contains(tolower(header), "x-vault-cluster") || (contains(tolower(body), "\"initialized\"") && contains(tolower(body), "\"sealed\"") && (contains(tolower(body), "\"cluster_name\"") || contains(tolower(body), "\"cluster_id\"")))'
+      - type: word
+        part: header
+        words:
+          - "x-vault-cluster"
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "\"initialized\""
+          - "\"sealed\""
+          - "\"cluster_name\""
+        condition: and
+      - type: word
+        part: body
+        words:
+          - "\"initialized\""
+          - "\"sealed\""
+          - "\"cluster_id\""
+        condition: and

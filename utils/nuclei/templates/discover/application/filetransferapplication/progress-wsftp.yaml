@@ -19,8 +19,24 @@ http:
     max-redirects: 5
     stop-at-first-match: true
     matchers:
-      - type: dsl
-        dsl:
-          - 'contains(tolower(body), "ws_ftp") && contains(tolower(body), "progress")'
-          - 'contains(tolower(body), "ws_ftp server")'
-          - 'contains(tolower(body), "ws_ftp") && contains(tolower(body), "thinclient")'
+      - type: word
+        part: body
+        words:
+          - "ws_ftp"
+          - "progress"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "ws_ftp server"
+          - "progress"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "ws_ftp"
+          - "thinclient"
+        condition: and
+        case-insensitive: true

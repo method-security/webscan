@@ -4,12 +4,14 @@ import (
 	// Standard
 	"context"
 	"fmt"
+	"time"
 
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
 	enumeratekubefern "github.com/Method-Security/webscan/generated/go/enumerate/kube"
 
 	// Utils
+	utils "github.com/Method-Security/webscan/utils"
 	request "github.com/Method-Security/webscan/utils/request"
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
 )
@@ -52,7 +54,7 @@ func PerformAppEnumerateKube(ctx context.Context, config *enumeratekubefern.Enum
 
 	// Send requests to the common Kubernetes paths
 	requests := []*common.HttpRequestResponse{}
-	for _, path := range commonKubepaths {
+	for i, path := range commonKubepaths {
 		// Create Request Config
 		requestConfig := createSendHTTPRequestConfig(baseURL, fmt.Sprintf("%s%s", parsedTargetPath, path), config.VerifyTls, config.Timeout, config.UserAgent)
 
@@ -66,6 +68,19 @@ func PerformAppEnumerateKube(ctx context.Context, config *enumeratekubefern.Enum
 
 		// Populate Attempt
 		requests = append(requests, request)
+
+		// Apply stealth delay between requests
+		if config.Sleep > 0 && i < len(commonKubepaths)-1 {
+			delay := utils.CalculateDelayWithJitter(config.Sleep, config.Jitter)
+			select {
+			case <-time.After(delay):
+			case <-ctx.Done():
+				report.Result.Target = config.Target
+				report.Result.Requests = requests
+				report.Errors = errors
+				return report
+			}
+		}
 	}
 
 	// Populate and return Report

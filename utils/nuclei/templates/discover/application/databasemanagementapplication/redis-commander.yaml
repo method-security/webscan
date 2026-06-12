@@ -18,9 +18,13 @@ http:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
+    matchers-condition: and
     matchers:
+      - type: status
+        status:
+          - 200
       - type: dsl
         dsl:
-          - 'status_code == 200 && contains(tolower(body), "<title>redis commander")'
-          - 'status_code == 200 && contains(tolower(body), "redis commander") && contains(tolower(body), "redis-commander")'
-          - 'status_code == 200 && contains(tolower(body), "redis commander") && contains(tolower(body), "connections") && contains(tolower(body), "keys")'
+          - 'contains(tolower(body), "<title>redis commander")'
+          - 'contains(tolower(body), "redis commander") && contains(tolower(body), "redis-commander")'
+          - 'contains(tolower(body), "redis commander") && contains(tolower(body), "connections") && contains(tolower(body), "keys")'

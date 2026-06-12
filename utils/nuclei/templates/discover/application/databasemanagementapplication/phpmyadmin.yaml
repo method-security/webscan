@@ -19,9 +19,13 @@ http:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
+    matchers-condition: and
     matchers:
+      - type: status
+        status:
+          - 200
       - type: dsl
         dsl:
-          - 'status_code == 200 && contains(tolower(body), "phpmyadmin") && contains(tolower(body), "pma_username") && contains(tolower(body), "pma_password")'
-          - 'status_code == 200 && contains(tolower(body), "phpmyadmin.css.php") && contains(tolower(body), "pma_username")'
-          - 'status_code == 200 && contains(tolower(body), "<title>phpmyadmin") && contains(tolower(body), "server choice")'
+          - 'contains(tolower(body), "phpmyadmin") && contains(tolower(body), "pma_username") && contains(tolower(body), "pma_password")'
+          - 'contains(tolower(body), "phpmyadmin.css.php") && contains(tolower(body), "pma_username")'
+          - 'contains(tolower(body), "<title>phpmyadmin") && contains(tolower(body), "server choice")'

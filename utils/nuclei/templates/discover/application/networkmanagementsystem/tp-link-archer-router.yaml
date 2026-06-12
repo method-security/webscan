@@ -24,12 +24,12 @@ http:
     matchers:
       - type: dsl
         dsl:
-          - 'status_code == 200 && !contains(tolower(body), "omada") && !contains(tolower(body), "tp-link eap") && (contains(tolower(body), "userrpm") || contains(tolower(body), "loginrpm.htm")) && contains(tolower(body), "tp-link")'
-          - 'status_code == 200 && !contains(tolower(body), "omada") && !contains(tolower(body), "tp-link eap") && contains(tolower(body), "tp-link") && (contains(tolower(body), "archer") || contains(tolower(body), "tl-wr")) && (contains(tolower(body), "login") || contains(tolower(body), "router") || contains(tolower(body), "password") || contains(tolower(body), "admin"))'
-          - 'status_code == 200 && !contains(tolower(body), "omada") && !contains(tolower(body), "tp-link eap") && contains(tolower(body), "tplink") && contains(tolower(body), "webpages/login")'
-          - 'status_code == 200 && !contains(tolower(body), "omada") && !contains(tolower(body), "tp-link eap") && contains(tolower(header), "set-cookie") && (contains(tolower(header), "sysauth=") || contains(tolower(header), "sysauth-https=")) && (contains(tolower(body), "tp-link") || contains(tolower(body), "tplink"))'
-          - 'status_code == 200 && !contains(tolower(body), "omada") && !contains(tolower(body), "tp-link eap") && contains(tolower(body), "tp-link") && contains(tolower(body), "wireless router") && contains(tolower(body), "login")'
-          - 'status_code == 200 && !contains(tolower(body), "omada") && !contains(tolower(body), "tp-link eap") && (contains(tolower(body), "<title>tp-link") || contains(tolower(body), "<title>tl-")) && contains(tolower(body), "login")'
+          - 'status_code == 200 && !contains(tolower(body), "omada") && !contains(tolower(body), "tp-link eap") && !contains(tolower(body), "deco") && (contains(tolower(body), "userrpm") || contains(tolower(body), "loginrpm.htm")) && contains(tolower(body), "tp-link")'
+          - 'status_code == 200 && !contains(tolower(body), "omada") && !contains(tolower(body), "tp-link eap") && !contains(tolower(body), "deco") && contains(tolower(body), "tp-link") && (contains(tolower(body), "archer") || contains(tolower(body), "tl-wr")) && (contains(tolower(body), "login") || contains(tolower(body), "router") || contains(tolower(body), "password") || contains(tolower(body), "admin"))'
+          - 'status_code == 200 && !contains(tolower(body), "omada") && !contains(tolower(body), "tp-link eap") && !contains(tolower(body), "deco") && contains(tolower(body), "tplink") && contains(tolower(body), "webpages/login") && (contains(tolower(body), "archer") || contains(tolower(body), "tl-wr"))'
+          - 'status_code == 200 && !contains(tolower(body), "omada") && !contains(tolower(body), "tp-link eap") && !contains(tolower(body), "deco") && contains(tolower(header), "set-cookie") && (contains(tolower(header), "sysauth=") || contains(tolower(header), "sysauth-https=")) && (contains(tolower(body), "tp-link") || contains(tolower(body), "tplink")) && (contains(tolower(body), "archer") || contains(tolower(body), "tl-wr"))'
+          - 'status_code == 200 && !contains(tolower(body), "omada") && !contains(tolower(body), "tp-link eap") && !contains(tolower(body), "deco") && contains(tolower(body), "tp-link") && contains(tolower(body), "wireless router") && contains(tolower(body), "login")'
+          - 'status_code == 200 && !contains(tolower(body), "omada") && !contains(tolower(body), "tp-link eap") && !contains(tolower(body), "deco") && (contains(tolower(body), "<title>tp-link") || contains(tolower(body), "<title>tl-")) && contains(tolower(body), "login")'
     extractors:
       - type: regex
         name: firmware_version

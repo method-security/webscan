@@ -7,12 +7,14 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
 	enumeratedockerfern "github.com/Method-Security/webscan/generated/go/enumerate/containerregistry"
 
 	// Utils
+	utils "github.com/Method-Security/webscan/utils"
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
 	standard "github.com/Method-Security/webscan/utils/request/standard"
 
@@ -475,12 +477,23 @@ func PerformAppEnumerateContainerRegistryDocker(ctx context.Context, config *enu
 	targets := []*enumeratedockerfern.EnumerateDockerResult{}
 	errors := []string{}
 
-	for _, targetURL := range config.Targets {
+	for i, targetURL := range config.Targets {
 		result, errs := enumerateTarget(ctx, targetURL, config.VerifyTls, config.Timeout, config.Threads, config.UserAgent)
 		if result != nil {
 			targets = append(targets, result)
 		}
 		errors = append(errors, errs...)
+
+		if config.Sleep > 0 && i < len(config.Targets)-1 {
+			delay := utils.CalculateDelayWithJitter(config.Sleep, config.Jitter)
+			select {
+			case <-time.After(delay):
+			case <-ctx.Done():
+				report.Result.Targets = targets
+				report.Errors = errors
+				return report
+			}
+		}
 	}
 
 	// Populate report

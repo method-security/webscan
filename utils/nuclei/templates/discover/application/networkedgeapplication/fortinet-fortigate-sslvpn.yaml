@@ -19,8 +19,23 @@ http:
     max-redirects: 5
     stop-at-first-match: true
     matchers:
-      - type: dsl
-        dsl:
-          - 'contains(tolower(body), "fortigate ssl-vpn") || contains(tolower(body), "fortigate ssl vpn")'
-          - 'contains(tolower(body), "fortinet") && contains(tolower(body), "remote/login")'
-          - 'contains(tolower(header), "fgtlanguage") && contains(tolower(body), "fortinet")'
+      - type: word
+        part: body
+        words:
+          - "fortigate ssl-vpn"
+          - "fortigate ssl vpn"
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "fortinet"
+          - "remote/login"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: all
+        words:
+          - "fgtlanguage"
+          - "fortinet"
+        condition: and
+        case-insensitive: true

@@ -11,12 +11,14 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
 	"github.com/Method-Security/webscan/generated/go/discover"
 
 	// Utils
+	utils "github.com/Method-Security/webscan/utils"
 	request "github.com/Method-Security/webscan/utils/request"
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
 
@@ -285,8 +287,6 @@ func PerformWordlistCapture(ctx context.Context, config discover.DiscoverWordlis
 				visitedURLs[targetURL] = struct{}{}
 				mu.Unlock()
 
-				log.Info("Fetching URL for wordlist", svc1log.SafeParam("url", targetURL))
-
 				// unmarkVisited removes targetURL from visitedURLs so that a later
 				// depth can retry it if the URL is re-discovered via another link.
 				unmarkVisited := func() {
@@ -294,6 +294,18 @@ func PerformWordlistCapture(ctx context.Context, config discover.DiscoverWordlis
 					delete(visitedURLs, targetURL)
 					mu.Unlock()
 				}
+
+				if delay := utils.CalculateDelayWithJitter(config.Sleep, config.Jitter); delay > 0 {
+					select {
+					case <-time.After(delay):
+					case <-ctx.Done():
+						// Unmark on cancel so a later depth can retry this URL.
+						unmarkVisited()
+						return
+					}
+				}
+
+				log.Info("Fetching URL for wordlist", svc1log.SafeParam("url", targetURL))
 
 				requestConfig, err := createRequestConfig(targetURL, config)
 				if err != nil {

@@ -14,7 +14,7 @@ http:
     path:
       - "{{BaseURL}}"
       - "{{BaseURL}}/MobileHMI/"
-      - "{{BaseURL}}/MobileHMI/Login.aspx"
+      - "{{BaseURL}}/anyglass/"
     redirects: true
     max-redirects: 5
     stop-at-first-match: true

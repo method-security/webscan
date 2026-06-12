@@ -21,9 +21,13 @@ http:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
+    matchers-condition: and
     matchers:
+      - type: status
+        status:
+          - 200
       - type: dsl
         dsl:
-          - 'status_code == 200 && !contains(tolower(body), "gitlab community edition") && contains(tolower(body), "netgear") && contains(tolower(body), "prosafe") && contains(tolower(body), "login")'
-          - 'status_code == 200 && !contains(tolower(body), "gitlab community edition") && contains(tolower(body), "netgear") && contains(tolower(body), "smart managed") && contains(tolower(body), "switch")'
-          - 'status_code == 200 && !contains(tolower(body), "gitlab community edition") && contains(tolower(body), "netgear") && contains(tolower(body), "base/main_login.html")'
+          - 'contains(tolower(body), "netgear") && contains(tolower(body), "prosafe") && contains(tolower(body), "login")'
+          - 'contains(tolower(body), "netgear") && contains(tolower(body), "smart managed") && contains(tolower(body), "switch")'
+          - 'contains(tolower(body), "netgear") && contains(tolower(body), "base/main_login.html")'

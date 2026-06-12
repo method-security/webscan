@@ -24,8 +24,9 @@ http:
       - type: word
         part: body
         words:
-          - "VMware ESXi"
           - "ESXi Embedded Host Client"
+          - "Log in - VMware ESXi"
+          - "esxUiApp"
         case-insensitive: true
       - type: word
         part: header

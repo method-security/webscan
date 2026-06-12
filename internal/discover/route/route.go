@@ -14,7 +14,7 @@ import (
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
 	"github.com/Method-Security/webscan/generated/go/discover"
-	"github.com/Method-Security/webscan/utils"
+	utils "github.com/Method-Security/webscan/utils"
 
 	// Utils
 	request "github.com/Method-Security/webscan/utils/request"
@@ -437,6 +437,18 @@ func PerformRouteCapture(ctx context.Context, config discover.DiscoverRouteConfi
 					return
 				}
 
+				// Apply stealth delay between requests. On ctx cancel, fall
+				// through to extraction so we don't discard the response we
+				// already paid the request cost for; the URL stays in
+				// visitedURLs intentionally (it has been fetched).
+				if config.Sleep > 0 {
+					delay := utils.CalculateDelayWithJitter(config.Sleep, config.Jitter)
+					select {
+					case <-time.After(delay):
+					case <-ctx.Done():
+					}
+				}
+
 				// Extract the routes and if enabled, static assets
 				if request.Response == nil || request.Response.ResponseBody == nil {
 					log.Info("No response from", svc1log.SafeParam("url", targetURL))
@@ -505,7 +517,7 @@ func PerformRouteCapture(ctx context.Context, config discover.DiscoverRouteConfi
 	sort.SliceStable(report.Result.Routes, func(i, j int) bool {
 		ri := report.Result.Routes[i]
 		rj := report.Result.Routes[j]
-		// Evidence-tagged routes survive MaxRoutes cap before untagged routes
+		// Prefer evidence-tagged routes while keeping output deterministic.
 		hasEvi := ri.Evidence != nil
 		hasEvj := rj.Evidence != nil
 		if hasEvi != hasEvj {
@@ -514,9 +526,6 @@ func PerformRouteCapture(ctx context.Context, config discover.DiscoverRouteConfi
 		// Same evidence tier: lexical for determinism
 		return ri.BaseUrl+ri.Path < rj.BaseUrl+rj.Path
 	})
-	if config.MaxRoutes != nil && *config.MaxRoutes > 0 && len(report.Result.Routes) > *config.MaxRoutes {
-		report.Result.Routes = report.Result.Routes[:*config.MaxRoutes]
-	}
 	report.Result.StaticAssets = discoverroutehelpers.MergeStaticAssets(allStaticAssets)
 	report.Errors = append(report.Errors, errors...)
 	return report

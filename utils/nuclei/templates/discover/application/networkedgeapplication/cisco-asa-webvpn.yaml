@@ -19,11 +19,32 @@ http:
     max-redirects: 5
     stop-at-first-match: true
     matchers:
-      - type: dsl
-        dsl:
-          - 'contains(body, "+CSCOE+") && contains(tolower(body), "webvpn")'
-          - 'contains(tolower(body), "cisco") && contains(tolower(body), "ssl vpn service")'
-          - 'contains(tolower(header), "webvpn") && contains(body, "+CSCOE+")'
-          - 'contains(tolower(header), "csco_webvpn") && (contains(body, "+CSCOE+") || contains(body, "+CSCOU+"))'
-          - 'contains(tolower(body), "anyconnect") && contains(body, "+CSCOU+") && contains(tolower(body), "cisco")'
-          - 'contains(tolower(body), "webvpn_login_primary_username") && contains(tolower(body), "cisco")'
+      - type: word
+        part: body
+        words:
+          - "+CSCOE+"
+          - "webvpn"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "cisco"
+          - "ssl vpn service"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "anyconnect"
+          - "+CSCOU+"
+          - "cisco"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "webvpn_login_primary_username"
+          - "cisco"
+        condition: and
+        case-insensitive: true

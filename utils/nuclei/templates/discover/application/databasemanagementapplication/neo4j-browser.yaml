@@ -19,8 +19,26 @@ http:
     max-redirects: 5
     stop-at-first-match: true
     matchers:
-      - type: dsl
-        dsl:
-          - 'status_code == 200 && !contains(tolower(header), "amazons3") && contains(tolower(body), "<title>neo4j browser") && contains(tolower(body), "assets/images/device-icons") && contains(tolower(body), "<div id=\"mount\"")'
-          - 'status_code == 200 && !contains(tolower(header), "amazons3") && contains(tolower(body), "neo4j browser") && contains(tolower(body), "favicons/safari-pinned-tab.svg") && contains(tolower(body), "<div id=\"mount\"")'
-          - 'status_code == 200 && !contains(tolower(header), "amazons3") && contains(tolower(body), "neo4j-browser") && contains(tolower(body), "neo4j") && contains(tolower(body), "<div id=\"mount\"")'
+      - type: word
+        part: body
+        words:
+          - "<title>neo4j browser"
+          - "assets/images/device-icons"
+          - "<div id=\"mount\""
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "neo4j browser"
+          - "favicons/safari-pinned-tab.svg"
+          - "<div id=\"mount\""
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "neo4j-browser"
+          - "<div id=\"mount\""
+        condition: and
+        case-insensitive: true

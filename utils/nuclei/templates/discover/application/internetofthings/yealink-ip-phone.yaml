@@ -1,0 +1,32 @@
+id: yealink-ip-phone-detect
+info:
+  name: Yealink IP Phone Detection
+  author: method-security
+  severity: info
+  description: Detects Yealink IP phone web configuration interfaces.
+  metadata:
+    method-application-type: INTERNET_OF_THINGS
+    method-module-name: YEALINK_IP_PHONE
+    cpe: cpe:2.3:h:yealink:*:*:*:*:*:*:*:*:*
+  tags: discovery,iot,phone,voip,yealink
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/servlet"
+      - "{{BaseURL}}/login.html"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: regex
+        part: body
+        regex:
+          - '(?i)<title>\s*Yealink\s+[A-Z0-9-]+\s+Phone\s*</title>'
+      - type: word
+        part: body
+        words:
+          - "Yealink"
+          - "Phone</title>"
+        condition: and
+        case-insensitive: true

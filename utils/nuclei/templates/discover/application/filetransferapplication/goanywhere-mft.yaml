@@ -19,10 +19,39 @@ http:
     max-redirects: 5
     stop-at-first-match: true
     matchers:
-      - type: dsl
-        dsl:
-          - 'contains(tolower(body), "goanywhere mft") && (contains(tolower(body), "login") || contains(tolower(body), "sign in") || contains(tolower(body), "web client"))'
-          - 'contains(tolower(body), "goanywhere login")'
-          - 'contains(tolower(body), "goanywhere web client")'
-          - 'contains(tolower(body), "goanywhere") && contains(tolower(body), "j_security_check")'
-          - 'contains(tolower(body), "goanywhere") && contains(tolower(body), "license agreement") && contains(tolower(body), "accept")'
+      - type: word
+        part: body
+        words:
+          - "goanywhere mft"
+          - "login"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "goanywhere mft"
+          - "sign in"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "goanywhere mft"
+          - "web client"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "goanywhere"
+          - "j_security_check"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "goanywhere"
+          - "license agreement"
+          - "accept"
+        condition: and
+        case-insensitive: true

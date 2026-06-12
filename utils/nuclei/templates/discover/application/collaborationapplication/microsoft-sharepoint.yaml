@@ -20,8 +20,38 @@ http:
     max-redirects: 5
     stop-at-first-match: true
     matchers:
-      - type: dsl
-        dsl:
-          - 'contains(tolower(header), "microsoftsharepointteamservices")'
-          - 'contains(tolower(body), "sharepoint") && contains(tolower(body), "/_layouts/15/")'
-          - 'contains(tolower(body), "msapplication-tileimage") && contains(tolower(body), "sharepoint")'
+      - type: word
+        part: header
+        words:
+          - "microsoftsharepointteamservices"
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "<meta name=\"generator\""
+          - "microsoft sharepoint"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "_spPageContextInfo"
+          - "/_layouts/15/"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "MSOWebPartPage_PostbackSource"
+          - "__REQUESTDIGEST"
+          - "/_layouts/15/"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "/_layouts/15/init.js"
+          - "/_layouts/15/1033/styles/"
+          - "corev15.css"
+        condition: and
+        case-insensitive: true

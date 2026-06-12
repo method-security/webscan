@@ -273,11 +273,10 @@ func CreateHTTPResponseFromBytes(statusCode int, redirectChain []string, headers
 	for key, values := range headers {
 		var processedValues []string
 		for _, value := range values {
-			// Split each value by comma and line breaks. CDP can expose duplicate
-			// response headers as newline-delimited strings.
-			splitValues := strings.FieldsFunc(value, func(r rune) bool {
-				return r == ',' || r == '\n' || r == '\r'
-			})
+			// CDP can expose duplicate response headers as newline-delimited
+			// strings. Content-Type parameters may contain commas, so only split
+			// that header on line breaks.
+			splitValues := splitHeaderValue(key, value)
 			for _, v := range splitValues {
 				trimmed := strings.TrimSpace(v)
 				if trimmed != "" {
@@ -311,6 +310,15 @@ func CreateHTTPResponseFromBytes(statusCode int, redirectChain []string, headers
 		ReceivedAt:      &receivedAt,
 		SizeBytes:       &sizeBytes,
 	}
+}
+
+func splitHeaderValue(key, value string) []string {
+	return strings.FieldsFunc(value, func(r rune) bool {
+		if r == '\n' || r == '\r' {
+			return true
+		}
+		return r == ',' && !strings.EqualFold(key, "Content-Type")
+	})
 }
 
 // CreateHTTPResponse creates an HttpResponse struct from HttpResponse data (string version)

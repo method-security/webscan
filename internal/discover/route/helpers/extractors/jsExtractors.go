@@ -639,6 +639,7 @@ func (v *visitor) addRoute(urlStr, method string, bodyParams []*discover.RouteBo
 // fetchSourceMapRoutes fetches a source map from the given URL, parses it, and extracts routes
 // from each sourcesContent entry. Routes are tagged with evidence = "sourcemap:<source_name>".
 func fetchSourceMapRoutes(ctx context.Context, sourceMapURL string, baseURL string, routeCaptureConfig discover.DiscoverRouteConfig) ([]*discover.RouteDetails, []string, []string) {
+	log := svc1log.FromContext(ctx)
 	routes := []*discover.RouteDetails{}
 	urls := []string{}
 	errors := []string{}
@@ -649,18 +650,24 @@ func fetchSourceMapRoutes(ctx context.Context, sourceMapURL string, baseURL stri
 
 	bodyBytes, _, statusCode, err := fetchJSResource(ctx, sourceMapURL, routeCaptureConfig)
 	if err != nil {
-		errors = append(errors, fmt.Sprintf("Failed to fetch source map %s: %s", sourceMapURL, err))
+		log.Warn("Failed to fetch source map; continuing without source-map routes",
+			svc1log.SafeParam("sourceMapURL", sourceMapURL),
+			svc1log.SafeParam("error", err.Error()))
 		return routes, urls, errors
 	}
 
 	if statusCode != 200 {
-		errors = append(errors, fmt.Sprintf("Failed to fetch source map %s: status %d", sourceMapURL, statusCode))
+		log.Warn("Failed to fetch source map; continuing without source-map routes",
+			svc1log.SafeParam("sourceMapURL", sourceMapURL),
+			svc1log.SafeParam("status", statusCode))
 		return routes, urls, errors
 	}
 
 	var sm sourceMap
 	if err := json.Unmarshal(bodyBytes, &sm); err != nil {
-		errors = append(errors, fmt.Sprintf("Failed to parse source map %s: %s", sourceMapURL, err))
+		log.Warn("Failed to parse source map; continuing without source-map routes",
+			svc1log.SafeParam("sourceMapURL", sourceMapURL),
+			svc1log.SafeParam("error", err.Error()))
 		return routes, urls, errors
 	}
 
@@ -691,7 +698,11 @@ func fetchSourceMapRoutes(ctx context.Context, sourceMapURL string, baseURL stri
 		}
 		routes = append(routes, contentRoutes...)
 		urls = append(urls, contentUrls...)
-		errors = append(errors, contentErrors...)
+		for _, contentErr := range contentErrors {
+			log.Warn("Failed to extract one route from source map content; continuing",
+				svc1log.SafeParam("sourceMapURL", sourceMapURL),
+				svc1log.SafeParam("error", contentErr))
+		}
 	}
 
 	return routes, urls, errors

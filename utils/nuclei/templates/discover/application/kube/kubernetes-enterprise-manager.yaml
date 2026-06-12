@@ -36,5 +36,5 @@ http:
       - type: regex
         part: body
         regex:
-          - '(?i)<title[^>]*>.*Kubernetes.*Dashboard.*</title>'
-          - '(?i)<title[^>]*>.*K8s.*Manager.*</title>'
+          - '(?i)<title[^>]*>[^<]*Kubernetes[^<]*Dashboard[^<]*</title>'
+          - '(?i)<title[^>]*>[^<]*K8s[^<]*Manager[^<]*</title>'

@@ -23,9 +23,9 @@ http:
       - type: status
         status:
           - 200
-      - type: dsl
-        dsl:
-          - 'contains(tolower(body), "<title>asus wireless router")'
-          - 'contains(tolower(body), "asus wireless router")'
-          - 'contains(tolower(body), "asuswrt") && contains(tolower(body), "main_login.asp")'
-          - 'contains(tolower(body), "asus router") && contains(tolower(body), "asus_token")'
+      - type: regex
+        part: body
+        regex:
+          - '(?i)<title>\s*ASUS\s+Wireless\s+Router'
+          - '(?i)asus_token[\s\S]{0,500}Main_Login\.asp|Main_Login\.asp[\s\S]{0,500}asus_token'
+          - '(?i)asuswrt[\s\S]{0,500}(asus_token|Main_Login\.asp)|(asus_token|Main_Login\.asp)[\s\S]{0,500}asuswrt'

@@ -19,8 +19,24 @@ http:
     max-redirects: 5
     stop-at-first-match: true
     matchers:
-      - type: dsl
-        dsl:
-          - 'contains(tolower(body), "serv-u") && contains(tolower(body), "solarwinds")'
-          - 'contains(tolower(body), "serv-u file server")'
-          - 'contains(tolower(body), "serv-u managed file transfer")'
+      - type: word
+        part: body
+        words:
+          - "serv-u"
+          - "solarwinds"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "serv-u file server"
+          - "login"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "serv-u managed file transfer"
+          - "login"
+        condition: and
+        case-insensitive: true

@@ -18,11 +18,15 @@ http:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
+    matchers-condition: and
     matchers:
+      - type: status
+        status:
+          - 200
       - type: dsl
         dsl:
-          - 'status_code == 200 && contains(tolower(body), "<title id=\"title\">omada controller")'
-          - 'status_code == 200 && contains(tolower(body), "<title>omada controller")'
-          - 'status_code == 200 && contains(tolower(body), "omada") && contains(tolower(body), "tp-link") && contains(tolower(body), "controller")'
-          - 'status_code == 200 && contains(tolower(body), "omada sdn") && contains(tolower(body), "login")'
-          - 'status_code == 200 && contains(tolower(body), "tplink omada") && contains(tolower(body), "webpages")'
+          - 'contains(tolower(body), "<title id=\"title\">omada controller")'
+          - 'contains(tolower(body), "<title>omada controller")'
+          - 'contains(tolower(body), "omada") && contains(tolower(body), "tp-link") && contains(tolower(body), "controller")'
+          - 'contains(tolower(body), "omada sdn") && contains(tolower(body), "login")'
+          - 'contains(tolower(body), "tplink omada") && contains(tolower(body), "webpages")'

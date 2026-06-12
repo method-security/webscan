@@ -3,7 +3,11 @@ package discoverroute
 import (
 	// Standard
 	"context"
+	stderrors "errors"
+	"fmt"
 	"net/url"
+	"sync"
+	"time"
 
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
@@ -21,6 +25,39 @@ import (
 // ExtractNetworkRoutes uses a headless browser to capture network requests and extract route details from them.
 // Returns a slice of RouteDetails, a slice of URLs, and a slice of errors.
 func ExtractNetworkRoutes(ctx context.Context, browser *headless.Requester, target string, ignoreCrossDomain bool, captureStaticAssets bool) ([]*discover.RouteDetails, []string, []string) {
+	log := svc1log.FromContext(ctx)
+	const maxNetworkCaptureAttempts = 3
+
+	var lastRoutes []*discover.RouteDetails
+	var lastUrls []string
+	var lastErrors []string
+	for attempt := 1; attempt <= maxNetworkCaptureAttempts; attempt++ {
+		if attempt > 1 {
+			if !sleepBeforeNetworkCaptureRetry(ctx, attempt) {
+				break
+			}
+			log.Warn("Retrying transient network route capture failure",
+				svc1log.SafeParam("attempt", attempt),
+				svc1log.SafeParam("maxAttempts", maxNetworkCaptureAttempts),
+				svc1log.SafeParam("target", target))
+		}
+
+		routes, urls, errors := extractNetworkRoutesOnce(ctx, browser, target, ignoreCrossDomain, captureStaticAssets)
+		lastRoutes = routes
+		lastUrls = urls
+		lastErrors = errors
+		if len(routes) > 0 || !networkCaptureErrorsAreTransient(errors) || ctx.Err() != nil {
+			return routes, urls, errors
+		}
+		if len(errors) > 0 {
+			browser.ResetOwnedBrowser(ctx, errors[0])
+		}
+	}
+
+	return lastRoutes, lastUrls, lastErrors
+}
+
+func extractNetworkRoutesOnce(ctx context.Context, browser *headless.Requester, target string, ignoreCrossDomain bool, captureStaticAssets bool) ([]*discover.RouteDetails, []string, []string) {
 	// Get the logger from the context
 	log := svc1log.FromContext(ctx)
 
@@ -38,62 +75,80 @@ func ExtractNetworkRoutes(ctx context.Context, browser *headless.Requester, targ
 		}
 	}
 
-	var page *rod.Page
-	pageErr := rod.Try(func() {
-		page = browser.Browser.MustPage(target).Context(ctx)
-	})
-	if pageErr != nil {
-		log.Error("Failed to create page", svc1log.SafeParam("url", target), svc1log.SafeParam("error", pageErr))
-		errors = append(errors, pageErr.Error())
+	page, err := browser.Browser.Page(proto.TargetCreateTarget{})
+	if err != nil {
+		errMsg := fmt.Sprintf("failed to create page: %s", cleanNetworkCaptureError(err))
+		log.Error("Failed to create page", svc1log.SafeParam("url", target), svc1log.SafeParam("error", errMsg))
+		errors = append(errors, errMsg)
 		return routes, discoverroutehelpers.SetToListString(urls), errors
 	}
+	createdPage := page
+	defer func() {
+		if closeErr := createdPage.Close(); closeErr != nil {
+			log.Debug("Failed to close network capture page", svc1log.SafeParam("error", cleanNetworkCaptureError(closeErr)))
+		}
+	}()
+
+	captureCtx, stopNetworkCapture := context.WithCancel(ctx)
+	defer stopNetworkCapture()
+	page = page.Context(captureCtx)
 	log.Debug("Successfully connected to page for network capture")
 
 	// Enable network event tracking
 	networkEventErr := proto.NetworkEnable{}.Call(page)
 	if networkEventErr != nil {
-		log.Error("Failed to enable network tracking", svc1log.SafeParam("error", networkEventErr))
-		errors = append(errors, networkEventErr.Error())
+		errMsg := fmt.Sprintf("failed to enable network tracking: %s", cleanNetworkCaptureError(networkEventErr))
+		log.Error("Failed to enable network tracking", svc1log.SafeParam("error", errMsg))
+		errors = append(errors, errMsg)
 		return routes, discoverroutehelpers.SetToListString(urls), errors
 	}
 
 	log.Info("Capturing network events")
-	// Capture network requests of type 'fetch' which are typical of API calls
+	// Capture API-style requests that may only appear during browser execution.
 	networkEvents := []*proto.NetworkRequestWillBeSent{}
+	var networkEventsMu sync.Mutex
 	waitForNetworkEvents := page.EachEvent(func(e *proto.NetworkRequestWillBeSent) {
 		log.Debug("Captured network event", svc1log.SafeParam("url", e.Request.URL), svc1log.SafeParam("type", e.Type))
-		// Only capture fetch requests
-		if e.Type == proto.NetworkResourceTypeFetch {
+		if isRouteNetworkResourceType(e.Type) {
+			networkEventsMu.Lock()
 			networkEvents = append(networkEvents, e)
+			networkEventsMu.Unlock()
 		}
 	})
+	networkEventsDone := make(chan struct{})
+	go func() {
+		waitForNetworkEvents()
+		close(networkEventsDone)
+	}()
 
 	// Navigate to the page
-	err := page.Navigate(target)
+	err = page.Navigate(target)
 	if err != nil {
-		log.Error("Failed to navigate to page", svc1log.SafeParam("url", target), svc1log.SafeParam("error", err))
-		errors = append(errors, err.Error())
-		return routes, discoverroutehelpers.SetToListString(urls), errors
-	}
-	// Wait for the page to load
-	err = page.WaitLoad()
-	if err != nil {
-		log.Debug("Failed to wait for page load", svc1log.SafeParam("url", target), svc1log.SafeParam("error", err))
-		errors = append(errors, err.Error())
-		// Reload the page if it can't load, possible redirect
-		reloadErr := page.Reload()
-		if reloadErr != nil {
-			log.Error("Failed to reload page", svc1log.SafeParam("url", target), svc1log.SafeParam("error", reloadErr))
-			errors = append(errors, reloadErr.Error())
-			return routes, discoverroutehelpers.SetToListString(urls), errors
+		errMsg := fmt.Sprintf("failed to navigate to page: %s", cleanNetworkCaptureError(err))
+		log.Warn("Failed to navigate to page, processing captured network events", svc1log.SafeParam("url", target), svc1log.SafeParam("error", errMsg))
+		errors = append(errors, errMsg)
+	} else {
+		// Wait for the page to load. If this fails, keep any events already captured.
+		err = page.WaitLoad()
+		if err != nil {
+			errMsg := fmt.Sprintf("failed to wait for page load: %s", cleanNetworkCaptureError(err))
+			log.Debug("Failed to wait for page load, processing captured network events", svc1log.SafeParam("url", target), svc1log.SafeParam("error", errMsg))
+			errors = append(errors, errMsg)
 		}
 	}
+
+	waitForNetworkStabilization(ctx, browser.MinDOMStabalizeTimeSeconds)
+
 	// Wait for network events to be captured
-	waitForNetworkEvents()
+	stopNetworkCapture()
+	<-networkEventsDone
 
 	log.Info("Processing network events")
 	// Process network events and populate the WebRoute structure
-	for _, event := range networkEvents {
+	networkEventsMu.Lock()
+	capturedNetworkEvents := append([]*proto.NetworkRequestWillBeSent(nil), networkEvents...)
+	networkEventsMu.Unlock()
+	for _, event := range capturedNetworkEvents {
 		request := event.Request
 
 		// Filter requests by base domain if required
@@ -148,4 +203,67 @@ func ExtractNetworkRoutes(ctx context.Context, browser *headless.Requester, targ
 	}
 
 	return discoverroutehelpers.MergeWebRoutes(routes), discoverroutehelpers.SetToListString(urls), errors
+}
+
+func isRouteNetworkResourceType(resourceType proto.NetworkResourceType) bool {
+	return resourceType == proto.NetworkResourceTypeFetch || resourceType == proto.NetworkResourceTypeXHR
+}
+
+func waitForNetworkStabilization(ctx context.Context, minDOMStabalizeTimeSeconds int) {
+	waitSeconds := minDOMStabalizeTimeSeconds
+	if waitSeconds <= 0 {
+		waitSeconds = 2
+	}
+
+	select {
+	case <-time.After(time.Duration(waitSeconds) * time.Second):
+	case <-ctx.Done():
+	}
+}
+
+func sleepBeforeNetworkCaptureRetry(ctx context.Context, attempt int) bool {
+	delay := time.Duration(attempt-1) * 250 * time.Millisecond
+	select {
+	case <-time.After(delay):
+		return true
+	case <-ctx.Done():
+		return false
+	}
+}
+
+func networkCaptureErrorsAreTransient(errorMessages []string) bool {
+	if len(errorMessages) == 0 {
+		return false
+	}
+	for _, msg := range errorMessages {
+		if headless.IsTransientHeadlessError(fmt.Errorf("%s", msg)) {
+			return true
+		}
+	}
+	return false
+}
+
+func cleanNetworkCaptureError(err error) string {
+	if err == nil {
+		return "unknown error"
+	}
+
+	var navErr *rod.NavigationError
+	if stderrors.As(err, &navErr) {
+		return navErr.Reason
+	}
+
+	var tryErr *rod.TryError
+	if stderrors.As(err, &tryErr) {
+		return fmt.Sprintf("%v", tryErr.Value)
+	}
+
+	if stderrors.Is(err, context.DeadlineExceeded) {
+		return "network route capture timed out"
+	}
+	if stderrors.Is(err, context.Canceled) {
+		return "network route capture canceled"
+	}
+
+	return err.Error()
 }

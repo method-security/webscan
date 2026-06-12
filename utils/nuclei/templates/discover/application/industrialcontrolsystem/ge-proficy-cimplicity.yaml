@@ -26,3 +26,8 @@ http:
           - "CimWeb"
         condition: and
         case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "<title>CimWeb"
+        case-insensitive: true

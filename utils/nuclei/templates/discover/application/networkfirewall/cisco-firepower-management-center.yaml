@@ -12,15 +12,14 @@ info:
 requests:
   - method: GET
     path:
+      - "{{BaseURL}}"
       - "{{BaseURL}}/api/fmc_platform/v1/info/serverversion"
       - "{{BaseURL}}/api/fmc_config/v1/domain/default"
       - "{{BaseURL}}/ui/login"
       - "{{BaseURL}}/login"
-      - "{{BaseURL}}/"
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
-    matchers-condition: or
     matchers:
       - type: regex
         part: body

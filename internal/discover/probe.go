@@ -4,12 +4,14 @@ import (
 	// Standard
 	"context"
 	"fmt"
+	"time"
 
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
 	"github.com/Method-Security/webscan/generated/go/discover"
 
 	// Utils
+	utils "github.com/Method-Security/webscan/utils"
 	request "github.com/Method-Security/webscan/utils/request"
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
 )
@@ -126,12 +128,23 @@ func PerformWebProbe(ctx context.Context, config *discover.DiscoverProbeConfig, 
 
 	// Single loop to process all targets
 	allResponses := []*common.HttpRequestResponse{}
-	for _, target := range config.Targets {
+	for i, target := range config.Targets {
 		responses, errs := sendRequests(ctx, target, config, browserbaseSecrets)
 		if len(errs) > 0 {
 			errors = append(errors, errs...)
 		}
 		allResponses = append(allResponses, responses...)
+
+		if config.Sleep > 0 && i < len(config.Targets)-1 {
+			delay := utils.CalculateDelayWithJitter(config.Sleep, config.Jitter)
+			select {
+			case <-time.After(delay):
+			case <-ctx.Done():
+				result.Targets = allResponses
+				report.Errors = errors
+				return report, nil
+			}
+		}
 	}
 
 	result.Targets = allResponses

@@ -1,0 +1,37 @@
+id: polycom-ip-phone-detect
+info:
+  name: Polycom IP Phone Detection
+  author: method-security
+  severity: info
+  description: Detects Polycom IP phone web configuration interfaces.
+  metadata:
+    method-application-type: INTERNET_OF_THINGS
+    method-module-name: POLYCOM_IP_PHONE
+    cpe: cpe:2.3:h:polycom:*:*:*:*:*:*:*:*:*
+  tags: discovery,iot,phone,voip,polycom
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/index.htm"
+      - "{{BaseURL}}/login.htm"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: regex
+        part: body
+        regex:
+          - '(?i)<title>\s*Polycom\s+(Login|-\s*Configuration Utility)\s*</title>'
+      - type: word
+        part: header
+        words:
+          - "Polycom SoundPoint IP Telephone HTTPd"
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "Polycom Login"
+          - "resources/webLogin-all.css"
+        condition: and
+        case-insensitive: true

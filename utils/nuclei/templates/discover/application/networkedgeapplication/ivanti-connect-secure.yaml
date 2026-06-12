@@ -33,6 +33,13 @@ http:
         part: body
         words:
           - "/dana-na/"
+          - "welcome.cgi?p=logo"
+        case-insensitive: true
+        condition: and
+      - type: word
+        part: body
+        words:
+          - "/dana-na/"
           - "ivehost"
         case-insensitive: true
         condition: and

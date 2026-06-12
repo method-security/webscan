@@ -3,7 +3,6 @@ package headless
 import (
 	// Standard
 	"fmt"
-
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
 	// External

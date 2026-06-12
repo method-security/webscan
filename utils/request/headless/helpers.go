@@ -546,6 +546,42 @@ func isChromeStaticAssetViewerHTML(htmlContent string) bool {
 	}
 }
 
+func isChromeTextDocumentViewerHTML(htmlContent string) bool {
+	if htmlContent == "" || len(htmlContent) > 256*1024 {
+		return false
+	}
+
+	content := strings.ToLower(htmlContent)
+	if !strings.Contains(content, "<pre") || !strings.Contains(content, `name="color-scheme"`) {
+		return false
+	}
+
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlContent))
+	if err != nil {
+		return false
+	}
+	if doc.Find(`head meta[name="color-scheme"]`).Length() == 0 {
+		return false
+	}
+	body := doc.Find("body")
+	if body.Length() != 1 {
+		return false
+	}
+	children := body.Children()
+	switch children.Length() {
+	case 1:
+		return strings.EqualFold(goquery.NodeName(children.First()), "pre")
+	case 2:
+		first := children.First()
+		second := children.Last()
+		return strings.EqualFold(goquery.NodeName(first), "pre") &&
+			strings.EqualFold(goquery.NodeName(second), "div") &&
+			second.HasClass("json-formatter-container")
+	default:
+		return false
+	}
+}
+
 func shouldParseStaticAssetViewerHTML(htmlContent string) bool {
 	const maxViewerShellHTMLBytes = 256 * 1024
 	if htmlContent == "" || len(htmlContent) > maxViewerShellHTMLBytes {
@@ -563,11 +599,11 @@ func shouldLoadStaticResource(htmlContent, constructedURL, finalURL string) bool
 	if utils.IsStaticAsset(constructedURL) || utils.IsStaticAsset(finalURL) {
 		return true
 	}
-	return isChromeStaticAssetViewerHTML(htmlContent)
+	return isChromeStaticAssetViewerHTML(htmlContent) || isChromeTextDocumentViewerHTML(htmlContent)
 }
 
 func isValidStaticResourceBody(body []byte) bool {
-	return len(body) > 0 && (requesthelpers.IsDetectedBinaryBody(body) || json.Valid(body))
+	return len(body) > 0
 }
 
 func headersForLoadedStaticResource(existingHeaders, loadedHeaders map[string][]string, body []byte) map[string][]string {

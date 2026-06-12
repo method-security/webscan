@@ -106,15 +106,38 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 			return resp, redirectChain, nil
 		}
 
-		// Response is a 3xx with a Location header.  If the caller has used
-		// up its redirect budget — including MaxRedirects=0, which the
-		// helper's contract describes as "for requests that don't follow
-		// redirects" — return the redirect response as-is so the caller can
-		// inspect Location, Set-Cookie, and the status code.  Without this,
-		// any 3xx-with-Location on a MaxRedirects=0 call would surface as a
-		// "maximum redirects exceeded" error and the response would be
-		// inaccessible — breaking, e.g., wp-login.php success detection
-		// where the success signal IS the 302 to /wp-admin/.
+		// Parse Redirect Location first — we need the resolved URL to decide
+		// whether this is a trailing-slash hop before applying the budget check.
+		nextURL, err := resp.Request.URL.Parse(location)
+		if err != nil {
+			log.Error("Failed to parse redirect location", svc1log.SafeParam("error", err))
+			return nil, redirectChain, fmt.Errorf("failed to parse redirect location: %v", err)
+		}
+
+		// Check if this is just a trailing slash redirect (should not count as a
+		// redirect and must be checked BEFORE the budget gate so that
+		// MaxRedirects=0 callers still get transparent slash-normalisation).
+		if utils.IsTrailingSlashRedirect(currentURL, nextURL.String()) {
+			log.Debug("Detected trailing slash redirect, not counting as redirect", svc1log.SafeParam("from", currentURL), svc1log.SafeParam("to", nextURL.String()))
+			// Close Response Body
+			err = resp.Body.Close()
+			if err != nil {
+				log.Error("Failed to close response body", svc1log.SafeParam("error", err))
+				return nil, redirectChain, fmt.Errorf("failed to close response body: %v", err)
+			}
+			// Update current URL but don't increment redirect count
+			currentURL = nextURL.String()
+			redirects-- // Decrement to offset the loop increment
+			continue
+		}
+
+		// Budget check — only for non-trailing-slash redirects.  With
+		// MaxRedirects=0 the caller has opted into "give me the redirect
+		// response as-is so I can read Location/Set-Cookie" (e.g.
+		// wp-login.php success detection where the 302 to /wp-admin/ IS the
+		// success signal).  Without this, a 3xx-with-Location on a
+		// MaxRedirects=0 call would surface as "maximum redirects exceeded"
+		// and the response would be inaccessible.
 		if redirects >= config.MaxRedirects {
 			log.Debug("Redirect budget exhausted; returning redirect response as-is",
 				svc1log.SafeParam("url", currentURL),
@@ -125,13 +148,6 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 				redirectChain[len(redirectChain)-1] = currentURL
 			}
 			return resp, redirectChain, nil
-		}
-
-		// Parse Redirect Location
-		nextURL, err := resp.Request.URL.Parse(location)
-		if err != nil {
-			log.Error("Failed to parse redirect location", svc1log.SafeParam("error", err))
-			return nil, redirectChain, fmt.Errorf("failed to parse redirect location: %v", err)
 		}
 
 		// Check if redirect is cross-domain and should be blocked
@@ -145,21 +161,6 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 				}
 				return nil, redirectChain, fmt.Errorf("cross-domain redirect blocked: %s -> %s", currentURL, nextURL.String()) // Dont change this comment used for DD metric
 			}
-		}
-
-		// Check if this is just a trailing slash redirect (should not count as a redirect)
-		if utils.IsTrailingSlashRedirect(currentURL, nextURL.String()) {
-			log.Debug("Detected trailing slash redirect, not counting as redirect", svc1log.SafeParam("from", currentURL), svc1log.SafeParam("to", nextURL.String()))
-			// Close Response Body
-			err = resp.Body.Close()
-			if err != nil {
-				log.Error("Failed to close response body", svc1log.SafeParam("error", err))
-				return nil, redirectChain, fmt.Errorf("failed to close response body: %v", err)
-			}
-			// Update current URL but don't increment redirect count
-			currentURL = nextURL.String()
-			redirects-- // Decrement to offset the loop increment
-			continue
 		}
 
 		// Close Response Body

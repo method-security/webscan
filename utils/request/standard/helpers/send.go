@@ -131,26 +131,11 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 			continue
 		}
 
-		// Budget check — only for non-trailing-slash redirects.  With
-		// MaxRedirects=0 the caller has opted into "give me the redirect
-		// response as-is so I can read Location/Set-Cookie" (e.g.
-		// wp-login.php success detection where the 302 to /wp-admin/ IS the
-		// success signal).  Without this, a 3xx-with-Location on a
-		// MaxRedirects=0 call would surface as "maximum redirects exceeded"
-		// and the response would be inaccessible.
-		if redirects >= config.MaxRedirects {
-			log.Debug("Redirect budget exhausted; returning redirect response as-is",
-				svc1log.SafeParam("url", currentURL),
-				svc1log.SafeParam("status", resp.StatusCode),
-				svc1log.SafeParam("location", location),
-				svc1log.SafeParam("maxRedirects", config.MaxRedirects))
-			if currentURL != redirectChain[len(redirectChain)-1] {
-				redirectChain[len(redirectChain)-1] = currentURL
-			}
-			return resp, redirectChain, nil
-		}
-
-		// Check if redirect is cross-domain and should be blocked
+		// Check if redirect is cross-domain and should be blocked.  This runs
+		// BEFORE the budget gate so that callers with IgnoreCrossDomainRedirects=true
+		// still get a cross-domain error even when MaxRedirects=0 — matching the
+		// original behaviour where the cross-domain guard was always evaluated before
+		// the loop counter increment that caused the budget to be exceeded.
 		if config.IgnoreCrossDomainRedirects {
 			originalURL, parseErr := neturl.Parse(url)
 			if parseErr == nil && originalURL.Hostname() != nextURL.Hostname() {
@@ -161,6 +146,24 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 				}
 				return nil, redirectChain, fmt.Errorf("cross-domain redirect blocked: %s -> %s", currentURL, nextURL.String()) // Dont change this comment used for DD metric
 			}
+		}
+
+		// Budget check — only for non-trailing-slash, non-cross-domain redirects.
+		// With MaxRedirects=0 the caller opts into "give me the redirect response
+		// as-is so I can read Location/Set-Cookie" (e.g. wp-login.php success
+		// detection where the 302 to /wp-admin/ IS the success signal).  Without
+		// this, a 3xx-with-Location on a MaxRedirects=0 call would surface as
+		// "maximum redirects exceeded" and the response would be inaccessible.
+		if redirects >= config.MaxRedirects {
+			log.Debug("Redirect budget exhausted; returning redirect response as-is",
+				svc1log.SafeParam("url", currentURL),
+				svc1log.SafeParam("status", resp.StatusCode),
+				svc1log.SafeParam("location", location),
+				svc1log.SafeParam("maxRedirects", config.MaxRedirects))
+			if currentURL != redirectChain[len(redirectChain)-1] {
+				redirectChain[len(redirectChain)-1] = currentURL
+			}
+			return resp, redirectChain, nil
 		}
 
 		// Close Response Body

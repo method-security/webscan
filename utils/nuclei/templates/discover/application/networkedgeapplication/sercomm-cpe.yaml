@@ -25,7 +25,6 @@ http:
       - type: dsl
         dsl:
           - 'status_code == 200 && contains(tolower(body), "sercomm") && contains(tolower(body), "login")'
-          - 'status_code == 200 && contains(tolower(body), "sercomm") && (contains(tolower(body), "userlogin") || contains(tolower(body), "modem") || contains(tolower(body), "gateway"))'
           - 'status_code == 200 && contains(tolower(header), "mini_httpd") && (contains(tolower(body), "sercomm") || contains(tolower(body), "userlogin.html"))'
           - 'status_code == 200 && contains(tolower(header), "server") && contains(tolower(header), "rompager") && (contains(tolower(body), "sercomm") || contains(tolower(body), "userlogin.html") || contains(tolower(body), "nvg") || contains(tolower(body), "sgw")) && (contains(tolower(body), "login") || contains(tolower(body), "modem"))'
           - 'status_code == 200 && (contains(tolower(body), "nvg589") || contains(tolower(body), "nvg599") || contains(tolower(body), "nvg510") || contains(tolower(body), "vd625") || contains(tolower(body), "sgw500")) && contains(tolower(body), "login")'

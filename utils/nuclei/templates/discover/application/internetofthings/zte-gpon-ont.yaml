@@ -71,7 +71,6 @@ http:
           - "F670"
           - "F668"
         case-insensitive: true
-        condition: or
     extractors:
       - type: regex
         name: model

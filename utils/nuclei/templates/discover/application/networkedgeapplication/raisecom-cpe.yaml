@@ -5,13 +5,15 @@ info:
   severity: info
   description: |
     Detects Raisecom Technology DSL CPE (ZXV-818-P and related ADSL2+ products) running the Realtek SDK stock webserver.
-    Two-stage probe: Tier-1 confirms Realtek SDK (Server: RTK Web 0.9 + stock asset paths); Tier-2 performs the
-    Realtek SDK Referer-header origin-check bypass on /status.htm with Referer: http://<host>/login.htm — when the
-    target firmware is vulnerable (most pre-patch Raisecom firmware), the Tier-2 body exposes Firmware Version,
-    Built Date, Serial Number, MAC Address, and Operational Status pre-auth.
+    Probes the Realtek SDK Referer-header origin-check bypass on /status.htm with Referer: http://<host>/login.htm.
+    Fires ONLY when the response carries Raisecom-distinctive content — specifically a MAC address with the Raisecom
+    OUI prefix 00:1A:EF in the device-info table. Generic Realtek SDK responses without a Raisecom OUI are caught by
+    the realtek-sdk-cpe-detect template (module name REALTEK_SDK) instead, so we don't mis-label other OEMs on the
+    same stack as Raisecom.
     Validated against TC-015 (185.99.214.43 — ZXV-818-P/Vr.1.21, Apr 6 2021 build, OUI 00:1A:EF Raisecom).
-    Note: the Tier-2 Referer-bypass is a Realtek-SDK-broad implementation flaw — the template still implements it
-    even though the live target may have rotated since TC-015's original capture.
+    Note: the Referer-bypass is a Realtek-SDK-broad implementation flaw — the template still implements it
+    even though the live target may have rotated since TC-015's original capture. Devices that patched the bypass
+    won't expose Raisecom-distinctive data here and will only surface via realtek-sdk-cpe-detect.
   metadata:
     method-application-type: NETWORK_EDGE_APPLICATION
     method-module-name: RAISECOM
@@ -19,38 +21,20 @@ info:
     cpe: cpe:2.3:o:raisecom:cpe_firmware:*:*:*:*:*:*:*:*
   tags: discovery,raisecom,zxv,adsl,dsl,realtek-sdk,cpe,network-edge,soho
 http:
-  # Tier-1 probe: confirm Realtek SDK stock webserver. GET / returns
-  # the 151-byte JS-redirect to /login.htm; either the root or
-  # /login.htm body carries the stock asset triple.
-  - method: GET
-    path:
-      - "{{BaseURL}}"
-      - "{{BaseURL}}/login.htm"
-    redirects: true
-    max-redirects: 5
-    stop-at-first-match: true
-    matchers-condition: and
-    matchers:
-      - type: regex
-        part: header
-        regex:
-          - '(?i)server:\s*RTK Web 0\.9'
-      - type: dsl
-        dsl:
-          - >-
-            contains(body, "reset.css") &&
-            contains(body, "base.css") &&
-            contains(body, "style.css")
-          - >-
-            contains(body, "parent.location=\"/login.htm\"") ||
-            contains(body, "parent.location='/login.htm'") ||
-            contains(body, "<title>Router</title>")
-  # Tier-2 probe: Realtek SDK Referer-header bypass on /status.htm.
-  # With Referer: http://{{Hostname}}/login.htm the embedded webserver
-  # serves the device-info table pre-auth. Without it (or when patched
-  # / rate-limited) the device returns the 151-byte JS-redirect and
-  # this matcher block fails — Tier-1 will still have fired so the
-  # vendor confirmation stands.
+  # Realtek SDK Referer-header bypass on /status.htm. With
+  # Referer: http://{{Hostname}}/login.htm the embedded webserver
+  # serves the device-info table pre-auth. Required signals:
+  #   - 200 status
+  #   - Server: RTK Web 0.9 (Realtek SDK stock webserver)
+  #   - DSL Router Status title + Firmware Version + MAC Address
+  #     fields (the device-info layout)
+  #   - MAC Address with the Raisecom OUI prefix 00:1A:EF
+  # The OUI check is what makes this template Raisecom-distinctive
+  # — without it we'd mis-label generic Realtek SDK OEMs (Zhone /
+  # Comtrend / white-label Chinese DSL modems) as Raisecom whenever
+  # the device-info table is exposed. Devices that patched the
+  # Referer bypass don't surface here and instead match the broader
+  # realtek-sdk-cpe-detect (module REALTEK_SDK) template.
   - method: GET
     path:
       - "{{BaseURL}}/status.htm"
@@ -59,6 +43,9 @@ http:
     redirects: false
     matchers-condition: and
     matchers:
+      - type: status
+        status:
+          - 200
       - type: regex
         part: header
         regex:
@@ -73,6 +60,15 @@ http:
           - "Firmware Version"
           - "MAC Address"
         condition: and
+      # Raisecom-distinctive signal: MAC Address in the device-info
+      # table carries the Raisecom OUI prefix 00:1A:EF. This is what
+      # separates Raisecom from other OEMs on the same Realtek SDK
+      # stack — without this match we fall through to the generic
+      # realtek-sdk-cpe-detect template.
+      - type: regex
+        part: body
+        regex:
+          - '(?i)<th>MAC Address</th>\s*<td>\s*00:1A:EF(?::[0-9A-F]{2}){3}\s*</td>'
     extractors:
       # Firmware version: Raisecom format is <Model>/Vr.<X.YY>, e.g.
       # ZXV-818-P/Vr.1.21. Captures the full string so both model

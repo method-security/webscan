@@ -38,17 +38,24 @@ http:
         regex:
           - '(?i)<title>\s*HUAWEI\s+HOME\s+GATEWAY'
           - '(?i)<title>\s*(?:HG|HN|EG)[0-9]{3,5}[A-Z]?'
-      # Co-signal: at least one of these brand-confirmation markers must
-      # also be present. Huawei OptiXstar / EchoLife branding, a Huawei
-      # body reference (copyright / JS / footer), or the RomPager
-      # embedded webserver header (Allegro RomPager is the canonical
-      # webserver across Huawei HG/HN ONT firmware).
+      # Co-signal: at least one of these brand/firmware markers must
+      # also be present *outside* the title. We deliberately do NOT
+      # accept a bare "huawei" body word here — for the HOME GATEWAY
+      # title variant that's already in the title regex, so it would
+      # be trivially self-satisfied and provide no real co-signal.
+      # Accepted markers:
+      # - EchoLife / OptiXstar product-line strings (distinct from
+      #   the HG/HN/EG model regex above)
+      # - /asp/ CGI-path references in body (Huawei HG/HN firmware
+      #   uses .asp extension for its management UI)
+      # - `Server: RomPager` (Allegro RomPager is the canonical
+      #   embedded webserver across Huawei HG/HN ONT firmware)
       - type: dsl
         dsl:
           - >-
-            contains(tolower(body), "huawei") ||
             contains(tolower(body), "echolife") ||
             contains(tolower(body), "optixstar") ||
+            contains(tolower(body), "/asp/") ||
             (contains(tolower(header), "server") && contains(tolower(header), "rompager"))
     extractors:
       - type: regex

@@ -37,15 +37,19 @@ http:
       - type: dsl
         dsl:
           # Variant 1: Smart Wi-Fi (modern) HTML login (status 200)
-          # with anchored "Linksys Smart Wi-Fi" title — three
-          # brand+product-line tokens in an anchored title position,
-          # plus an independent body-word check confirming a
-          # Smart-Wi-Fi-specific marker (the "/ui/dynamic/" asset
-          # path or another Linksys body reference) appears elsewhere.
+          # with anchored "Linksys Smart Wi-Fi" title — note the
+          # anchor is strict (no preamble allowed before "Linksys"),
+          # which rejects review / blog / marketing pages whose
+          # `<title>` merely *contains* the phrase. PLUS a
+          # Smart-Wi-Fi-device-specific co-signal that is NOT
+          # trivially present in the title text — the "/ui/dynamic/"
+          # asset path family or a JNAP API reference. The bare
+          # body word "linksys" is deliberately NOT in this list —
+          # it would be self-satisfied by the title itself.
           - >-
             status_code == 200 &&
-            regex("(?i)<title>[^<]*Linksys\\s+Smart\\s+Wi-?Fi", body) &&
-            (contains(tolower(body), "/ui/dynamic/") || contains(tolower(body), "linksys"))
+            regex("(?i)<title>\\s*Linksys\\s+Smart\\s+Wi-?Fi", body) &&
+            (contains(tolower(body), "/ui/dynamic/") || contains(tolower(body), "jnap"))
           # Variant 2: WRT54G / E-series 401 with model-bearing
           # basic-auth realm — status 401 + auth scheme "Basic" +
           # brand "Linksys" + model token (Exxx / WRTxx). Realm

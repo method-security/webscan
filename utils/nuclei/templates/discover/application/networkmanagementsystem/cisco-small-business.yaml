@@ -38,21 +38,27 @@ http:
       - type: dsl
         dsl:
           # Variant 1: HTML login page (status 200) with anchored
-          # "Cisco Small Business" title — three brand+product-line
-          # tokens in an anchored title position. A 200 status filter
-          # rejects 404 pages that happen to contain the phrase.
+          # "Cisco Small Business" title (no preamble allowed) PLUS a
+          # Cisco-SB-device-specific path co-signal that is NOT
+          # trivially present in the title text — guards against
+          # marketing / documentation pages that reuse the phrase.
+          # Cisco SB RV-series firmware reliably emits /cgi-bin/
+          # paths or a "csbrouter" / "csb" path in linked assets.
           - >-
             status_code == 200 &&
-            regex("(?i)<title>\\s*Cisco\\s+Small\\s+Business", body)
+            regex("(?i)<title>\\s*Cisco\\s+Small\\s+Business", body) &&
+            (contains(tolower(body), "/cgi-bin/") || contains(tolower(body), "csbrouter") || contains(tolower(body), "csb_"))
           # Variant 2: HTML login page (status 200) with model-bearing
-          # "Cisco RV<num>" title — brand + model-family tokens in an
-          # anchored title, plus an independent body-word check
-          # confirming "small business" or "router" appears elsewhere
-          # in the page (footer / branding / form labels).
+          # "Cisco RV<num>" title PLUS a non-title-trivial Cisco-SB
+          # marker. "Small Business" body string (appears in footer /
+          # branding distinct from the model title) or a /cgi-bin/
+          # device path. The bare word "router" is deliberately NOT
+          # in this list — it would false-positive on any router
+          # vendor admin page.
           - >-
             status_code == 200 &&
             regex("(?i)<title>\\s*Cisco\\s+RV[0-9]+X?", body) &&
-            (contains(tolower(body), "small business") || contains(tolower(body), "router"))
+            (contains(tolower(body), "small business") || contains(tolower(body), "/cgi-bin/") || contains(tolower(body), "csbrouter"))
           # Variant 3: 401 response carrying model-bearing basic-auth
           # realm — status code 401 + auth scheme "Basic" + brand
           # "Cisco" + model "RV<num>" + router-class noun. Five

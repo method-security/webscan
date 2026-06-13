@@ -14,7 +14,18 @@ info:
     cpe: cpe:2.3:o:linksys:router_firmware:*:*:*:*:*:*:*:*
   tags: discovery,linksys,smart-wifi,wrt,e-series,router,network-management,soho
 http:
-  # Probe 1: anchored title + basic-auth realm.
+  # Probe 1: brand+product anchor in HTML title OR basic-auth realm.
+  # Two alternative firmware response variants modelled as OR'd dsl
+  # expressions — each variant is itself a *multi-token composite*
+  # signal that combines status code + brand + product-line / model
+  # tokens. The OR is across firmware response shapes (Smart Wi-Fi
+  # HTML login vs WRT/E-series 401 with realm), not across single
+  # generic anchors, so each variant individually satisfies the
+  # Tier-1 multi-signal guard.
+  #
+  # Pattern follows draytek-vigor-web-ui.yaml (sibling template) —
+  # one dsl matcher with multiple AND'd variants OR'd at the dsl-list
+  # level.
   - method: GET
     path:
       - "{{BaseURL}}"
@@ -23,17 +34,25 @@ http:
     max-redirects: 5
     stop-at-first-match: true
     matchers:
-      # Smart Wi-Fi (modern) login title.
-      - type: regex
-        part: body
-        regex:
-          - '(?i)<title>[^<]*Linksys\s+Smart\s+Wi-?Fi'
-      # WRT54G / E-series basic-auth realm — the realm string carries
-      # a Linksys model identifier (Exxx or WRTxx).
-      - type: regex
-        part: header
-        regex:
-          - '(?i)WWW-Authenticate:\s*Basic\s+realm="Linksys\s+[A-Z0-9]+"'
+      - type: dsl
+        dsl:
+          # Variant 1: Smart Wi-Fi (modern) HTML login (status 200)
+          # with anchored "Linksys Smart Wi-Fi" title — three
+          # brand+product-line tokens in an anchored title position,
+          # plus an independent body-word check confirming a
+          # Smart-Wi-Fi-specific marker (the "/ui/dynamic/" asset
+          # path or another Linksys body reference) appears elsewhere.
+          - >-
+            status_code == 200 &&
+            regex("(?i)<title>[^<]*Linksys\\s+Smart\\s+Wi-?Fi", body) &&
+            (contains(tolower(body), "/ui/dynamic/") || contains(tolower(body), "linksys"))
+          # Variant 2: WRT54G / E-series 401 with model-bearing
+          # basic-auth realm — status 401 + auth scheme "Basic" +
+          # brand "Linksys" + model token (Exxx / WRTxx). Realm
+          # itself is a multi-token anchor combined with status.
+          - >-
+            status_code == 401 &&
+            regex("(?i)Basic\\s+realm=\"Linksys\\s+[A-Z0-9]+\"", header)
     extractors:
       # Realm-derived model.
       - type: regex

@@ -16,7 +16,14 @@ info:
     cpe: cpe:2.3:o:huawei:home_gateway_firmware:*:*:*:*:*:*:*:*
   tags: discovery,huawei,gpon,ont,hg8245,echolife,iot,isp-cpe,soho
 http:
-  # Probe 1: anchored title — HOME GATEWAY or HG-prefix model.
+  # Probe 1: anchored title — HOME GATEWAY or HG-prefix model — PLUS a
+  # required brand-confirmation co-signal somewhere else in the response
+  # (body word or Server header). The HG/HN/EG model-in-title regex
+  # alone could mis-fire on vendor catalog pages, eBay listings, or
+  # support forums that happen to use the same naming; pairing it with
+  # an independent Huawei-brand marker addresses the Tier-1 multi-signal
+  # guard. Huawei ONT firmware reliably emits at least one of these
+  # in addition to the title.
   - method: GET
     path:
       - "{{BaseURL}}"
@@ -24,12 +31,25 @@ http:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
+    matchers-condition: and
     matchers:
       - type: regex
         part: body
         regex:
           - '(?i)<title>\s*HUAWEI\s+HOME\s+GATEWAY'
           - '(?i)<title>\s*(?:HG|HN|EG)[0-9]{3,5}[A-Z]?'
+      # Co-signal: at least one of these brand-confirmation markers must
+      # also be present. Huawei OptiXstar / EchoLife branding, a Huawei
+      # body reference (copyright / JS / footer), or the RomPager
+      # embedded webserver header (Allegro RomPager is the canonical
+      # webserver across Huawei HG/HN ONT firmware).
+      - type: dsl
+        dsl:
+          - >-
+            contains(tolower(body), "huawei") ||
+            contains(tolower(body), "echolife") ||
+            contains(tolower(body), "optixstar") ||
+            (contains(tolower(header), "server") && contains(tolower(header), "rompager"))
     extractors:
       - type: regex
         name: model

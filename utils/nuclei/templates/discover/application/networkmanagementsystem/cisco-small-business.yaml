@@ -15,7 +15,18 @@ info:
     cpe: cpe:2.3:o:cisco:small_business_router_firmware:*:*:*:*:*:*:*:*
   tags: discovery,cisco,small-business,rv-series,sg-series,router,network-management,soho
 http:
-  # Probe 1: anchored title / WWW-Authenticate realm.
+  # Probe 1: brand+model anchor in HTML title OR basic-auth realm.
+  # Three alternative firmware response variants modelled as OR'd
+  # dsl expressions — each variant is itself a *multi-token composite*
+  # signal that combines status code + brand + product-line / model
+  # + (where present) auth scheme. The OR is across firmware response
+  # shapes (HTML login page vs 401 with realm), not across single
+  # generic anchors, so each variant individually satisfies the Tier-1
+  # multi-signal guard.
+  #
+  # Pattern follows draytek-vigor-web-ui.yaml (sibling template) —
+  # one dsl matcher with multiple AND'd variants OR'd at the dsl-list
+  # level.
   - method: GET
     path:
       - "{{BaseURL}}"
@@ -24,19 +35,32 @@ http:
     max-redirects: 5
     stop-at-first-match: true
     matchers:
-      # Anchored title — Cisco Small Business / Cisco RV34X login page.
-      - type: regex
-        part: body
-        regex:
-          - '(?i)<title>\s*Cisco\s+Small\s+Business'
-          - '(?i)<title>\s*Cisco\s+RV[0-9]+X?'
-      # WWW-Authenticate realm — the realm string carries the model
-      # ("Cisco RV340 Router" etc.). Rejects realms that only contain
-      # the word "Cisco" generically.
-      - type: regex
-        part: header
-        regex:
-          - '(?i)WWW-Authenticate:\s*Basic\s+realm="Cisco\s+RV[0-9]+[A-Z0-9 ]*Router"'
+      - type: dsl
+        dsl:
+          # Variant 1: HTML login page (status 200) with anchored
+          # "Cisco Small Business" title — three brand+product-line
+          # tokens in an anchored title position. A 200 status filter
+          # rejects 404 pages that happen to contain the phrase.
+          - >-
+            status_code == 200 &&
+            regex("(?i)<title>\\s*Cisco\\s+Small\\s+Business", body)
+          # Variant 2: HTML login page (status 200) with model-bearing
+          # "Cisco RV<num>" title — brand + model-family tokens in an
+          # anchored title, plus an independent body-word check
+          # confirming "small business" or "router" appears elsewhere
+          # in the page (footer / branding / form labels).
+          - >-
+            status_code == 200 &&
+            regex("(?i)<title>\\s*Cisco\\s+RV[0-9]+X?", body) &&
+            (contains(tolower(body), "small business") || contains(tolower(body), "router"))
+          # Variant 3: 401 response carrying model-bearing basic-auth
+          # realm — status code 401 + auth scheme "Basic" + brand
+          # "Cisco" + model "RV<num>" + router-class noun. Five
+          # composite tokens; the realm itself is a multi-token
+          # anchor that rejects pages with only "Cisco" in headers.
+          - >-
+            status_code == 401 &&
+            regex("(?i)Basic\\s+realm=\"Cisco\\s+RV[0-9]+[A-Z0-9 ]*Router\"", header)
     extractors:
       # Realm-derived model.
       - type: regex

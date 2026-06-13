@@ -70,7 +70,6 @@ http:
         words:
           - "firmwareVersion"
           - "modelNumber"
-        condition: or
         case-insensitive: true
     extractors:
       - type: regex

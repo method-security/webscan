@@ -22,7 +22,6 @@ http:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
-    matchers-condition: or
     matchers:
       # Era 1: RouterOS 6.x — long title + mikrotik_logo.png + h1 v6
       # OR the 6.x co-signal "If this device is not in your possession".

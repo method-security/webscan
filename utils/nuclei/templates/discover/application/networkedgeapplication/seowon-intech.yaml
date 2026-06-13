@@ -22,7 +22,6 @@ http:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
-    matchers-condition: or
     matchers:
       # Smoking gun: AXLogin JS namespace + the hidden form fields that
       # SEOWON ships across SLC / SDR / SLR families. Either the
@@ -37,15 +36,23 @@ http:
             contains(body, "id=\"Command\"") &&
             contains(body, "id=\"expires\"") &&
             contains(body, "id=\"currentTime\"")
-      # Co-signal path: SEOWON's redirect chain stamps a 12-digit
-      # YYYYMMDDHHMM UI build timestamp into the login URL. Capturing
-      # this Location header from the cgi-bin shim is direct evidence
-      # of a SEOWON build pipeline.
-      - type: regex
+      # Co-signal: SEOWON's redirect chain stamps a 12-digit
+      # YYYYMMDDHHMM UI build timestamp into the login URL AND ships
+      # at least one matching timestamped asset. A lone Location header
+      # of /login<12-digit>.html is too generic on its own — many login
+      # systems redirect through a numeric path — so we require it
+      # paired with either an AXLogin marker (when the redirect target
+      # was followed and the login HTML landed) or one of the
+      # timestamped JS asset paths in the body.
+      - type: dsl
         name: timestamped-login-path
-        part: header
-        regex:
-          - '(?i)location:\s*/login[0-9]{12}\.html'
+        dsl:
+          - >-
+            regex("(?i)location:\\s*/login[0-9]{12}\\.html", header) &&
+            (
+              contains(body, "AXLogin") ||
+              regex("(?:cookie\\.min|validate|favicon)[0-9]{12}\\.(?:js|ico)", body)
+            )
       # Body co-signal — assets share the same 12-digit timestamp
       # suffix (cookie.min<TS>.js, validate<TS>.js, favicon<TS>.ico).
       # Two timestamped assets is strong evidence even if the redirect

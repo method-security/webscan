@@ -24,7 +24,6 @@ http:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
-    matchers-condition: or
     matchers:
       - type: regex
         part: body
@@ -40,9 +39,15 @@ http:
           - '(?i)<title>\s*((?:HG|HN|EG)[0-9]{3,5}[A-Z]?)'
   # Probe 2: pre-auth /asp/GetRandCount.asp returns a per-request
   # nonce. This endpoint path is highly Huawei-CPE-specific. The
-  # body shape varies by firmware (older returns a bare numeric
-  # token, newer ships JSON), so we match on size + at least one
-  # nonce-ish keyword to avoid firing on generic 200 responses.
+  # body shape varies by firmware: newer ships JSON with named
+  # nonce keys (RandKey/RandCount/RandNum); older returns a bare
+  # numeric token. We accept either:
+  #   - a small (< 4 KB) 200 body that contains a named nonce key,
+  #     OR
+  #   - a small body that is *just* a numeric token (anchored regex
+  #     against the whole body, no leading/trailing content).
+  # The bare-`Rand` substring matcher is intentionally NOT here —
+  # it false-positives on generic words like `Random` / `Brand`.
   - method: GET
     path:
       - "{{BaseURL}}/asp/GetRandCount.asp"
@@ -55,12 +60,10 @@ http:
       - type: dsl
         dsl:
           - 'len(body) > 0 && len(body) < 4096'
-      - type: word
-        part: body
-        words:
-          - "RandKey"
-          - "RandCount"
-          - "RandNum"
-          - "Rand"
-        case-insensitive: true
-        condition: or
+      - type: dsl
+        dsl:
+          - >-
+            contains(body, "RandKey") ||
+            contains(body, "RandCount") ||
+            contains(body, "RandNum") ||
+            regex("^\\s*[0-9]+\\s*$", body)

@@ -128,11 +128,21 @@ func (b *Builder) PopulateProbes(eng *nucleilib.NucleiEngine) error {
 			MatcherDetails: &nuclei.NucleiMatcherDetails{},
 		}
 
+		// SEC-702.A — record the declaration-order named extractors
+		// per template so Consume can recover names from matcher-
+		// emitted events whose ExtractorName Nuclei dropped.
+		var extractorNames []string
+
 		// Check if RequestsHTTP is available, otherwise use RequestsHeadless
 		if len(template.RequestsHTTP) > 0 {
 			for _, request := range template.RequestsHTTP {
 				// Extract payloads
 				b.extractPayloadsFromRequest(probe, request.Payloads)
+				for _, extractor := range request.Extractors {
+					if extractor.Name != "" {
+						extractorNames = append(extractorNames, extractor.Name)
+					}
+				}
 				// Extract expected matchers
 				var matchers []*nuclei.NucleiExpectedMatcher
 
@@ -174,6 +184,11 @@ func (b *Builder) PopulateProbes(eng *nucleilib.NucleiEngine) error {
 			for _, request := range template.RequestsHeadless {
 				// Extract payloads
 				b.extractPayloadsFromRequest(probe, request.Payloads)
+				for _, extractor := range request.Extractors {
+					if extractor.Name != "" {
+						extractorNames = append(extractorNames, extractor.Name)
+					}
+				}
 				// Extract expected matchers
 				var matchers []*nuclei.NucleiExpectedMatcher
 
@@ -213,6 +228,9 @@ func (b *Builder) PopulateProbes(eng *nucleilib.NucleiEngine) error {
 			}
 		}
 		b.probeIdx[id] = probe
+		if len(extractorNames) > 0 {
+			b.extractorNamesIdx[id] = extractorNames
+		}
 	}
 	return nil
 }
@@ -258,7 +276,7 @@ func (b *Builder) Consume(ev *nout.ResultEvent) {
 		b.attemptIdx[targetURL] = templateAttempts
 	}
 	if existing, alreadySeen := templateAttempts[ev.TemplateID]; alreadySeen {
-		mergeExtractedFields(existing, ev)
+		b.mergeExtractedFields(existing, ev)
 		return
 	}
 
@@ -355,15 +373,12 @@ func (b *Builder) Consume(ev *nout.ResultEvent) {
 	}
 
 	// SEC-702.A — seed the per-host extractor map from this first
-	// event. ExtractorName is populated by Nuclei when a template
-	// extractor (vs. matcher) fired; templates without extractors
-	// leave it empty and the map stays nil.
-	var extractedFields map[string]string
-	if ev.ExtractorName != "" {
-		extractedFields = map[string]string{
-			ev.ExtractorName: strings.Join(ev.ExtractedResults, ","),
-		}
-	}
+	// event. Nuclei emits ExtractorName only in the extractor-only
+	// branch of MakeDefaultResultEvent; matcher-named events drop
+	// the name. b.extractedFieldsFromEvent recovers the name from
+	// the template definition when the upstream API doesn't carry
+	// it. nil is returned when no extractor output is available.
+	extractedFields := b.extractedFieldsFromEvent(ev)
 
 	attemptInfo.Finding = &nuclei.NucleiFindingInfo{
 		Name:             name,
@@ -385,27 +400,86 @@ func (b *Builder) Consume(ev *nout.ResultEvent) {
 	templateAttempts[ev.TemplateID] = attemptInfo
 }
 
-// mergeExtractedFields overlays the ExtractorName/ExtractedResults
-// from ev onto an already-tracked AttemptInfo. Called by Consume when
-// a second event arrives for the same (target, templateId) — typical
-// when one template fires multiple extractors on one host. First-write
-// wins per extractor name (Nuclei rarely emits the same extractor
-// twice on a single template run, but if it does we keep the earlier
-// value to mirror Builder's "first event populates Finding" rule).
-func mergeExtractedFields(existing *nuclei.NucleiAttemptInfo, ev *nout.ResultEvent) {
+// mergeExtractedFields overlays the extractor outputs carried by ev
+// onto an already-tracked AttemptInfo. Called by Consume when a
+// second event arrives for the same (target, templateId) — typical
+// when one template fires multiple matchers or multiple extractors
+// on one host. First-write wins per extractor name (Nuclei rarely
+// emits the same extractor twice on a single template run, but if
+// it does we keep the earlier value to mirror Builder's "first event
+// populates Finding" rule).
+func (b *Builder) mergeExtractedFields(existing *nuclei.NucleiAttemptInfo, ev *nout.ResultEvent) {
 	if existing == nil || existing.Finding == nil {
 		return
 	}
-	if ev.ExtractorName == "" {
+	fields := b.extractedFieldsFromEvent(ev)
+	if len(fields) == 0 {
 		return
 	}
 	if existing.Finding.ExtractedFields == nil {
-		existing.Finding.ExtractedFields = make(map[string]string)
+		existing.Finding.ExtractedFields = make(map[string]string, len(fields))
 	}
-	if _, present := existing.Finding.ExtractedFields[ev.ExtractorName]; present {
-		return
+	for k, v := range fields {
+		if _, present := existing.Finding.ExtractedFields[k]; present {
+			continue
+		}
+		existing.Finding.ExtractedFields[k] = v
 	}
-	existing.Finding.ExtractedFields[ev.ExtractorName] = strings.Join(ev.ExtractedResults, ",")
+}
+
+// extractedFieldsFromEvent returns the per-extractor name → value
+// map for one Nuclei result event. Three cases:
+//
+//  1. ev.ExtractorName non-empty — extractor-only branch of
+//     MakeDefaultResultEvent. Single key/value, name preserved.
+//
+//  2. ev.ExtractorName empty AND ExtractedResults non-empty AND the
+//     template declares the SAME number of named extractors as
+//     ExtractedResults items — matcher-named branch with cardinality
+//     match. Map results positionally to extractor names.
+//
+//  3. ev.ExtractorName empty AND ExtractedResults non-empty AND the
+//     template has exactly one named extractor (cardinality 1 vs
+//     >=1 results) — common single-extractor template; join all
+//     values under that extractor's name.
+//
+// Other shapes (no extractors declared, cardinality mismatch between
+// declared extractors and runtime results) return nil — engines that
+// downstream-need a specific extractor name read nothing rather than
+// see a value mis-attributed to the wrong extractor.
+func (b *Builder) extractedFieldsFromEvent(ev *nout.ResultEvent) map[string]string {
+	if ev.ExtractorName != "" {
+		return map[string]string{
+			ev.ExtractorName: strings.Join(ev.ExtractedResults, ","),
+		}
+	}
+	if len(ev.ExtractedResults) == 0 {
+		return nil
+	}
+	names := b.extractorNamesIdx[ev.TemplateID]
+	if len(names) == 0 {
+		return nil
+	}
+	if len(names) == 1 {
+		// Single named extractor — join all flat results under it.
+		return map[string]string{
+			names[0]: strings.Join(ev.ExtractedResults, ","),
+		}
+	}
+	if len(names) == len(ev.ExtractedResults) {
+		// N declared names, N runtime results — best-effort positional
+		// assignment. Nuclei's OutputExtracts ordering is not strictly
+		// guaranteed across releases but in practice tracks extractor
+		// declaration order; if upstream Nuclei changes that we'd
+		// see the wrong value attributed to the wrong name. Worth it
+		// for the recover-by-default behavior over silent loss.
+		fields := make(map[string]string, len(names))
+		for i, n := range names {
+			fields[n] = ev.ExtractedResults[i]
+		}
+		return fields
+	}
+	return nil
 }
 
 // Final returns the fully-populated Fern report.

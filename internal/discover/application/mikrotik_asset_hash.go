@@ -89,10 +89,3 @@ func lookupMikrotikAssetHash(hash string) (string, bool) {
 	}
 	return version, true
 }
-
-// mikrotikAssetHashLoadError exposes any error from the lazy YAML
-// load. Used by tests to assert the embedded file parses cleanly.
-func mikrotikAssetHashLoadError() error {
-	mikrotikAssetHashOnce.Do(loadMikrotikAssetHash)
-	return mikrotikAssetHashLoadErr
-}

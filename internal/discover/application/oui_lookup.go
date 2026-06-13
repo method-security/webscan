@@ -120,13 +120,6 @@ func lookupOuiVendor(mac string) (string, bool) {
 	return vendor, true
 }
 
-// ouiLookupLoadError exposes any error from the lazy YAML load.
-// Used by tests to assert the embedded file parses cleanly.
-func ouiLookupLoadError() error {
-	ouiLookupOnce.Do(loadOuiLookup)
-	return ouiLookupLoadErr
-}
-
 // normalizeOuiPrefix strips MAC separators, uppercases the result,
 // and returns the leading 6 hex characters — or "" if mac yields
 // fewer than 12 hex digits after stripping (i.e. not a complete

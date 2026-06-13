@@ -112,11 +112,10 @@ func loadArchLookup() {
 // in the template extractor, not here).
 //
 // If the YAML failed to parse at init (e.g. a typo'd architecture
-// string), every lookup returns (zero, false) and the load error is
-// reachable via archLookupLoadError() for tests / diagnostics. The
-// engine treats no-hit as the expected case (the seed table is
-// empty), so a load failure degrades gracefully to "no architecture
-// inference" rather than crashing the scan.
+// string), every lookup returns (zero, false). The engine treats
+// no-hit as the expected case (the seed table is empty), so a load
+// failure degrades gracefully to "no architecture inference" rather
+// than crashing the scan.
 func lookupArchitecture(vendor, model string) (discover.ApplicationArchitectureValue, bool) {
 	archLookupOnce.Do(loadArchLookup)
 	if archLookupLoadErr != nil {
@@ -134,12 +133,4 @@ func lookupArchitecture(vendor, model string) (discover.ApplicationArchitectureV
 		return "", false
 	}
 	return arch, true
-}
-
-// archLookupLoadError exposes any error from the lazy YAML load. Used
-// by tests to assert the embedded file parses cleanly even when the
-// table is intentionally empty at SEC-702.A seed time.
-func archLookupLoadError() error {
-	archLookupOnce.Do(loadArchLookup)
-	return archLookupLoadErr
 }

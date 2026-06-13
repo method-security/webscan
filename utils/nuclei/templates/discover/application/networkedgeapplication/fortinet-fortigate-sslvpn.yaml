@@ -7,10 +7,8 @@ info:
   metadata:
     method-application-type: NETWORK_EDGE_APPLICATION
     method-module-name: FORTINET_FORTIGATE_SSLVPN
-    method-sub-module-name: SSL_VPN_PORTAL
-    method-detection-state: DEFAULT_PAGE
     cpe: cpe:2.3:o:fortinet:fortios:*:*:*:*:*:*:*:*
-  tags: discovery,vpn,fortinet,fortigate,fortios,ssl-vpn,network-edge
+  tags: discovery,fortinet,fortigate,fortios,ssl-vpn,network-edge
 http:
   - method: GET
     path:
@@ -20,31 +18,24 @@ http:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
-    matchers-condition: or
     matchers:
       - type: word
         part: body
         words:
-          - "FortiGate SSL-VPN"
-          - "FortiGate SSL VPN"
+          - "fortigate ssl-vpn"
+          - "fortigate ssl vpn"
         case-insensitive: true
       - type: word
         part: body
         words:
           - "fortinet"
           - "remote/login"
-        case-insensitive: true
         condition: and
-      - type: word
-        part: header
-        words:
-          - "SVPNCOOKIE="
         case-insensitive: true
       - type: word
-        part: body
+        part: all
         words:
-          - "<title>FortiGate</title>"
+          - "fgtlanguage"
+          - "fortinet"
+        condition: and
         case-insensitive: true
-      - type: dsl
-        dsl:
-          - 'contains(to_lower(header), "fgtlanguage=") && contains(to_lower(body), "remote/login")'

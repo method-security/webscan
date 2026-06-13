@@ -7,10 +7,8 @@ info:
   metadata:
     method-application-type: NETWORK_EDGE_APPLICATION
     method-module-name: CITRIX_GATEWAY
-    method-sub-module-name: SSL_VPN_PORTAL
-    method-detection-state: DEFAULT_PAGE
     cpe: cpe:2.3:a:citrix:gateway:*:*:*:*:*:*:*:*
-  tags: discovery,vpn,citrix,netscaler,gateway,network-edge
+  tags: discovery,citrix,netscaler,gateway,vpn,network-edge
 http:
   - method: GET
     path:
@@ -22,31 +20,24 @@ http:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
-    matchers-condition: or
     matchers:
       - type: word
         part: body
         words:
-          - "Citrix Gateway"
-          - "NetScaler Gateway"
+          - "citrix gateway"
+          - "netscaler gateway"
         case-insensitive: true
       - type: word
         part: body
         words:
           - "nsgateway"
           - "citrix"
-        case-insensitive: true
         condition: and
-      - type: dsl
-        dsl:
-          - 'contains(tolower(all_headers), "nsc_") && (contains(tolower(body), "citrix") || contains(tolower(body), "netscaler"))'
-      - type: dsl
-        dsl:
-          - 'contains(tolower(all_headers), "ns_af") && contains(tolower(body), "citrix")'
+        case-insensitive: true
       - type: word
-        part: body
+        part: all
         words:
-          - "<title>Citrix Gateway</title>"
-          - "<title>NetScaler Gateway</title>"
-          - "<title>Citrix Virtual Apps</title>"
+          - "ns_af"
+          - "citrix"
+        condition: and
         case-insensitive: true

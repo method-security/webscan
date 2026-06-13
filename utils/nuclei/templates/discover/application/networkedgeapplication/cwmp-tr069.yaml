@@ -25,7 +25,7 @@ http:
       - "{{BaseURL}}/ACS"
     redirects: true
     max-redirects: 3
-    stop-at-first-match: false
+    stop-at-first-match: true
     matchers:
       # Matcher 1: RomPager embedded webserver Server header (highest-confidence signal).
       - type: regex
@@ -48,7 +48,6 @@ http:
         words:
           - "<cwmp:Inform>"
           - "xmlns:cwmp=\"urn:dslforum-org:cwmp-1-"
-        condition: or
         case-insensitive: true
     extractors:
       # Extract RomPager version when present (drives VERSIONED-tier signal +

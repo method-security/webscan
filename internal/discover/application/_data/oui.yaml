@@ -1,0 +1,21 @@
+# SEC-702.A — IEEE OUI → vendor lookup table
+#
+# Maps a MAC OUI prefix (first 6 hex chars, uppercase, no separators)
+# to the IEEE-registered vendor name. Read at package init by
+# internal/discover/application/oui_lookup.go via `//go:embed` and
+# unmarshaled into the in-memory lookup table. This file is the
+# single source of truth — there is no parallel Go map literal to
+# keep in sync.
+#
+# Population strategy: targeted, not exhaustive. The full IEEE OUI
+# registry has 50k+ entries; we only need the prefixes that the WS-4
+# catalog actually relies on. Cluster F (Ubiquiti) and Cluster I
+# (Raisecom) seed their respective vendors; Cluster P does a broader
+# sweep across IoT/SOHO vendors.
+#
+# Key format: 6 uppercase hex characters, no separators (e.g.
+# "001AEF"). Templates emitting method-device-mac (or the device_mac
+# extractor) normalize the MAC (strip colons / dashes / dots,
+# uppercase) before the lookup runs; the engine does the strip itself.
+
+ouis: {}

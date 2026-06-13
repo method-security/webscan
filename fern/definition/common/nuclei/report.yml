@@ -31,6 +31,15 @@ types:
       finding: boolean
       probe: optional<probe.NucleiProbe>
       metadata: optional<map<string, string>>
+      # Per-host runtime values captured by template extractors
+      # (SEC-702.A). Keyed by extractor `name:` (e.g. `device_mac`,
+      # `device_serial`, `architecture_value`); the value is the
+      # comma-joined ExtractedResults from Nuclei. Populated by the
+      # Builder when an event carries `ExtractorName`. Engines that
+      # also read template metadata (e.g. discover/application) treat
+      # extractedFields as the override channel — extractor output
+      # wins over `metadata` when both keys are present.
+      extractedFields: optional<map<string, string>>
   NucleiAttemptInfo:
     properties:
       templateId: string # Nuclei template ID

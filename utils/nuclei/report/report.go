@@ -219,6 +219,14 @@ func (b *Builder) PopulateProbes(eng *nucleilib.NucleiEngine) error {
 
 // Consume processes a single Nuclei result event and updates the report accordingly.
 // It handles probe information, target bucketing, and attempt tracking.
+//
+// SEC-702.A: events sharing a (target, templateId) pair are merged into
+// one AttemptInfo. The first event populates the Finding; subsequent
+// events overlay their ExtractedFields onto the same AttemptInfo so
+// downstream engines see a single consolidated record per template per
+// target. Non-extractor fields (Metadata, classification, severity,
+// HTTP request/response) are template-stable, so the first-event copy
+// is authoritative.
 func (b *Builder) Consume(ev *nout.ResultEvent) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -237,6 +245,21 @@ func (b *Builder) Consume(ev *nout.ResultEvent) {
 		targetInfo = &nuclei.NucleiTargetInfo{Target: targetURL}
 		b.targetIdx[targetURL] = targetInfo
 		b.targets = append(b.targets, targetInfo)
+	}
+
+	// SEC-702.A — check the (target, templateId) merge index FIRST.
+	// If we've already built an AttemptInfo for this pair, the only
+	// per-event field that varies is ExtractorName/ExtractedResults;
+	// overlay those into the existing Finding's ExtractedFields and
+	// skip the rest of this function.
+	templateAttempts, hasTargetTemplates := b.attemptIdx[targetURL]
+	if !hasTargetTemplates {
+		templateAttempts = make(map[string]*nuclei.NucleiAttemptInfo)
+		b.attemptIdx[targetURL] = templateAttempts
+	}
+	if existing, alreadySeen := templateAttempts[ev.TemplateID]; alreadySeen {
+		mergeExtractedFields(existing, ev)
+		return
 	}
 
 	// Build attempt information
@@ -331,6 +354,17 @@ func (b *Builder) Consume(ev *nout.ResultEvent) {
 		}
 	}
 
+	// SEC-702.A — seed the per-host extractor map from this first
+	// event. ExtractorName is populated by Nuclei when a template
+	// extractor (vs. matcher) fired; templates without extractors
+	// leave it empty and the map stays nil.
+	var extractedFields map[string]string
+	if ev.ExtractorName != "" {
+		extractedFields = map[string]string{
+			ev.ExtractorName: strings.Join(ev.ExtractedResults, ","),
+		}
+	}
+
 	attemptInfo.Finding = &nuclei.NucleiFindingInfo{
 		Name:             name,
 		SoftwareWeakness: &softwareWeakness,
@@ -343,10 +377,35 @@ func (b *Builder) Consume(ev *nout.ResultEvent) {
 		Finding:          ev.MatcherStatus,
 		Probe:            probe,
 		Metadata:         metadata,
+		ExtractedFields:  extractedFields,
 	}
 
 	// Always add the attempt to the report, even if there was an error parsing the request/response
 	targetInfo.Attempts = append(targetInfo.Attempts, attemptInfo)
+	templateAttempts[ev.TemplateID] = attemptInfo
+}
+
+// mergeExtractedFields overlays the ExtractorName/ExtractedResults
+// from ev onto an already-tracked AttemptInfo. Called by Consume when
+// a second event arrives for the same (target, templateId) — typical
+// when one template fires multiple extractors on one host. First-write
+// wins per extractor name (Nuclei rarely emits the same extractor
+// twice on a single template run, but if it does we keep the earlier
+// value to mirror Builder's "first event populates Finding" rule).
+func mergeExtractedFields(existing *nuclei.NucleiAttemptInfo, ev *nout.ResultEvent) {
+	if existing == nil || existing.Finding == nil {
+		return
+	}
+	if ev.ExtractorName == "" {
+		return
+	}
+	if existing.Finding.ExtractedFields == nil {
+		existing.Finding.ExtractedFields = make(map[string]string)
+	}
+	if _, present := existing.Finding.ExtractedFields[ev.ExtractorName]; present {
+		return
+	}
+	existing.Finding.ExtractedFields[ev.ExtractorName] = strings.Join(ev.ExtractedResults, ",")
 }
 
 // Final returns the fully-populated Fern report.

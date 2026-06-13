@@ -48,15 +48,30 @@ types:
       - MODEL_LOOKUP
       - INFERRED_FROM_FIRMWARE_URL
       - INFERRED_FROM_REALM
-  # Architecture inference attached to a fingerprint attempt. Values
-  # (e.g. "arm", "mipsbe", "x86_64", "arm64") are intentionally free
-  # strings — the embedded-device universe is wider than any practical
-  # enum. confidence is in [0.0, 1.0] per the SEC-702 confidence rubric.
+  # Pre-auth HTTP architecture values, per the SEC-702 catalog. The
+  # value list is closed by design: detection-rule writers and threat-
+  # research queries downstream get a typed contract instead of having
+  # to defend against typos ("mipsbe" vs "MIPSBE" vs "mips_be" drift
+  # across templates). New architectures (e.g. riscv, sh4, sparc)
+  # earn admission via a small Fern PR once a TC validates them — the
+  # cost is low and the contract stays honest.
+  ApplicationArchitectureValue:
+    enum:
+      - MIPSBE
+      - ARM
+      - ARM64
+      - X86_64
+      - MIPS32
+      - TILE
+      - PPC
+      - SMIPS
+  # Architecture inference attached to a fingerprint attempt.
+  # confidence is in [0.0, 1.0] per the SEC-702 confidence rubric.
   ArchitectureInfo:
     properties:
-      value: string
+      value: ApplicationArchitectureValue
       source: ArchitectureSource
-      confidence: double
+      confidence: float
   ApplicationResourceConfigType:
     discriminated: false
     union:

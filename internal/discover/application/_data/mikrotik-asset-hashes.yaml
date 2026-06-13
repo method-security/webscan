@@ -2,8 +2,11 @@
 #
 # Maps the content-hash suffix in a 7.17+ MikroTik WebFig asset path
 # (e.g. /assets/style-<hash>.css, /assets/script-<hash>.js) to the
-# RouterOS version that ships that exact bundle. Read by
-# internal/discover/application/mikrotik_asset_hash.go.
+# RouterOS version that ships that exact bundle. Read at package init
+# by internal/discover/application/mikrotik_asset_hash.go via
+# `//go:embed` and unmarshaled into the in-memory lookup table. This
+# file is the single source of truth — there is no parallel Go map
+# literal to keep in sync.
 #
 # Background (TC-001): 7.17+ post-redesign WebFig no longer carries a
 # user-visible RouterOS version string on the login page (catalog
@@ -16,7 +19,7 @@
 # the broader 7.x sweep.
 #
 # Key format: the hash substring as it appears in the asset path,
-# without the file extension. Templates emit
-# method-mikrotik-asset-hash exactly as captured by the extractor.
+# without the file extension. Templates emit method-mikrotik-asset-
+# hash (or the mikrotik_asset_hash extractor) exactly as captured.
 
 hashes: {}

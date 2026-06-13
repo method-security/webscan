@@ -1,0 +1,27 @@
+# SEC-702.A — architecture lookup table
+#
+# Maps (vendor, model) → architecture string. Read at package init by
+# internal/discover/application/arch_lookup.go via `//go:embed` and
+# unmarshaled into the in-memory lookup table. This file is the
+# single source of truth — there is no parallel Go map literal to
+# keep in sync.
+#
+# Architecture values must match the ApplicationArchitectureValue Fern
+# enum: MIPSBE, ARM, ARM64, X86_64, MIPS32, TILE, PPC, SMIPS. Case-
+# insensitive on read — the helper uppercases before lookup so YAML
+# can use the friendlier lowercase form. New architectures earn
+# admission via a small Fern PR once a TC validates them — see
+# fern/definition/discover/application.yml.
+#
+# Vendor keys are lowercase, hyphenated. Model keys are exact-match
+# strings (case-sensitive — match the device-reported model verbatim,
+# do not pre-lowercase). Per-cluster PRs populate this file:
+#   Cluster C (MikroTik), Cluster E (Dahua), Cluster F (Ubiquiti),
+#   plus the data-PR cluster P.
+#
+# Confidence assigned by arch_lookup.go for MODEL_LOOKUP hits is
+# 0.75 (per SEC-702 catalog confidence rubric: 0.6–0.85 range for
+# MODEL_LOOKUP). Templates may override by emitting their own
+# method-architecture-confidence metadata or extractor output.
+
+vendors: {}

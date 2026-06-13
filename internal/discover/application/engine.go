@@ -16,30 +16,29 @@ import (
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
-// Template-author metadata key contract (SEC-702.A).
+// Template-author input contract (SEC-702.A).
 //
-// Templates emit values via `info.metadata.<key>:` blocks. Static
-// values flow through verbatim; "lookup" keys trigger a helper call
-// in this file. Per-cluster PRs are free to add more keys, but these
-// are the seed contract:
+// Templates emit values via two channels and the engine reads BOTH:
 //
-//	method-architecture-value         — literal arch string (free-form,
-//	                                    Linux/Go convention)
-//	method-architecture-source        — one of DEVICE_DISCLOSED,
-//	                                    MODEL_LOOKUP,
-//	                                    INFERRED_FROM_FIRMWARE_URL,
-//	                                    INFERRED_FROM_REALM
-//	method-architecture-confidence    — float string in [0.0, 1.0]
-//	                                    (optional; default 0.0)
-//	method-arch-lookup-vendor         — vendor key for arch-lookup table
-//	                                    (only used if method-architecture-
-//	                                    value is unset)
-//	method-arch-lookup-model          — model key for arch-lookup table
-//	method-device-mac                 — raw MAC; engine normalizes to
-//	                                    canonical AA:BB:CC:DD:EE:FF
-//	method-device-serial              — verbatim serial (preserved as-is)
-//	method-mikrotik-asset-hash        — RouterOS 7.17+ asset content
-//	                                    hash; engine resolves to version
+//  1. `info.metadata.<key>:` — STATIC values shared by every host the
+//     template fires on (e.g. method-module-name: "MIKROTIK"). The
+//     keys listed in this block are the seed metadata contract.
+//
+//  2. `extractors[*].name: <key>` — PER-HOST values captured at scan
+//     time (e.g. a regex extractor named `device_mac` whose value
+//     varies by target). These ride along on each NucleiFindingInfo
+//     in the new ExtractedFields map (see Builder in
+//     utils/nuclei/report).
+//
+// PRECEDENCE: extractor output WINS over metadata. A template that
+// statically declares method-device-mac AND defines an extractor
+// named device_mac that doesn't fire will emit the metadata value;
+// if the extractor does fire, the engine uses the per-host capture.
+// Same rule applies to architecture_value / architecture_source /
+// architecture_confidence and to device_serial.
+//
+// Per-cluster PRs are free to add more keys; the names below are the
+// seed contract.
 const (
 	metaApplicationType        = "method-application-type"
 	metaModuleName             = "method-module-name"
@@ -56,8 +55,47 @@ const (
 	metaMikrotikAssetHash      = "method-mikrotik-asset-hash"
 )
 
-// convertNucleiAttemptToFingerprintAttemptStruct converts a Nuclei attempt to an application fingerprint attempt
-func convertNucleiAttemptToFingerprintAttemptStruct(nucleiAttempt *nuclei.NucleiAttemptInfo) *discover.ApplicationFingerprintAttempt {
+// Extractor name contract (SEC-702.A). Templates that need per-host
+// values define Nuclei extractors with these exact `name:` strings;
+// the Builder maps name → captured value into ExtractedFields.
+const (
+	extractArchValue         = "architecture_value"
+	extractArchSource        = "architecture_source"
+	extractArchConfidence    = "architecture_confidence"
+	extractDeviceMac         = "device_mac"
+	extractDeviceSerial      = "device_serial"
+	extractMikrotikAssetHash = "mikrotik_asset_hash"
+)
+
+// pickField returns the extractor-output value for extractorKey if
+// present and non-empty; otherwise falls back to the metadata value
+// for metaKey. This is the canonical "extractor wins over metadata"
+// helper for the SEC-702.A inputs.
+//
+// Pass extractorKey="" to skip the extractor lookup entirely (e.g.
+// when the field is currently metadata-only at the template layer).
+// Pass metaKey="" to skip the metadata fallback. The TrimSpace guard
+// rejects whitespace-only values from either source.
+func pickField(ef map[string]string, extractorKey string, md map[string]string, metaKey string) string {
+	if extractorKey != "" {
+		if v, ok := ef[extractorKey]; ok && strings.TrimSpace(v) != "" {
+			return v
+		}
+	}
+	if metaKey != "" {
+		if v, ok := md[metaKey]; ok && strings.TrimSpace(v) != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+// convertNucleiAttemptToFingerprintAttemptStruct converts a Nuclei
+// attempt to an application fingerprint attempt. log is the engine
+// log handle threaded through from LaunchFingerprintEngine; it's used
+// for the OUI-vs-module observability warning (SEC-702.A delta 3).
+// Passing a nil log is safe — the OUI helper short-circuits.
+func convertNucleiAttemptToFingerprintAttemptStruct(log svc1log.Logger, nucleiAttempt *nuclei.NucleiAttemptInfo) *discover.ApplicationFingerprintAttempt {
 	if nucleiAttempt == nil || nucleiAttempt.TemplateId == "" {
 		return nil
 	}
@@ -72,10 +110,19 @@ func convertNucleiAttemptToFingerprintAttemptStruct(nucleiAttempt *nuclei.Nuclei
 	var deviceMacFromMetadata *string
 	var deviceSerialFromMetadata *string
 
-	// Parse metadata from the Nuclei finding if available
-	if nucleiAttempt.Finding != nil && nucleiAttempt.Finding.Metadata != nil {
-		md := nucleiAttempt.Finding.Metadata
+	// SEC-702.A — pull the metadata + extractor maps from the
+	// finding. Either may be nil (template without metadata, or
+	// without extractors). We pass both to the helpers below; the
+	// pickField helper handles nil gracefully and "extractor wins"
+	// is uniform across the call sites.
+	var md map[string]string
+	var ef map[string]string
+	if nucleiAttempt.Finding != nil {
+		md = nucleiAttempt.Finding.Metadata
+		ef = nucleiAttempt.Finding.ExtractedFields
+	}
 
+	if md != nil {
 		// Check for method-application-type in metadata
 		if appTypeStr, exists := md[metaApplicationType]; exists {
 			if appType, err := discover.NewApplicationResourceTypeFromString(appTypeStr); err == nil {
@@ -104,45 +151,58 @@ func convertNucleiAttemptToFingerprintAttemptStruct(nucleiAttempt *nuclei.Nuclei
 		if cpeStr, exists := md[metaCPE]; exists {
 			cpeFromMetadata = &cpeStr
 		}
+	}
 
-		// SEC-702.A — derive architecture from metadata.
-		architectureFromMetadata = deriveArchitecture(md)
+	// SEC-702.A — derive architecture from extractors first, then
+	// metadata. Returns nil when neither path applies; never guesses.
+	architectureFromMetadata = deriveArchitecture(md, ef)
 
-		// SEC-702.A — device MAC: normalize to canonical form before
-		// publishing. NormalizeMac fails-closed on inputs that don't
-		// contain a full 48-bit MAC, so a garbage extractor result
-		// produces no deviceMac (rather than a half-formed one).
-		if rawMac, exists := md[metaDeviceMac]; exists {
-			if canonical := NormalizeMac(rawMac); canonical != "" {
-				deviceMacFromMetadata = &canonical
-			}
-		}
-
-		// SEC-702.A — device serial: verbatim. The catalog warns that
-		// some devices (Dahua 2019+) emit a 32-char hex realm that
-		// LOOKS like a serial but is actually a hash; templates must
-		// length-bound their extractors. The engine trusts the
-		// template's extractor here — it does not re-validate.
-		if rawSerial, exists := md[metaDeviceSerial]; exists {
-			trimmed := strings.TrimSpace(rawSerial)
-			if trimmed != "" {
-				deviceSerialFromMetadata = &trimmed
-			}
-		}
-
-		// SEC-702.A — MikroTik 7.17+ asset-hash → version dereference.
-		// If the template provided a CPE template containing the
-		// literal placeholder "{version}" AND the asset-hash hits a
-		// known RouterOS release, substitute. Otherwise leave the CPE
-		// untouched. This keeps the asset-hash helper useful even
-		// when the schema has no dedicated version field.
-		if hash, exists := md[metaMikrotikAssetHash]; exists && hash != "" {
-			if version, ok := lookupMikrotikAssetHash(hash); ok && cpeFromMetadata != nil {
-				substituted := strings.ReplaceAll(*cpeFromMetadata, "{version}", version)
-				cpeFromMetadata = &substituted
-			}
+	// SEC-702.A — device MAC: extractor wins over metadata. Normalize
+	// to canonical form before publishing. NormalizeMac fails-closed
+	// on inputs that don't contain a full 48-bit MAC, so a garbage
+	// extractor result produces no deviceMac (rather than a half-
+	// formed one).
+	if rawMac := pickField(ef, extractDeviceMac, md, metaDeviceMac); rawMac != "" {
+		if canonical := NormalizeMac(rawMac); canonical != "" {
+			deviceMacFromMetadata = &canonical
 		}
 	}
+
+	// SEC-702.A — device serial: verbatim. The catalog warns that
+	// some devices (Dahua 2019+) emit a 32-char hex realm that
+	// LOOKS like a serial but is actually a hash; templates must
+	// length-bound their extractors. The engine trusts the
+	// template's extractor here — it does not re-validate.
+	if rawSerial := pickField(ef, extractDeviceSerial, md, metaDeviceSerial); rawSerial != "" {
+		trimmed := strings.TrimSpace(rawSerial)
+		if trimmed != "" {
+			deviceSerialFromMetadata = &trimmed
+		}
+	}
+
+	// SEC-702.A — MikroTik 7.17+ asset-hash → version dereference.
+	// If the template provided a CPE template containing the
+	// literal placeholder "{version}" AND the asset-hash hits a
+	// known RouterOS release, substitute. Otherwise leave the CPE
+	// untouched. This keeps the asset-hash helper useful even
+	// when the schema has no dedicated version field.
+	if hash := pickField(ef, extractMikrotikAssetHash, md, metaMikrotikAssetHash); hash != "" {
+		if version, ok := lookupMikrotikAssetHash(hash); ok && cpeFromMetadata != nil {
+			substituted := strings.ReplaceAll(*cpeFromMetadata, "{version}", version)
+			cpeFromMetadata = &substituted
+		}
+	}
+
+	// SEC-702.A delta 3 — OUI vendor confirmation, log-only.
+	// When the device self-disclosed its MAC pre-auth and OuiLookup
+	// returns a vendor that disagrees with the template's
+	// method-module-name, log a warning at INFO. NEVER overwrite the
+	// module — OEM-rebrand cases (Hao Yun An Fang / Dahua, Amcrest /
+	// Dahua) intentionally surface the rebrand attribution from the
+	// template, not the underlying ODM from the OUI. The disagreement
+	// is forensically interesting (both vendors are recorded), not a
+	// correction signal.
+	maybeLogOuiVendorMismatch(log, nucleiAttempt.TemplateId, deviceMacFromMetadata, moduleNameFromMetadata)
 
 	// Create the simplified fingerprint attempt using the new Fern structure
 	attempt := &discover.ApplicationFingerprintAttempt{
@@ -161,68 +221,140 @@ func convertNucleiAttemptToFingerprintAttemptStruct(nucleiAttempt *nuclei.Nuclei
 	return attempt
 }
 
-// deriveArchitecture builds an ArchitectureInfo from template metadata,
-// or returns nil when no source applies. Two paths:
+// detectOuiVendorMismatch returns (vendor, true) if the device MAC's
+// OUI prefix resolves to a vendor that disagrees with module, and
+// ("", false) otherwise. Disagreement is case-insensitive on a
+// substring basis — "DAHUA" matches "Dahua Technology Co., Ltd.";
+// "MIKROTIK" matches "Routerboard.com" only if neither contains the
+// other (i.e. truly different vendors).
 //
-//  1. Template emits method-architecture-value directly. method-
-//     architecture-source MUST also be set (parseable as an
-//     ArchitectureSource enum) for the result to be admitted —
-//     unsourced architecture values are dropped to keep the
-//     provenance contract honest. confidence defaults to 0.0 when
-//     method-architecture-confidence is absent or unparseable.
+// Returns ("", false) for any of: deviceMac nil/empty, OUI lookup
+// miss, module empty, or vendor-and-module agree. Pulled out as a
+// pure function so engine_test.go can exercise it without a logger
+// or log capture.
+func detectOuiVendorMismatch(deviceMac *string, module string) (string, bool) {
+	if deviceMac == nil || *deviceMac == "" {
+		return "", false
+	}
+	if module == "" {
+		return "", false
+	}
+	vendor, found := lookupOuiVendor(*deviceMac)
+	if !found {
+		return "", false
+	}
+	// Case-insensitive substring agreement check. Either name may be
+	// the abbreviated form of the other ("DAHUA" vs "Dahua Technology
+	// Co., Ltd."), so a match in either direction means they agree.
+	vendorLower := strings.ToLower(vendor)
+	moduleLower := strings.ToLower(module)
+	if strings.Contains(vendorLower, moduleLower) || strings.Contains(moduleLower, vendorLower) {
+		return "", false
+	}
+	return vendor, true
+}
+
+// maybeLogOuiVendorMismatch is the engine-side caller. Logs a single
+// INFO line when OUI vendor and template module disagree (matching
+// the engine's existing observability level for fingerprint events);
+// log == nil short-circuits so non-engine callers don't need to
+// fabricate a logger.
+func maybeLogOuiVendorMismatch(log svc1log.Logger, templateID string, deviceMac *string, module string) {
+	if log == nil {
+		return
+	}
+	vendor, mismatch := detectOuiVendorMismatch(deviceMac, module)
+	if !mismatch {
+		return
+	}
+	log.Info(
+		"OUI vendor disagrees with template module — both retained, no overwrite (SEC-702.A delta 3)",
+		svc1log.SafeParam("templateId", templateID),
+		svc1log.SafeParam("deviceMac", *deviceMac),
+		svc1log.SafeParam("ouiVendor", vendor),
+		svc1log.SafeParam("templateModule", module),
+	)
+}
+
+// deriveArchitecture builds an ArchitectureInfo from template
+// metadata + per-host extractor outputs, or returns nil when no
+// source applies. Extractor values win over metadata for each
+// field (value / source / confidence) independently — a template
+// that statically declares method-architecture-source but emits a
+// per-host architecture_value via extractor combines both. Two
+// derivation paths:
 //
-//  2. Template emits method-arch-lookup-vendor + method-arch-lookup-
-//     model AND method-architecture-value is unset. The engine calls
+//  1. Direct value path. Template emits architecture_value
+//     (extractor) or method-architecture-value (metadata) AND a
+//     parseable source. The value must match the
+//     ApplicationArchitectureValue Fern enum (uppercase, case-
+//     insensitive on read). Unsourced values are dropped to keep
+//     the provenance contract honest. Confidence defaults to 0.0
+//     when absent / unparseable.
+//
+//  2. Model-lookup path. Template emits method-arch-lookup-vendor +
+//     method-arch-lookup-model AND no direct value. The engine calls
 //     lookupArchitecture and on a hit emits source=MODEL_LOOKUP with
-//     confidence=archLookupConfidence (catalog-defined 0.75 midpoint
-//     of the MODEL_LOOKUP 0.6–0.85 range).
+//     confidence=archLookupConfidence (0.75 midpoint of the 0.6–0.85
+//     MODEL_LOOKUP range); a template-supplied confidence (extractor
+//     or metadata) overrides.
 //
-// Returns nil for both no-direct-value/no-lookup-hit AND
-// direct-value-without-source — never guesses.
-func deriveArchitecture(md map[string]string) *discover.ArchitectureInfo {
-	if archValue, ok := md[metaArchitectureValue]; ok && archValue != "" {
-		archSrcStr, hasSrc := md[metaArchitectureSource]
-		if !hasSrc {
+// Returns nil when neither path applies — never guesses.
+func deriveArchitecture(md, ef map[string]string) *discover.ArchitectureInfo {
+	// Path 1: direct value (extractor wins per-field over metadata).
+	archValueStr := pickField(ef, extractArchValue, md, metaArchitectureValue)
+	if archValueStr != "" {
+		archSourceStr := pickField(ef, extractArchSource, md, metaArchitectureSource)
+		if archSourceStr == "" {
 			return nil
 		}
-		archSrc, err := discover.NewArchitectureSourceFromString(archSrcStr)
+		archSrc, err := discover.NewArchitectureSourceFromString(archSourceStr)
 		if err != nil {
 			return nil
 		}
+		archEnum, err := discover.NewApplicationArchitectureValueFromString(strings.ToUpper(strings.TrimSpace(archValueStr)))
+		if err != nil {
+			// Value didn't match the closed enum (e.g. a template
+			// emitted "riscv64" before that arch was added). Drop the
+			// inference rather than emit a half-formed record.
+			return nil
+		}
 		confidence := 0.0
-		if confStr, hasConf := md[metaArchitectureConfidence]; hasConf {
+		if confStr := pickField(ef, extractArchConfidence, md, metaArchitectureConfidence); confStr != "" {
 			if parsed, parseErr := strconv.ParseFloat(strings.TrimSpace(confStr), 64); parseErr == nil {
 				confidence = clampConfidence(parsed)
 			}
 		}
 		return &discover.ArchitectureInfo{
-			Value:      archValue,
+			Value:      archEnum,
 			Source:     archSrc,
 			Confidence: confidence,
 		}
 	}
 
-	// Path 2: (vendor, model) → arch lookup.
-	vendor, hasVendor := md[metaArchLookupVendor]
-	model, hasModel := md[metaArchLookupModel]
-	if !hasVendor || !hasModel || vendor == "" || model == "" {
+	// Path 2: (vendor, model) → arch lookup. The lookup keys are
+	// template-static today (per-cluster PRs may add extractor-based
+	// vendor/model keys later, in which case pickField will handle
+	// the precedence automatically).
+	vendor := pickField(ef, "", md, metaArchLookupVendor)
+	model := pickField(ef, "", md, metaArchLookupModel)
+	if vendor == "" || model == "" {
 		return nil
 	}
-	arch, hit := lookupArchitecture(vendor, model)
+	archEnum, hit := lookupArchitecture(vendor, model)
 	if !hit {
 		// Empty table at SEC-702.A seed-time; no hit is the expected
 		// path until Cluster C / E / F / P populate the table.
 		return nil
 	}
-	// Allow templates to override the helper's default confidence.
 	confidence := archLookupConfidence
-	if confStr, hasConf := md[metaArchitectureConfidence]; hasConf {
+	if confStr := pickField(ef, extractArchConfidence, md, metaArchitectureConfidence); confStr != "" {
 		if parsed, parseErr := strconv.ParseFloat(strings.TrimSpace(confStr), 64); parseErr == nil {
 			confidence = clampConfidence(parsed)
 		}
 	}
 	return &discover.ArchitectureInfo{
-		Value:      arch,
+		Value:      archEnum,
 		Source:     discover.ArchitectureSourceModelLookup,
 		Confidence: confidence,
 	}
@@ -327,7 +459,7 @@ func LaunchFingerprintEngine(ctx context.Context, config *discover.DiscoverAppli
 				seenTemplateIds[nucleiAttempt.TemplateId] = true
 
 				// Convert nuclei attempt to application fingerprint attempt
-				attempt := convertNucleiAttemptToFingerprintAttemptStruct(nucleiAttempt)
+				attempt := convertNucleiAttemptToFingerprintAttemptStruct(log, nucleiAttempt)
 				if attempt != nil {
 					fingerprintTarget.Attempts = append(fingerprintTarget.Attempts, attempt)
 				}

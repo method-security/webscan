@@ -123,6 +123,24 @@ func GetHeaderValueFromHeaderMap(headers map[string][]string, name string) *stri
 	return nil
 }
 
+func GetContentTypeFromHeaderMap(headers map[string][]string) string {
+	if headers == nil {
+		return ""
+	}
+
+	for headerName, values := range headers {
+		if !strings.EqualFold(headerName, "Content-Type") {
+			continue
+		}
+		for i := len(values) - 1; i >= 0; i-- {
+			if value := strings.TrimSpace(values[i]); value != "" {
+				return value
+			}
+		}
+	}
+	return ""
+}
+
 // GetResponseBodyStringFromBodyStruct extracts string content from a Body struct
 func GetResponseBodyStringFromBodyStruct(body *common.Body) *string {
 	if body == nil {
@@ -255,20 +273,22 @@ func CreateHTTPResponseFromBytes(statusCode int, redirectChain []string, headers
 	for key, values := range headers {
 		var processedValues []string
 		for _, value := range values {
-			// Split each value by comma and trim spaces
-			splitValues := strings.Split(value, ",")
+			// CDP can expose duplicate response headers as newline-delimited
+			// strings. Content-Type parameters may contain commas, so only split
+			// that header on line breaks.
+			splitValues := splitHeaderValue(key, value)
 			for _, v := range splitValues {
-				processedValues = append(processedValues, strings.TrimSpace(v))
+				trimmed := strings.TrimSpace(v)
+				if trimmed != "" {
+					processedValues = append(processedValues, trimmed)
+				}
 			}
 		}
 		processedHeaders[key] = processedValues
 	}
 
 	// Get content type from headers
-	contentType := ""
-	if ct := GetHeaderValueFromHeaderMap(processedHeaders, "Content-Type"); ct != nil {
-		contentType = *ct
-	}
+	contentType := GetContentTypeFromHeaderMap(processedHeaders)
 
 	// If no content type is provided, try to detect it from string representation
 	if contentType == "" {
@@ -290,6 +310,15 @@ func CreateHTTPResponseFromBytes(statusCode int, redirectChain []string, headers
 		ReceivedAt:      &receivedAt,
 		SizeBytes:       &sizeBytes,
 	}
+}
+
+func splitHeaderValue(key, value string) []string {
+	return strings.FieldsFunc(value, func(r rune) bool {
+		if r == '\n' || r == '\r' {
+			return true
+		}
+		return r == ',' && !strings.EqualFold(key, "Content-Type")
+	})
 }
 
 // CreateHTTPResponse creates an HttpResponse struct from HttpResponse data (string version)

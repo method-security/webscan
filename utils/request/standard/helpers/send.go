@@ -141,6 +141,13 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 			continue
 		}
 
+		if redirects >= config.MaxRedirects {
+			if currentURL != redirectChain[len(redirectChain)-1] {
+				redirectChain[len(redirectChain)-1] = currentURL
+			}
+			return resp, redirectChain, nil
+		}
+
 		// Close Response Body
 		err = resp.Body.Close()
 		if err != nil {

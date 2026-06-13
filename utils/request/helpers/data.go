@@ -268,7 +268,7 @@ func IsDetectedBinaryBody(bodyData []byte) bool {
 
 // CreateHTTPResponseFromBytes creates an HttpResponse struct from HttpResponse data using byte array
 func CreateHTTPResponseFromBytes(statusCode int, redirectChain []string, headers map[string][]string, responseBody []byte) common.HttpResponse {
-	// Process headers to split comma-delimited values
+	// Process headers to split newline-delimited duplicate values from CDP.
 	processedHeaders := make(map[string][]string)
 	for key, values := range headers {
 		var processedValues []string
@@ -317,7 +317,7 @@ func splitHeaderValue(key, value string) []string {
 		if r == '\n' || r == '\r' {
 			return true
 		}
-		return r == ',' && !strings.EqualFold(key, "Content-Type")
+		return false
 	})
 }
 

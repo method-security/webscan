@@ -7,10 +7,8 @@ info:
   metadata:
     method-application-type: NETWORK_EDGE_APPLICATION
     method-module-name: SONICWALL_SMA
-    method-sub-module-name: SSL_VPN_PORTAL
-    method-detection-state: DEFAULT_PAGE
     cpe: cpe:2.3:a:sonicwall:secure_mobile_access:*:*:*:*:*:*:*:*
-  tags: discovery,vpn,sonicwall,sma,ssl-vpn,network-edge
+  tags: discovery,sonicwall,sma,ssl-vpn,network-edge
 http:
   - method: GET
     path:
@@ -21,30 +19,26 @@ http:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
-    matchers-condition: or
     matchers:
       - type: word
         part: body
         words:
-          - "SonicWall"
-          - "Virtual Office"
-        case-insensitive: true
+          - "sonicwall"
+          - "virtual office"
         condition: and
-      - type: word
-        part: body
-        words:
-          - "SonicWall"
-          - "Secure Mobile Access"
-        case-insensitive: true
-        condition: and
-      - type: word
-        part: header
-        words:
-          - "swap="
-          - "SWSessionID="
         case-insensitive: true
       - type: word
         part: body
         words:
-          - "<title>SonicWall Virtual Office</title>"
+          - "sonicwall"
+          - "secure mobile access"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "sonicwall"
+          - "sma"
+          - "login"
+        condition: and
         case-insensitive: true

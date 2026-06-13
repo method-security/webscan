@@ -24,7 +24,7 @@ import (
 
 // ExtractNetworkRoutes uses a headless browser to capture network requests and extract route details from them.
 // Returns a slice of RouteDetails, a slice of URLs, and a slice of errors.
-func ExtractNetworkRoutes(ctx context.Context, browser *headless.Requester, target string, ignoreCrossDomain bool, captureStaticAssets bool) ([]*discover.RouteDetails, []string, []string) {
+func ExtractNetworkRoutes(ctx context.Context, browser *headless.Requester, target string, ignoreCrossDomain bool, captureStaticAssets bool, verifyTLS bool) ([]*discover.RouteDetails, []string, []string) {
 	log := svc1log.FromContext(ctx)
 	const maxNetworkCaptureAttempts = 3
 
@@ -42,7 +42,7 @@ func ExtractNetworkRoutes(ctx context.Context, browser *headless.Requester, targ
 				svc1log.SafeParam("target", target))
 		}
 
-		routes, urls, errors := extractNetworkRoutesOnce(ctx, browser, target, ignoreCrossDomain, captureStaticAssets)
+		routes, urls, errors := extractNetworkRoutesOnce(ctx, browser, target, ignoreCrossDomain, captureStaticAssets, verifyTLS)
 		lastRoutes = routes
 		lastUrls = urls
 		lastErrors = errors
@@ -57,7 +57,7 @@ func ExtractNetworkRoutes(ctx context.Context, browser *headless.Requester, targ
 	return lastRoutes, lastUrls, lastErrors
 }
 
-func extractNetworkRoutesOnce(ctx context.Context, browser *headless.Requester, target string, ignoreCrossDomain bool, captureStaticAssets bool) ([]*discover.RouteDetails, []string, []string) {
+func extractNetworkRoutesOnce(ctx context.Context, browser *headless.Requester, target string, ignoreCrossDomain bool, captureStaticAssets bool, verifyTLS bool) ([]*discover.RouteDetails, []string, []string) {
 	// Get the logger from the context
 	log := svc1log.FromContext(ctx)
 
@@ -73,6 +73,16 @@ func extractNetworkRoutesOnce(ctx context.Context, browser *headless.Requester, 
 			log.Error("Failed to initialize browser", svc1log.SafeParam("error", err))
 			return routes, discoverroutehelpers.SetToListString(urls), []string{err.Error()}
 		}
+	}
+
+	if !verifyTLS {
+		if err := browser.Browser.IgnoreCertErrors(true); err != nil {
+			errMsg := fmt.Sprintf("failed to disable certificate error checking: %s", cleanNetworkCaptureError(err))
+			log.Warn("Failed to disable certificate error checking for network capture", svc1log.SafeParam("error", errMsg))
+			errors = append(errors, errMsg)
+			return routes, discoverroutehelpers.SetToListString(urls), errors
+		}
+		log.Info("Certificate error checking disabled for network capture")
 	}
 
 	page, err := browser.Browser.Page(proto.TargetCreateTarget{})

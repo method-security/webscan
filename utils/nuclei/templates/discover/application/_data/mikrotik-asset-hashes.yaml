@@ -1,0 +1,22 @@
+# SEC-702.A — MikroTik RouterOS 7.17+ asset-hash → version lookup
+#
+# Maps the content-hash suffix in a 7.17+ MikroTik WebFig asset path
+# (e.g. /assets/style-<hash>.css, /assets/script-<hash>.js) to the
+# RouterOS version that ships that exact bundle. Read by
+# internal/discover/application/mikrotik_asset_hash.go.
+#
+# Background (TC-001): 7.17+ post-redesign WebFig no longer carries a
+# user-visible RouterOS version string on the login page (catalog
+# anti-pattern: the 6.x / 7.0–7.16 <h1>RouterOS v<n>.<n></h1> regex
+# does NOT fire). The static asset bundles ARE versioned, so the
+# webpack-style hash suffix becomes the canonical version source.
+#
+# Population: Cluster C (MikroTik) seeds the first table from
+# RouterOS 7.17 / 7.18 / 7.19 captures; the data-PR cluster P does
+# the broader 7.x sweep.
+#
+# Key format: the hash substring as it appears in the asset path,
+# without the file extension. Templates emit
+# method-mikrotik-asset-hash exactly as captured by the extractor.
+
+hashes: {}

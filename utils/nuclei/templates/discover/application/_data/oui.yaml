@@ -1,0 +1,20 @@
+# SEC-702.A — IEEE OUI → vendor lookup table
+#
+# Maps a MAC OUI prefix (first 6 hex chars, uppercase, no separators)
+# to the IEEE-registered vendor name. Read by
+# internal/discover/application/oui_lookup.go to confirm vendor
+# attribution when a device self-discloses its MAC pre-auth — e.g.
+# Ubiquiti AIROS_<MAC> cookie (TC-004), Raisecom /status.htm MAC
+# field (TC-015).
+#
+# Population strategy: targeted not exhaustive. The full IEEE OUI
+# registry has 50k+ entries; we only need the prefixes that the
+# WS-4 catalog actually relies on. Cluster F (Ubiquiti) and Cluster
+# I (Raisecom) seed their respective vendors; Cluster P does a
+# broader sweep across IoT/SOHO vendors.
+#
+# Key format: 6 uppercase hex characters, no separators. Templates
+# emitting method-oui-lookup-mac normalize the MAC (strip colons /
+# dashes / dots, uppercase) before the lookup runs.
+
+ouis: {}

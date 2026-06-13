@@ -38,6 +38,25 @@ types:
       - EXPOSED_ADMIN
       - VULNERABLE_VERSION
       - DEBUGGING_ENABLED
+  # Provenance of an architecture inference, per the IoT/SOHO catalog
+  # (SEC-702). Values are deliberately ordered from highest- to
+  # lowest-fidelity source so consumers can prefer DEVICE_DISCLOSED over
+  # any inferred value when both are available on the same target.
+  ArchitectureSource:
+    enum:
+      - DEVICE_DISCLOSED
+      - MODEL_LOOKUP
+      - INFERRED_FROM_FIRMWARE_URL
+      - INFERRED_FROM_REALM
+  # Architecture inference attached to a fingerprint attempt. Values
+  # (e.g. "arm", "mipsbe", "x86_64", "arm64") are intentionally free
+  # strings — the embedded-device universe is wider than any practical
+  # enum. confidence is in [0.0, 1.0] per the SEC-702 confidence rubric.
+  ArchitectureInfo:
+    properties:
+      value: string
+      source: ArchitectureSource
+      confidence: double
   ApplicationResourceConfigType:
     discriminated: false
     union:
@@ -64,6 +83,21 @@ types:
       cpe: optional<string>
       request: http.HttpRequestResponse
       finding: boolean
+      # Pre-auth HTTP architecture inference (SEC-702.A). Present only
+      # when at least one of the catalog's three viable sources fires —
+      # device-disclosed string, (vendor, model) lookup, or firmware-URL
+      # inference. Engine never guesses: absent if no source applies.
+      architecture: optional<ArchitectureInfo>
+      # Device MAC address self-disclosed pre-auth (e.g. Ubiquiti
+      # AIROS_<MAC> cookie + TLS cert CN, Raisecom /status.htm).
+      # Canonical form colon-separated uppercase ("AA:BB:CC:DD:EE:FF")
+      # — emit normalized regardless of on-device source format.
+      deviceMac: optional<string>
+      # Device serial self-disclosed pre-auth (e.g. Dahua 2017-era
+      # /cgi-bin/magicBox.cgi Digest realm="Login to <SERIAL>").
+      # Hashed realms (32-char hex) are NOT serials; templates must
+      # length-bound the extractor to reject them.
+      deviceSerial: optional<string>
   ApplicationFingerprintTarget:
     properties:
       target: string

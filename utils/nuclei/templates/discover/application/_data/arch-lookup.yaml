@@ -1,0 +1,34 @@
+# SEC-702.A — architecture lookup table
+#
+# Maps (vendor, model) → architecture string. Read by
+# internal/discover/application/arch_lookup.go to populate
+# ApplicationFingerprintAttempt.architecture with source=MODEL_LOOKUP
+# when a template extracts a model but cannot directly observe the
+# architecture in the HTTP response.
+#
+# Free-string architecture values (Linux/Go convention):
+#   - arm          (32-bit ARM, ARMv5/v6/v7)
+#   - arm64        (64-bit ARM, AArch64)
+#   - mipsbe       (MIPS big-endian)
+#   - mipsel       (MIPS little-endian, lowercase L)
+#   - mips64be     (64-bit MIPS big-endian)
+#   - x86          (32-bit i386)
+#   - x86_64       (amd64)
+#   - ppc          (PowerPC)
+#   - ppc64        (PowerPC 64-bit)
+#   - sh4          (SuperH)
+#   - sparc        (SPARC)
+#   - riscv64      (RISC-V 64-bit)
+#
+# Vendor keys are lowercase, hyphenated. Model keys are exact-match
+# strings (case-sensitive — match the device-reported model verbatim,
+# do not pre-lowercase). Per-cluster PRs populate this file:
+#   Cluster C (MikroTik), Cluster E (Dahua), Cluster F (Ubiquiti),
+#   plus the data-PR cluster P.
+#
+# Confidence assigned by arch_lookup.go for MODEL_LOOKUP hits is
+# 0.75 (per SEC-702 catalog confidence rubric: 0.6–0.85 range for
+# MODEL_LOOKUP). Templates may override by emitting their own
+# method-architecture-confidence metadata.
+
+vendors: {}

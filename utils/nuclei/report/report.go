@@ -428,25 +428,32 @@ func (b *Builder) mergeExtractedFields(existing *nuclei.NucleiAttemptInfo, ev *n
 }
 
 // extractedFieldsFromEvent returns the per-extractor name → value
-// map for one Nuclei result event. Three cases:
+// map for one Nuclei result event. Two cases:
 //
 //  1. ev.ExtractorName non-empty — extractor-only branch of
 //     MakeDefaultResultEvent. Single key/value, name preserved.
 //
 //  2. ev.ExtractorName empty AND ExtractedResults non-empty AND the
-//     template declares the SAME number of named extractors as
-//     ExtractedResults items — matcher-named branch with cardinality
-//     match. Map results positionally to extractor names.
+//     template has exactly one named extractor across ALL its
+//     requests — matcher-named branch on a single-extractor
+//     template. Join all flat results under that extractor's name.
 //
-//  3. ev.ExtractorName empty AND ExtractedResults non-empty AND the
-//     template has exactly one named extractor (cardinality 1 vs
-//     >=1 results) — common single-extractor template; join all
-//     values under that extractor's name.
+// Multi-extractor templates do NOT get recovered. Nuclei's public
+// SDK drops both the per-extractor name AND any per-request marker
+// on matcher-emitted events, so we can't tell which extractor (or
+// which request, for multi-request templates) produced which slice
+// of ExtractedResults. Positional mapping would mis-attribute when
+// (a) requests fire in a different order than declared, (b) Nuclei
+// dedupes / reorders OutputExtracts across requests, or (c) only
+// some extractors matched and the cardinality is incidentally
+// matched. Authors who need multiple per-host fields on the same
+// host should split into one template per field, each with a single
+// named extractor; the (target, templateId) merge below collapses
+// the wider Fingerprint into one AttemptInfo (per template) without
+// requiring multi-extractor-per-template recovery.
 //
-// Other shapes (no extractors declared, cardinality mismatch between
-// declared extractors and runtime results) return nil — engines that
-// downstream-need a specific extractor name read nothing rather than
-// see a value mis-attributed to the wrong extractor.
+// Engines downstream prefer a miss over a mis-attribution — see the
+// SEC-702.A "never guess" guardrail.
 func (b *Builder) extractedFieldsFromEvent(ev *nout.ResultEvent) map[string]string {
 	if ev.ExtractorName != "" {
 		return map[string]string{
@@ -457,29 +464,15 @@ func (b *Builder) extractedFieldsFromEvent(ev *nout.ResultEvent) map[string]stri
 		return nil
 	}
 	names := b.extractorNamesIdx[ev.TemplateID]
-	if len(names) == 0 {
+	if len(names) != 1 {
+		// 0 declared (template has no named extractors) OR 2+ declared
+		// (we'd have to guess which named the flat results belong to).
+		// Drop — downstream engines miss rather than mis-attribute.
 		return nil
 	}
-	if len(names) == 1 {
-		// Single named extractor — join all flat results under it.
-		return map[string]string{
-			names[0]: strings.Join(ev.ExtractedResults, ","),
-		}
+	return map[string]string{
+		names[0]: strings.Join(ev.ExtractedResults, ","),
 	}
-	if len(names) == len(ev.ExtractedResults) {
-		// N declared names, N runtime results — best-effort positional
-		// assignment. Nuclei's OutputExtracts ordering is not strictly
-		// guaranteed across releases but in practice tracks extractor
-		// declaration order; if upstream Nuclei changes that we'd
-		// see the wrong value attributed to the wrong name. Worth it
-		// for the recover-by-default behavior over silent loss.
-		fields := make(map[string]string, len(names))
-		for i, n := range names {
-			fields[n] = ev.ExtractedResults[i]
-		}
-		return fields
-	}
-	return nil
 }
 
 // Final returns the fully-populated Fern report.

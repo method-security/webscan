@@ -42,20 +42,41 @@ func TestExtractedFieldsFromEvent_MatcherEventSingleNamedExtractor(t *testing.T)
 	}
 }
 
-func TestExtractedFieldsFromEvent_MatcherEventCardinalityMatch(t *testing.T) {
-	// Multi-extractor template, positional cardinality match.
+func TestExtractedFieldsFromEvent_MultiExtractorTemplateDropsAmbiguous(t *testing.T) {
+	// Multi-extractor template: we have 2 declared named extractors
+	// but no way to tell which produced which slice of the flat
+	// results from a matcher event. Drop — engines miss rather than
+	// mis-attribute. Authors needing multiple per-host fields should
+	// split into separate single-extractor templates.
 	b := NewBuilder()
 	b.extractorNamesIdx["ubiquiti-airos"] = []string{"device_mac", "architecture_value"}
 	ev := &nout.ResultEvent{
 		TemplateID:       "ubiquiti-airos",
 		ExtractedResults: []string{"00:1A:EF:67:31:34", "MIPSBE"},
 	}
-	got := b.extractedFieldsFromEvent(ev)
-	if got["device_mac"] != "00:1A:EF:67:31:34" {
-		t.Errorf("device_mac = %q; want 00:1A:EF:67:31:34", got["device_mac"])
+	if got := b.extractedFieldsFromEvent(ev); got != nil {
+		t.Fatalf("got %v; want nil (multi-extractor template, can't disambiguate)", got)
 	}
-	if got["architecture_value"] != "MIPSBE" {
-		t.Errorf("architecture_value = %q; want MIPSBE", got["architecture_value"])
+}
+
+func TestExtractedFieldsFromEvent_MultiRequestTemplateConcatBugReproducer(t *testing.T) {
+	// Bugbot Medium repro: a 2-request template with one named
+	// extractor in each request ends up with extractorNamesIdx[id]
+	// = ["a", "b"] after PopulateProbes (concatenated across
+	// requests). When request 1 fires a matcher event with 1
+	// extracted result, the count comparison sees 1 vs 2 and the
+	// old "len(names) == len(results)" path would have skipped.
+	// Under the conservative len(names)==1 rule it ALSO skips —
+	// downstream misses rather than positionally mis-attributes
+	// "request 1's value" to the wrong name.
+	b := NewBuilder()
+	b.extractorNamesIdx["multi-request"] = []string{"a", "b"} // concat across two requests
+	ev := &nout.ResultEvent{
+		TemplateID:       "multi-request",
+		ExtractedResults: []string{"request_1_value"},
+	}
+	if got := b.extractedFieldsFromEvent(ev); got != nil {
+		t.Fatalf("got %v; want nil (multi-extractor template, can't tell which request fired)", got)
 	}
 }
 
@@ -68,20 +89,6 @@ func TestExtractedFieldsFromEvent_NoTemplate(t *testing.T) {
 	}
 	if got := b.extractedFieldsFromEvent(ev); got != nil {
 		t.Fatalf("got %v; want nil (template not registered)", got)
-	}
-}
-
-func TestExtractedFieldsFromEvent_CardinalityMismatchSkips(t *testing.T) {
-	// 3 declared extractors but only 2 runtime results — don't
-	// guess; downstream prefers a miss over a mis-attribution.
-	b := NewBuilder()
-	b.extractorNamesIdx["multi-ext"] = []string{"a", "b", "c"}
-	ev := &nout.ResultEvent{
-		TemplateID:       "multi-ext",
-		ExtractedResults: []string{"x", "y"},
-	}
-	if got := b.extractedFieldsFromEvent(ev); got != nil {
-		t.Fatalf("got %v; want nil (3-extractor template with 2 results)", got)
 	}
 }
 

@@ -523,6 +523,38 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 			formData := requesthelpers.ParseFormDataPairs(formDataPairs)
 
+			// Multipart file upload flag (repeated)
+			filePairs, err := cmd.Flags().GetStringArray("file")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			files, err := parseDiscoverRequestFiles(filePairs)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Raw binary body flags
+			binaryBodyStr, err := cmd.Flags().GetString("binary-body")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			var binaryBody *string
+			if binaryBodyStr != "" {
+				binaryBody = &binaryBodyStr
+			}
+			binaryBodyMimeStr, err := cmd.Flags().GetString("binary-body-mime-type")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			var binaryBodyMime *string
+			if binaryBodyMimeStr != "" {
+				binaryBodyMime = &binaryBodyMimeStr
+			}
+
 			// Config flags
 			maxRedirects, err := cmd.Flags().GetInt("max-redirects")
 			if err != nil {
@@ -570,6 +602,9 @@ func (a *WebScan) InitDiscoverCommand() {
 				JsonBody:                   jsonBody,
 				TextBody:                   textBody,
 				FormData:                   formData,
+				Files:                      files,
+				BinaryBody:                 binaryBody,
+				BinaryBodyMimeType:         binaryBodyMime,
 				MaxRedirects:               maxRedirects,
 				FollowRedirects:            followRedirects,
 				VerifyTls:                  verifyTLS,
@@ -591,6 +626,9 @@ func (a *WebScan) InitDiscoverCommand() {
 	discoverRequestCmd.Flags().String("json-body", "", "Request body as JSON string")
 	discoverRequestCmd.Flags().String("text-body", "", "Request body as plain text")
 	discoverRequestCmd.Flags().StringArray("form-data", []string{}, "Form data as 'key=value' pairs (repeatable)")
+	discoverRequestCmd.Flags().StringArray("file", []string{}, "Multipart file part as 'fieldName|fileName|contentType|base64' (repeatable; contentType may be empty)")
+	discoverRequestCmd.Flags().String("binary-body", "", "Raw request body as base64-encoded bytes")
+	discoverRequestCmd.Flags().String("binary-body-mime-type", "", "Content-Type for --binary-body (default application/octet-stream)")
 	// Config Flags
 	discoverRequestCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
 	discoverRequestCmd.Flags().Bool("follow-redirects", true, "Follow HTTP redirects")
@@ -831,8 +869,34 @@ func (a *WebScan) InitDiscoverCommand() {
 				return
 			}
 
+			// Authenticated-crawl flags
+			headerPairs, err := cmd.Flags().GetStringArray("header")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			cookiePairs, err := cmd.Flags().GetStringArray("cookie")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			localStoragePairs, err := cmd.Flags().GetStringArray("local-storage")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			sessionStoragePairs, err := cmd.Flags().GetStringArray("session-storage")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
 			// Set Config
 			config := getDiscoverRouteConfig(target, ignoreCrossDomain, collectStaticAssets, spiderDepth, maxRedirects, verifyTLS, timeout, sleep, jitter, threads, userAgentPreset, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig, bundleURLs, fetchSourceMaps, maxBundles)
+			config.Headers = requesthelpers.ParseHeaderPairs(headerPairs)
+			config.Cookies = requesthelpers.ParseFormDataPairs(cookiePairs)
+			config.LocalStorage = requesthelpers.ParseFormDataPairs(localStoragePairs)
+			config.SessionStorage = requesthelpers.ParseFormDataPairs(sessionStoragePairs)
 
 			// Generate a report
 			report := discoverroute.PerformRouteCapture(cmd.Context(), config, requestMethodConfig.BrowserbaseSecrets)
@@ -865,6 +929,11 @@ func (a *WebScan) InitDiscoverCommand() {
 	discoverRouteCmd.Flags().StringSlice("bundle-urls", []string{}, "Explicit JS bundle URLs to scan for routes")
 	discoverRouteCmd.Flags().Bool("fetch-source-maps", true, "Fetch and scan source maps for additional routes")
 	discoverRouteCmd.Flags().Int("max-bundles", -1, "Maximum number of JS bundles to process (-1 = unlimited, 0 = disabled)")
+	// Authenticated-crawl flags
+	discoverRouteCmd.Flags().StringArray("header", []string{}, "Request header for authenticated crawl as 'Name: Value' (repeatable)")
+	discoverRouteCmd.Flags().StringArray("cookie", []string{}, "Cookie for authenticated crawl as 'name=value' (repeatable)")
+	discoverRouteCmd.Flags().StringArray("local-storage", []string{}, "localStorage entry as 'key=value' injected before page load (repeatable, headless only)")
+	discoverRouteCmd.Flags().StringArray("session-storage", []string{}, "sessionStorage entry as 'key=value' injected before page load (repeatable, headless only)")
 
 	// Mark Required Flags
 	_ = discoverRouteCmd.MarkFlagRequired("target")
@@ -1166,6 +1235,39 @@ func (a *WebScan) InitDiscoverCommand() {
 
 	// Add Command to Root Command
 	a.RootCmd.AddCommand(discoverCmd)
+}
+
+// parseDiscoverRequestFiles parses repeated --file values formatted as
+// 'fieldName|fileName|contentType|base64' into multipart RequestFile parts.
+// contentType may be empty (e.g. 'field|name.txt||<base64>').
+func parseDiscoverRequestFiles(pairs []string) ([]*discover.RequestFile, error) {
+	if len(pairs) == 0 {
+		return nil, nil
+	}
+	files := make([]*discover.RequestFile, 0, len(pairs))
+	for _, pair := range pairs {
+		parts := strings.SplitN(pair, "|", 4)
+		if len(parts) != 4 {
+			return nil, fmt.Errorf("invalid --file %q: expected 'fieldName|fileName|contentType|base64'", pair)
+		}
+		fieldName := strings.TrimSpace(parts[0])
+		fileName := strings.TrimSpace(parts[1])
+		contentType := strings.TrimSpace(parts[2])
+		contentBase64 := strings.TrimSpace(parts[3])
+		if fieldName == "" || fileName == "" || contentBase64 == "" {
+			return nil, fmt.Errorf("invalid --file %q: fieldName, fileName, and base64 content are required", pair)
+		}
+		file := &discover.RequestFile{
+			FieldName:     fieldName,
+			FileName:      fileName,
+			ContentBase64: contentBase64,
+		}
+		if contentType != "" {
+			file.ContentType = &contentType
+		}
+		files = append(files, file)
+	}
+	return files, nil
 }
 
 // getDiscoverApplicationConfig builds the config for application fingerprinting discovery.

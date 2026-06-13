@@ -175,7 +175,8 @@ func createSendHTTPRequestConfigWithQuery(baseURL, path string, queryParams map[
 		Path:    path,
 		Method:  common.HttpMethodGet,
 		Params: &common.HttpRequestParams{
-			Query: queryParams,
+			Query:   queryParams,
+			Headers: requesthelpers.BuildAuthHeaders(config.Headers, config.Cookies),
 		},
 	}
 	return common.SendHttpRequestConfig{
@@ -189,6 +190,9 @@ func createSendHTTPRequestConfigWithQuery(baseURL, path string, queryParams map[
 		HeadlessConfig:             config.HeadlessConfig,
 		BrowserbaseConfig:          config.BrowserbaseConfig,
 		BrowserbaseSecrets:         browserbaseSecrets,
+		Cookies:                    config.Cookies,
+		LocalStorage:               config.LocalStorage,
+		SessionStorage:             config.SessionStorage,
 	}
 }
 

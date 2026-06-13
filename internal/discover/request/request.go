@@ -4,6 +4,7 @@ import (
 	// Standard
 	"context"
 	"crypto/x509"
+	"fmt"
 	"io"
 	"time"
 
@@ -63,6 +64,40 @@ func buildHTTPRequest(config discover.DiscoverRequestConfig) (*common.HttpReques
 			Form: &common.FormBody{
 				Fields:   config.FormData,
 				MimeType: &mimeType,
+			},
+		}
+	case len(config.Files) > 0:
+		parts := make([]*common.MultipartPart, 0, len(config.Files))
+		for _, file := range config.Files {
+			if file == nil {
+				continue
+			}
+			partHeaders := map[string]string{
+				"Content-Disposition": fmt.Sprintf("form-data; name=%q; filename=%q", file.FieldName, file.FileName),
+			}
+			var partMime *string
+			if file.ContentType != nil && *file.ContentType != "" {
+				partHeaders["Content-Type"] = *file.ContentType
+				partMime = file.ContentType
+			}
+			parts = append(parts, &common.MultipartPart{
+				Headers: partHeaders,
+				Content: &common.BinaryBody{
+					Base64:   file.ContentBase64,
+					MimeType: partMime,
+				},
+			})
+		}
+		body = &common.Body{
+			Kind:      "multipart",
+			Multipart: &common.MultipartBody{Parts: parts},
+		}
+	case config.BinaryBody != nil && *config.BinaryBody != "":
+		body = &common.Body{
+			Kind: "binary",
+			Binary: &common.BinaryBody{
+				Base64:   *config.BinaryBody,
+				MimeType: config.BinaryBodyMimeType,
 			},
 		}
 	}

@@ -1,4 +1,4 @@
-# SEC-702.A — MikroTik RouterOS 7.17+ asset-hash → version lookup
+# MikroTik RouterOS 7.17+ asset-hash → version lookup
 #
 # Maps the content-hash suffix in a 7.17+ MikroTik WebFig asset path
 # (e.g. /assets/style-<hash>.css, /assets/script-<hash>.js) to the

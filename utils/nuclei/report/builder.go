@@ -10,24 +10,24 @@ import (
 // Builder constructs and manages Nuclei scan reports.
 // It maintains indexes for probes and targets to efficiently process scan results.
 //
-// SEC-702.A: attemptIdx merges Nuclei events by (target, templateId).
-// Nuclei emits one ResultEvent per matched extractor/matcher; without
-// the merge, the same template firing two extractors on the same host
-// produced two AttemptInfo entries downstream. Engines de-duped by
-// templateId and silently dropped the second event's extractor data
-// (e.g. device_serial captured by extractor B was lost because
+// attemptIdx merges Nuclei events by (target, templateId). Nuclei
+// emits one ResultEvent per matched extractor/matcher; without the
+// merge, the same template firing two extractors on the same host
+// produces two AttemptInfo entries downstream. Engines de-dup by
+// templateId and silently drop the second event's extractor data
+// (e.g. device_serial captured by extractor B is lost because
 // extractor A's event arrived first). With the merge, the engine sees
 // a single consolidated AttemptInfo per (target, templateId) carrying
 // the union of all extractor outputs in ExtractedFields.
 //
-// SEC-702.A: extractorNamesIdx records the named extractors declared
-// by each template. Nuclei's MakeDefaultResultEvent emits matcher-
-// named ResultEvents WITHOUT ExtractorName whenever the template's
-// matchers populate `Matches` (the typical matcher+extractor case);
-// the event still carries flat `ExtractedResults` but the per-
-// extractor names are dropped from the public SDK API. We recover
-// the names positionally from the template definition when the
-// cardinality matches — see Consume.
+// extractorNamesIdx records the named extractors declared by each
+// template. Nuclei's MakeDefaultResultEvent emits matcher-named
+// ResultEvents WITHOUT ExtractorName whenever the template's matchers
+// populate `Matches` (the typical matcher+extractor case); the event
+// still carries flat `ExtractedResults` but the per-extractor names
+// are dropped from the public SDK API. We recover the names
+// positionally from the template definition when the cardinality
+// matches — see Consume.
 type Builder struct {
 	mu                sync.Mutex
 	targets           []*nuclei.NucleiTargetInfo

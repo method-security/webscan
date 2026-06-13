@@ -1,4 +1,4 @@
-// Package application — SEC-702.A MikroTik RouterOS 7.17+
+// Package application — MikroTik RouterOS 7.17+
 // asset-hash → version lookup helper.
 //
 // Background (TC-001): RouterOS 7.17+ post-redesign WebFig dropped
@@ -31,8 +31,7 @@ import (
 
 // mikrotikAssetHashYAML is the embedded YAML source of truth for the
 // hash → version table. Cluster C (MikroTik) seeds it from RouterOS
-// 7.17+ captures; later data PRs extend coverage. Empty at SEC-702.A
-// seed-time.
+// 7.17+ captures; later data PRs extend coverage. Empty at seed-time.
 //
 //go:embed _data/mikrotik-asset-hashes.yaml
 var mikrotikAssetHashYAML []byte

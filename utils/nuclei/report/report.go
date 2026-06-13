@@ -128,9 +128,9 @@ func (b *Builder) PopulateProbes(eng *nucleilib.NucleiEngine) error {
 			MatcherDetails: &nuclei.NucleiMatcherDetails{},
 		}
 
-		// SEC-702.A — record the declaration-order named extractors
-		// per template so Consume can recover names from matcher-
-		// emitted events whose ExtractorName Nuclei dropped.
+		// Record the declaration-order named extractors per template
+		// so Consume can recover names from matcher-emitted events
+		// whose ExtractorName Nuclei dropped.
 		var extractorNames []string
 
 		// Check if RequestsHTTP is available, otherwise use RequestsHeadless
@@ -238,8 +238,8 @@ func (b *Builder) PopulateProbes(eng *nucleilib.NucleiEngine) error {
 // Consume processes a single Nuclei result event and updates the report accordingly.
 // It handles probe information, target bucketing, and attempt tracking.
 //
-// SEC-702.A: events sharing a (target, templateId) pair are merged into
-// one AttemptInfo. The first event populates the Finding; subsequent
+// Events sharing a (target, templateId) pair are merged into one
+// AttemptInfo. The first event populates the Finding; subsequent
 // events overlay their ExtractedFields onto the same AttemptInfo so
 // downstream engines see a single consolidated record per template per
 // target. Non-extractor fields (Metadata, classification, severity,
@@ -265,11 +265,11 @@ func (b *Builder) Consume(ev *nout.ResultEvent) {
 		b.targets = append(b.targets, targetInfo)
 	}
 
-	// SEC-702.A — check the (target, templateId) merge index FIRST.
-	// If we've already built an AttemptInfo for this pair, the only
-	// per-event field that varies is ExtractorName/ExtractedResults;
-	// overlay those into the existing Finding's ExtractedFields and
-	// skip the rest of this function.
+	// Check the (target, templateId) merge index first. If we've
+	// already built an AttemptInfo for this pair, the only per-event
+	// field that varies is ExtractorName/ExtractedResults; overlay
+	// those into the existing Finding's ExtractedFields and skip the
+	// rest of this function.
 	templateAttempts, hasTargetTemplates := b.attemptIdx[targetURL]
 	if !hasTargetTemplates {
 		templateAttempts = make(map[string]*nuclei.NucleiAttemptInfo)
@@ -372,12 +372,12 @@ func (b *Builder) Consume(ev *nout.ResultEvent) {
 		}
 	}
 
-	// SEC-702.A — seed the per-host extractor map from this first
-	// event. Nuclei emits ExtractorName only in the extractor-only
-	// branch of MakeDefaultResultEvent; matcher-named events drop
-	// the name. b.extractedFieldsFromEvent recovers the name from
-	// the template definition when the upstream API doesn't carry
-	// it. nil is returned when no extractor output is available.
+	// Seed the per-host extractor map from this first event. Nuclei
+	// emits ExtractorName only in the extractor-only branch of
+	// MakeDefaultResultEvent; matcher-named events drop the name.
+	// b.extractedFieldsFromEvent recovers the name from the template
+	// definition when the upstream API doesn't carry it. nil is
+	// returned when no extractor output is available.
 	extractedFields := b.extractedFieldsFromEvent(ev)
 
 	attemptInfo.Finding = &nuclei.NucleiFindingInfo{
@@ -452,8 +452,8 @@ func (b *Builder) mergeExtractedFields(existing *nuclei.NucleiAttemptInfo, ev *n
 // the wider Fingerprint into one AttemptInfo (per template) without
 // requiring multi-extractor-per-template recovery.
 //
-// Engines downstream prefer a miss over a mis-attribution — see the
-// SEC-702.A "never guess" guardrail.
+// Engines downstream prefer a miss over a mis-attribution — never
+// guess when the extractor-name mapping is ambiguous.
 func (b *Builder) extractedFieldsFromEvent(ev *nout.ResultEvent) map[string]string {
 	if ev.ExtractorName != "" {
 		return map[string]string{

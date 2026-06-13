@@ -1,4 +1,4 @@
-# SEC-702.A — architecture lookup table
+# Architecture lookup table
 #
 # Maps (vendor, model) → architecture string. Read at package init by
 # internal/discover/application/arch_lookup.go via `//go:embed` and
@@ -15,13 +15,11 @@
 #
 # Vendor keys are lowercase, hyphenated. Model keys are exact-match
 # strings (case-sensitive — match the device-reported model verbatim,
-# do not pre-lowercase). Per-cluster PRs populate this file:
-#   Cluster C (MikroTik), Cluster E (Dahua), Cluster F (Ubiquiti),
-#   plus the data-PR cluster P.
+# do not pre-lowercase). Per-cluster PRs populate this file.
 #
 # Confidence assigned by arch_lookup.go for MODEL_LOOKUP hits is
-# 0.75 (per SEC-702 catalog confidence rubric: 0.6–0.85 range for
-# MODEL_LOOKUP). Templates may override by emitting their own
+# 0.75 (catalog confidence rubric: 0.6–0.85 range for MODEL_LOOKUP).
+# Templates may override by emitting their own
 # method-architecture-confidence metadata or extractor output.
 
 vendors: {}

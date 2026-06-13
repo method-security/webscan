@@ -1,4 +1,4 @@
-// Package application — SEC-702.A IEEE OUI → vendor lookup helper.
+// Package application — IEEE OUI → vendor lookup helper.
 //
 // When a device self-discloses its MAC address pre-auth (TC-004
 // Ubiquiti AIROS_<MAC> cookie + TLS cert CN, TC-015 Raisecom

@@ -16,7 +16,7 @@ import (
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
-// Template-author input contract (SEC-702.A).
+// Template-author input contract.
 //
 // Templates emit values via two channels and the engine reads BOTH:
 //
@@ -55,7 +55,7 @@ const (
 	metaMikrotikAssetHash      = "method-mikrotik-asset-hash"
 )
 
-// Extractor name contract (SEC-702.A). Templates that need per-host
+// Extractor name contract. Templates that need per-host
 // values define Nuclei extractors with these exact `name:` strings;
 // the Builder maps name → captured value into ExtractedFields.
 const (
@@ -70,7 +70,7 @@ const (
 // pickField returns the extractor-output value for extractorKey if
 // present and non-empty; otherwise falls back to the metadata value
 // for metaKey. This is the canonical "extractor wins over metadata"
-// helper for the SEC-702.A inputs.
+// helper for the metadata and extractor inputs.
 //
 // Pass extractorKey="" to skip the extractor lookup entirely (e.g.
 // when the field is currently metadata-only at the template layer).
@@ -93,7 +93,7 @@ func pickField(ef map[string]string, extractorKey string, md map[string]string, 
 // convertNucleiAttemptToFingerprintAttemptStruct converts a Nuclei
 // attempt to an application fingerprint attempt. log is the engine
 // log handle threaded through from LaunchFingerprintEngine; it's used
-// for the OUI-vs-module observability warning (SEC-702.A delta 3).
+// for the OUI-vs-module observability warning.
 // Passing a nil log is safe — the OUI helper short-circuits.
 func convertNucleiAttemptToFingerprintAttemptStruct(log svc1log.Logger, nucleiAttempt *nuclei.NucleiAttemptInfo) *discover.ApplicationFingerprintAttempt {
 	if nucleiAttempt == nil || nucleiAttempt.TemplateId == "" {
@@ -110,11 +110,11 @@ func convertNucleiAttemptToFingerprintAttemptStruct(log svc1log.Logger, nucleiAt
 	var deviceMacFromMetadata *string
 	var deviceSerialFromMetadata *string
 
-	// SEC-702.A — pull the metadata + extractor maps from the
-	// finding. Either may be nil (template without metadata, or
-	// without extractors). We pass both to the helpers below; the
-	// pickField helper handles nil gracefully and "extractor wins"
-	// is uniform across the call sites.
+	// Pull the metadata + extractor maps from the finding. Either
+	// may be nil (template without metadata, or without extractors).
+	// We pass both to the helpers below; the pickField helper handles
+	// nil gracefully and "extractor wins" is uniform across the call
+	// sites.
 	var md map[string]string
 	var ef map[string]string
 	if nucleiAttempt.Finding != nil {
@@ -153,26 +153,24 @@ func convertNucleiAttemptToFingerprintAttemptStruct(log svc1log.Logger, nucleiAt
 		}
 	}
 
-	// SEC-702.A — derive architecture from extractors first, then
-	// metadata. Returns nil when neither path applies; never guesses.
+	// Derive architecture from extractors first, then metadata.
+	// Returns nil when neither path applies; never guesses.
 	architectureFromMetadata = deriveArchitecture(md, ef)
 
-	// SEC-702.A — device MAC: extractor wins over metadata. Normalize
-	// to canonical form before publishing. NormalizeMac fails-closed
-	// on inputs that don't contain a full 48-bit MAC, so a garbage
-	// extractor result produces no deviceMac (rather than a half-
-	// formed one).
+	// Device MAC: extractor wins over metadata. Normalize to canonical
+	// form before publishing. NormalizeMac fails-closed on inputs that
+	// don't contain a full 48-bit MAC, so a garbage extractor result
+	// produces no deviceMac (rather than a half-formed one).
 	if rawMac := pickField(ef, extractDeviceMac, md, metaDeviceMac); rawMac != "" {
 		if canonical := NormalizeMac(rawMac); canonical != "" {
 			deviceMacFromMetadata = &canonical
 		}
 	}
 
-	// SEC-702.A — device serial: verbatim. The catalog warns that
-	// some devices (Dahua 2019+) emit a 32-char hex realm that
-	// LOOKS like a serial but is actually a hash; templates must
-	// length-bound their extractors. The engine trusts the
-	// template's extractor here — it does not re-validate.
+	// Device serial: verbatim. Some devices (Dahua 2019+) emit a
+	// 32-char hex realm that looks like a serial but is actually a
+	// hash; templates must length-bound their extractors. The engine
+	// trusts the template's extractor here — it does not re-validate.
 	if rawSerial := pickField(ef, extractDeviceSerial, md, metaDeviceSerial); rawSerial != "" {
 		trimmed := strings.TrimSpace(rawSerial)
 		if trimmed != "" {
@@ -180,8 +178,8 @@ func convertNucleiAttemptToFingerprintAttemptStruct(log svc1log.Logger, nucleiAt
 		}
 	}
 
-	// SEC-702.A — MikroTik 7.17+ asset-hash → version dereference.
-	// If the template provided a CPE template containing the
+	// MikroTik 7.17+ asset-hash → version dereference. If the template
+	// provided a CPE template containing the
 	// literal placeholder "{version}" AND the asset-hash hits a
 	// known RouterOS release, substitute. Otherwise leave the CPE
 	// untouched. This keeps the asset-hash helper useful even
@@ -193,7 +191,7 @@ func convertNucleiAttemptToFingerprintAttemptStruct(log svc1log.Logger, nucleiAt
 		}
 	}
 
-	// SEC-702.A delta 3 — OUI vendor confirmation, log-only.
+	// OUI vendor confirmation, log-only.
 	// When the device self-disclosed its MAC pre-auth and OuiLookup
 	// returns a vendor that disagrees with the template's
 	// method-module-name, log a warning at INFO. NEVER overwrite the
@@ -268,7 +266,7 @@ func maybeLogOuiVendorMismatch(log svc1log.Logger, templateID string, deviceMac 
 		return
 	}
 	log.Info(
-		"OUI vendor disagrees with template module — both retained, no overwrite (SEC-702.A delta 3)",
+		"OUI vendor disagrees with template module — both retained, no overwrite",
 		svc1log.SafeParam("templateId", templateID),
 		svc1log.SafeParam("deviceMac", *deviceMac),
 		svc1log.SafeParam("ouiVendor", vendor),
@@ -343,8 +341,8 @@ func deriveArchitecture(md, ef map[string]string) *discover.ArchitectureInfo {
 	}
 	archEnum, hit := lookupArchitecture(vendor, model)
 	if !hit {
-		// Empty table at SEC-702.A seed-time; no hit is the expected
-		// path until Cluster C / E / F / P populate the table.
+		// Empty table at seed-time; no hit is the expected path until
+		// per-cluster PRs populate the table.
 		return nil
 	}
 	confidence := archLookupConfidence
@@ -362,8 +360,7 @@ func deriveArchitecture(md, ef map[string]string) *discover.ArchitectureInfo {
 
 // clampConfidence pins a confidence value to [0.0, 1.0]. The Fern
 // schema doesn't constrain the range, so the engine enforces it
-// here to keep downstream consumers (and the confidence rubric in
-// the SEC-702 catalog) honest.
+// here to keep downstream consumers honest.
 func clampConfidence(c float64) float64 {
 	if c < 0.0 {
 		return 0.0

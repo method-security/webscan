@@ -1,8 +1,7 @@
-// Package application — SEC-702.A architecture inference helper.
+// Package application — architecture inference helper.
 //
 // The catalog defines three viable sources for the pre-auth HTTP
-// architecture inference (see SEC-702 description, "Architecture
-// inference" section):
+// architecture inference. Three viable sources in priority order:
 //
 //  1. DEVICE_DISCLOSED — template extracted an architecture string
 //     directly from the device's pre-auth response (Synology
@@ -64,7 +63,7 @@ var (
 
 // archLookupConfidence is the confidence value emitted for any
 // MODEL_LOOKUP hit produced by this helper. 0.75 sits in the middle
-// of the SEC-702 catalog's 0.6–0.85 range for MODEL_LOOKUP. Templates
+// of the catalog's 0.6–0.85 range for MODEL_LOOKUP. Templates
 // that want a different confidence can override via
 // method-architecture-confidence (metadata or extractor), which the
 // engine prefers when set.

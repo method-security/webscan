@@ -37,6 +37,7 @@ types:
       - MISCONFIGURED
       - EXPOSED_ADMIN
       - VULNERABLE_VERSION
+      - VERSIONED
       - DEBUGGING_ENABLED
   ApplicationResourceConfigType:
     discriminated: false

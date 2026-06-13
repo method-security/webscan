@@ -7,8 +7,10 @@ info:
   metadata:
     method-application-type: NETWORK_EDGE_APPLICATION
     method-module-name: IVANTI_CONNECT_SECURE
+    method-sub-module-name: SSL_VPN_PORTAL
+    method-detection-state: DEFAULT_PAGE
     cpe: cpe:2.3:a:ivanti:connect_secure:*:*:*:*:*:*:*:*
-  tags: discovery,ivanti,pulse,connect-secure,vpn,network-edge
+  tags: discovery,vpn,ivanti,pulse,connect-secure,network-edge
 http:
   - method: GET
     path:
@@ -19,31 +21,38 @@ http:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
+    matchers-condition: or
     matchers:
       - type: word
         part: body
         words:
-          - "pulse connect secure"
-          - "ivanti connect secure"
+          - "Pulse Connect Secure"
+          - "Ivanti Connect Secure"
         case-insensitive: true
       - type: word
         part: body
         words:
           - "/dana-na/"
           - "welcome.cgi?p=logo"
-        condition: and
         case-insensitive: true
+        condition: and
       - type: word
         part: body
         words:
           - "/dana-na/"
           - "ivehost"
-        condition: and
         case-insensitive: true
+        condition: and
       - type: word
         part: header
         words:
-          - "DSSIGNIN"
-          - "DSID"
+          - "DSSIGNIN="
+          - "DSID="
         case-insensitive: true
         condition: and
+      - type: word
+        part: body
+        words:
+          - "<title>Ivanti Connect Secure</title>"
+          - "<title>Pulse Connect Secure</title>"
+        case-insensitive: true

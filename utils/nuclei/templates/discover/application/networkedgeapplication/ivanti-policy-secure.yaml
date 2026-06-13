@@ -1,0 +1,42 @@
+id: ivanti-policy-secure-detect
+info:
+  name: Ivanti Policy Secure Detection
+  author: method-security
+  severity: info
+  description: Detects Ivanti Policy Secure (formerly Pulse Policy Secure) network access control portals using dana-admin and policy-specific paths and session cookies.
+  metadata:
+    method-application-type: NETWORK_EDGE_APPLICATION
+    method-module-name: IVANTI_POLICY_SECURE
+    method-sub-module-name: SSL_VPN_PORTAL
+    method-detection-state: DEFAULT_PAGE
+    cpe: cpe:2.3:a:ivanti:policy_secure:*:*:*:*:*:*:*:*
+  tags: discovery,vpn,ivanti,pulse,policy-secure,network-edge
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/dana-na/auth/url_admin/welcome.cgi"
+      - "{{BaseURL}}/dana-admin/"
+      - "{{BaseURL}}/dana-na/auth/url_default/welcome.cgi"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers-condition: or
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "Pulse Policy Secure"
+          - "Ivanti Policy Secure"
+        case-insensitive: true
+      - type: word
+        part: header
+        words:
+          - "ADMINDSID="
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "<title>Ivanti Policy Secure</title>"
+          - "<title>Pulse Policy Secure</title>"
+        case-insensitive: true

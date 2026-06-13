@@ -1,0 +1,32 @@
+id: firezone-detect
+info:
+  name: Firezone VPN Web UI Detection
+  author: method-security
+  severity: info
+  description: Detects Firezone, a self-hosted WireGuard-based VPN and firewall management platform. Firezone exposes a web UI typically on port 13000 for user and device management.
+  metadata:
+    method-application-type: NETWORK_EDGE_APPLICATION
+    method-module-name: FIREZONE
+    cpe: cpe:2.3:a:firezone:firezone:*:*:*:*:*:*:*:*
+  tags: discovery,firezone,wireguard,vpn,network-edge
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/sign_in"
+      - "{{BaseURL}}/users/sign_in"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers-condition: or
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "Firezone"
+        case-insensitive: true
+      - type: word
+        part: title
+        words:
+          - "Firezone"
+        case-insensitive: true

@@ -1,0 +1,39 @@
+id: openvpn-management-http-detect
+info:
+  name: OpenVPN Management Interface HTTP Status Page Detection
+  author: method-security
+  severity: info
+  description: Detects OpenVPN management interface HTTP status pages exposed by the --management flag. Exposed status pages reveal connected clients, routing tables, and VPN server state.
+  metadata:
+    method-application-type: NETWORK_EDGE_APPLICATION
+    method-module-name: OPENVPN_ACCESS_SERVER
+    cpe: cpe:2.3:a:openvpn:access_server:*:*:*:*:*:*:*:*
+  tags: discovery,openvpn,vpn,management-interface,network-edge
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/status"
+      - "{{BaseURL}}/openvpn-status"
+    redirects: true
+    max-redirects: 3
+    stop-at-first-match: true
+    matchers-condition: or
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "OpenVPN Status"
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "OpenVPN CLIENT LIST"
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "OpenVPN ROUTING TABLE"
+          - "OpenVPN"
+        condition: and
+        case-insensitive: true

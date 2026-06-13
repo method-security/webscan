@@ -1,0 +1,45 @@
+id: openvpn-access-server-detect
+info:
+  name: OpenVPN Access Server Web UI Detection
+  author: method-security
+  severity: info
+  description: Detects OpenVPN Access Server web administration and client portal interfaces. OpenVPN Access Server exposes a web UI for user self-service and administrator management.
+  metadata:
+    method-application-type: NETWORK_EDGE_APPLICATION
+    method-module-name: OPENVPN_ACCESS_SERVER
+    cpe: cpe:2.3:a:openvpn:access_server:*:*:*:*:*:*:*:*
+  tags: discovery,openvpn,access-server,vpn,network-edge
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/__login__"
+      - "{{BaseURL}}/admin"
+      - "{{BaseURL}}/admin/__login__"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers-condition: or
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "OpenVPN Access Server"
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "openvpn-as"
+        case-insensitive: true
+      - type: word
+        part: title
+        words:
+          - "OpenVPN Access Server"
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "openvpn_as"
+          - "OpenVPN"
+        condition: and
+        case-insensitive: true

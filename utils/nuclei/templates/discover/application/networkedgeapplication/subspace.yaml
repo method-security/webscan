@@ -1,0 +1,25 @@
+id: subspace-detect
+info:
+  name: Subspace VPN Web UI Detection
+  author: method-security
+  severity: info
+  description: Detects Subspace, a simple WireGuard VPN web interface for managing users and device configurations. Subspace provides self-service VPN configuration for end users.
+  metadata:
+    method-application-type: NETWORK_EDGE_APPLICATION
+    method-module-name: SUBSPACE
+    cpe: cpe:2.3:a:subspacecommunity:subspace:*:*:*:*:*:*:*:*
+  tags: discovery,subspace,wireguard,vpn,network-edge
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/signin"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "Subspace"
+        case-insensitive: true

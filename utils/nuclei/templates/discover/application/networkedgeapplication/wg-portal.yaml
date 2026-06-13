@@ -1,0 +1,57 @@
+id: wg-portal-detect
+info:
+  name: WireGuard Portal Web UI Detection
+  author: method-security
+  severity: info
+  description: Detects h44z WireGuard Portal, a web-based management portal for WireGuard VPN with LDAP integration. Attempts to extract version information from the portal API.
+  metadata:
+    method-application-type: NETWORK_EDGE_APPLICATION
+    method-module-name: WG_PORTAL
+    cpe: cpe:2.3:a:h44z:wg-portal:*:*:*:*:*:*:*:*
+  tags: discovery,wireguard,wg-portal,vpn,network-edge
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/login"
+      - "{{BaseURL}}/auth/login"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers-condition: or
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "WireGuard Portal"
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "wg-portal"
+        case-insensitive: true
+      - type: word
+        part: title
+        words:
+          - "WireGuard Portal"
+        case-insensitive: true
+
+  - method: GET
+    path:
+      - "{{BaseURL}}/api/v0/version"
+      - "{{BaseURL}}/api/v1/info"
+    redirects: true
+    max-redirects: 3
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "version"
+        case-insensitive: true
+    extractors:
+      - type: json
+        name: version
+        part: body
+        json:
+          - ".version"
+          - ".Version"

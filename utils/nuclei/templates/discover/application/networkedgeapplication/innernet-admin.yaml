@@ -1,0 +1,26 @@
+id: innernet-admin-detect
+info:
+  name: Innernet Server Admin UI Detection
+  author: method-security
+  severity: info
+  description: Detects Innernet server admin interface. Innernet is a WireGuard-based internal networking tool that exposes an HTTP admin interface for managing peers and networks.
+  metadata:
+    method-application-type: NETWORK_EDGE_APPLICATION
+    method-module-name: INNERNET_ADMIN
+    cpe: cpe:2.3:a:tonarino:innernet:*:*:*:*:*:*:*:*
+  tags: discovery,innernet,wireguard,vpn,network-edge
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/api/v1"
+      - "{{BaseURL}}/health"
+    redirects: true
+    max-redirects: 3
+    stop-at-first-match: true
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "innernet"
+        case-insensitive: true

@@ -1,0 +1,25 @@
+id: wg-easy-detect
+info:
+  name: WG-Easy WireGuard Web UI Detection
+  author: method-security
+  severity: info
+  description: Detects wg-easy, a WireGuard VPN web management interface. WG-Easy provides a simple web UI for managing WireGuard peers and configurations.
+  metadata:
+    method-application-type: NETWORK_EDGE_APPLICATION
+    method-module-name: WG_EASY
+    cpe: cpe:2.3:a:wg-easy:wg-easy:*:*:*:*:*:*:*:*
+  tags: discovery,wireguard,wg-easy,vpn,network-edge
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/login"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: word
+        part: title
+        words:
+          - "WG-Easy"
+        case-insensitive: true

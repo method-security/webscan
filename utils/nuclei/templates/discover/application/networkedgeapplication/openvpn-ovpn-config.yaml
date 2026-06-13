@@ -1,0 +1,46 @@
+id: openvpn-ovpn-config-detect
+info:
+  name: OpenVPN OVPN Client Config File Exposure Detection
+  author: method-security
+  severity: info
+  description: Detects OpenVPN client configuration files (.ovpn) served over HTTP. Exposed .ovpn files contain VPN server addresses, CA certificates, and client credentials that can facilitate unauthorized access.
+  metadata:
+    method-application-type: NETWORK_EDGE_APPLICATION
+    method-module-name: OPENVPN_ACCESS_SERVER
+    cpe: cpe:2.3:a:openvpn:access_server:*:*:*:*:*:*:*:*
+  tags: discovery,openvpn,vpn,config-exposure,network-edge
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/client.ovpn"
+      - "{{BaseURL}}/vpn.ovpn"
+      - "{{BaseURL}}/config.ovpn"
+      - "{{BaseURL}}/openvpn.ovpn"
+      - "{{BaseURL}}/configs/client.ovpn"
+      - "{{BaseURL}}/downloads/client.ovpn"
+    redirects: true
+    max-redirects: 3
+    stop-at-first-match: true
+    matchers-condition: or
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "client"
+          - "dev tun"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "remote "
+          - "<ca>"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "proto tcp"
+          - "proto udp"
+        condition: or
+        case-insensitive: true

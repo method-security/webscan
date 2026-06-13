@@ -1,0 +1,25 @@
+id: wireguard-ui-detect
+info:
+  name: WireGuard UI Web Management Interface Detection
+  author: method-security
+  severity: info
+  description: Detects ngoduykhanh's WireGuard UI, a web-based management interface for WireGuard VPN. The interface allows management of WireGuard peers and server configuration.
+  metadata:
+    method-application-type: NETWORK_EDGE_APPLICATION
+    method-module-name: WIREGUARD_UI
+    cpe: cpe:2.3:a:ngoduykhanh:wireguard-ui:*:*:*:*:*:*:*:*
+  tags: discovery,wireguard,wireguard-ui,vpn,network-edge
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/login"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "WireGuard UI"
+        case-insensitive: true

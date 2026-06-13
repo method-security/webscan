@@ -1,0 +1,118 @@
+id: raisecom-cpe-detect
+info:
+  name: Raisecom Technology CPE (ZXV / ADSL2+ Series) Web Management Detection
+  author: method-security
+  severity: info
+  description: |
+    Detects Raisecom Technology DSL CPE (ZXV-818-P and related ADSL2+ products) running the Realtek SDK stock webserver.
+    Two-stage probe: Tier-1 confirms Realtek SDK (Server: RTK Web 0.9 + stock asset paths); Tier-2 performs the
+    Realtek SDK Referer-header origin-check bypass on /status.htm with Referer: http://<host>/login.htm — when the
+    target firmware is vulnerable (most pre-patch Raisecom firmware), the Tier-2 body exposes Firmware Version,
+    Built Date, Serial Number, MAC Address, and Operational Status pre-auth.
+    Validated against TC-015 (185.99.214.43 — ZXV-818-P/Vr.1.21, Apr 6 2021 build, OUI 00:1A:EF Raisecom).
+    Note: the Tier-2 Referer-bypass is a Realtek-SDK-broad implementation flaw — the template still implements it
+    even though the live target may have rotated since TC-015's original capture.
+  metadata:
+    method-application-type: NETWORK_EDGE_APPLICATION
+    method-module-name: RAISECOM
+    method-detection-state: EXPOSED_ADMIN
+    cpe: cpe:2.3:o:raisecom:cpe_firmware:*:*:*:*:*:*:*:*
+  tags: discovery,raisecom,zxv,adsl,dsl,realtek-sdk,cpe,network-edge,soho
+http:
+  # Tier-1 probe: confirm Realtek SDK stock webserver. GET / returns
+  # the 151-byte JS-redirect to /login.htm; either the root or
+  # /login.htm body carries the stock asset triple.
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/login.htm"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers-condition: and
+    matchers:
+      - type: regex
+        part: header
+        regex:
+          - '(?i)server:\s*RTK Web 0\.9'
+      - type: dsl
+        dsl:
+          - >-
+            contains(body, "reset.css") &&
+            contains(body, "base.css") &&
+            contains(body, "style.css")
+          - >-
+            contains(body, "parent.location=\"/login.htm\"") ||
+            contains(body, "parent.location='/login.htm'") ||
+            contains(body, "<title>Router</title>")
+  # Tier-2 probe: Realtek SDK Referer-header bypass on /status.htm.
+  # With Referer: http://{{Hostname}}/login.htm the embedded webserver
+  # serves the device-info table pre-auth. Without it (or when patched
+  # / rate-limited) the device returns the 151-byte JS-redirect and
+  # this matcher block fails — Tier-1 will still have fired so the
+  # vendor confirmation stands.
+  - method: GET
+    path:
+      - "{{BaseURL}}/status.htm"
+    headers:
+      Referer: "http://{{Hostname}}/login.htm"
+    redirects: false
+    matchers-condition: and
+    matchers:
+      - type: regex
+        part: header
+        regex:
+          - '(?i)server:\s*RTK Web 0\.9'
+      - type: word
+        part: body
+        words:
+          - "<title>DSL Router Status</title>"
+      - type: word
+        part: body
+        words:
+          - "Firmware Version"
+          - "MAC Address"
+        condition: and
+    extractors:
+      # Firmware version: Raisecom format is <Model>/Vr.<X.YY>, e.g.
+      # ZXV-818-P/Vr.1.21. Captures the full string so both model
+      # and version are visible downstream.
+      - type: regex
+        name: firmware_version
+        part: body
+        group: 1
+        regex:
+          - '<th>Firmware Version</th>\s*<td>\s*([A-Z0-9-]+/Vr\.[0-9.]+)\s*</td>'
+      # Built date (free-form C ctime-like string).
+      - type: regex
+        name: built_date
+        part: body
+        group: 1
+        regex:
+          - '<th>Built Date</th>\s*<td>\s*([A-Za-z]+\s+\d+\s+\d{4}\s+\d{2}:\d{2}:\d{2})\s*</td>'
+      # Serial number (MAC-form, 12-hex). Surfaced via the extractor
+      # field; dedicated ApplicationFingerprintAttempt.deviceSerial
+      # wiring lands with SEC-702.A / PR #423 in a follow-on PR.
+      - type: regex
+        name: device_serial
+        part: body
+        group: 1
+        regex:
+          - '<th>Serial Number</th>\s*<td>\s*([0-9A-F]{12})\s*</td>'
+      # MAC address (canonical colon form). Surfaced via the extractor
+      # field; dedicated ApplicationFingerprintAttempt.deviceMac wiring
+      # + OUI lookup (00:1A:EF → Raisecom) lands with SEC-702.A / PR
+      # #423 in a follow-on PR.
+      - type: regex
+        name: device_mac
+        part: body
+        group: 1
+        regex:
+          - '<th>MAC Address</th>\s*<td>\s*([0-9A-F]{2}(?::[0-9A-F]{2}){5})\s*</td>'
+      # Operational status — confirms DSL CPE product family.
+      - type: regex
+        name: operational_status
+        part: body
+        group: 1
+        regex:
+          - '<th[^>]*>Operational Status</th>\s*<td>\s*(ADSL2?\+?\s+[A-Za-z0-9]+)'

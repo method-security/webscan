@@ -1,0 +1,36 @@
+### REQUEST
+GET / HTTP/1.1
+Host: example.com
+User-Agent: Mozilla/5.0
+
+### RESPONSE
+HTTP/1.1 200 OK
+Content-Type: text/html; charset=UTF-8
+Server: Apache/2.4.41 (Ubuntu)
+X-Powered-By: PHP/7.4.3
+Link: <https://example.com/wp-json/>; rel="https://api.w.org/"
+Content-Length: 1024
+
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+<meta charset="UTF-8">
+<title>Best MikroTik Tutorials &#8211; A WordPress site about networking</title>
+<link rel="stylesheet" href="https://example.com/wp-content/themes/twentytwentyone/style.css">
+<meta name="generator" content="WordPress 6.4.1">
+</head>
+<body class="home blog wp-embed-responsive">
+<header>
+<h1>Welcome to my MikroTik blog!</h1>
+<p>Learn how to configure RouterOS, WebFig, Winbox, and more — for free.</p>
+</header>
+<article>
+<h2>Posts about MikroTik routers</h2>
+<p>Configuring a MikroTik RouterOS device for the first time can be confusing. This tutorial walks through the WebFig interface and the Winbox application.</p>
+<p>Tags: mikrotik, routeros, webfig, winbox, networking</p>
+</article>
+<footer>
+<p>Copyright (c) 2024 Example Blog. Powered by WordPress.</p>
+</footer>
+</body>
+</html>

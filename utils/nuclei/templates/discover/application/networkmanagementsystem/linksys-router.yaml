@@ -1,0 +1,94 @@
+id: linksys-router-detect
+info:
+  name: Linksys Smart Wi-Fi / WRT / E-Series Router Web Management Detection
+  author: method-security
+  severity: info
+  description: |
+    Detects Linksys consumer routers across three eras: Smart Wi-Fi (modern), WRT54G + WRT/E-series basic-auth,
+    and the JNAP REST endpoint that is sometimes unauth-readable.
+    No fixture validation — built from catalog signatures (SEC-702 description); confidence lower than TC-backed templates.
+  metadata:
+    method-application-type: NETWORK_MANAGEMENT_SYSTEM
+    method-module-name: LINKSYS
+    method-detection-state: EXPOSED_ADMIN
+    cpe: cpe:2.3:o:linksys:router_firmware:*:*:*:*:*:*:*:*
+  tags: discovery,linksys,smart-wifi,wrt,e-series,router,network-management,soho
+http:
+  # Probe 1: anchored title + basic-auth realm.
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/ui/dynamic/login.html"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers-condition: or
+    matchers:
+      # Smart Wi-Fi (modern) login title.
+      - type: regex
+        part: body
+        regex:
+          - '(?i)<title>[^<]*Linksys\s+Smart\s+Wi-?Fi'
+      # WRT54G / E-series basic-auth realm — the realm string carries
+      # a Linksys model identifier (Exxx or WRTxx).
+      - type: regex
+        part: header
+        regex:
+          - '(?i)WWW-Authenticate:\s*Basic\s+realm="Linksys\s+[A-Z0-9]+"'
+    extractors:
+      # Realm-derived model.
+      - type: regex
+        name: model
+        part: header
+        group: 1
+        regex:
+          - '(?i)WWW-Authenticate:\s*Basic\s+realm="Linksys\s+([A-Z0-9]+)"'
+  # Probe 2: JNAP REST endpoint. Sometimes unauth-readable on older
+  # Smart Wi-Fi firmware — returns model, firmware, and hardware
+  # revision in JSON.
+  - method: POST
+    path:
+      - "{{BaseURL}}/JNAP/"
+    headers:
+      Content-Type: "application/json"
+      X-JNAP-Action: "http://linksys.com/jnap/core/GetDeviceInfo"
+    body: '{}'
+    redirects: false
+    matchers-condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+      - type: word
+        part: body
+        words:
+          - '"result"'
+          - '"output"'
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "firmwareVersion"
+          - "modelNumber"
+        condition: or
+        case-insensitive: true
+    extractors:
+      - type: regex
+        name: firmware_version
+        part: body
+        group: 1
+        regex:
+          - '"firmwareVersion"\s*:\s*"([^"]+)"'
+      - type: regex
+        name: model
+        part: body
+        group: 1
+        regex:
+          - '"modelNumber"\s*:\s*"([^"]+)"'
+      - type: regex
+        name: hardware_version
+        part: body
+        group: 1
+        regex:
+          - '"hardwareVersion"\s*:\s*"([^"]+)"'

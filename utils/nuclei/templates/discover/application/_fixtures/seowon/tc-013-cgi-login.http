@@ -1,0 +1,11 @@
+### REQUEST
+GET /cgi-bin/login.cgi HTTP/1.1
+Host: 185.162.40.226
+
+### RESPONSE
+HTTP/1.1 302 Found
+Location: /login201906111053.html
+Transfer-Encoding: chunked
+Date: Sat, 13 Jun 2026 01:17:07 GMT
+Server: lighttpd/1.4.29
+

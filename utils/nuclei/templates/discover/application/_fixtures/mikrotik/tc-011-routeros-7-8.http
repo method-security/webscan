@@ -1,0 +1,72 @@
+### REQUEST
+GET / HTTP/1.1
+Host: 188.209.153.168
+User-Agent: Mozilla/5.0
+Accept: */*
+
+### RESPONSE
+HTTP/1.1 200 OK
+Cache-Control: max-age=31536000
+Connection: Keep-Alive
+Content-Length: 5146
+Content-Type: text/html
+Date: Sat, 13 Jun 2026 00:47:57 GMT
+Expires: Sun, 13 Jun 2027 00:47:57 GMT
+X-Frame-Options: sameorigin
+
+<!doctype html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="icon" href="/favicon.png"/>
+<title>RouterOS router configuration page</title>
+<style>
+body { font-family: Verdana, Geneva, sans-serif; font-size: 11px; }
+#container { width: 700px; margin: 0 auto; }
+#box { background: linear-gradient(#ffffff,#f3f3f3); border: 1px solid #c1c1c1; padding: 30px; }
+h1 { font-size: 14px; padding-bottom: 5px; border-bottom: 1px solid #c1c1c1; }
+h2 { font-size: 12px; padding-bottom: 3px; }
+table { width: 100%; }
+fieldset { border: 0; }
+.floater { float: left; text-align: center; width: 23%; margin: 4px 1%; padding: 5px 0; border: 1px solid #c1c1c1; }
+.floater img { display: block; margin: 0 auto 5px auto; }
+.label { width: 80px; }
+input.btn { background: #f6921e; color: white; border: 1px solid #c1c1c1; padding: 2px 10px; cursor: pointer; }
+</style>
+<script>
+function login(user, pwd, autologin) {
+    var expires = new Date();
+    expires.setTime(expires.getTime() + (30 * 24 * 60 * 60 * 1000));
+    document.cookie = 'username=' + user + '; expires=' + expires.toGMTString() + '; path=/';
+    window.name = (autologin ? 'autologin=' : 'login=') + user + '|' + pwd;
+    window.location.replace('/webfig/' + window.location.hash);
+}
+function loaded() {
+    document.getElementById('name').focus();
+}
+</script>
+</head>
+<body onload="loaded()">
+<div id="container">
+<div id="box">
+<a href="https://mikrotik.com"><img src="mikrotik_logo.png" style="float: right;" alt="Mikrotik"/></a><br style="clear: both;"/>
+<h1>RouterOS v7.8</h1>
+<p>You have connected to a router. Administrative access only. If this device is not in your possession, please contact your local network administrator.</p>
+<table id="login">
+    <tr><td colspan="3"><h2>WebFig Login:</h2>
+    <tr><td class="label">Login: <td><input id="name" type="text" tabindex="1">
+    <tr><td class="label">Password: <td><input id="pwd" type="password" tabindex="2">
+    <tr><td><input id="login" type="button" class="btn" value="Login" tabindex="3" onclick="login(document.getElementById('name').value,document.getElementById('pwd').value,false)">
+</table>
+<fieldset>
+    <div class="floater"><a href="https://mt.lv/winbox64"><img src="winbox.png" alt="Winbox"/></a><br/><label>Winbox</label></div>
+    <div class="floater"><a href="/graphs"><img src="green.png" alt="Graphs"/></a><br/><label>Graphs</label></div>
+    <div class="floater"><a href="/help/license.html"><img src="license.png" alt="License"/></a><br/><label>License</label></div>
+    <div class="floater"><a href="https://help.mikrotik.com/docs/"><img src="help.png" alt="Help"/></a><br/><label>Help</label></div>
+</fieldset>
+<br style="clear: both"/>
+<div style="float: right">&copy; <a href="https://mikrotik.com">mikrotik</a></div>
+</div>
+</div>
+</body>
+</html>

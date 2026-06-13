@@ -1,0 +1,66 @@
+id: huawei-gpon-ont-detect
+info:
+  name: Huawei HG / HN / Echolife GPON ONT Web Management Detection
+  author: method-security
+  severity: info
+  description: |
+    Detects Huawei HG / HN / EchoLife / OptiXstar GPON ONT (Optical Network Terminal) web management interfaces.
+    Title "HUAWEI HOME GATEWAY" or model-bearing titles (HG8245 / HG8245H / HN8245 etc.), plus the unique
+    /asp/GetRandCount.asp pre-auth nonce endpoint that is highly Huawei-CPE-specific.
+    No fixture validation — built from catalog signatures (SEC-702 description); confidence lower than TC-backed templates.
+    Sibling: CWMP/TR-069 on TCP/7547 (AITF-81 networkscan probe).
+  metadata:
+    method-application-type: INTERNET_OF_THINGS
+    method-module-name: HUAWEI_GPON_ONT
+    method-detection-state: EXPOSED_ADMIN
+    cpe: cpe:2.3:o:huawei:home_gateway_firmware:*:*:*:*:*:*:*:*
+  tags: discovery,huawei,gpon,ont,hg8245,echolife,iot,isp-cpe,soho
+http:
+  # Probe 1: anchored title — HOME GATEWAY or HG-prefix model.
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/index.asp"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers-condition: or
+    matchers:
+      - type: regex
+        part: body
+        regex:
+          - '(?i)<title>\s*HUAWEI\s+HOME\s+GATEWAY'
+          - '(?i)<title>\s*(?:HG|HN|EG)[0-9]{3,5}[A-Z]?'
+    extractors:
+      - type: regex
+        name: model
+        part: body
+        group: 1
+        regex:
+          - '(?i)<title>\s*((?:HG|HN|EG)[0-9]{3,5}[A-Z]?)'
+  # Probe 2: pre-auth /asp/GetRandCount.asp returns a per-request
+  # nonce. This endpoint path is highly Huawei-CPE-specific. The
+  # body shape varies by firmware (older returns a bare numeric
+  # token, newer ships JSON), so we match on size + at least one
+  # nonce-ish keyword to avoid firing on generic 200 responses.
+  - method: GET
+    path:
+      - "{{BaseURL}}/asp/GetRandCount.asp"
+    redirects: false
+    matchers-condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+      - type: dsl
+        dsl:
+          - 'len(body) > 0 && len(body) < 4096'
+      - type: word
+        part: body
+        words:
+          - "RandKey"
+          - "RandCount"
+          - "RandNum"
+          - "Rand"
+        case-insensitive: true
+        condition: or

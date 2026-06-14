@@ -2,6 +2,11 @@ imports:
   http: ../common/http.yml
   method: ../common/method.yml
 types:
+  # Per-hop entry in the redirect history (URL + HTTP status code if known)
+  RedirectHop:
+    properties:
+      url: string
+      statusCode: optional<integer>
   # Enums
   SensitiveContentType:
     enum:
@@ -51,6 +56,9 @@ types:
       request: optional<http.HttpRequestResponse>
       screenshot: optional<base64>
       sensitiveContents: optional<list<SensitiveContent>>
+      finalUrl: optional<string>
+      elapsedMs: optional<long>
+      redirectHistory: optional<list<RedirectHop>>
   # Report Struct
   DiscoverPageReport:
     properties:

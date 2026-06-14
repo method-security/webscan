@@ -4,7 +4,6 @@ import (
 	// Standard
 	"context"
 	"crypto/x509"
-	"fmt"
 	"io"
 	"time"
 
@@ -57,7 +56,7 @@ func buildHTTPRequest(config discover.DiscoverRequestConfig) (*common.HttpReques
 				MimeType: &mimeType,
 			},
 		}
-	case len(config.FormData) > 0:
+	case config.FormData != nil && len(config.FormData) > 0:
 		mimeType := "application/x-www-form-urlencoded"
 		body = &common.Body{
 			Kind: "form",
@@ -127,27 +126,21 @@ func PerformRequest(ctx context.Context, config discover.DiscoverRequestConfig) 
 	result := discover.DiscoverRequestResult{}
 	errors := []string{}
 	report := discover.DiscoverRequestReport{Config: &config, Result: &result}
-	addSignalLog := func(level string, format string, args ...interface{}) {
-		errors = append(errors, fmt.Sprintf("%s: %s", level, fmt.Sprintf(format, args...)))
-	}
 
 	// Build HTTP request
 	log.Info("Building HTTP request", svc1log.SafeParam("target", config.Target))
-	addSignalLog("info", "building HTTP request for target %s", config.Target)
 	request, err := buildHTTPRequest(config)
 	if err != nil {
-		addSignalLog("error", "failed to build HTTP request: %s", err.Error())
+		errors = append(errors, err.Error())
 		report.Errors = errors
 		return &report
 	}
-	addSignalLog("info", "built HTTP request with method %s", config.HttpMethod)
 
 	// Determine effective max redirects
 	maxRedirects := config.MaxRedirects
 	if !config.FollowRedirects {
 		maxRedirects = 0
 	}
-	addSignalLog("info", "configured request timeout=%d verifyTls=%t maxRedirects=%d", config.Timeout, config.VerifyTls, maxRedirects)
 
 	// Build SendHttpRequestConfig
 	sendConfig := common.SendHttpRequestConfig{
@@ -163,23 +156,17 @@ func PerformRequest(ctx context.Context, config discover.DiscoverRequestConfig) 
 	// Construct URL
 	constructedURL, err := standardhelpers.ConstructURL(ctx, request)
 	if err != nil {
-		addSignalLog("error", "failed to construct URL: %s", err.Error())
+		errors = append(errors, err.Error())
 		report.Errors = errors
 		return &report
 	}
-	addSignalLog("info", "constructed request URL %s", *constructedURL)
 
 	// Prepare request body
 	constructedReqReader, err := standardhelpers.PrepareRequestBody(ctx, request)
 	if err != nil {
-		addSignalLog("error", "failed to prepare request body: %s", err.Error())
+		errors = append(errors, err.Error())
 		report.Errors = errors
 		return &report
-	}
-	if request.Params != nil && request.Params.Body != nil {
-		addSignalLog("info", "prepared request body of type %s", request.Params.Body.Kind)
-	} else {
-		addSignalLog("info", "prepared request without a body")
 	}
 
 	// Build headers map for the raw HTTP call
@@ -188,28 +175,22 @@ func PerformRequest(ctx context.Context, config discover.DiscoverRequestConfig) 
 		rawHeaders = request.Params.Headers
 	}
 	constructedHeaders := requesthelpers.FlattenHeaders(rawHeaders)
-	addSignalLog("info", "prepared %d request headers", len(constructedHeaders))
 
 	// Record sent time
 	sentAt := time.Now()
 	request.SentAt = sentAt
-	addSignalLog("info", "request sent at %s", sentAt.Format(time.RFC3339Nano))
 
 	// Send HTTP request (directly to access TLS state)
 	log.Info("Sending HTTP request", svc1log.SafeParam("url", *constructedURL))
-	addSignalLog("info", "sending HTTP request to %s", *constructedURL)
 	resp, redirectChain, err := standardhelpers.SendHTTPRequest(ctx, *constructedURL, constructedHeaders, constructedReqReader, sendConfig)
 	if err != nil {
-		addSignalLog("error", "HTTP request failed: %s", err.Error())
+		errors = append(errors, err.Error())
 		report.Errors = errors
 		return &report
 	}
-	addSignalLog("info", "received response with status code %d and %d redirects", resp.StatusCode, len(redirectChain))
 	defer func() {
 		if closeErr := resp.Body.Close(); closeErr != nil {
 			log.Warn("Failed to close response body", svc1log.SafeParam("error", closeErr))
-			addSignalLog("warn", "failed to close response body: %s", closeErr.Error())
-			report.Errors = errors
 		}
 	}()
 
@@ -217,23 +198,18 @@ func PerformRequest(ctx context.Context, config discover.DiscoverRequestConfig) 
 	if resp.TLS != nil && len(resp.TLS.PeerCertificates) > 0 {
 		tlsCerts := extractTLSCertificates(resp.TLS.PeerCertificates)
 		result.TlsCertificates = tlsCerts
-		addSignalLog("info", "extracted %d TLS certificates", len(tlsCerts))
-	} else {
-		addSignalLog("info", "no TLS certificates available on response")
 	}
 
 	// Read and marshal response body
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		addSignalLog("error", "failed to read response body: %s", err.Error())
+		errors = append(errors, err.Error())
 		report.Errors = errors
 		return &report
 	}
-	addSignalLog("info", "read response body with %d bytes", len(bodyBytes))
 
 	// Build the HttpResponse
 	httpResponse := requesthelpers.CreateHTTPResponseFromBytes(resp.StatusCode, redirectChain, resp.Header, bodyBytes)
-	addSignalLog("info", "created HTTP response signal object")
 
 	// Build HttpRequestResponse
 	httpRequestResponse := &common.HttpRequestResponse{
@@ -242,7 +218,6 @@ func PerformRequest(ctx context.Context, config discover.DiscoverRequestConfig) 
 	}
 	result.Request = httpRequestResponse
 
-	addSignalLog("info", "completed HTTP request")
 	report.Errors = errors
 	return &report
 }

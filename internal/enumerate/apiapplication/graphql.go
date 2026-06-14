@@ -324,12 +324,16 @@ func populateReportWithDirectives(data *enumerateapiapplicationfern.EnumerateGra
 // Anything that fails this check (e.g., a malformed document with unbalanced braces) errors
 // out conservatively rather than letting a mutation slip through.
 func validateQueryOperations(query string, allowMutations bool) error {
+	// Short-circuit when the caller has explicitly opted in. The scanner below is
+	// intentionally conservative; with --allow-mutations the operator is telling us
+	// "send whatever I supplied and let the server reject it," so we skip our own
+	// parsing rather than block on a malformed-but-server-acceptable document.
+	if allowMutations {
+		return nil
+	}
 	operations, err := topLevelOperationKinds(query)
 	if err != nil {
 		return fmt.Errorf("failed to parse query for operation gating: %v", err)
-	}
-	if allowMutations {
-		return nil
 	}
 	for _, op := range operations {
 		if op == "mutation" || op == "subscription" {

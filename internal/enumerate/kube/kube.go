@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"runtime"
 	"sync"
 	"time"
 
@@ -208,10 +207,9 @@ func PerformAppEnumerateKube(ctx context.Context, config *enumeratekubefern.Enum
 		}
 	} else {
 		// Fast mode: fan out all probes concurrently — one goroutine per path.
-		// We use GOMAXPROCS as a soft guideline but do not throttle since N=19 is small.
+		// N=19 is small enough that we don't bound with a semaphore; the kernel/socket
+		// layer will provide back-pressure if needed.
 		// Results are written into results[i] (one slot per path index) to preserve order.
-		_ = runtime.GOMAXPROCS(0) // document intent; no semaphore needed at N=19
-
 		var mu sync.Mutex
 		var wg sync.WaitGroup
 

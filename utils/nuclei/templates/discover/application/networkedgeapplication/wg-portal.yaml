@@ -41,13 +41,15 @@ http:
       - "{{BaseURL}}/api/v1/info"
     redirects: true
     max-redirects: 5
+    matchers-condition: and
     matchers:
+      - type: status
+        status:
+          - 200
       - type: word
-        part: body
+        part: header
         words:
-          - "wg-portal"
-          - "WireGuard Portal"
-        condition: or
+          - "application/json"
         case-insensitive: true
     extractors:
       - type: json

@@ -44,6 +44,43 @@ func ParseHeaderPairs(pairs []string) map[string]string {
 	return headers
 }
 
+// BuildAuthHeaders merges explicit request headers and cookies into a single
+// multi-value header map suitable for HttpRequestParams. Cookies are folded into
+// a single "Cookie" header so the standard transport forwards them; the headless
+// transport additionally seeds the cookie jar from the same cookie map. Returns
+// nil when neither headers nor cookies are supplied.
+func BuildAuthHeaders(headers map[string]string, cookies map[string]string) map[string][]string {
+	if len(headers) == 0 && len(cookies) == 0 {
+		return nil
+	}
+	result := make(map[string][]string, len(headers)+1)
+	for key, value := range headers {
+		result[key] = []string{value}
+	}
+	if len(cookies) > 0 {
+		pairs := make([]string, 0, len(cookies))
+		for name, value := range cookies {
+			pairs = append(pairs, fmt.Sprintf("%s=%s", name, value))
+		}
+		cookieValue := strings.Join(pairs, "; ")
+		// Merge onto any caller-supplied Cookie header (case-insensitive) rather than
+		// clobbering it, so an explicit --header "Cookie: ..." and --cookie compose.
+		cookieKey := "Cookie"
+		for key := range result {
+			if strings.EqualFold(key, "Cookie") {
+				cookieKey = key
+				break
+			}
+		}
+		if existing, ok := result[cookieKey]; ok && len(existing) > 0 && existing[0] != "" {
+			result[cookieKey] = []string{existing[0] + "; " + cookieValue}
+		} else {
+			result[cookieKey] = []string{cookieValue}
+		}
+	}
+	return result
+}
+
 // ParseFormDataPairs converts a slice of "key=value" strings (as supplied via a
 // repeated --form-data CLI flag) into a map[string]string. Pairs that do not
 // contain an equals sign are silently ignored. Leading and trailing whitespace is
@@ -268,7 +305,7 @@ func IsDetectedBinaryBody(bodyData []byte) bool {
 
 // CreateHTTPResponseFromBytes creates an HttpResponse struct from HttpResponse data using byte array
 func CreateHTTPResponseFromBytes(statusCode int, redirectChain []string, headers map[string][]string, responseBody []byte) common.HttpResponse {
-	// Process headers to split comma-delimited values
+	// Process headers to split newline-delimited duplicate values from CDP.
 	processedHeaders := make(map[string][]string)
 	for key, values := range headers {
 		var processedValues []string
@@ -317,7 +354,7 @@ func splitHeaderValue(key, value string) []string {
 		if r == '\n' || r == '\r' {
 			return true
 		}
-		return r == ',' && !strings.EqualFold(key, "Content-Type")
+		return false
 	})
 }
 

@@ -22,6 +22,10 @@ types:
       bundleUrls: optional<list<string>>
       fetchSourceMaps: boolean
       maxBundles: integer
+      headers: optional<map<string, string>>
+      cookies: optional<map<string, string>>
+      localStorage: optional<map<string, string>>
+      sessionStorage: optional<map<string, string>>
   # Report Struct
   RouteBodyParam:
     properties:

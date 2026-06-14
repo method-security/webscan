@@ -9,6 +9,7 @@ types:
       userAgent: method.UserAgentPreset
       headers: optional<map<string, string>>
       cookies: optional<map<string, string>>
+      specUrl: optional<string>
       candidatePaths: optional<list<string>>
   EnumerateSwaggerResult:
     properties:

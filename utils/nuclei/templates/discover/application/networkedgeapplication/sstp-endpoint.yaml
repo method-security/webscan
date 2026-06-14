@@ -3,36 +3,27 @@ info:
   name: Windows SSTP VPN Endpoint Detection
   author: method-security
   severity: info
-  description: Detects Microsoft SSTP (Secure Socket Tunneling Protocol) VPN endpoints exposed on HTTPS. Identifies SSTP by the SSTPVERSION header returned during protocol negotiation, and extracts Windows Server version from Server response headers.
+  description: Detects Microsoft SSTP (Secure Socket Tunneling Protocol) VPN endpoints exposed on HTTPS. Identifies SSTP by the SSTPVERSION header returned during SSTP_DUPLEX_POST negotiation, and extracts Windows Server version from Server response headers.
   metadata:
     method-application-type: NETWORK_EDGE_APPLICATION
     method-module-name: SSTP_ENDPOINT
     cpe: cpe:2.3:o:microsoft:windows_server:*:*:*:*:*:*:*:*
   tags: discovery,sstp,vpn,windows,rras,network-edge
 http:
-  - method: CONNECT
-    path:
-      - "{{BaseURL}}/sra_{BA195980-CD49-458b-9E23-C84EE0ADCD75}/"
-    headers:
-      SSTP-VER: "1.0"
-      SSTP-DUPLEX-POST: "1"
-      Content-Length: "0"
+  - raw:
+      - |
+        SSTP_DUPLEX_POST /sra_{BA195980-CD49-458b-9E23-C84EE0ADCD75}/ HTTP/1.1
+        Host: {{Hostname}}
+        Content-Type: application/octet-stream
+        SSTP-VER: 1.0
+        Content-Length: 0
+
     redirects: false
     matchers:
       - type: word
         part: header
         words:
           - "SSTPVERSION"
-        case-insensitive: true
-      - type: word
-        part: header
-        words:
-          - "sstp"
-        case-insensitive: true
-      - type: word
-        part: body
-        words:
-          - "SSTP"
         case-insensitive: true
     extractors:
       - type: regex

@@ -3,6 +3,8 @@ package cmd
 import (
 	// Standard
 	"errors"
+	"strings"
+
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
 	enumerateapiapplicationfern "github.com/Method-Security/webscan/generated/go/enumerate/apiapplication"
@@ -118,6 +120,132 @@ func (a *WebScan) InitEnumerateCommand() {
 
 	// Mark required flags
 	_ = enumerateAPIApplicationGraphqlCmd.MarkFlagRequired("target")
+
+	// GraphQL Field Wordlist Command (fallback when introspection is disabled)
+	enumerateAPIApplicationGraphqlFieldWordlistCmd := &cobra.Command{
+		Use:   "field-wordlist",
+		Short: "Probe GraphQL field names via wordlist fallback",
+		Long:  `When GraphQL introspection is disabled, iterate over a wordlist of candidate field names and parse "Did you mean?" suggestions from error responses to confirm accessible fields.`,
+		Run: func(cmd *cobra.Command, args []string) {
+			defer a.OutputSignal.PanicHandler(cmd.Context())
+
+			// Target flag
+			target, err := cmd.Flags().GetString("target")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Wordlist flag (repeatable)
+			wordlist, err := cmd.Flags().GetStringArray("wordlist")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Parent type flag
+			parentType, err := cmd.Flags().GetString("parent-type")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Batch size flag
+			batchSize, err := cmd.Flags().GetInt("batch-size")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Header flag (repeated)
+			headerPairs, err := cmd.Flags().GetStringArray("header")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			headers := requesthelpers.ParseHeaderPairs(headerPairs)
+
+			// Cookie flag (repeated)
+			cookiePairs, err := cmd.Flags().GetStringArray("cookie")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			cookies := map[string]string{}
+			for _, pair := range cookiePairs {
+				parts := strings.SplitN(pair, "=", 2)
+				if len(parts) == 2 {
+					cookies[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
+				}
+			}
+
+			// Timeout flag
+			timeout, err := cmd.Flags().GetInt("timeout")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Verify TLS flag
+			verifyTLS, err := cmd.Flags().GetBool("verify-tls")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// User Agent flag
+			userAgentPreset, err := requesthelpers.GetUserAgentFlag(cmd)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			config := enumerateapiapplicationfern.EnumerateGraphqlFieldWordlistConfig{
+				Target:    target,
+				VerifyTls: &verifyTLS,
+				Timeout:   &timeout,
+				UserAgent: &userAgentPreset,
+			}
+			if len(wordlist) > 0 {
+				config.Wordlist = wordlist
+			}
+			if parentType != "" {
+				config.ParentType = &parentType
+			}
+			if batchSize > 0 {
+				config.BatchSize = &batchSize
+			}
+			if len(headers) > 0 {
+				config.Headers = headers
+			}
+			if len(cookies) > 0 {
+				config.Cookies = cookies
+			}
+
+			// Generate report
+			report := enumerateapiapplication.PerformAppEnumerateGraphQLFieldWordlist(cmd.Context(), config)
+			a.OutputSignal.Content = report
+		},
+	}
+
+	// Target Flags
+	enumerateAPIApplicationGraphqlFieldWordlistCmd.Flags().String("target", "", "GraphQL endpoint URL to probe for field names")
+	// Config Flags
+	enumerateAPIApplicationGraphqlFieldWordlistCmd.Flags().StringArray("wordlist", []string{}, "Candidate field names to probe (repeatable; defaults to embedded list when empty)")
+	enumerateAPIApplicationGraphqlFieldWordlistCmd.Flags().String("parent-type", "Query", "GraphQL parent type to record on confirmed fields (default: Query)")
+	enumerateAPIApplicationGraphqlFieldWordlistCmd.Flags().Int("batch-size", 10, "Number of candidate field names per probe query")
+	enumerateAPIApplicationGraphqlFieldWordlistCmd.Flags().StringArray("header", []string{}, "Request headers as 'Key: Value' pairs (repeatable)")
+	enumerateAPIApplicationGraphqlFieldWordlistCmd.Flags().StringArray("cookie", []string{}, "Cookies as 'name=value' pairs (repeatable)")
+	enumerateAPIApplicationGraphqlFieldWordlistCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
+	enumerateAPIApplicationGraphqlFieldWordlistCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates")
+	// User Agent Flag
+	enumerateAPIApplicationGraphqlFieldWordlistCmd.Flags().String("user-agent", "RANDOM", "User-Agent preset (RANDOM, CHROME, FIREFOX, SAFARI, EDGE)")
+
+	// Mark required flags
+	_ = enumerateAPIApplicationGraphqlFieldWordlistCmd.MarkFlagRequired("target")
+
+	// Add field-wordlist subcommand to graphql command
+	enumerateAPIApplicationGraphqlCmd.AddCommand(enumerateAPIApplicationGraphqlFieldWordlistCmd)
 
 	// Add Command to 'Enumerate API Application' Command
 	enumerateAPIApplicationCmd.AddCommand(enumerateAPIApplicationGraphqlCmd)

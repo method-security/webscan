@@ -1,5 +1,6 @@
 imports:
   common: ./common.yml
+  method: ../../common/method.yml
 types:
   # Specfic GraphQL Structs
   GraphQlField:
@@ -50,4 +51,39 @@ types:
     properties:
       config: EnumerateGraphqlConfig
       result: EnumerateGraphqlResult
+      errors: optional<list<string>>
+
+  # GraphQL field wordlist fallback types
+  GraphQlConfirmedField:
+    properties:
+      fieldName: string
+      parentType: string
+      suggestions: optional<list<string>>
+
+  EnumerateGraphqlFieldWordlistConfig:
+    properties:
+      target: string
+      wordlist: optional<list<string>>
+      parentType: optional<string>
+      batchSize: optional<integer>
+      headers: optional<map<string, string>>
+      cookies: optional<map<string, string>>
+      timeout: optional<integer>
+      verifyTls: optional<boolean>
+      userAgent: optional<method.UserAgentPreset>
+
+  EnumerateGraphqlFieldWordlistData:
+    properties:
+      target: string
+      parentType: string
+      confirmedFields: optional<list<GraphQlConfirmedField>>
+
+  EnumerateGraphqlFieldWordlistResult:
+    properties:
+      data: optional<EnumerateGraphqlFieldWordlistData>
+
+  EnumerateGraphqlFieldWordlistReport:
+    properties:
+      config: EnumerateGraphqlFieldWordlistConfig
+      result: EnumerateGraphqlFieldWordlistResult
       errors: optional<list<string>>

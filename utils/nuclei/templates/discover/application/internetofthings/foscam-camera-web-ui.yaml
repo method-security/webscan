@@ -1,0 +1,55 @@
+id: foscam-camera-web-ui-detect
+info:
+  name: Foscam IP Camera Web UI Detection
+  author: method-security
+  severity: info
+  description: |
+    Detects Foscam IP cameras by the Foscam-specific digest-auth realm on /cgi-bin/CGIProxy.fcgi
+    and the Foscam-anchored <title>. No live fixture available for this template — the matchers
+    are sourced from the published Foscam UI corpus referenced in the SEC-702 catalog and the
+    AITF-123 ticket's section §4 (Amcrest / Foscam gap fill).
+    Low-confidence pending a live target capture; this template is intentionally minimal so
+    a future TC re-probe can expand it (CVE precondition gating, sub-model discriminator,
+    architecture inference). The /cgi-bin/CGIProxy.fcgi path is highly Foscam-specific —
+    it is unique to Foscam's mobile-API gateway and has not been observed on any other
+    surveillance vendor in the SEC-702 catalog.
+    TODO (post-fixture): refine the title regex once a live capture confirms whether
+    modern Foscam firmware ships <title>Foscam Camera</title> verbatim or whether it
+    has been brand-localized.
+  metadata:
+    method-application-type: INTERNET_OF_THINGS
+    method-module-name: FOSCAM
+    method-detection-state: EXPOSED_ADMIN
+    cpe: cpe:2.3:o:foscam:firmware:*:*:*:*:*:*:*:*
+  tags: discovery,iot,foscam,camera,ipc,surveillance
+http:
+  # Tier-1 probe: Foscam digest-auth realm on the proprietary
+  # /cgi-bin/CGIProxy.fcgi gateway. WWW-Authenticate: Digest realm="Foscam"
+  # is dispositive — no other vendor uses "Foscam" as the realm value.
+  - method: GET
+    path:
+      - "{{BaseURL}}/cgi-bin/CGIProxy.fcgi"
+      - "{{BaseURL}}"
+    redirects: false
+    stop-at-first-match: false
+    matchers:
+      # Matcher 1: Foscam digest realm — highest-confidence anchor.
+      - type: regex
+        name: foscam-digest-realm
+        part: header
+        regex:
+          - '(?i)www-authenticate:\s*digest\s+realm="Foscam"'
+      # Matcher 2: title anchor (case-insensitive). Less reliable —
+      # modern firmware may localize the title.
+      - type: regex
+        name: foscam-title
+        part: body
+        regex:
+          - '(?i)<title>\s*Foscam(?:\s+Camera)?\s*</title>'
+    extractors:
+      - type: regex
+        name: realm
+        part: header
+        group: 1
+        regex:
+          - '(?i)www-authenticate:\s*digest\s+realm="([^"]+)"'

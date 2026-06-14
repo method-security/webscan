@@ -1,0 +1,92 @@
+id: hikvision-ivms-web-ui-detect
+info:
+  name: Hikvision iVMS / VideoManageSystem / HikCentral (Family B) Web UI Detection
+  author: method-security
+  severity: info
+  description: |
+    Detects Hikvision Family B — the iVMS / VideoManageSystem / HikCentral generation
+    (iVMS-4200 Web, iVMS-5200 Professional, HikCentral Professional, DS-9600 enterprise NVR).
+    Family B is a completely different web stack from Family A (ISAPI / DS-7xxx) and
+    requires its own template. The discriminators are unambiguous:
+      Smoking gun: <title data-text="Text.VideoManageSystem"></title> — the data-text
+      attribute is iVMS-only, and the i18n token Text.VideoManageSystem is unique to
+      this stack.
+      Login form: <form action="cgi-bin/main-cgi"> with classic Hikvision SDK Hungarian-
+      notation fields szUserName, szUserPasswdSrc, szUserLoginCert, nonce (sz prefix =
+      null-terminated string in Hikvision SDK style).
+      Assets: hash-suffixed (e.g. /style/index_c730c36.css, /images/login_bg_54a9b17.jpg)
+      rather than ?version=<ts> like Family A.
+    Negative anchors (per decision #7): NO /doc/page/login.asp redirect, NO oLan.*
+    Angular bindings, NO pigsney directive, NO ng-controller="loginController". These
+    MUST NOT match — if they fire, the target is Family A, not iVMS.
+    Self-redirecting script at top of body (window.location.href = href + '?_=' + ran)
+    is also iVMS-unique cache-busting.
+    Validated against TC-006 (likely iVMS-4200 Web / HikCentral).
+  metadata:
+    method-application-type: INTERNET_OF_THINGS
+    method-module-name: HIKVISION_IVMS
+    method-sub-module-name: "iVMS (Video Management System)"
+    method-detection-state: EXPOSED_ADMIN
+    cpe: cpe:2.3:a:hikvision:ivms:*:*:*:*:*:*:*:*
+  tags: discovery,iot,hikvision,ivms,videomanagesystem,hikcentral,surveillance
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+    redirects: true
+    max-redirects: 5
+    matchers-condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+      # Smoking-gun #1: data-text="Text.VideoManageSystem" is iVMS-only.
+      # The data-text attribute is the iVMS i18n binding pattern; the
+      # Text.VideoManageSystem token is brand-stable across iVMS-4200,
+      # iVMS-5200, and HikCentral.
+      - type: word
+        part: body
+        words:
+          - 'data-text="Text.VideoManageSystem"'
+      # Smoking-gun #2: cgi-bin/main-cgi form action with the iVMS
+      # Hungarian-notation field set. The sz-prefix is from Hikvision's
+      # native SDK convention (null-terminated string).
+      - type: dsl
+        dsl:
+          - >-
+            contains(body, "cgi-bin/main-cgi") &&
+            contains(body, "szUserName") &&
+            contains(body, "szUserPasswdSrc")
+      # NEGATIVE anchors — none of these may appear or it's Family A
+      # not Family B. Drops any host with the Family A Angular shell.
+      - type: dsl
+        dsl:
+          - >-
+            !contains(body, "/doc/page/login.asp") &&
+            !contains(body, "ng-controller=\"loginController\"") &&
+            !contains(body, "pigsney") &&
+            !regex("oLan\\.[a-zA-Z]+", body)
+      # NEGATIVE: WordPress / blog filter — same body-text false-positive
+      # the Family A template avoids.
+      - type: dsl
+        dsl:
+          - >-
+            !contains(tolower(body), "wp-content") &&
+            !contains(tolower(body), "wp-includes") &&
+            !contains(tolower(body), "wordpress")
+    extractors:
+      # Hash-suffixed asset path — iVMS asset content-hash. Surfaces
+      # so the consumer can correlate to a build version (cluster
+      # uses these as a path-asset-hash version source).
+      - type: regex
+        name: asset_hash
+        part: body
+        group: 1
+        regex:
+          - '/style/index_([a-f0-9]{6,8})\.css'
+      - type: regex
+        name: last_modified
+        part: header
+        group: 1
+        regex:
+          - '(?i)last-modified:\s*([^\r\n]+)'

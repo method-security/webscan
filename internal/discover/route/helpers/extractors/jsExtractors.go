@@ -45,6 +45,9 @@ func fetchJSResource(ctx context.Context, fullURL string, routeCaptureConfig dis
 		Method:  common.HttpMethodGet,
 		Params: &common.HttpRequestParams{
 			Query: queryParams,
+			// Authenticated sites can serve login pages or 401s for bundle and
+			// source-map fetches; carry the same auth context as the spider.
+			Headers: requesthelpers.BuildAuthHeaders(routeCaptureConfig.Headers, routeCaptureConfig.Cookies),
 		},
 	}
 

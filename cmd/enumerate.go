@@ -202,6 +202,13 @@ func (a *WebScan) InitEnumerateCommand() {
 				return
 			}
 
+			// Spec URL flag (direct override — skips all probing)
+			specUrl, err := cmd.Flags().GetString("spec-url")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
 			config := enumerateapiapplicationfern.EnumerateSwaggerConfig{
 				Target:         target,
 				Timeout:        timeout,
@@ -209,6 +216,9 @@ func (a *WebScan) InitEnumerateCommand() {
 				Headers:        headers,
 				Cookies:        cookies,
 				CandidatePaths: candidatePaths,
+			}
+			if specUrl != "" {
+				config.SpecUrl = &specUrl
 			}
 
 			// Generate report
@@ -224,6 +234,7 @@ func (a *WebScan) InitEnumerateCommand() {
 	enumerateAPIApplicationSwaggerCmd.Flags().StringArray("header", []string{}, "Request headers as 'Key: Value' pairs (repeatable)")
 	enumerateAPIApplicationSwaggerCmd.Flags().StringArray("cookie", []string{}, "Cookies as 'name=value' pairs (repeatable)")
 	enumerateAPIApplicationSwaggerCmd.Flags().StringSlice("candidate-paths", []string{}, "Additional spec paths to probe before built-in paths (comma-separated)")
+	enumerateAPIApplicationSwaggerCmd.Flags().String("spec-url", "", "Direct URL to OpenAPI/Swagger spec; skips all probing when set")
 	// User Agent Flag
 	enumerateAPIApplicationSwaggerCmd.Flags().String("user-agent", "RANDOM", "User-Agent preset (RANDOM, CHROME, FIREFOX, SAFARI, EDGE)")
 

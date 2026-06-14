@@ -2,7 +2,6 @@ imports:
   http: ../../common/http.yml
   method: ../../common/method.yml
 types:
-  # Function Config Struct
   EnumerateKubeConfig:
     properties:
       target: string
@@ -11,10 +10,37 @@ types:
       sleep: integer
       jitter: integer
       userAgent: method.UserAgentPreset
+
+  # Classification of the security sensitivity of a probed Kubernetes API path.
+  # SENSITIVE: endpoints whose anonymous reachability indicates a misconfiguration
+  # (e.g. /api/v1/secrets, /api/v1/configmaps, /api/v1/nodes, /api/v1/pods,
+  # /api/v1/services, /api/v1/namespaces, /apis/apps/v1/deployments,
+  # /apis/networking.k8s.io/v1/ingresses, /api/v1/persistentvolumes, /metrics).
+  # STANDARD: discovery/health endpoints that are routinely exposed
+  # (/, /api, /api/v1, /apis, /version, /healthz, /livez, /readyz, /openapi/v2).
+  KubeEndpointSensitivity:
+    enum:
+      - SENSITIVE
+      - STANDARD
+
+  # One probed endpoint plus its classification.
+  KubeEndpointResult:
+    properties:
+      request: http.HttpRequestResponse
+      sensitivity: KubeEndpointSensitivity
+
+  # Parsed fields from the /version endpoint response body.
+  KubeVersionInfo:
+    properties:
+      gitVersion: optional<string>
+      platform: optional<string>
+
   EnumerateKubeResult:
     properties:
       target: string
-      requests: optional<list<http.HttpRequestResponse>>
+      requests: optional<list<KubeEndpointResult>>
+      versionInfo: optional<KubeVersionInfo>
+
   # Report Struct
   EnumerateKubeReport:
     properties:

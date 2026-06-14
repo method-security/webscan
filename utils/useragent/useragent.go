@@ -55,6 +55,8 @@ func pick(preset common.UserAgentPreset) string {
 		return pickByFilter(func(ua *pdua.UserAgent) bool {
 			return pdua.ContainsTagsAny(ua, "Edge")
 		})
+	case common.UserAgentPresetCurl:
+		return "curl/8.4.0"
 	default:
 		return pickRandom()
 	}

@@ -81,6 +81,23 @@ func BuildAuthHeaders(headers map[string]string, cookies map[string]string) map[
 	return result
 }
 
+// ParseCookiePairs converts a slice of "name=value" strings (as supplied via a
+// repeated --cookie CLI flag) into a map[string]string. Pairs that do not
+// contain an equals sign are silently ignored. Leading and trailing whitespace is
+// trimmed from both the name and the value. Returns nil when pairs is empty.
+func ParseCookiePairs(pairs []string) map[string]string {
+	if len(pairs) == 0 {
+		return nil
+	}
+	cookies := make(map[string]string, len(pairs))
+	for _, pair := range pairs {
+		if kv := strings.SplitN(pair, "=", 2); len(kv) == 2 {
+			cookies[strings.TrimSpace(kv[0])] = strings.TrimSpace(kv[1])
+		}
+	}
+	return cookies
+}
+
 // ParseFormDataPairs converts a slice of "key=value" strings (as supplied via a
 // repeated --form-data CLI flag) into a map[string]string. Pairs that do not
 // contain an equals sign are silently ignored. Leading and trailing whitespace is

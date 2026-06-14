@@ -90,9 +90,25 @@ func (a *WebScan) InitEnumerateCommand() {
 				return
 			}
 
+			// Cookie flag (repeated, name=value)
+			cookiePairs, err := cmd.Flags().GetStringArray("cookie")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			cookies := requesthelpers.ParseCookiePairs(cookiePairs)
+
+			// Allow-mutations flag (gates AST-level rejection of mutation/subscription operations)
+			allowMutations, err := cmd.Flags().GetBool("allow-mutations")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
 			config := enumerateapiapplicationfern.EnumerateGraphqlConfig{
 				Target:  target,
 				Headers: headers,
+				Cookies: cookies,
 				Timeout: &timeout,
 			}
 			if query != "" {
@@ -100,6 +116,9 @@ func (a *WebScan) InitEnumerateCommand() {
 			}
 			if variables != "" {
 				config.Variables = &variables
+			}
+			if allowMutations {
+				config.AllowMutations = &allowMutations
 			}
 
 			// Generate report
@@ -113,8 +132,10 @@ func (a *WebScan) InitEnumerateCommand() {
 	// Config Flags
 	enumerateAPIApplicationGraphqlCmd.Flags().StringArray("header", []string{}, "Request headers as 'Key: Value' pairs (repeatable)")
 	enumerateAPIApplicationGraphqlCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
+	enumerateAPIApplicationGraphqlCmd.Flags().StringArray("cookie", []string{}, "Request cookies as 'name=value' pairs (repeatable)")
 	enumerateAPIApplicationGraphqlCmd.Flags().String("query", "", "Execute this ad-hoc GraphQL query instead of schema introspection")
 	enumerateAPIApplicationGraphqlCmd.Flags().String("variables", "", "JSON-encoded variables for the ad-hoc --query")
+	enumerateAPIApplicationGraphqlCmd.Flags().Bool("allow-mutations", false, "Permit mutation and subscription operations (default rejects them at the AST level)")
 
 	// Mark required flags
 	_ = enumerateAPIApplicationGraphqlCmd.MarkFlagRequired("target")

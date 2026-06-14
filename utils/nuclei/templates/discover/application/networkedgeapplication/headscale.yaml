@@ -1,0 +1,54 @@
+id: headscale-detect
+info:
+  name: Headscale Coordination Server Detection
+  author: method-security
+  severity: info
+  description: Detects self-hosted Headscale coordination servers (an open-source Tailscale control plane) by matching Headscale-specific UI pages, login endpoints, health checks, and API responses.
+  metadata:
+    method-application-type: NETWORK_EDGE_APPLICATION
+    method-module-name: HEADSCALE
+    cpe: cpe:2.3:a:juanfont:headscale:*:*:*:*:*:*:*:*
+  tags: discovery,headscale,tailscale,mesh-vpn,vpn,network-edge
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/web/sign-in"
+      - "{{BaseURL}}/health"
+      - "{{BaseURL}}/api/v1/"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: word
+        part: title
+        words:
+          - "Headscale"
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "headscale"
+          - "sign-in"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "headscale"
+          - "login"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "headscale"
+          - "auth"
+        condition: and
+        case-insensitive: true
+      - type: dsl
+        dsl:
+          - 'status_code == 200 && contains(content_type, "application/json") && contains(body, "headscale")'
+      - type: dsl
+        dsl:
+          - 'status_code == 200 && contains(content_type, "application/json") && contains_any(body, "\"preauth_key\"", "\"machine_key\"", "\"headscale\"")'

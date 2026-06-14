@@ -1,0 +1,57 @@
+id: netbird-dashboard-detect
+info:
+  name: NetBird Management Dashboard Detection
+  author: method-security
+  severity: info
+  description: Detects NetBird mesh VPN management dashboards by matching NetBird-specific page titles, branding, and dashboard/peers route markers.
+  metadata:
+    method-application-type: NETWORK_EDGE_APPLICATION
+    method-module-name: NETBIRD
+    cpe: cpe:2.3:a:netbird:dashboard:*:*:*:*:*:*:*:*
+  tags: discovery,netbird,mesh-vpn,vpn,network-edge,dashboard
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/peers"
+      - "{{BaseURL}}/auth"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: word
+        part: title
+        words:
+          - "NetBird Dashboard"
+        case-insensitive: true
+      - type: word
+        part: title
+        words:
+          - "NetBird"
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "netbird"
+          - "dashboard"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "netbird"
+          - "peers"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "netbird"
+          - "login"
+        condition: and
+        case-insensitive: true
+      - type: regex
+        part: body
+        regex:
+          - '(?i)netbird[._-][a-z0-9]+\.js'
+          - '(?i)/assets/netbird'

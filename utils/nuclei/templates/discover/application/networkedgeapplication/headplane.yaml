@@ -1,0 +1,40 @@
+id: headplane-detect
+info:
+  name: Headplane Headscale Frontend Detection
+  author: method-security
+  severity: info
+  description: Detects Headplane, a third-party web frontend for the Headscale coordination server, by matching Headplane-specific branding in the page title, body text, and JavaScript bundle references.
+  metadata:
+    method-application-type: NETWORK_EDGE_APPLICATION
+    method-module-name: HEADPLANE
+    cpe: cpe:2.3:a:tale:headplane:*:*:*:*:*:*:*:*
+  tags: discovery,headplane,headscale,mesh-vpn,vpn,network-edge,ui
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/login"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: word
+        part: title
+        words:
+          - "Headplane"
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "Headplane"
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "headplane"
+        case-insensitive: true
+      - type: regex
+        part: body
+        regex:
+          - '(?i)headplane[._-][a-z0-9]+\.js'
+          - '(?i)/assets/headplane'

@@ -1,0 +1,40 @@
+id: netbird-api-detect
+info:
+  name: NetBird Management API Detection
+  author: method-security
+  severity: info
+  description: Detects NetBird management API endpoints by matching NetBird-specific JSON response structures, authentication challenges, and API path markers on management server routes.
+  metadata:
+    method-application-type: NETWORK_EDGE_APPLICATION
+    method-module-name: NETBIRD
+    cpe: cpe:2.3:a:netbird:management:*:*:*:*:*:*:*:*
+  tags: discovery,netbird,mesh-vpn,vpn,network-edge,api,management
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/api/"
+      - "{{BaseURL}}/api/users/current"
+      - "{{BaseURL}}/api/peers"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "netbird"
+        case-insensitive: true
+      - type: dsl
+        dsl:
+          - 'contains(content_type, "application/json") && contains_any(body, "\"peer_id\"", "\"management_server\"", "\"signal_server\"")'
+      - type: dsl
+        dsl:
+          - 'status_code == 401 && contains_any(header, "X-NetBird", "netbird")'
+      - type: word
+        part: header
+        words:
+          - "X-NetBird"
+        case-insensitive: true
+      - type: dsl
+        dsl:
+          - 'contains(content_type, "application/json") && status_code == 401 && contains_any(body, "\"message\"", "\"code\"") && contains(body, "netbird")'

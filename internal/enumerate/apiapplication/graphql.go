@@ -351,6 +351,16 @@ func validateQueryOperations(query string, allowMutations bool) error {
 // supplied document. It is a conservative scanner — it does not understand variable
 // definitions, directives on operation definitions, etc., but it recognizes enough to
 // identify operation keywords reliably.
+//
+// The scanner tracks atConstructStart: only the FIRST identifier of each top-level
+// construct is treated as the construct's kind keyword. This prevents misclassifying a
+// fragment name (`fragment mutation on Query { ... }`) or a named-query's operation name
+// (`query mutation { x }`) as a top-level mutation operation. atConstructStart starts
+// true, flips to false once the construct's kind has been consumed (or once a shorthand
+// `{` opens the construct), and flips back to true only when a `}` returns the depth to
+// 0 — `)`/`]` returning to depth 0 (e.g. after variable definitions like
+// `query Foo($x: Int)`) do NOT reset the flag because the construct's selection set
+// hasn't opened yet.
 func topLevelOperationKinds(query string) ([]string, error) {
 	const (
 		opQuery        = "query"
@@ -361,13 +371,10 @@ func topLevelOperationKinds(query string) ([]string, error) {
 
 	var ops []string
 	depth := 0
+	atConstructStart := true
 	i := 0
 	n := len(query)
 
-	// expectingOperation tracks whether the next identifier we see at depth 0 should be
-	// classified as a top-level operation. Initially true. After we consume an operation
-	// (or shorthand `{`), it stays false until we close the corresponding selection set,
-	// fragment, or skip the operation body.
 	for i < n {
 		c := query[i]
 
@@ -424,9 +431,10 @@ func topLevelOperationKinds(query string) ([]string, error) {
 
 		// Braces/parens/brackets: track depth.
 		if c == '{' {
-			if depth == 0 {
-				// Shorthand operation: anonymous query.
+			if depth == 0 && atConstructStart {
+				// Shorthand operation: anonymous query at the start of a construct.
 				ops = append(ops, "anonymous")
+				atConstructStart = false
 			}
 			depth++
 			i++
@@ -436,6 +444,10 @@ func topLevelOperationKinds(query string) ([]string, error) {
 			depth--
 			if depth < 0 {
 				return nil, fmt.Errorf("unbalanced closing brace at offset %d", i)
+			}
+			if depth == 0 {
+				// Construct's selection set just closed; next construct may start.
+				atConstructStart = true
 			}
 			i++
 			continue
@@ -450,6 +462,9 @@ func topLevelOperationKinds(query string) ([]string, error) {
 			if depth < 0 {
 				return nil, fmt.Errorf("unbalanced closing bracket at offset %d", i)
 			}
+			// Returning to depth 0 via `)`/`]` does NOT reset atConstructStart — the
+			// construct's selection set hasn't opened yet (we're still inside
+			// e.g. `query Foo($x: Int) { ... }` after the variable-definition `)`).
 			i++
 			continue
 		}
@@ -461,7 +476,7 @@ func topLevelOperationKinds(query string) ([]string, error) {
 				i++
 			}
 			ident := query[start:i]
-			if depth == 0 {
+			if depth == 0 && atConstructStart {
 				switch ident {
 				case opQuery, opMutation, opSubscription:
 					ops = append(ops, ident)
@@ -469,8 +484,13 @@ func topLevelOperationKinds(query string) ([]string, error) {
 					// Fragment definition — not an operation, but a top-level construct.
 					// Don't add it to ops.
 				default:
-					// Some other token at depth 0 (e.g., directive name, variable). Ignore.
+					// Some other top-level extension keyword (e.g., `schema`, `extend`,
+					// `type`, `enum`) — uncommon in a query document but allowed.
 				}
+				// Whatever the first identifier was, we've now consumed the kind slot;
+				// any subsequent identifiers in this construct (operation name, "on",
+				// fragment type, directive names, etc.) must NOT be re-classified.
+				atConstructStart = false
 			}
 			continue
 		}

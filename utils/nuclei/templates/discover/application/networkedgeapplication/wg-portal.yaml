@@ -9,9 +9,6 @@ info:
     method-module-name: WG_PORTAL
     cpe: cpe:2.3:a:h44z:wg-portal:*:*:*:*:*:*:*:*
   tags: discovery,wireguard,wg-portal,vpn,network-edge
-
-flow: http(1) && http(2)
-
 http:
   - method: GET
     path:
@@ -48,7 +45,9 @@ http:
       - type: word
         part: body
         words:
-          - "version"
+          - "wg-portal"
+          - "WireGuard Portal"
+        condition: or
         case-insensitive: true
     extractors:
       - type: json

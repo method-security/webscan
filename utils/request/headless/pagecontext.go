@@ -61,6 +61,48 @@ func applyRequestHeaders(page *rod.Page, config common.SendHttpRequestConfig, lo
 	}
 }
 
+// parseCookieHeader splits a folded "name=value; name2=value2" Cookie header value
+// into its individual cookie pairs. Malformed segments without an '=' are skipped.
+func parseCookieHeader(value string) map[string]string {
+	cookies := make(map[string]string)
+	for _, part := range strings.Split(value, ";") {
+		kv := strings.SplitN(strings.TrimSpace(part), "=", 2)
+		if len(kv) != 2 {
+			continue
+		}
+		if name := strings.TrimSpace(kv[0]); name != "" {
+			cookies[name] = strings.TrimSpace(kv[1])
+		}
+	}
+	return cookies
+}
+
+// mergedCookies combines explicit jar cookies (config.Cookies) with any cookies that
+// callers fold into a Cookie request header (e.g. via BuildAuthHeaders, as Swagger's
+// headless UI step does). Without this, headless navigations would silently run
+// without session cookies whenever the caller only supplied them as a Cookie header,
+// unlike the standard transport which always forwards that header. Explicit jar
+// cookies take precedence on key collisions.
+func mergedCookies(config common.SendHttpRequestConfig) map[string]string {
+	merged := make(map[string]string)
+	if config.Request != nil && config.Request.Params != nil {
+		for key, values := range config.Request.Params.Headers {
+			if !strings.EqualFold(key, "Cookie") {
+				continue
+			}
+			for _, value := range values {
+				for name, cookieValue := range parseCookieHeader(value) {
+					merged[name] = cookieValue
+				}
+			}
+		}
+	}
+	for name, value := range config.Cookies {
+		merged[name] = value
+	}
+	return merged
+}
+
 // applyCookies seeds the browser cookie jar with caller-supplied cookies scoped to
 // the target URL, enabling authenticated headless crawls.
 func applyCookies(page *rod.Page, targetURL string, cookies map[string]string, log svc1log.Logger) {
@@ -131,7 +173,7 @@ func startConsoleCapture(page *rod.Page, config common.SendHttpRequestConfig, lo
 // acts when the corresponding config field is populated.
 func applyPageContext(page *rod.Page, targetURL string, config common.SendHttpRequestConfig, log svc1log.Logger) {
 	applyRequestHeaders(page, config, log)
-	applyCookies(page, targetURL, config.Cookies, log)
+	applyCookies(page, targetURL, mergedCookies(config), log)
 	applyWebStorage(page, config.LocalStorage, config.SessionStorage, log)
 }
 

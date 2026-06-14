@@ -354,6 +354,34 @@ func findOpenAPISpec(ctx context.Context, target string, timeout int, headlessPa
 	return "", nil, nil, fmt.Errorf("no valid Swagger/OpenAPI spec found")
 }
 
+// processOpenAPIDocument dispatches document parsing to the appropriate version handler.
+// It is shared by the normal probe path and the specUrl early-exit path.
+func processOpenAPIDocument(document libopenapi.Document, docType map[string]interface{}, report *enumerateapiapplicationfern.EnumerateSwaggerReport, target string) {
+	if version, ok := docType["swagger"]; ok {
+		versionStr := fmt.Sprintf("%v", version)
+		if strings.HasPrefix(versionStr, "2") {
+			report.Result.Version = &versionStr
+			if err := handleSwaggerV2(document, report, target); err != nil {
+				report.Errors = append(report.Errors, err.Error())
+			}
+		} else {
+			report.Errors = append(report.Errors, fmt.Sprintf("unsupported Swagger version: %s", versionStr))
+		}
+	} else if version, ok := docType["openapi"]; ok {
+		versionStr := fmt.Sprintf("%v", version)
+		if strings.HasPrefix(versionStr, "3") {
+			report.Result.Version = &versionStr
+			if err := handleOpenAPIV3(document, report, target); err != nil {
+				report.Errors = append(report.Errors, err.Error())
+			}
+		} else {
+			report.Errors = append(report.Errors, fmt.Sprintf("unsupported OpenAPI version: %s", versionStr))
+		}
+	} else {
+		report.Errors = append(report.Errors, "unsupported OpenAPI version")
+	}
+}
+
 // PerformAppEnumerateSwagger performs a Swagger scan against a target URL and returns the report.
 func PerformAppEnumerateSwagger(ctx context.Context, config enumerateapiapplicationfern.EnumerateSwaggerConfig, headlessPath string) enumerateapiapplicationfern.EnumerateSwaggerReport {
 	result := enumerateapiapplicationfern.EnumerateSwaggerResult{}
@@ -364,6 +392,57 @@ func PerformAppEnumerateSwagger(ctx context.Context, config enumerateapiapplicat
 
 	// Merge caller-supplied headers/cookies for authenticated spec fetches
 	headers := requesthelpers.BuildAuthHeaders(config.Headers, config.Cookies)
+
+	// Early-exit path: caller already knows the spec URL — fetch it directly, skip all probing.
+	if config.SpecUrl != nil && *config.SpecUrl != "" {
+		baseURL, specPath, queryParams, err := requesthelpers.SplitTargetURL(*config.SpecUrl)
+		if err != nil {
+			report.Errors = append(report.Errors, fmt.Sprintf("invalid specUrl: %v", err))
+			return report
+		}
+		requestConfig := createSendHTTPRequestConfig(baseURL, specPath, config.Timeout, config.UserAgent, common.RequestMethodStandard, nil, headers)
+		// Preserve query parameters from specUrl (e.g., ?format=openapi) — SplitTargetURL strips them.
+		if len(queryParams) > 0 {
+			if requestConfig.Request.Params == nil {
+				requestConfig.Request.Params = &common.HttpRequestParams{}
+			}
+			requestConfig.Request.Params.Query = queryParams
+		}
+		response, err := request.SendRequest(ctx, requestConfig)
+		if err != nil {
+			report.Errors = append(report.Errors, fmt.Sprintf("failed to fetch specUrl: %v", err))
+			return report
+		}
+		if response.Response == nil || response.Response.StatusCode == nil || *response.Response.StatusCode != 200 || response.Response.ResponseBody == nil {
+			status := 0
+			if response.Response != nil && response.Response.StatusCode != nil {
+				status = *response.Response.StatusCode
+			}
+			report.Errors = append(report.Errors, fmt.Sprintf("specUrl returned non-200 status: %d", status))
+			return report
+		}
+		responseBody := requesthelpers.GetResponseBodyStringFromBodyStruct(response.Response.ResponseBody)
+		if responseBody == nil {
+			report.Errors = append(report.Errors, "specUrl returned empty body")
+			return report
+		}
+		docType, isValidSpec := detectOpenAPISpec(*responseBody)
+		if !isValidSpec {
+			report.Errors = append(report.Errors, "specUrl response is not a valid OpenAPI/Swagger spec")
+			return report
+		}
+		swaggerURL := *config.SpecUrl
+		bodyBytes := []byte(*responseBody)
+		result.SchemaUrl = &swaggerURL
+		result.Raw = base64.StdEncoding.EncodeToString(bodyBytes)
+		document, err := libopenapi.NewDocument(bodyBytes)
+		if err != nil {
+			report.Errors = append(report.Errors, fmt.Sprintf("Error creating new document: %v", err))
+			return report
+		}
+		processOpenAPIDocument(document, docType, &report, target)
+		return report
+	}
 
 	// Try to find a valid Swagger/OpenAPI spec
 	swaggerURL, bodyBytes, docType, err := findOpenAPISpec(ctx, target, config.Timeout, headlessPath, config.UserAgent, headers, config.CandidatePaths)
@@ -384,35 +463,7 @@ func PerformAppEnumerateSwagger(ctx context.Context, config enumerateapiapplicat
 		return report
 	}
 
-	// Use the already-parsed docType from the detection phase
-
-	if version, ok := docType["swagger"]; ok {
-		versionStr := fmt.Sprintf("%v", version)
-		if strings.HasPrefix(versionStr, "2") {
-			result.Version = &versionStr
-			err = handleSwaggerV2(document, &report, target)
-		} else {
-			report.Errors = append(report.Errors, fmt.Sprintf("unsupported Swagger version: %s", versionStr))
-			return report
-		}
-	} else if version, ok := docType["openapi"]; ok {
-		versionStr := fmt.Sprintf("%v", version)
-		if strings.HasPrefix(versionStr, "3") {
-			result.Version = &versionStr
-			err = handleOpenAPIV3(document, &report, target)
-		} else {
-			report.Errors = append(report.Errors, fmt.Sprintf("unsupported OpenAPI version: %s", versionStr))
-			return report
-		}
-	} else {
-		report.Errors = append(report.Errors, "unsupported OpenAPI version")
-		return report
-	}
-
-	if err != nil {
-		report.Errors = append(report.Errors, err.Error())
-		return report
-	}
+	processOpenAPIDocument(document, docType, &report, target)
 
 	return report
 }

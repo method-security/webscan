@@ -7,6 +7,10 @@ types:
       target: string
       timeout: integer
       userAgent: method.UserAgentPreset
+      headers: optional<map<string, string>>
+      cookies: optional<map<string, string>>
+      specUrl: optional<string>
+      candidatePaths: optional<list<string>>
   EnumerateSwaggerResult:
     properties:
       apiType: common.ApiType

@@ -19,9 +19,12 @@ import (
 
 // SendRequest sends a request based on the specified request method
 func SendRequest(ctx context.Context, config common.SendHttpRequestConfig) (*common.HttpRequestResponse, error) {
-	// Set timeout for request
-	requestCtx, requestCancel := context.WithTimeout(ctx, time.Duration(config.Timeout)*time.Second)
-	defer requestCancel()
+	requestCtx := ctx
+	if config.Timeout > 0 {
+		var requestCancel context.CancelFunc
+		requestCtx, requestCancel = context.WithTimeout(ctx, time.Duration(config.Timeout)*time.Second)
+		defer requestCancel()
+	}
 
 	// Get the logger from the context
 	log := svc1log.FromContext(ctx)

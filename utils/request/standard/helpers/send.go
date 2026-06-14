@@ -15,6 +15,7 @@ import (
 	common "github.com/Method-Security/webscan/generated/go/common"
 	// Utils
 	utils "github.com/Method-Security/webscan/utils"
+	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
 	useragent "github.com/Method-Security/webscan/utils/useragent"
 
 	// External
@@ -59,11 +60,12 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 			reqBody = bytes.NewReader(bodyBuffer.Bytes())
 		}
 
-		// Create Request (Set Method, URL, Body)
-		req, err := http.NewRequest(string(config.Request.Method), currentURL, reqBody)
+		// Create Request (Set Method, URL, Body). Bind the caller's context so a
+		// cancelled/expired request actually aborts the in-flight dial.
+		req, err := http.NewRequestWithContext(ctx, string(config.Request.Method), currentURL, reqBody)
 		if err != nil {
-			log.Error("Failed to create request", svc1log.SafeParam("error", err.Error()))
-			return nil, redirectChain, fmt.Errorf("failed to create request: %v", err)
+			log.Error("Failed to create request", svc1log.SafeParam("url", currentURL), svc1log.SafeParam("error", err.Error()))
+			return nil, redirectChain, fmt.Errorf("failed to create request for %s: %v", currentURL, err)
 		}
 
 		// Set Headers
@@ -79,8 +81,12 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 		// Send Request
 		resp, err := client.Do(req)
 		if err != nil {
-			log.Error("Failed to send request", svc1log.SafeParam("error", err.Error()))
-			return nil, redirectChain, fmt.Errorf("redirect request failed: %v", err)
+			detail := requesthelpers.ClassifyTransportError(err)
+			log.Error("Failed to send request",
+				svc1log.SafeParam("url", currentURL),
+				svc1log.SafeParam("category", string(detail.Category)),
+				svc1log.SafeParam("error", detail.Cause))
+			return nil, redirectChain, fmt.Errorf("request to %s failed [%s]: %s", currentURL, detail.Category, detail.Cause)
 		}
 
 		// Check if Response is not a redirect, return

@@ -15,3 +15,8 @@ types:
       headlessConfig: optional<method.HeadlessRequestConfig>
       browserbaseConfig: optional<method.BrowserbaseRequestConfig>
       browserbaseSecrets: optional<method.BrowserbaseRequestSecrets>
+      cookies: optional<map<string, string>>
+      localStorage: optional<map<string, string>>
+      sessionStorage: optional<map<string, string>>
+      captureConsoleLogs: optional<boolean>
+      captureCookies: optional<boolean>

@@ -63,20 +63,58 @@ func (a *WebScan) InitEnumerateCommand() {
 				return
 			}
 
+			// Header flag (repeated)
+			headerPairs, err := cmd.Flags().GetStringArray("header")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			headers := requesthelpers.ParseHeaderPairs(headerPairs)
+
+			// Timeout flag
+			timeout, err := cmd.Flags().GetInt("timeout")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Ad-hoc query flags
+			query, err := cmd.Flags().GetString("query")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			variables, err := cmd.Flags().GetString("variables")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
 			config := enumerateapiapplicationfern.EnumerateGraphqlConfig{
-				Target: target,
+				Target:  target,
+				Headers: headers,
+				Timeout: &timeout,
+			}
+			if query != "" {
+				config.Query = &query
+			}
+			if variables != "" {
+				config.Variables = &variables
 			}
 
 			// Generate report
-			report := enumerateapiapplication.PerformAppEnumerateGraphQL(cmd.Context(), config.Target)
+			report := enumerateapiapplication.PerformAppEnumerateGraphQL(cmd.Context(), config)
 			a.OutputSignal.Content = report
 		},
 	}
 
 	// Target Flags
 	enumerateAPIApplicationGraphqlCmd.Flags().String("target", "", "URL target to perform GraphQL enumeration against")
-	// TODO: Add --user-agent flag here once graphql is migrated to the standard HTTP client.
-	// Skipped for now because graphql uses http.Post directly instead of SendHTTPRequest.
+	// Config Flags
+	enumerateAPIApplicationGraphqlCmd.Flags().StringArray("header", []string{}, "Request headers as 'Key: Value' pairs (repeatable)")
+	enumerateAPIApplicationGraphqlCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
+	enumerateAPIApplicationGraphqlCmd.Flags().String("query", "", "Execute this ad-hoc GraphQL query instead of schema introspection")
+	enumerateAPIApplicationGraphqlCmd.Flags().String("variables", "", "JSON-encoded variables for the ad-hoc --query")
 
 	// Mark required flags
 	_ = enumerateAPIApplicationGraphqlCmd.MarkFlagRequired("target")
@@ -120,10 +158,46 @@ func (a *WebScan) InitEnumerateCommand() {
 				return
 			}
 
+			// Header flag (repeated)
+			headerPairs, err := cmd.Flags().GetStringArray("header")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			headers := requesthelpers.ParseHeaderPairs(headerPairs)
+
+			// Cookie flag (repeated)
+			cookiePairs, err := cmd.Flags().GetStringArray("cookie")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			cookies := requesthelpers.ParseFormDataPairs(cookiePairs)
+
+			// Candidate spec paths flag
+			candidatePaths, err := cmd.Flags().GetStringSlice("candidate-paths")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Spec URL flag (direct override — skips all probing)
+			specUrl, err := cmd.Flags().GetString("spec-url")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
 			config := enumerateapiapplicationfern.EnumerateSwaggerConfig{
-				Target:    target,
-				Timeout:   timeout,
-				UserAgent: userAgentPreset,
+				Target:         target,
+				Timeout:        timeout,
+				UserAgent:      userAgentPreset,
+				Headers:        headers,
+				Cookies:        cookies,
+				CandidatePaths: candidatePaths,
+			}
+			if specUrl != "" {
+				config.SpecUrl = &specUrl
 			}
 
 			// Generate report
@@ -136,6 +210,10 @@ func (a *WebScan) InitEnumerateCommand() {
 	// Config Flags
 	enumerateAPIApplicationSwaggerCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
 	enumerateAPIApplicationSwaggerCmd.Flags().String("headless-path", "", "Path to headless browser executable")
+	enumerateAPIApplicationSwaggerCmd.Flags().StringArray("header", []string{}, "Request headers as 'Key: Value' pairs (repeatable)")
+	enumerateAPIApplicationSwaggerCmd.Flags().StringArray("cookie", []string{}, "Cookies as 'name=value' pairs (repeatable)")
+	enumerateAPIApplicationSwaggerCmd.Flags().StringSlice("candidate-paths", []string{}, "Additional spec paths to probe before built-in paths (comma-separated)")
+	enumerateAPIApplicationSwaggerCmd.Flags().String("spec-url", "", "Direct URL to OpenAPI/Swagger spec; skips all probing when set")
 	// User Agent Flag
 	enumerateAPIApplicationSwaggerCmd.Flags().String("user-agent", "RANDOM", "User-Agent preset (RANDOM, CHROME, FIREFOX, SAFARI, EDGE)")
 

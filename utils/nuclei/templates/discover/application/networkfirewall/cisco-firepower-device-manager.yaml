@@ -9,7 +9,7 @@ info:
     method-module-name: CISCO_FIREPOWER_DEVICE_MANAGER
     cpe: cpe:2.3:a:cisco:firepower_device_manager:*:*:*:*:*:*:*:*
   tags: discovery,cisco,firepower,fdm,device-manager,network-firewall
-requests:
+http:
   - method: GET
     path:
       - "{{BaseURL}}"
@@ -23,6 +23,7 @@ requests:
       - type: regex
         part: body
         regex:
+          - '(?i)<title[^>]*>.*Firepower\s+Device\s+Manager.*</title>'
           - '(?i)"fireos_version"\s*:'
           - '(?i)/ui/js/[^"]*fdm'
           - '(?i)/ui/assets/fdm/'

@@ -248,6 +248,13 @@ func (b *Requester) sendRequestWithArtifactsOnce(ctx context.Context, config com
 			}
 		}
 
+		// Apply caller-supplied request context (headers, cookies, web storage)
+		// before navigation so authenticated headless crawls behave like the
+		// standard transport. Console capture is started here so messages emitted
+		// during page load are recorded.
+		applyPageContext(page, *constructedURL, config, log)
+		console := startConsoleCapture(page, config, log)
+
 		// Setup request monitoring and navigate
 		headerCapture := setupHeaderInterception(page, log)
 		handleNavigation(ctx, page, &redirectChain, &redirectChainMu, requestComplete, &once, config.MaxRedirects, browsersErr)
@@ -483,6 +490,15 @@ func (b *Requester) sendRequestWithArtifactsOnce(ctx context.Context, config com
 			responseHeaders,
 			responseBody,
 		)
+
+		// Attach captured console logs and page cookies when requested.
+		if console != nil {
+			response.ConsoleLogs = console.snapshot()
+		}
+		if cookies := collectCookies(page, config, log); len(cookies) > 0 {
+			response.Cookies = cookies
+		}
+
 		report.Response = &response
 
 		if captureScreenshot && browserErr == nil {

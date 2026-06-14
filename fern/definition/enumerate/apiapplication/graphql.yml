@@ -27,6 +27,10 @@ types:
   EnumerateGraphqlConfig:
     properties:
       target: string
+      headers: optional<map<string, string>>
+      timeout: optional<integer>
+      query: optional<string>
+      variables: optional<string>
   EnumerateGraphqlData:
     properties:
       apiType: common.ApiType
@@ -37,6 +41,7 @@ types:
       securitySchemes: optional<map<string, common.SecurityScheme>>
       security: optional<list<common.SecurityRequirement>>
       queries: optional<list<GraphQlQuery>>
+      queryResponse: optional<string>
       raw: string
   EnumerateGraphqlResult:
     properties:

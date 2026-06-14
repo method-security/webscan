@@ -42,6 +42,10 @@ types:
       requestMethod: method.RequestMethod
       headlessConfig: optional<method.HeadlessRequestConfig>
       browserbaseConfig: optional<method.BrowserbaseRequestConfig>
+      headers: optional<map<string, string>>
+      cookies: optional<map<string, string>>
+      localStorage: optional<map<string, string>>
+      sessionStorage: optional<map<string, string>>
   DiscoverPageResult:
     properties:
       request: optional<http.HttpRequestResponse>

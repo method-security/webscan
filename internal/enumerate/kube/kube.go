@@ -16,7 +16,23 @@ import (
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
 )
 
-var commonKubepaths = []string{"/api", "/livez", "/version"}
+var commonKubepaths = []string{
+	"/",
+	"/api",
+	"/api/v1",
+	"/apis",
+	"/version",
+	"/healthz",
+	"/livez",
+	"/readyz",
+	"/metrics",
+	"/api/v1/nodes",
+	"/api/v1/pods",
+	"/api/v1/services",
+	"/api/v1/namespaces",
+	"/api/v1/secrets",
+	"/api/v1/configmaps",
+}
 
 func createSendHTTPRequestConfig(baseURL, path string, verifyTLS bool, timeout int, userAgent common.UserAgentPreset) common.SendHttpRequestConfig {
 	request := common.HttpRequest{

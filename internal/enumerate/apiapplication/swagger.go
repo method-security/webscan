@@ -109,12 +109,12 @@ func generateSpecPaths() []string {
 	return paths
 }
 
-func createSendHTTPRequestConfig(baseURL, path string, timeout int, userAgent common.UserAgentPreset, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig) common.SendHttpRequestConfig {
+func createSendHTTPRequestConfig(baseURL, path string, timeout int, userAgent common.UserAgentPreset, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, headers map[string][]string) common.SendHttpRequestConfig {
 	request := common.HttpRequest{
 		BaseUrl: baseURL,
 		Path:    path,
 		Method:  common.HttpMethodGet,
-		Params:  &common.HttpRequestParams{},
+		Params:  &common.HttpRequestParams{Headers: headers},
 	}
 	return common.SendHttpRequestConfig{
 		Request:            &request,
@@ -210,18 +210,21 @@ func isLikelySpecURL(url string) bool {
 // findOpenAPISpec attempts to locate a valid OpenAPI/Swagger specification
 // First checks if target is a Swagger UI page, then uses headless if needed,
 // otherwise falls back to trying common endpoint paths.
-func findOpenAPISpec(ctx context.Context, target string, timeout int, headlessPath string, userAgent common.UserAgentPreset) (string, []byte, map[string]interface{}, error) {
+func findOpenAPISpec(ctx context.Context, target string, timeout int, headlessPath string, userAgent common.UserAgentPreset, headers map[string][]string, candidatePaths []string) (string, []byte, map[string]interface{}, error) {
 	baseURL, parsedTargetPath, _, err := requesthelpers.SplitTargetURL(target)
 	if err != nil {
 		return "", nil, nil, fmt.Errorf("failed to split target URL: %w", err)
 	}
+
+	// Caller-supplied candidate paths are probed before the built-in spec paths.
+	specPaths := append(append([]string{}, candidatePaths...), generateSpecPaths()...)
 
 	if dl, ok := ctx.Deadline(); ok {
 		timeout = int(time.Until(dl).Seconds())
 	}
 
 	// STEP 1: Make a standard request to check if target is a Swagger UI page
-	requestConfig := createSendHTTPRequestConfig(baseURL, parsedTargetPath, timeout, userAgent, common.RequestMethodStandard, nil)
+	requestConfig := createSendHTTPRequestConfig(baseURL, parsedTargetPath, timeout, userAgent, common.RequestMethodStandard, nil, headers)
 	response, err := request.SendRequest(ctx, requestConfig)
 
 	if err == nil && response.Response != nil && response.Response.StatusCode != nil &&
@@ -237,7 +240,7 @@ func findOpenAPISpec(ctx context.Context, target string, timeout int, headlessPa
 					MinDomStabalizeTime: 5,
 				}
 
-				headlessRequestConfig := createSendHTTPRequestConfig(baseURL, parsedTargetPath, timeout, userAgent, common.RequestMethodHeadless, headlessConfig)
+				headlessRequestConfig := createSendHTTPRequestConfig(baseURL, parsedTargetPath, timeout, userAgent, common.RequestMethodHeadless, headlessConfig, headers)
 				headlessResponse, err := request.SendRequest(ctx, headlessRequestConfig)
 
 				if err == nil && headlessResponse.Response != nil && headlessResponse.Response.StatusCode != nil &&
@@ -262,7 +265,7 @@ func findOpenAPISpec(ctx context.Context, target string, timeout int, headlessPa
 							}
 
 							// Make request to the extracted spec URL
-							specRequestConfig := createSendHTTPRequestConfig(baseURL, specPath, timeout, userAgent, common.RequestMethodStandard, nil)
+							specRequestConfig := createSendHTTPRequestConfig(baseURL, specPath, timeout, userAgent, common.RequestMethodStandard, nil, headers)
 							specResponse, err := request.SendRequest(ctx, specRequestConfig)
 							if err != nil {
 								continue
@@ -286,8 +289,8 @@ func findOpenAPISpec(ctx context.Context, target string, timeout int, headlessPa
 						}
 
 						// If no extracted URLs worked, try common paths as fallback
-						for _, path := range generateSpecPaths() {
-							specRequestConfig := createSendHTTPRequestConfig(baseURL, path, timeout, userAgent, common.RequestMethodStandard, nil)
+						for _, path := range specPaths {
+							specRequestConfig := createSendHTTPRequestConfig(baseURL, path, timeout, userAgent, common.RequestMethodStandard, nil, headers)
 							specResponse, err := request.SendRequest(ctx, specRequestConfig)
 							if err != nil {
 								continue
@@ -317,13 +320,13 @@ func findOpenAPISpec(ctx context.Context, target string, timeout int, headlessPa
 	}
 
 	// STEP 3: Fall back to trying common spec paths directly
-	for _, path := range generateSpecPaths() {
+	for _, path := range specPaths {
 		if dl, ok := ctx.Deadline(); ok {
 			timeout = int(time.Until(dl).Seconds())
 		}
 
 		// Create a request config for the Swagger/OpenAPI spec and send the request
-		requestConfig := createSendHTTPRequestConfig(baseURL, fmt.Sprintf("%s%s", parsedTargetPath, path), timeout, userAgent, common.RequestMethodStandard, nil)
+		requestConfig := createSendHTTPRequestConfig(baseURL, fmt.Sprintf("%s%s", parsedTargetPath, path), timeout, userAgent, common.RequestMethodStandard, nil, headers)
 		request, err := request.SendRequest(ctx, requestConfig)
 		if err != nil {
 			continue // Try next path on request failure
@@ -359,8 +362,11 @@ func PerformAppEnumerateSwagger(ctx context.Context, config enumerateapiapplicat
 	// Normalize target URL
 	target := strings.TrimSuffix(config.Target, "/")
 
+	// Merge caller-supplied headers/cookies for authenticated spec fetches
+	headers := requesthelpers.BuildAuthHeaders(config.Headers, config.Cookies)
+
 	// Try to find a valid Swagger/OpenAPI spec
-	swaggerURL, bodyBytes, docType, err := findOpenAPISpec(ctx, target, config.Timeout, headlessPath, config.UserAgent)
+	swaggerURL, bodyBytes, docType, err := findOpenAPISpec(ctx, target, config.Timeout, headlessPath, config.UserAgent, headers, config.CandidatePaths)
 	if err != nil {
 		report.Errors = append(report.Errors, err.Error())
 		return report

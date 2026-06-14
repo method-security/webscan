@@ -12,6 +12,14 @@ types:
       notAfter: datetime
       serialNumber: optional<string>
 
+  RequestFile:
+    docs: A single multipart file part for an upload request.
+    properties:
+      fieldName: string
+      fileName: string
+      contentBase64: string
+      contentType: optional<string>
+
   DiscoverRequestConfig:
     properties:
       target: string
@@ -20,6 +28,9 @@ types:
       jsonBody: optional<string>
       textBody: optional<string>
       formData: optional<map<string, string>>
+      files: optional<list<RequestFile>>
+      binaryBody: optional<string>
+      binaryBodyMimeType: optional<string>
       maxRedirects: integer
       followRedirects: boolean
       verifyTls: boolean

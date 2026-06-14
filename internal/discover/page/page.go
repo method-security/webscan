@@ -27,9 +27,13 @@ func getHTTPRequestConfig(baseURL string, path string, queryParams map[string]st
 		Path:    path,
 		Method:  common.HttpMethodGet,
 		Params: &common.HttpRequestParams{
-			Query: queryParams,
+			Query:   queryParams,
+			Headers: requesthelpers.BuildAuthHeaders(config.Headers, config.Cookies),
 		},
 	}
+	// Capture console logs and page cookies on headless captures to mirror the
+	// rendered-page output contract; the standard transport ignores both flags.
+	captureBrowserArtifacts := config.RequestMethod == common.RequestMethodHeadless
 	return common.SendHttpRequestConfig{
 		Request:                    &request,
 		MaxRedirects:               config.MaxRedirects,
@@ -41,6 +45,11 @@ func getHTTPRequestConfig(baseURL string, path string, queryParams map[string]st
 		HeadlessConfig:             config.HeadlessConfig,
 		BrowserbaseConfig:          config.BrowserbaseConfig,
 		BrowserbaseSecrets:         browserbaseSecrets,
+		Cookies:                    config.Cookies,
+		LocalStorage:               config.LocalStorage,
+		SessionStorage:             config.SessionStorage,
+		CaptureConsoleLogs:         &captureBrowserArtifacts,
+		CaptureCookies:             &captureBrowserArtifacts,
 	}
 }
 

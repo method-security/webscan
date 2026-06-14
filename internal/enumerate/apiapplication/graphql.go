@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	// Generated
 	enumerateapiapplicationfern "github.com/Method-Security/webscan/generated/go/enumerate/apiapplication"
@@ -17,18 +18,42 @@ import (
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
-// PerformAppEnumerateGraphQL performs a GraphQL scan against a target URL and returns the report.
-func PerformAppEnumerateGraphQL(ctx context.Context, target string) enumerateapiapplicationfern.EnumerateGraphqlReport {
-	log := svc1log.FromContext(ctx)
-	log.Info("Performing GraphQL scan", svc1log.SafeParam("target", target))
+const defaultGraphQLTimeout = 30
 
-	report := enumerateapiapplicationfern.EnumerateGraphqlReport{Config: &enumerateapiapplicationfern.EnumerateGraphqlConfig{Target: target}}
+const introspectionQuery = `{"query":"{ __schema { types { name kind description fields { name } } } }"}`
+
+// PerformAppEnumerateGraphQL performs a GraphQL scan against a target URL and returns the report.
+// When config.Query is set, the ad-hoc query is executed and its raw response returned instead
+// of running schema introspection.
+func PerformAppEnumerateGraphQL(ctx context.Context, config enumerateapiapplicationfern.EnumerateGraphqlConfig) enumerateapiapplicationfern.EnumerateGraphqlReport {
+	log := svc1log.FromContext(ctx)
+	log.Info("Performing GraphQL scan", svc1log.SafeParam("target", config.Target))
+
+	report := enumerateapiapplicationfern.EnumerateGraphqlReport{Config: &config}
 	report.Result = &enumerateapiapplicationfern.EnumerateGraphqlResult{}
 	data := &enumerateapiapplicationfern.EnumerateGraphqlData{}
 
-	body, err := fetchGraphQLSchema(ctx, target)
+	requestBody, err := buildGraphQLRequestBody(config)
 	if err != nil {
 		report.Errors = append(report.Errors, err.Error())
+		return report
+	}
+
+	body, err := fetchGraphQL(ctx, config.Target, requestBody, config.Headers, config.Timeout)
+	if err != nil {
+		report.Errors = append(report.Errors, err.Error())
+		return report
+	}
+
+	data.BaseEndpointUrl = config.Target
+	data.ApiType = enumerateapiapplicationfern.ApiTypeGraphQl
+	data.Raw = base64.StdEncoding.EncodeToString(body)
+
+	// Ad-hoc query mode: return the raw response without introspection parsing.
+	if config.Query != nil && *config.Query != "" {
+		response := string(body)
+		data.QueryResponse = &response
+		report.Result.Data = data
 		return report
 	}
 
@@ -47,11 +72,6 @@ func PerformAppEnumerateGraphQL(ctx context.Context, target string) enumerateapi
 		return report
 	}
 
-	// Set data after all functions succeed
-	data.BaseEndpointUrl = target
-	data.ApiType = enumerateapiapplicationfern.ApiTypeGraphQl
-	data.Raw = base64.StdEncoding.EncodeToString(body)
-
 	typeFields := extractTypeFields(schema)
 
 	populateReportWithQueries(data, schema, typeFields)
@@ -61,13 +81,45 @@ func PerformAppEnumerateGraphQL(ctx context.Context, target string) enumerateapi
 	return report
 }
 
-func fetchGraphQLSchema(ctx context.Context, target string) ([]byte, error) {
+// buildGraphQLRequestBody returns the JSON POST body. Defaults to the introspection
+// query; when an ad-hoc query is supplied it is JSON-encoded with optional variables.
+func buildGraphQLRequestBody(config enumerateapiapplicationfern.EnumerateGraphqlConfig) ([]byte, error) {
+	if config.Query == nil || *config.Query == "" {
+		return []byte(introspectionQuery), nil
+	}
+
+	payload := map[string]interface{}{"query": *config.Query}
+	if config.Variables != nil && *config.Variables != "" {
+		var variables interface{}
+		if err := json.Unmarshal([]byte(*config.Variables), &variables); err != nil {
+			return nil, fmt.Errorf("failed to parse variables as JSON: %v", err)
+		}
+		payload["variables"] = variables
+	}
+	return json.Marshal(payload)
+}
+
+func fetchGraphQL(ctx context.Context, target string, requestBody []byte, headers map[string]string, timeout *int) ([]byte, error) {
 	log := svc1log.FromContext(ctx)
 
-	query := `{"query":"{ __schema { types { name kind description fields { name } } } }"}`
-	resp, err := http.Post(target, "application/json", bytes.NewBuffer([]byte(query)))
+	effectiveTimeout := defaultGraphQLTimeout
+	if timeout != nil && *timeout > 0 {
+		effectiveTimeout = *timeout
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, target, bytes.NewBuffer(requestBody))
 	if err != nil {
-		log.Error("Failed to fetch GraphQL schema", svc1log.SafeParam("error", err))
+		return nil, fmt.Errorf("failed to build GraphQL request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	for key, value := range headers {
+		req.Header.Set(key, value)
+	}
+
+	client := &http.Client{Timeout: time.Duration(effectiveTimeout) * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Error("Failed to fetch GraphQL response", svc1log.SafeParam("error", err))
 		return nil, err
 	}
 	defer func() {

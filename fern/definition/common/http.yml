@@ -68,6 +68,13 @@ types:
       baseHeaders: optional<map<string, list<string>>>
       params: optional<HttpRequestParams>
       sentAt: datetime
+  # Cookie set by a page after navigation (headless capture)
+  ResponseCookie:
+    properties:
+      name: string
+      value: string
+      domain: optional<string>
+      path: optional<string>
   # Response Struct
   HttpResponse:
     properties:
@@ -77,6 +84,8 @@ types:
       responseBody: optional<Body>
       receivedAt: optional<datetime>
       sizeBytes: optional<integer>
+      consoleLogs: optional<list<string>>
+      cookies: optional<list<ResponseCookie>>
   # Returned Struct
   HttpRequestResponse:
     properties:

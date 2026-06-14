@@ -24,6 +24,7 @@ http:
       - type: regex
         part: body
         regex:
+          - '(?i)<title[^>]*>.*Cisco\s+IOS\s*XR.*</title>'
           - '(?i)<title[^>]*>.*Cisco.*IOS\s*XR.*(Management|Configuration|Administration).*Interface.*</title>'
           - '(?i)Cisco\s+IOS\s*XR\s+(Configuration|Management|Web\s+Interface)'
       - type: word

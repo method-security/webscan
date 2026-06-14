@@ -62,7 +62,21 @@ func BuildAuthHeaders(headers map[string]string, cookies map[string]string) map[
 		for name, value := range cookies {
 			pairs = append(pairs, fmt.Sprintf("%s=%s", name, value))
 		}
-		result["Cookie"] = []string{strings.Join(pairs, "; ")}
+		cookieValue := strings.Join(pairs, "; ")
+		// Merge onto any caller-supplied Cookie header (case-insensitive) rather than
+		// clobbering it, so an explicit --header "Cookie: ..." and --cookie compose.
+		cookieKey := "Cookie"
+		for key := range result {
+			if strings.EqualFold(key, "Cookie") {
+				cookieKey = key
+				break
+			}
+		}
+		if existing, ok := result[cookieKey]; ok && len(existing) > 0 && existing[0] != "" {
+			result[cookieKey] = []string{existing[0] + "; " + cookieValue}
+		} else {
+			result[cookieKey] = []string{cookieValue}
+		}
 	}
 	return result
 }

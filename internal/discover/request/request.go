@@ -4,6 +4,7 @@ import (
 	// Standard
 	"context"
 	"crypto/x509"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"time"
@@ -36,7 +37,8 @@ func buildHTTPRequest(config discover.DiscoverRequestConfig) (*common.HttpReques
 		}
 	}
 
-	// Build body based on priority: JSON > Text > Form
+	// Build body based on priority: JSON > Text > Files (multipart, folding any
+	// formData fields) > Form (urlencoded) > Binary
 	var body *common.Body
 	switch {
 	case config.JsonBody != nil && *config.JsonBody != "":
@@ -57,17 +59,21 @@ func buildHTTPRequest(config discover.DiscoverRequestConfig) (*common.HttpReques
 				MimeType: &mimeType,
 			},
 		}
-	case config.FormData != nil && len(config.FormData) > 0:
-		mimeType := "application/x-www-form-urlencoded"
-		body = &common.Body{
-			Kind: "form",
-			Form: &common.FormBody{
-				Fields:   config.FormData,
-				MimeType: &mimeType,
-			},
-		}
 	case len(config.Files) > 0:
-		parts := make([]*common.MultipartPart, 0, len(config.Files))
+		// Files require multipart/form-data, which can also carry plain text
+		// fields, so fold any formData in alongside the file parts rather than
+		// dropping it (a urlencoded body cannot carry uploads).
+		parts := make([]*common.MultipartPart, 0, len(config.Files)+len(config.FormData))
+		for name, value := range config.FormData {
+			parts = append(parts, &common.MultipartPart{
+				Headers: map[string]string{
+					"Content-Disposition": fmt.Sprintf("form-data; name=%q", name),
+				},
+				Content: &common.BinaryBody{
+					Base64: base64.StdEncoding.EncodeToString([]byte(value)),
+				},
+			})
+		}
 		for _, file := range config.Files {
 			if file == nil {
 				continue
@@ -91,6 +97,15 @@ func buildHTTPRequest(config discover.DiscoverRequestConfig) (*common.HttpReques
 		body = &common.Body{
 			Kind:      "multipart",
 			Multipart: &common.MultipartBody{Parts: parts},
+		}
+	case config.FormData != nil && len(config.FormData) > 0:
+		mimeType := "application/x-www-form-urlencoded"
+		body = &common.Body{
+			Kind: "form",
+			Form: &common.FormBody{
+				Fields:   config.FormData,
+				MimeType: &mimeType,
+			},
 		}
 	case config.BinaryBody != nil && *config.BinaryBody != "":
 		body = &common.Body{

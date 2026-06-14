@@ -1,0 +1,62 @@
+id: canon-imagerunner-detect
+info:
+  name: Canon imageRUNNER / i-SENSYS MFP Web Management Detection
+  author: method-security
+  severity: info
+  description: |
+    Detects Canon imageRUNNER (iR-ADV) and i-SENSYS / imageCLASS MFP
+    web management interfaces (Remote UI). The model is carried in
+    the login page title — Canon's Remote UI follows a stable shape
+    "<Model> / Login - <Model>" across the iR / iR-ADV / LBP / MF
+    families. The body's "Canon" footer string is the structural
+    co-signal.
+    Firmware version is not consistently HTTP-determinable from the
+    pre-auth Remote UI, so the template stops at EXPOSED_ADMIN; model
+    name is captured as subModule.
+    Catalog reference: SEC-702 — Cluster O (printers).
+  metadata:
+    method-application-type: HARDWARE_MANAGEMENT_SYSTEM
+    method-module-name: CANON_PRINTER
+    method-detection-state: EXPOSED_ADMIN
+    cpe: cpe:2.3:o:canon:*:*:*:*:*:*:*:*:*
+  tags: discovery,canon,imagerunner,i-sensys,imageclass,printer,mfp,hardware,management-console
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/login.html"
+      - "{{BaseURL}}/_top.html"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers-condition: and
+    matchers:
+      # Title anchor on the Canon product-family prefixes (iR, iR-ADV,
+      # LBP, MF, GX, TS). Same restraint as the Brother template —
+      # refuse to match a third-party page that just says "Canon".
+      - type: regex
+        part: body
+        regex:
+          - '(?i)<title[^>]*>\s*(?:iR(?:[\s\-]?ADV)?|LBP|MF|GX|TS)[\s\-]?[A-Z0-9]+[A-Z0-9_\-/i]*'
+      # Body co-signal — Canon footer / brand string. Intentionally
+      # OMITS "Remote UI" because that token is embedded in the same
+      # Canon Remote UI <title> tag the title anchor above already
+      # requires; matching it again as the "co-signal" would be
+      # trivially satisfied by the title-anchor's own text. The
+      # remaining alternatives are footer copyright, brand URL, or
+      # product-family names that don't recur in the title.
+      - type: regex
+        part: body
+        regex:
+          - '(?i)(?:©\s*CANON\s*INC\.|canon\.com|imageRUNNER|i-SENSYS|imageCLASS)'
+      - type: status
+        status:
+          - 200
+    extractors:
+      # Model name from the title.
+      - type: regex
+        name: model
+        part: body
+        group: 1
+        regex:
+          - '(?i)<title[^>]*>\s*((?:iR(?:[\s\-]?ADV)?|LBP|MF|GX|TS)[\s\-]?[A-Z0-9][A-Z0-9_\-/i]+)'

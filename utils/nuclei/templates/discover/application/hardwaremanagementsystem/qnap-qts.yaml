@@ -1,0 +1,87 @@
+id: qnap-qts-detect
+info:
+  name: QNAP QTS / QuTS hero NAS Web Management Detection
+  author: method-security
+  severity: info
+  description: |
+    Detects QNAP QTS / QuTS hero NAS web management interfaces.
+    The smoking-gun signal is GET /cgi-bin/authLogin.cgi — an unauthenticated GET on
+    nearly every QTS / QuTS hero firmware that returns an XML envelope disclosing
+    model (<modelName>TS-453D</modelName>), firmware (<firmware>5.1.5</firmware>),
+    internal model code, and platform family (<platform>TS-X53</platform>).
+    The platform → architecture mapping (TS-X53 → Intel Celeron Apollo Lake →
+    x86_64, TS-X28A → Annapurna Alpine → arm64, ...) is out of scope for this PR
+    and lands with the SEC-702.A schema + engine work (tool-factory/sec-702 / #423).
+    Catalog reference: SEC-702 — Cluster G (NAS).
+  metadata:
+    method-application-type: HARDWARE_MANAGEMENT_SYSTEM
+    method-module-name: QNAP_QTS
+    method-detection-state: EXPOSED_ADMIN
+    cpe: cpe:2.3:o:qnap:qts:*:*:*:*:*:*:*:*
+  tags: discovery,qnap,qts,quts-hero,nas,storage,hardware,management-console,soho
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/cgi-bin/authLogin.cgi"
+    redirects: false
+    matchers-condition: and
+    matchers:
+      # XML envelope must carry the QNAP-distinctive element names. Match
+      # all three concurrently to rule out generic "QNAP" string false-
+      # positives (vendor product pages, OEM rebrands, honeypots).
+      - type: word
+        part: body
+        words:
+          - "<authSid>"
+          - "<modelName>"
+          - "<firmware>"
+        condition: and
+        case-insensitive: false
+      - type: status
+        status:
+          - 200
+    extractors:
+      # Real QTS / QuTS hero firmware wraps the inner element text in
+      # <![CDATA[...]]> ("<modelName><![CDATA[TS-453D]]></modelName>"),
+      # so every regex below tolerates the optional CDATA wrapper.
+      # The non-greedy ".*?" inside the optional group keeps the
+      # outer element-name anchors strict.
+      #
+      # <modelName>TS-453D</modelName> → subModule. QNAP model strings
+      # span TS- / TVS- / TBS- / HS- / TES- prefixes plus alphanumeric
+      # suffixes (TS-453D, TVS-h1288X, TS-h2490FU).
+      - type: regex
+        name: model
+        part: body
+        group: 1
+        regex:
+          - '<modelName>(?:<!\[CDATA\[)?\s*([A-Za-z0-9_\-]+)\s*(?:\]\]>)?</modelName>'
+      # <firmware>5.1.5</firmware> → firmware version. QNAP ships
+      # major.minor.patch ("5.1.5") or major.minor.patch.build
+      # ("5.1.5.2418"); the regex accepts both.
+      - type: regex
+        name: firmware
+        part: body
+        group: 1
+        regex:
+          - '<firmware>(?:<!\[CDATA\[)?\s*([0-9][0-9.]*)\s*(?:\]\]>)?</firmware>'
+      # <platform>TS-X53</platform> → platform family (distinct from
+      # <modelName>; e.g. TS-X53 = Intel Celeron Apollo Lake, TS-X28A =
+      # Annapurna Alpine). Captured as named informational metadata;
+      # the platform → architecture mapping is out of scope for this PR
+      # (see description above).
+      - type: regex
+        name: platform
+        part: body
+        group: 1
+        regex:
+          - '<platform>(?:<!\[CDATA\[)?\s*([A-Za-z0-9_\-]+)\s*(?:\]\]>)?</platform>'
+      # <internalModelName>...</internalModelName> — vendor-internal
+      # build identifier; useful for cross-reference but not emitted
+      # to any structured field.
+      - type: regex
+        name: internal_model
+        part: body
+        group: 1
+        regex:
+          - '<internalModelName>(?:<!\[CDATA\[)?\s*([^<\]]+?)\s*(?:\]\]>)?</internalModelName>'

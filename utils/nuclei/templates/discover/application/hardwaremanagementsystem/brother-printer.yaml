@@ -1,0 +1,58 @@
+id: brother-printer-detect
+info:
+  name: Brother Printer / MFP Web Management Detection
+  author: method-security
+  severity: info
+  description: |
+    Detects Brother printer / multifunction-printer web management
+    interfaces. The /general/status.html endpoint is unauthenticated on
+    most Brother HL- / DCP- / MFC- firmware and carries the device model
+    in the page title (<title>HL-L2380DW</title>). The body's status
+    table additionally exposes model + status pre-auth.
+    Brother firmware version is not consistently HTTP-determinable across
+    the model range, so the template stops at EXPOSED_ADMIN; model name
+    is captured as subModule.
+    Catalog reference: SEC-702 — Cluster O (printers).
+  metadata:
+    method-application-type: HARDWARE_MANAGEMENT_SYSTEM
+    method-module-name: BROTHER_PRINTER
+    method-detection-state: EXPOSED_ADMIN
+    cpe: cpe:2.3:o:brother:*:*:*:*:*:*:*:*:*
+  tags: discovery,brother,printer,mfp,hardware,management-console
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/general/status.html"
+    redirects: true
+    max-redirects: 5
+    matchers-condition: and
+    matchers:
+      # Brother title is anchored to a known model-name pattern:
+      # the HL- / DCP- / MFC- / ADS- / PT- / QL- prefix family.
+      # Refusing the open-ended "any Brother model" path avoids
+      # firing on a third-party site that happens to say "Brother".
+      - type: regex
+        part: body
+        regex:
+          - '(?i)<title[^>]*>\s*(?:HL|DCP|MFC|ADS|PT|QL|RJ)-[A-Z0-9]+[A-Z0-9_\-]*\s*</title>'
+      # Body co-signal — Brother status tables consistently include
+      # one of these labels in their pre-auth shape.
+      - type: word
+        part: body
+        words:
+          - "Brother"
+          - "Status Monitor"
+          - "Device Information"
+        condition: or
+        case-insensitive: true
+      - type: status
+        status:
+          - 200
+    extractors:
+      # Model name from the title.
+      - type: regex
+        name: model
+        part: body
+        group: 1
+        regex:
+          - '(?i)<title[^>]*>\s*((?:HL|DCP|MFC|ADS|PT|QL|RJ)-[A-Z0-9_\-]+)\s*</title>'

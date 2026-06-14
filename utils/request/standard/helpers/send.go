@@ -44,7 +44,7 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 	if bodyReader != nil {
 		bodyBuffer = &bytes.Buffer{}
 		if _, err := io.Copy(bodyBuffer, bodyReader); err != nil {
-			log.Error("Failed to buffer request body", svc1log.SafeParam("error", err))
+			log.Error("Failed to buffer request body", svc1log.SafeParam("error", err.Error()))
 			return nil, redirectChain, fmt.Errorf("failed to buffer request body: %v", err)
 		}
 	}
@@ -62,7 +62,7 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 		// Create Request (Set Method, URL, Body)
 		req, err := http.NewRequest(string(config.Request.Method), currentURL, reqBody)
 		if err != nil {
-			log.Error("Failed to create request", svc1log.SafeParam("error", err))
+			log.Error("Failed to create request", svc1log.SafeParam("error", err.Error()))
 			return nil, redirectChain, fmt.Errorf("failed to create request: %v", err)
 		}
 
@@ -79,7 +79,7 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 		// Send Request
 		resp, err := client.Do(req)
 		if err != nil {
-			log.Error("Failed to send request", svc1log.SafeParam("error", err))
+			log.Error("Failed to send request", svc1log.SafeParam("error", err.Error()))
 			return nil, redirectChain, fmt.Errorf("redirect request failed: %v", err)
 		}
 
@@ -110,7 +110,7 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 		// whether this is a trailing-slash hop before applying the budget check.
 		nextURL, err := resp.Request.URL.Parse(location)
 		if err != nil {
-			log.Error("Failed to parse redirect location", svc1log.SafeParam("error", err))
+			log.Error("Failed to parse redirect location", svc1log.SafeParam("error", err.Error()))
 			return nil, redirectChain, fmt.Errorf("failed to parse redirect location: %v", err)
 		}
 
@@ -122,7 +122,7 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 			// Close Response Body
 			err = resp.Body.Close()
 			if err != nil {
-				log.Error("Failed to close response body", svc1log.SafeParam("error", err))
+				log.Error("Failed to close response body", svc1log.SafeParam("error", err.Error()))
 				return nil, redirectChain, fmt.Errorf("failed to close response body: %v", err)
 			}
 			// Update current URL but don't increment redirect count
@@ -142,7 +142,7 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 				log.Info("Blocking cross-domain redirect", svc1log.SafeParam("from", currentURL), svc1log.SafeParam("to", nextURL.String()))
 				err = resp.Body.Close()
 				if err != nil {
-					log.Error("Failed to close response body", svc1log.SafeParam("error", err))
+					log.Error("Failed to close response body", svc1log.SafeParam("error", err.Error()))
 				}
 				return nil, redirectChain, fmt.Errorf("cross-domain redirect blocked: %s -> %s", currentURL, nextURL.String()) // Dont change this comment used for DD metric
 			}
@@ -169,7 +169,7 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 		// Close Response Body
 		err = resp.Body.Close()
 		if err != nil {
-			log.Error("Failed to close response body", svc1log.SafeParam("error", err))
+			log.Error("Failed to close response body", svc1log.SafeParam("error", err.Error()))
 			return nil, redirectChain, fmt.Errorf("failed to close response body: %v", err)
 		}
 

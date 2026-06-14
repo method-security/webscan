@@ -71,7 +71,8 @@ func ClassifyTransportError(err error) TransportErrorDetail {
 	if err == nil {
 		return TransportErrorDetail{}
 	}
-	detail := TransportErrorDetail{Category: TransportErrorTransport, Cause: err.Error()}
+	causeErr := UnwrapURLError(err)
+	detail := TransportErrorDetail{Category: TransportErrorTransport, Cause: causeErr.Error()}
 
 	if opErr := asOpError(err); opErr != nil {
 		detail.Op = opErr.Op
@@ -88,7 +89,7 @@ func ClassifyTransportError(err error) TransportErrorDetail {
 		detail.Category = TransportErrorTimeout
 	case isDNSError(err, &detail):
 		detail.Category = TransportErrorDNS
-	case isTLSError(err):
+	case isTLSError(causeErr):
 		detail.Category = TransportErrorTLS
 	case classifySyscall(err, &detail):
 		// category set by classifySyscall

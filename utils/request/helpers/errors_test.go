@@ -41,6 +41,12 @@ func TestClassifyTransportError(t *testing.T) {
 		{name: "context canceled", err: urlErr(context.Canceled), category: TransportErrorCanceled},
 		{name: "tls unknown authority", err: urlErr(x509.UnknownAuthorityError{}), category: TransportErrorTLS},
 		{name: "tls handshake string", err: urlErr(errors.New("tls: handshake failure")), category: TransportErrorTLS},
+		{name: "tls-looking url does not override cause", err: &url.Error{Op: "Get", URL: "https://example.com/tls:x509", Err: &net.OpError{
+			Op:   "dial",
+			Net:  "tcp",
+			Addr: &net.TCPAddr{IP: net.ParseIP("1.2.3.4"), Port: 443},
+			Err:  os.NewSyscallError("connect", syscall.ECONNREFUSED),
+		}}, category: TransportErrorConnRefused, wantAddr: "1.2.3.4:443"},
 		{name: "unknown transport", err: urlErr(errors.New("something weird happened")), category: TransportErrorTransport},
 	}
 	for _, tt := range tests {

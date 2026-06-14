@@ -45,7 +45,6 @@ http:
       - "{{BaseURL}}/doc/page/login.asp"
     redirects: true
     max-redirects: 5
-    stop-at-first-match: false
     matchers:
       # Matcher 1: Server: DNVRS-Webs header. POSITIVE Hikvision
       # anchor — corrects the TC-012 mis-attribution. Hikvision
@@ -55,7 +54,7 @@ http:
       - type: dsl
         name: dnvrs-webs-anchor
         dsl:
-          - 'contains(tolower(header), "server: dnvrs-webs")'
+          - 'status_code == 200 && contains(tolower(header), "server: dnvrs-webs")'
       # Matcher 2: redirect-to-login.asp shim. The window.location.href
       # = "./doc/page/login.asp?_" pattern is Hikvision-unique. We
       # require it next to status 200 to filter random redirect pages.
@@ -122,7 +121,6 @@ http:
       - "{{BaseURL}}/SDK/activateStatus"
       - "{{BaseURL}}/ISAPI/Security/sessionLogin/capabilities"
     redirects: false
-    stop-at-first-match: false
     matchers-condition: and
     matchers:
       - type: status

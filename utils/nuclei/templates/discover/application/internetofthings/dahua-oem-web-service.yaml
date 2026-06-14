@@ -107,12 +107,12 @@ http:
             contains(body, "jsCore/mToken.js")
           # React+Less era (2023+): 32 hash-keyed less stylesheets +
           # React root div. style/color.<hash>.less is Dahua-unique;
-          # the regex enforces the .less extension AND requires the
-          # numeric-suffix sibling pattern (e.g., color.7661345.1.less)
-          # to rule out generic "color.css" references.
+          # the regex accepts both color.<hash>.less and the more
+          # common color.<hash>.<N>.less form (e.g., color.7661345.1.less)
+          # via the optional numeric-segment group (?:\.[0-9]+)?.
           - >-
             contains(body, "<div id=\"root\"") &&
-            regex("style/color\\.[a-f0-9]{7}\\.less", body)
+            regex("style/color\\.[a-f0-9]{7}(?:\\.[0-9]+)?\\.less", body)
     extractors:
       # Amcrest body marker. Amcrest is widely rebranded Dahua firmware
       # (typical: <title>WEB SERVICE</title> + the literal token

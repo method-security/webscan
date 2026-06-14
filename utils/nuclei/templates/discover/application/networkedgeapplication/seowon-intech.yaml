@@ -1,0 +1,93 @@
+id: seowon-intech-cpe-detect
+info:
+  name: SEOWON Intech CPE (SLC / SDR / SLR Series) Web Management Detection
+  author: method-security
+  severity: info
+  description: |
+    Detects SEOWON Intech LTE/DSL CPE management interfaces (SLC-1xx indoor, SDR-3xxx outdoor, SLR-1xx LTE routers).
+    Smoking gun is the AXLogin JS namespace + the redirect chain that surfaces a YYYYMMDDHHMM UI build timestamp in the login path.
+    Often deployed under ISP rebrands (Mobinnet IR, Reliance Jio IN, MTN Africa); match on structural strings not body brand text.
+    Validated against TC-013 (185.162.40.226 — SLC-130 LTE CPE on Mobinnet, build 201906111053).
+  metadata:
+    method-application-type: NETWORK_EDGE_APPLICATION
+    method-module-name: SEOWON_INTECH
+    method-detection-state: EXPOSED_ADMIN
+    cpe: cpe:2.3:o:seowonintech:cpe_firmware:*:*:*:*:*:*:*:*
+  tags: discovery,seowon,intech,slc,sdr,slr,lte,dsl,cpe,network-edge,soho,isp-cpe
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/cgi-bin/login.cgi"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      # Smoking gun: AXLogin JS namespace + the hidden form fields that
+      # SEOWON ships across SLC / SDR / SLR families. Either the
+      # loginForm() submit handler OR the initialize() bootstrap call
+      # is dispositive.
+      - type: dsl
+        name: axlogin-namespace
+        dsl:
+          - >-
+            status_code == 200 &&
+            (contains(body, "AXLogin.loginForm()") || contains(body, "AXLogin.initialize()")) &&
+            contains(body, "id=\"Command\"") &&
+            contains(body, "id=\"expires\"") &&
+            contains(body, "id=\"currentTime\"")
+      # Co-signal: SEOWON's redirect chain stamps a 12-digit
+      # YYYYMMDDHHMM UI build timestamp into the login URL AND ships
+      # at least one matching timestamped asset. A lone Location header
+      # of /login<12-digit>.html is too generic on its own — many login
+      # systems redirect through a numeric path — so we require it
+      # paired with either an AXLogin marker (when the redirect target
+      # was followed and the login HTML landed) or one of the
+      # timestamped JS asset paths in the body.
+      - type: dsl
+        name: timestamped-login-path
+        dsl:
+          - >-
+            regex("(?i)location:\\s*/login[0-9]{12}\\.html", header) &&
+            (
+              contains(body, "AXLogin") ||
+              regex("(?:cookie\\.min|validate|favicon)[0-9]{12}\\.(?:js|ico)", body)
+            )
+      # Body co-signal — assets share the same 12-digit timestamp
+      # suffix (cookie.min<TS>.js, validate<TS>.js, favicon<TS>.ico).
+      # Two timestamped assets is strong evidence even if the redirect
+      # chain isn't observed (e.g. when the scanner doesn't follow).
+      - type: dsl
+        name: timestamped-assets
+        dsl:
+          - >-
+            status_code == 200 &&
+            regex("cookie\\.min[0-9]{12}\\.js", body) &&
+            regex("validate[0-9]{12}\\.js", body)
+    extractors:
+      # Primary version source: the 12-digit minute-precision UI build
+      # timestamp on the login URL. Direct version disclosure.
+      - type: regex
+        name: ui_build_timestamp
+        part: header
+        group: 1
+        regex:
+          - '(?i)location:\s*/login([0-9]{12})\.html'
+      # Body fallback: the same timestamp on assets if Location wasn't
+      # captured (template ran on the already-landed login HTML).
+      - type: regex
+        name: ui_build_timestamp_body
+        part: body
+        group: 1
+        regex:
+          - 'cookie\.min([0-9]{12})\.js'
+      # OEM-revealing asset pattern: operator help/guide PDF link that
+      # carries the actual SEOWON hardware model in the filename. This
+      # is the rebrand-piercing signal (Mobinnet hides SEOWON branding
+      # in HTML but the help PDF link literally names the model).
+      - type: regex
+        name: model
+        part: body
+        group: 1
+        regex:
+          - 'SEOWON-([A-Z0-9-]+)-(?:help|guide|manual)\.(?:pdf|html)'

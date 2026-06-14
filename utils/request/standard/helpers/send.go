@@ -44,7 +44,7 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 	if bodyReader != nil {
 		bodyBuffer = &bytes.Buffer{}
 		if _, err := io.Copy(bodyBuffer, bodyReader); err != nil {
-			log.Error("Failed to buffer request body", svc1log.SafeParam("error", err))
+			log.Error("Failed to buffer request body", svc1log.SafeParam("error", err.Error()))
 			return nil, redirectChain, fmt.Errorf("failed to buffer request body: %v", err)
 		}
 	}
@@ -62,7 +62,7 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 		// Create Request (Set Method, URL, Body)
 		req, err := http.NewRequest(string(config.Request.Method), currentURL, reqBody)
 		if err != nil {
-			log.Error("Failed to create request", svc1log.SafeParam("error", err))
+			log.Error("Failed to create request", svc1log.SafeParam("error", err.Error()))
 			return nil, redirectChain, fmt.Errorf("failed to create request: %v", err)
 		}
 
@@ -79,7 +79,7 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 		// Send Request
 		resp, err := client.Do(req)
 		if err != nil {
-			log.Error("Failed to send request", svc1log.SafeParam("error", err))
+			log.Error("Failed to send request", svc1log.SafeParam("error", err.Error()))
 			return nil, redirectChain, fmt.Errorf("redirect request failed: %v", err)
 		}
 
@@ -106,33 +106,23 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 			return resp, redirectChain, nil
 		}
 
-		// Parse Redirect Location
+		// Parse Redirect Location first — we need the resolved URL to decide
+		// whether this is a trailing-slash hop before applying the budget check.
 		nextURL, err := resp.Request.URL.Parse(location)
 		if err != nil {
-			log.Error("Failed to parse redirect location", svc1log.SafeParam("error", err))
+			log.Error("Failed to parse redirect location", svc1log.SafeParam("error", err.Error()))
 			return nil, redirectChain, fmt.Errorf("failed to parse redirect location: %v", err)
 		}
 
-		// Check if redirect is cross-domain and should be blocked
-		if config.IgnoreCrossDomainRedirects {
-			originalURL, parseErr := neturl.Parse(url)
-			if parseErr == nil && originalURL.Hostname() != nextURL.Hostname() {
-				log.Info("Blocking cross-domain redirect", svc1log.SafeParam("from", currentURL), svc1log.SafeParam("to", nextURL.String()))
-				err = resp.Body.Close()
-				if err != nil {
-					log.Error("Failed to close response body", svc1log.SafeParam("error", err))
-				}
-				return nil, redirectChain, fmt.Errorf("cross-domain redirect blocked: %s -> %s", currentURL, nextURL.String()) // Dont change this comment used for DD metric
-			}
-		}
-
-		// Check if this is just a trailing slash redirect (should not count as a redirect)
+		// Check if this is just a trailing slash redirect (should not count as a
+		// redirect and must be checked BEFORE the budget gate so that
+		// MaxRedirects=0 callers still get transparent slash-normalisation).
 		if utils.IsTrailingSlashRedirect(currentURL, nextURL.String()) {
 			log.Debug("Detected trailing slash redirect, not counting as redirect", svc1log.SafeParam("from", currentURL), svc1log.SafeParam("to", nextURL.String()))
 			// Close Response Body
 			err = resp.Body.Close()
 			if err != nil {
-				log.Error("Failed to close response body", svc1log.SafeParam("error", err))
+				log.Error("Failed to close response body", svc1log.SafeParam("error", err.Error()))
 				return nil, redirectChain, fmt.Errorf("failed to close response body: %v", err)
 			}
 			// Update current URL but don't increment redirect count
@@ -141,10 +131,45 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 			continue
 		}
 
+		// Check if redirect is cross-domain and should be blocked.  This runs
+		// BEFORE the budget gate so that callers with IgnoreCrossDomainRedirects=true
+		// still get a cross-domain error even when MaxRedirects=0 — matching the
+		// original behaviour where the cross-domain guard was always evaluated before
+		// the loop counter increment that caused the budget to be exceeded.
+		if config.IgnoreCrossDomainRedirects {
+			originalURL, parseErr := neturl.Parse(url)
+			if parseErr == nil && originalURL.Hostname() != nextURL.Hostname() {
+				log.Info("Blocking cross-domain redirect", svc1log.SafeParam("from", currentURL), svc1log.SafeParam("to", nextURL.String()))
+				err = resp.Body.Close()
+				if err != nil {
+					log.Error("Failed to close response body", svc1log.SafeParam("error", err.Error()))
+				}
+				return nil, redirectChain, fmt.Errorf("cross-domain redirect blocked: %s -> %s", currentURL, nextURL.String()) // Dont change this comment used for DD metric
+			}
+		}
+
+		// Budget check — only for non-trailing-slash, non-cross-domain redirects.
+		// With MaxRedirects=0 the caller opts into "give me the redirect response
+		// as-is so I can read Location/Set-Cookie" (e.g. wp-login.php success
+		// detection where the 302 to /wp-admin/ IS the success signal).  Without
+		// this, a 3xx-with-Location on a MaxRedirects=0 call would surface as
+		// "maximum redirects exceeded" and the response would be inaccessible.
+		if redirects >= config.MaxRedirects {
+			log.Debug("Redirect budget exhausted; returning redirect response as-is",
+				svc1log.SafeParam("url", currentURL),
+				svc1log.SafeParam("status", resp.StatusCode),
+				svc1log.SafeParam("location", location),
+				svc1log.SafeParam("maxRedirects", config.MaxRedirects))
+			if currentURL != redirectChain[len(redirectChain)-1] {
+				redirectChain[len(redirectChain)-1] = currentURL
+			}
+			return resp, redirectChain, nil
+		}
+
 		// Close Response Body
 		err = resp.Body.Close()
 		if err != nil {
-			log.Error("Failed to close response body", svc1log.SafeParam("error", err))
+			log.Error("Failed to close response body", svc1log.SafeParam("error", err.Error()))
 			return nil, redirectChain, fmt.Errorf("failed to close response body: %v", err)
 		}
 

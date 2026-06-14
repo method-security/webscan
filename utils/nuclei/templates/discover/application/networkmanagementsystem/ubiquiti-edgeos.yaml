@@ -1,0 +1,48 @@
+id: ubiquiti-edgeos-detect
+info:
+  name: Ubiquiti EdgeOS / EdgeMAX Router Web Management Detection
+  author: method-security
+  severity: info
+  description: |
+    Detects Ubiquiti EdgeOS / EdgeMAX wired-router management interfaces (EdgeRouter X / Lite / 8 / 12, ER-X series).
+    EdgeOS UI inherits the Vyatta login chrome; anchored title plus EdgeOS JS bundle markers form the signal.
+    No fixture validation — built from catalog signatures (SEC-702 description); confidence lower than TC-backed templates.
+  metadata:
+    method-application-type: NETWORK_MANAGEMENT_SYSTEM
+    method-module-name: UBIQUITI_EDGEOS
+    method-detection-state: EXPOSED_ADMIN
+    cpe: cpe:2.3:o:ubiquiti:edgeos:*:*:*:*:*:*:*:*
+  tags: discovery,ubiquiti,edgeos,edgemax,edgerouter,router,network-management,soho
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/login"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers-condition: and
+    matchers:
+      # Anchored title — either EdgeOS or EdgeMAX (both ship in the
+      # field across hardware generations).
+      - type: regex
+        part: body
+        regex:
+          - '(?i)<title>\s*(?:EdgeOS|EdgeMAX)'
+      # Co-signal: EdgeOS-specific JS / asset path. The login bundle
+      # is namespaced under /files/login/. Pairing this with the
+      # title rejects pages that only mention EdgeOS in body text.
+      - type: regex
+        part: body
+        regex:
+          - '(?i)/files/login/(?:js|css)/|edgeos[._-](?:login|app)\.js'
+    extractors:
+      # Version is sometimes baked into the JS bundle path. Capture
+      # group 1 is the dotted version (e.g. "2.0.9" or "1.10.11").
+      - type: regex
+        name: edgeos_version
+        part: body
+        group: 1
+        regex:
+          - '(?i)edgeos[^"''<>]{0,40}?v?([0-9]+\.[0-9]+\.[0-9]+(?:[.-][a-z0-9]+)?)'
+          - '(?i)"firmwareVersion"\s*:\s*"v?([0-9]+\.[0-9]+\.[0-9]+(?:[.-][a-z0-9]+)?)"'

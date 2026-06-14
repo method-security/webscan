@@ -21,6 +21,41 @@ import (
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
+// populateConvenienceFields fills the three derived fields on result from the
+// populated httpRequestResponse. It is null-safe: if httpRequestResponse or its
+// Response are nil the function is a no-op.
+func populateConvenienceFields(result *discover.DiscoverPageResult, httpRequestResponse *common.HttpRequestResponse) {
+	if result == nil || httpRequestResponse == nil || httpRequestResponse.Response == nil {
+		return
+	}
+	resp := httpRequestResponse.Response
+
+	// finalUrl — last element of redirectChain, if any
+	if len(resp.RedirectChain) > 0 {
+		last := resp.RedirectChain[len(resp.RedirectChain)-1]
+		result.FinalUrl = &last
+	}
+
+	// elapsedMs — receivedAt minus sentAt (only when receivedAt is present)
+	if resp.ReceivedAt != nil {
+		ms := resp.ReceivedAt.Sub(httpRequestResponse.Request.SentAt).Milliseconds()
+		result.ElapsedMs = &ms
+	}
+
+	// redirectHistory — per-hop URL with status code only on the last hop
+	if len(resp.RedirectChain) > 0 {
+		hops := make([]*discover.RedirectHop, 0, len(resp.RedirectChain))
+		for i, u := range resp.RedirectChain {
+			hop := &discover.RedirectHop{Url: u}
+			if i == len(resp.RedirectChain)-1 && resp.StatusCode != nil {
+				hop.StatusCode = resp.StatusCode
+			}
+			hops = append(hops, hop)
+		}
+		result.RedirectHistory = hops
+	}
+}
+
 func getHTTPRequestConfig(baseURL string, path string, queryParams map[string]string, config discover.DiscoverPageConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) common.SendHttpRequestConfig {
 	request := common.HttpRequest{
 		BaseUrl: baseURL,
@@ -127,6 +162,7 @@ func PerformPageCapture(
 			errors = append(errors, fmt.Sprintf("page %s returned status code %d which is not in the allowed response codes", config.Target, *httpRequestResponse.Response.StatusCode))
 		} else {
 			result.Request = httpRequestResponse
+			populateConvenienceFields(&result, httpRequestResponse)
 
 			// If sensitive content detection is enabled, extract sensitive content from response body
 			if config.SensitiveContentDetection && httpRequestResponse.Response.ResponseBody != nil {

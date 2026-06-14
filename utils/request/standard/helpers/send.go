@@ -61,8 +61,7 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 		}
 
 		// Create Request (Set Method, URL, Body). Bind the caller's context so a
-		// cancelled/expired request actually aborts the in-flight dial instead of
-		// hanging until the client timeout (and forever when Timeout is 0).
+		// cancelled/expired request actually aborts the in-flight dial.
 		req, err := http.NewRequestWithContext(ctx, string(config.Request.Method), currentURL, reqBody)
 		if err != nil {
 			log.Error("Failed to create request", svc1log.SafeParam("url", currentURL), svc1log.SafeParam("error", err.Error()))

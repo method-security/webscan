@@ -135,7 +135,7 @@ func isTLSError(err error) bool {
 	}
 	// TLS alerts and handshake failures are not always typed; fall back to the
 	// conventional "tls:" / "x509:" prefixes the stdlib uses.
-	msg := err.Error()
+	msg := UnwrapURLError(err).Error()
 	return strings.Contains(msg, "tls:") || strings.Contains(msg, "x509:")
 }
 

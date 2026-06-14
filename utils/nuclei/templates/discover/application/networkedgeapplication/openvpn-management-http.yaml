@@ -6,8 +6,8 @@ info:
   description: Detects OpenVPN management interface HTTP status pages exposed by the --management flag. Exposed status pages reveal connected clients, routing tables, and VPN server state.
   metadata:
     method-application-type: NETWORK_EDGE_APPLICATION
-    method-module-name: OPENVPN_ACCESS_SERVER
-    cpe: cpe:2.3:a:openvpn:access_server:*:*:*:*:*:*:*:*
+    method-module-name: OPENVPN_MANAGEMENT_HTTP
+    cpe: cpe:2.3:a:openvpn:openvpn:*:*:*:*:*:*:*:*
   tags: discovery,openvpn,vpn,management-interface,network-edge
 http:
   - method: GET
@@ -16,9 +16,8 @@ http:
       - "{{BaseURL}}/status"
       - "{{BaseURL}}/openvpn-status"
     redirects: true
-    max-redirects: 3
+    max-redirects: 5
     stop-at-first-match: true
-    matchers-condition: or
     matchers:
       - type: word
         part: body

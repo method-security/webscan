@@ -9,6 +9,9 @@ info:
     method-module-name: WG_PORTAL
     cpe: cpe:2.3:a:h44z:wg-portal:*:*:*:*:*:*:*:*
   tags: discovery,wireguard,wg-portal,vpn,network-edge
+
+flow: http(1) && http(2)
+
 http:
   - method: GET
     path:
@@ -18,7 +21,6 @@ http:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
-    matchers-condition: or
     matchers:
       - type: word
         part: body
@@ -41,7 +43,7 @@ http:
       - "{{BaseURL}}/api/v0/version"
       - "{{BaseURL}}/api/v1/info"
     redirects: true
-    max-redirects: 3
+    max-redirects: 5
     matchers:
       - type: word
         part: body

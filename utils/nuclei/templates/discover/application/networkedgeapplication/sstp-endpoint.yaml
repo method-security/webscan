@@ -16,9 +16,8 @@ http:
     headers:
       SSTP-VER: "1.0"
       SSTP-DUPLEX-POST: "1"
-      Content-Length: "18446744073709551615"
+      Content-Length: "0"
     redirects: false
-    matchers-condition: or
     matchers:
       - type: word
         part: header

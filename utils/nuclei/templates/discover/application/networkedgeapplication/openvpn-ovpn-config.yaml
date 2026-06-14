@@ -6,8 +6,8 @@ info:
   description: Detects OpenVPN client configuration files (.ovpn) served over HTTP. Exposed .ovpn files contain VPN server addresses, CA certificates, and client credentials that can facilitate unauthorized access.
   metadata:
     method-application-type: NETWORK_EDGE_APPLICATION
-    method-module-name: OPENVPN_ACCESS_SERVER
-    cpe: cpe:2.3:a:openvpn:access_server:*:*:*:*:*:*:*:*
+    method-module-name: OPENVPN_OVPN_CONFIG
+    cpe: cpe:2.3:a:openvpn:openvpn:*:*:*:*:*:*:*:*
   tags: discovery,openvpn,vpn,config-exposure,network-edge
 http:
   - method: GET
@@ -19,9 +19,9 @@ http:
       - "{{BaseURL}}/configs/client.ovpn"
       - "{{BaseURL}}/downloads/client.ovpn"
     redirects: true
-    max-redirects: 3
+    max-redirects: 5
     stop-at-first-match: true
-    matchers-condition: or
+    matchers-condition: and
     matchers:
       - type: word
         part: body

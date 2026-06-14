@@ -24,7 +24,7 @@ http:
       - "{{BaseURL}}/cwmp"
       - "{{BaseURL}}/ACS"
     redirects: true
-    max-redirects: 3
+    max-redirects: 5
     stop-at-first-match: true
     matchers:
       # Matcher 1: RomPager embedded webserver Server header (highest-confidence signal).

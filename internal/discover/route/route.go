@@ -49,6 +49,10 @@ func resolveEffectiveTarget(ctx context.Context, target string, config discover.
 		Method:  common.HttpMethodHead,
 		Params: &common.HttpRequestParams{
 			Query: queryParams,
+			// Carry auth headers/cookies so redirect resolution matches the
+			// credentialed spider requests (login/session cookies can change
+			// where the target redirects).
+			Headers: requesthelpers.BuildAuthHeaders(config.Headers, config.Cookies),
 		},
 	}
 
@@ -179,6 +183,9 @@ func createSendHTTPRequestConfigWithQuery(baseURL, path string, queryParams map[
 			Headers: requesthelpers.BuildAuthHeaders(config.Headers, config.Cookies),
 		},
 	}
+	// Capture console logs and page cookies on headless captures to match the
+	// page-capture output contract; the standard transport ignores both flags.
+	captureBrowserArtifacts := config.RequestMethod == common.RequestMethodHeadless
 	return common.SendHttpRequestConfig{
 		Request:                    &request,
 		MaxRedirects:               config.MaxRedirects,
@@ -193,6 +200,8 @@ func createSendHTTPRequestConfigWithQuery(baseURL, path string, queryParams map[
 		Cookies:                    config.Cookies,
 		LocalStorage:               config.LocalStorage,
 		SessionStorage:             config.SessionStorage,
+		CaptureConsoleLogs:         &captureBrowserArtifacts,
+		CaptureCookies:             &captureBrowserArtifacts,
 	}
 }
 

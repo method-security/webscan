@@ -406,8 +406,34 @@ func (a *WebScan) InitDiscoverCommand() {
 				return
 			}
 
+			// Authenticated-capture flags
+			headerPairs, err := cmd.Flags().GetStringArray("header")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			cookiePairs, err := cmd.Flags().GetStringArray("cookie")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			localStoragePairs, err := cmd.Flags().GetStringArray("local-storage")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			sessionStoragePairs, err := cmd.Flags().GetStringArray("session-storage")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
 			// Set Config
 			config := getDiscoverPageConfig(target, sensitiveContentDetection, sensitiveContentFingerprintsPath, responseCodes, maxRedirects, verifyTLS, timeout, ignoreCrossDomainRedirects, takeScreenshot, userAgentPreset, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
+			config.Headers = requesthelpers.ParseHeaderPairs(headerPairs)
+			config.Cookies = requesthelpers.ParseFormDataPairs(cookiePairs)
+			config.LocalStorage = requesthelpers.ParseFormDataPairs(localStoragePairs)
+			config.SessionStorage = requesthelpers.ParseFormDataPairs(sessionStoragePairs)
 
 			// Load sensitive content fingerprints if sensitive content detection is enabled and no fingerprints are found, return an error
 			var sensitiveContentFingerprints *discover.SensitiveContentFingerprints
@@ -451,6 +477,11 @@ func (a *WebScan) InitDiscoverCommand() {
 	discoverPageCmd.Flags().String("browserbase-project", "", "Browserbase project ID")
 	discoverPageCmd.Flags().Bool("browserbase-proxy", false, "Use Browserbase proxy for requests")
 	discoverPageCmd.Flags().StringSlice("browserbase-countries", []string{}, "List of countries to use for Browserbase proxy")
+	// Authenticated-capture flags
+	discoverPageCmd.Flags().StringArray("header", []string{}, "Request header for authenticated capture as 'Name: Value' (repeatable)")
+	discoverPageCmd.Flags().StringArray("cookie", []string{}, "Cookie for authenticated capture as 'name=value' (repeatable)")
+	discoverPageCmd.Flags().StringArray("local-storage", []string{}, "localStorage entry as 'key=value' injected before page load (repeatable, headless only)")
+	discoverPageCmd.Flags().StringArray("session-storage", []string{}, "sessionStorage entry as 'key=value' injected before page load (repeatable, headless only)")
 
 	// Mark Required Flags
 	_ = discoverPageCmd.MarkFlagRequired("target")

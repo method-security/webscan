@@ -395,12 +395,19 @@ func PerformAppEnumerateSwagger(ctx context.Context, config enumerateapiapplicat
 
 	// Early-exit path: caller already knows the spec URL — fetch it directly, skip all probing.
 	if config.SpecUrl != nil && *config.SpecUrl != "" {
-		baseURL, specPath, _, err := requesthelpers.SplitTargetURL(*config.SpecUrl)
+		baseURL, specPath, queryParams, err := requesthelpers.SplitTargetURL(*config.SpecUrl)
 		if err != nil {
 			report.Errors = append(report.Errors, fmt.Sprintf("invalid specUrl: %v", err))
 			return report
 		}
 		requestConfig := createSendHTTPRequestConfig(baseURL, specPath, config.Timeout, config.UserAgent, common.RequestMethodStandard, nil, headers)
+		// Preserve query parameters from specUrl (e.g., ?format=openapi) — SplitTargetURL strips them.
+		if len(queryParams) > 0 {
+			if requestConfig.Request.Params == nil {
+				requestConfig.Request.Params = &common.HttpRequestParams{}
+			}
+			requestConfig.Request.Params.Query = queryParams
+		}
 		response, err := request.SendRequest(ctx, requestConfig)
 		if err != nil {
 			report.Errors = append(report.Errors, fmt.Sprintf("failed to fetch specUrl: %v", err))

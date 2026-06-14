@@ -55,6 +55,7 @@ http:
       - "{{BaseURL}}"
     redirects: true
     max-redirects: 5
+    stop-at-first-match: true
     matchers-condition: and
     matchers:
       # Status code 200 — login screen is exposed (we're not gating on
@@ -157,6 +158,7 @@ http:
     path:
       - "{{BaseURL}}/cap.js"
     redirects: false
+    stop-at-first-match: true
     matchers-condition: and
     matchers:
       - type: status
@@ -200,6 +202,7 @@ http:
     path:
       - "{{BaseURL}}/pluginVersion.js"
     redirects: false
+    stop-at-first-match: true
     matchers-condition: and
     matchers:
       - type: status

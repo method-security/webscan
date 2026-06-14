@@ -31,6 +31,7 @@ http:
       - "{{BaseURL}}/cgi-bin/CGIProxy.fcgi"
       - "{{BaseURL}}"
     redirects: false
+    stop-at-first-match: true
     matchers:
       # Matcher 1: Foscam digest realm — highest-confidence anchor.
       - type: regex

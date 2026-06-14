@@ -45,6 +45,7 @@ http:
       - "{{BaseURL}}"
     redirects: true
     max-redirects: 5
+    stop-at-first-match: true
     matchers-condition: and
     matchers:
       - type: status
@@ -115,6 +116,7 @@ http:
     path:
       - "{{BaseURL}}/RSVideoOcx.cab"
     redirects: false
+    stop-at-first-match: true
     matchers-condition: and
     matchers:
       - type: status

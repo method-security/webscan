@@ -7,7 +7,7 @@ info:
     Detects SEOWON Intech LTE/DSL CPE management interfaces (SLC-1xx indoor, SDR-3xxx outdoor, SLR-1xx LTE routers).
     Smoking gun is the AXLogin JS namespace + the redirect chain that surfaces a YYYYMMDDHHMM UI build timestamp in the login path.
     Often deployed under ISP rebrands (Mobinnet IR, Reliance Jio IN, MTN Africa); match on structural strings not body brand text.
-    Validated against TC-013 (185.162.40.226 — SLC-130 LTE CPE on Mobinnet, build 201906111053).
+    Validated against TC-013 (SEOWON SLC-130 LTE CPE on Mobinnet, build 201906111053).
   metadata:
     method-application-type: NETWORK_EDGE_APPLICATION
     method-module-name: SEOWON_INTECH

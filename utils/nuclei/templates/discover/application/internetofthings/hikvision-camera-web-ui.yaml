@@ -45,6 +45,7 @@ http:
       - "{{BaseURL}}/doc/page/login.asp"
     redirects: true
     max-redirects: 5
+    stop-at-first-match: true
     matchers:
       # Matcher 1: Server: DNVRS-Webs header. POSITIVE Hikvision
       # anchor — corrects the TC-012 mis-attribution. Hikvision
@@ -121,6 +122,7 @@ http:
       - "{{BaseURL}}/SDK/activateStatus"
       - "{{BaseURL}}/ISAPI/Security/sessionLogin/capabilities"
     redirects: false
+    stop-at-first-match: true
     matchers-condition: and
     matchers:
       - type: status

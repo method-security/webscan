@@ -1,0 +1,56 @@
+id: xerox-printer-detect
+info:
+  name: Xerox Printer / MFP Web Management Detection
+  author: method-security
+  severity: info
+  description: |
+    Detects Xerox printer / multifunction-printer web management
+    interfaces (CentreWare Internet Services / Embedded Web Server).
+    The login page title follows the stable shape "Xerox <Model>" or
+    "<Model> - Xerox" across the WorkCentre, VersaLink, AltaLink, Phaser,
+    and PrimeLink families. Body co-signals include "CentreWare" and
+    the Xerox copyright footer.
+    Firmware version is not consistently HTTP-determinable from the
+    pre-auth EWS landing page, so the template stops at EXPOSED_ADMIN;
+    model name is captured as subModule.
+    Catalog reference: SEC-702 — Cluster O (printers).
+  metadata:
+    method-application-type: INTERNET_OF_THINGS
+    method-module-name: XEROX_PRINTER
+    method-detection-state: EXPOSED_ADMIN
+    cpe: cpe:2.3:o:xerox:*:*:*:*:*:*:*:*:*
+  tags: discovery,xerox,workcentre,versalink,altalink,phaser,printer,mfp,hardware,management-console
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/home.html"
+      - "{{BaseURL}}/properties/authentication/login.php"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers-condition: and
+    matchers:
+      # Anchored Xerox-product title shape.
+      - type: regex
+        part: body
+        regex:
+          - '(?i)<title[^>]*>\s*Xerox\s+(?:WorkCentre|VersaLink|AltaLink|Phaser|PrimeLink|ColorQube|DocuCentre|B[0-9]+|C[0-9]+)'
+          - '(?i)<title[^>]*>\s*(?:WorkCentre|VersaLink|AltaLink|Phaser|PrimeLink|ColorQube|DocuCentre)\s*[A-Z0-9\-]+\s*-\s*Xerox'
+      # Body co-signal — CentreWare brand / Xerox footer / brand text.
+      - type: regex
+        part: body
+        regex:
+          - '(?i)(?:CentreWare|©\s*Xerox\s*Corporation|xerox\.com|Embedded\s*Web\s*Server)'
+      - type: status
+        status:
+          - 200
+    extractors:
+      # Model name from the title — captures the part after "Xerox ".
+      - type: regex
+        name: model
+        part: body
+        group: 1
+        regex:
+          - '(?i)<title[^>]*>\s*Xerox\s+((?:WorkCentre|VersaLink|AltaLink|Phaser|PrimeLink|ColorQube|DocuCentre|B[0-9]+|C[0-9]+)[A-Z0-9 \-]*)'
+          - '(?i)<title[^>]*>\s*((?:WorkCentre|VersaLink|AltaLink|Phaser|PrimeLink|ColorQube|DocuCentre)\s*[A-Z0-9\-]+)\s*-\s*Xerox'

@@ -1,156 +1,43 @@
 id: hikvision-camera-web-ui-detect
 info:
-  name: Hikvision ISAPI (Family A — DS-7xxx NVR / IPC / DVR) Web UI Detection
+  name: Hikvision Camera Web UI Detection
   author: method-security
   severity: info
-  description: |
-    Detects Hikvision Family A devices — the ISAPI / DS-7xxx NVR / IPC / DVR family.
-    Smoking gun is the /SDK/activateStatus or /ISAPI/Security/sessionLogin/capabilities
-    XML response carrying the Hikvision XML namespace — DUAL-NAMESPACE matcher:
-    pre-2018 firmware uses xmlns="http://www.std-cgi.com/ver20/XMLSchema" (TC-012);
-    post-2018 firmware migrated to xmlns="http://www.hikvision.com/ver20/XMLSchema"
-    (TC-003, TC-016). Both must be matched — a template keyed on only one misses
-    half the field.
-    Server: DNVRS-Webs is a POSITIVE anchor for Hikvision (D = Digital NVR Server),
-    NOT for Dahua. The TC-012 worked example was a target mis-attributed to Dahua
-    initially because of "D for Dahua" — the SEC-702 catalog explicitly forbids that
-    attribution. The Server header is independent of the XML namespace evolution:
-    TC-016 ships DNVRS-Webs + the modern hikvision.com namespace concurrently.
-    DVR-vs-NVR-vs-IPC discriminator via the /doc/page/login.asp body shape:
-      NVR: oCap.bSupportActive + ipcActivePassword input + oWifi.* properties
-      DVR: simplified login shell, NO ipcActivePassword, NO oWifi.*
-      IPC: served from index.asp directly (not in this TC set — Family A IPCs
-           skip the doc/page/login.asp redirect dance).
-    The pigsney AngularJS directive on password inputs is Hikvision-unique
-    (preventing browser password-manager autofill) — additional anchor for
-    Family A. Do NOT mis-attribute pigsney to any other vendor.
-    Validated against TC-003 (DS-7xxx modern NVR + hikvision.com xmlns),
-    TC-012 (DVR + DNVRS-Webs + std-cgi.com xmlns legacy),
-    TC-016 (DNVRS-Webs + modern hikvision.com xmlns — firmware-transition case).
+  description: Detects Hikvision camera and NVR web interfaces using the Hikvision doc/page login bootstrap.
   metadata:
     method-application-type: INTERNET_OF_THINGS
-    method-module-name: HIKVISION_ISAPI
-    method-detection-state: EXPOSED_ADMIN
-    cpe: cpe:2.3:o:hikvision:firmware:*:*:*:*:*:*:*:*
-  tags: discovery,iot,camera,nvr,dvr,ipc,hikvision,isapi,surveillance
+    method-module-name: HIKVISION_CAMERA
+    cpe: cpe:2.3:h:hikvision:*:*:*:*:*:*:*:*:*
+  tags: discovery,iot,camera,nvr,hikvision
 http:
-  # Tier-1 probe: GET / + the /doc/page/login.asp redirect bootstrap.
-  # The 481-byte JS-redirect shim is Hikvision-unique; Angular login
-  # shell carries oLan.*/oCap.* bindings + the pigsney directive.
-  # All Family A targets serve this shape regardless of whether
-  # Server: DNVRS-Webs is set (modern post-2018 builds omit it).
   - method: GET
     path:
       - "{{BaseURL}}"
       - "{{BaseURL}}/doc/page/login.asp"
+      - "{{BaseURL}}/doc/page/login.asp?_=1"
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
     matchers:
-      # Matcher 1: Server: DNVRS-Webs header. POSITIVE Hikvision
-      # anchor — corrects the TC-012 mis-attribution. Hikvision
-      # post-2018 firmware drops this header so it's not
-      # sufficient on its own; we OR it with the login-asp +
-      # pigsney shape below.
-      - type: dsl
-        name: dnvrs-webs-anchor
-        dsl:
-          - 'status_code == 200 && contains(tolower(header), "server: dnvrs-webs")'
-      # Matcher 2: redirect-to-login.asp shim. The window.location.href
-      # = "./doc/page/login.asp?_" pattern is Hikvision-unique. We
-      # require it next to status 200 to filter random redirect pages.
-      # Mandatory negative on WordPress to filter surveillance blogs
-      # that quote Hikvision login JS in their body text — mirrors
-      # the angular-login-shell filter below.
-      - type: dsl
-        name: doc-page-login-redirect
-        dsl:
-          - >-
-            status_code == 200 &&
-            !contains(tolower(body), "wp-content") &&
-            !contains(tolower(body), "wp-includes") &&
-            !contains(tolower(body), "wordpress") &&
-            contains(body, "doc/page/login.asp") &&
-            contains(body, "(new Date()).getTime()")
-      # Matcher 3: AngularJS login shell with pigsney directive. The
-      # ng-controller="loginController" + pigsney + oLan.* combination
-      # is Hikvision-unique (pigsney is not used anywhere else in
-      # the wider IoT corpus). Mandatory negative on WordPress to
-      # filter blogs that happen to mention Hikvision in body text.
-      - type: dsl
-        name: angular-login-shell
-        dsl:
-          - >-
-            status_code == 200 &&
-            !contains(tolower(body), "wp-content") &&
-            !contains(tolower(body), "wp-includes") &&
-            !contains(tolower(body), "wordpress") &&
-            contains(body, "ng-controller=\"loginController\"") &&
-            contains(body, "pigsney") &&
-            contains(body, "oLan.")
-    extractors:
-      # DVR-vs-NVR discriminator. Decision #6 in the prompt:
-      #   NVR: oCap.bSupportActive + ipcActivePassword (configures
-      #        downstream IPC channels)
-      #   DVR: absent both, simplified login shell
-      # Defaults to absent (we surface a discriminator-value but
-      # the consumer can leave subModule unset if ambiguous).
-      - type: dsl
-        name: device_class
-        dsl:
-          - >-
-            contains(body, "oCap.bSupportActive") && contains(body, "ipcActivePassword") ? "NVR" :
-            (contains(body, "logindiv") && !contains(body, "oWifi.") ? "DVR" : "")
-      # Last-Modified build-date hint.
-      - type: regex
-        name: last_modified
-        part: header
-        group: 1
-        regex:
-          - '(?i)last-modified:\s*([^\r\n]+)'
-
-  # Tier-2 probe: ISAPI capabilities + activate-status XML.
-  # Hits the smoking-gun XML namespace via /SDK/activateStatus
-  # (modern post-2018 firmware) or /ISAPI/Security/sessionLogin/capabilities
-  # (legacy pre-2018 firmware which lacks the /SDK endpoint).
-  # The dual-namespace regex accepts BOTH www.hikvision.com (modern)
-  # AND www.std-cgi.com (legacy) — the TC-016 worked example shows
-  # they coexist (DNVRS-Webs + modern xmlns concurrently). The
-  # namespace evolves independently of the Server header.
-  - method: GET
-    path:
-      - "{{BaseURL}}/SDK/activateStatus"
-      - "{{BaseURL}}/ISAPI/Security/sessionLogin/capabilities"
-    redirects: false
-    stop-at-first-match: true
-    matchers-condition: and
-    matchers:
-      - type: status
-        status:
-          - 200
-      # Dual-namespace XML regex — matches either pre-2018 std-cgi.com
-      # OR post-2018 hikvision.com. Alternation is mandatory; a
-      # single-namespace matcher misses half the population.
-      - type: regex
+      - type: word
         part: body
-        regex:
-          - 'xmlns="http://www\.(?:hikvision|std-cgi)\.com/ver20/XMLSchema"'
-    extractors:
-      # Surface the namespace as a firmware-era hint:
-      #   std-cgi.com   → pre-2018 firmware (legacy)
-      #   hikvision.com → post-2018 firmware (modern)
-      - type: regex
-        name: xmlns_era
+        words:
+          - "./doc/page/login.asp"
+          - "new Date()).getTime()"
+          - "Hikvision"
+        condition: and
+        case-insensitive: true
+      - type: word
         part: body
-        group: 1
-        regex:
-          - 'xmlns="http://www\.(hikvision|std-cgi)\.com/ver20/XMLSchema"'
-      # Activated state. Pre-init devices return <Activated>false</Activated>;
-      # this is a vulnerability-precondition gate for CVE-style follow-ups
-      # (out of scope for AITF-123 — WS-3 territory).
-      - type: regex
-        name: activated
+        words:
+          - "doc/page/login.asp"
+          - "doc/script/LAB.min.js"
+          - "$LAB"
+          - "Hikvision"
+        condition: and
+        case-insensitive: true
+      - type: word
         part: body
-        group: 1
-        regex:
-          - '<Activated>(true|false)</Activated>'
+        words:
+          - "Hikvision Digital Technology"
+        case-insensitive: true

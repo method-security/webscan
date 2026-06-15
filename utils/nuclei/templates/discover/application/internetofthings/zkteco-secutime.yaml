@@ -1,0 +1,73 @@
+id: zkteco-secutime-detect
+info:
+  name: ZKTeco Secutime Access Control / Time-Attendance Terminal Detection
+  author: method-security
+  severity: info
+  description: |
+    Detects ZKTeco biometric badge-reader, time-attendance terminal, and
+    door-controller web interfaces (Secutime UI — K40, MA300, MA500, F18,
+    F19, A-series time-attendance + C-series access-control panels).
+    Smoking gun: Server: ZK Web Server response header — vendor name
+    directly in the Server header, dispositive single-signal vendor ID.
+    Co-signals: HTTP/1.0 response protocol, /csl/login canonical path,
+    Set-Cookie: SessionID=<10-digit> (predictable numeric session IDs),
+    body refs Secutime.css (ZK product-line stylesheet), distinctive
+    Hungarian-named form fields username/userpwd.
+    Firmware version is NOT HTTP-determinable from the Secutime UI —
+    the footer's "Copyright 2006-2009" is the UI's frozen build date,
+    not the device firmware version.
+    Resource type: INTERNET_OF_THINGS per SEC-702 catalog reconciliation
+    (no ACCESS_CONTROL_SYSTEM resource type for v1 — see Salto Proaccess
+    Space precedent in internetofthings/salto-proaccess-space.yaml).
+    Catalog reference: SEC-702 — Cluster L (access control), TC-009.
+  metadata:
+    method-application-type: INTERNET_OF_THINGS
+    method-module-name: ZKTECO
+    method-sub-module-name: Secutime
+    method-detection-state: EXPOSED_ADMIN
+    cpe: cpe:2.3:o:zkteco:secutime:*:*:*:*:*:*:*:*
+  tags: discovery,zkteco,secutime,access-control,biometric,time-attendance,iot
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/csl/login"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      # Smoking gun #1: Server: ZK Web Server is dispositive on its own.
+      # part: header concatenates the full response header block, so use
+      # multiline (?m) to anchor ^ at the start of each header line. The
+      # trailing \r?$ tolerates CRLF vs LF line endings on different
+      # ZKTeco firmware spins.
+      - type: regex
+        part: header
+        regex:
+          - '(?im)^server:\s*ZK\s*Web\s*Server\s*\r?$'
+      # Belt-and-braces: body references to Secutime.css + the
+      # distinctive Hungarian-naming form fields are catch-fall for
+      # any future ZKTeco firmware that strips or replaces the
+      # Server header.
+      - type: dsl
+        dsl:
+          - 'contains(tolower(body), "secutime.css") && (contains(body, "userpwd") || contains(body, "username"))'
+    extractors:
+      # Capture the predictable numeric SessionID cookie shape. Useful
+      # downstream for the security-precondition path even though it's
+      # not a vendor identifier per se.
+      - type: regex
+        name: session_id_format
+        part: header
+        group: 1
+        regex:
+          - '(?i)set-cookie:\s*SessionID=([0-9]{10})\b'
+      # Server header, verbatim — for downstream correlation if ZK
+      # ever versions this string. Same multiline anchoring as the
+      # smoking-gun matcher above.
+      - type: regex
+        name: server
+        part: header
+        group: 1
+        regex:
+          - '(?im)^server:\s*(ZK\s*Web\s*Server)\s*\r?$'

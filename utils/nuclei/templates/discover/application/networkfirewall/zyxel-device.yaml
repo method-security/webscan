@@ -3,10 +3,23 @@ info:
   name: Zyxel Device Fingerprint Detection
   author: method-security
   severity: info
-  description: Detects exposed Zyxel network devices including firewalls, routers, gateways, and access points by identifying device-specific headers, authentication realms, and management interfaces.
+  description: |
+    Detects exposed Zyxel network devices including firewalls, routers, gateways,
+    and access points by identifying device-specific headers, authentication
+    realms, and management interfaces.
+    AITF-124 extension: when the Zyxel-identifying matchers above fire, the
+    ZLD-based USG / VPN series admin page references its ExtJS bundle under
+    /ext-js/<version>/ where <version> is the ZLD firmware version (e.g.
+    /ext-js/4.62/). That path is captured as a named version extractor — it
+    is intentionally NOT added as a top-level matcher because the /ext-js/
+    URL shape is generic Sencha ExtJS and would false-positive on any
+    Sencha-fronted site. Version-tier detection-state promotion lands with
+    the SEC-702.A schema work (tool-factory/sec-702 / #423).
+    Catalog reference: SEC-702 — Cluster K (firewall distros).
   metadata:
     method-application-type: NETWORK_FIREWALL
     method-module-name: ZYXEL_DEVICE
+    method-detection-state: EXPOSED_ADMIN
     cpe: cpe:2.3:h:zyxel:*:*:*:*:*:*:*:*:*
   tags: discovery,zyxel,firewall,router,gateway,network-device,management-console
 http:
@@ -59,3 +72,19 @@ http:
         part: body
         regex:
           - '(?i)<title[^>]*>.*(Zyxel|ZyWALL).*(Login|Management|Configuration).*</title>'
+    extractors:
+      # AITF-124 — extract the ZLD firmware version from the asset path
+      # /ext-js/<version>/. ZLD versions follow MAJOR.MINOR (4.62) or
+      # MAJOR.MINOR.PATCH (5.30.0) — both forms accepted.
+      - type: regex
+        name: version
+        part: body
+        group: 1
+        regex:
+          - '/ext-js/([0-9]+\.[0-9]+(?:\.[0-9]+)?)/'
+      - type: regex
+        name: server
+        part: header
+        group: 1
+        regex:
+          - '(?i)server:\s*(ZyXEL-RomPager/[0-9.]+|Zyxel[^\r\n]*)'

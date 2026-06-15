@@ -1,0 +1,61 @@
+id: opnsense-firewall-detect
+info:
+  name: OPNsense Firewall Web Management Detection
+  author: method-security
+  severity: info
+  description: |
+    Detects the OPNsense (FreeBSD-based open-source firewall distro) web
+    management console. Identification is anchored by the opnsense.org link
+    on the login page plus the lighttpd / OPNsense-specific structural
+    markers; the login page footer carries the user-facing version string
+    (semver — "23.7.12" — or semver + release tag — "24.1-RELEASE-amd64"),
+    captured as a named extractor; version-tier detection-state promotion
+    lands with the SEC-702.A schema work (tool-factory/sec-702 / #423).
+    Catalog reference: SEC-702 — Cluster K (firewall distros).
+  metadata:
+    method-application-type: NETWORK_FIREWALL
+    method-module-name: OPNSENSE
+    method-detection-state: EXPOSED_ADMIN
+    cpe: cpe:2.3:o:opnsense:opnsense:*:*:*:*:*:*:*:*
+  tags: discovery,opnsense,deciso,firewall,freebsd,soho
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/index.php"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers-condition: and
+    matchers:
+      # opnsense.org link anchor. Paired with a second OPNsense-specific
+      # structural signal so the template won't fire on a blog post.
+      - type: regex
+        part: body
+        regex:
+          - '(?i)href=["'']https?://(?:www\.)?opnsense\.org'
+      - type: regex
+        part: body
+        regex:
+          - '(?i)<title[^>]*>\s*(?:Login|OPNsense)'
+          - '(?i)class=["''][^"'']*opnsense[^"'']*["'']'
+          - '(?i)Powered\s*by\s*OPNsense'
+          - '(?i)Deciso\s*B\.?V\.?'
+    extractors:
+      # Footer version. OPNsense ships forms like:
+      #   23.7.12
+      #   24.1-RELEASE-amd64
+      #   OPNsense 23.1.5
+      - type: regex
+        name: version
+        part: body
+        group: 1
+        regex:
+          - '(?i)OPNsense\s+([0-9]+\.[0-9.]+(?:[-_][A-Za-z0-9_\-]+)?)'
+          - '(?i)Version[\s:]+([0-9]+\.[0-9.]+(?:[-_][A-Za-z0-9_\-]+)?)'
+      - type: regex
+        name: server
+        part: header
+        group: 1
+        regex:
+          - '(?i)server:\s*(lighttpd[/\s]*[0-9.]*)'

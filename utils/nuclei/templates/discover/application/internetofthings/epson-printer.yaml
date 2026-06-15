@@ -1,0 +1,60 @@
+id: epson-printer-detect
+info:
+  name: Epson Printer / MFP Web Management Detection
+  author: method-security
+  severity: info
+  description: |
+    Detects Epson printer / multifunction-printer Web Config web management
+    interfaces. The login page title carries the Epson-prefixed model
+    string "EPSON <Model>" across the EcoTank, WorkForce, Stylus, and
+    LX/LQ business-printer families. Body co-signals include the SEIKO
+    EPSON CORPORATION copyright and the Web Config product name.
+    Firmware version is not consistently HTTP-determinable from the
+    pre-auth Web Config landing page, so the template stops at
+    EXPOSED_ADMIN; model name is captured as subModule.
+    Catalog reference: SEC-702 — Cluster O (printers).
+  metadata:
+    method-application-type: INTERNET_OF_THINGS
+    method-module-name: EPSON_PRINTER
+    method-detection-state: EXPOSED_ADMIN
+    cpe: cpe:2.3:o:epson:*:*:*:*:*:*:*:*:*
+  tags: discovery,epson,ecotank,workforce,stylus,printer,mfp,hardware,management-console
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/PRESENTATION/HTML/TOP/PRTINFO.HTML"
+      - "{{BaseURL}}/PRESENTATION/HTML/TOP/INDEX.HTML"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers-condition: and
+    matchers:
+      # EPSON title anchor — the body must show a recognizable Epson
+      # product-family name to rule out the open-ended "any string
+      # containing EPSON" path.
+      - type: regex
+        part: body
+        regex:
+          - '(?i)<title[^>]*>\s*EPSON\s+[A-Z0-9][A-Z0-9 \-]+'
+      # Body co-signal — SEIKO EPSON copyright / epson.com brand link /
+      # EpsonNet Config product reference. "Web Config" intentionally
+      # excluded: it commonly appears INSIDE the <title> alongside the
+      # EPSON model string (e.g. <title>EPSON Web Config WF-3520</title>),
+      # so it would be a trivially-satisfied body co-signal that isn't
+      # independent of the primary title anchor.
+      - type: regex
+        part: body
+        regex:
+          - '(?i)(?:SEIKO\s*EPSON\s*CORPORATION|©\s*Seiko\s*Epson|epson\.com|EpsonNet\s*Config)'
+      - type: status
+        status:
+          - 200
+    extractors:
+      # Model name from the title — capture the EPSON-prefixed model.
+      - type: regex
+        name: model
+        part: body
+        group: 1
+        regex:
+          - '(?i)<title[^>]*>\s*EPSON\s+([A-Z0-9][A-Z0-9 \-]+?)\s*</title>'

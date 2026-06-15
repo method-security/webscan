@@ -3,18 +3,30 @@ info:
   name: DrayTek Vigor Web Management Detection
   author: method-security
   severity: info
-  description: Detects DrayTek Vigor router/firewall web management interfaces using Vigor-specific login titles, authentication realms, and headers.
+  description: |
+    Detects DrayTek Vigor router/firewall web management interfaces using
+    Vigor-specific login titles, authentication realms, and headers.
+    AITF-124 extension: when the Vigor login HTML carries the embedded
+    ModelName + FirmwareVersion comment ("<!-- ModelName=Vigor2960,
+    FirmwareVersion=1.5.1.1 -->"), the comment's two fields are captured
+    as named extractors; version-tier detection-state promotion lands
+    with the SEC-702.A schema work (tool-factory/sec-702 / #423).
+    CVE-2024-12987 (WS-3 / AITF-84 PR #410) gates its precondition probe
+    on this fingerprint firing first.
+    Catalog reference: SEC-702 — Cluster K (firewall distros).
   metadata:
     method-application-type: NETWORK_MANAGEMENT_SYSTEM
     method-module-name: DRAYTEK_VIGOR
+    method-detection-state: EXPOSED_ADMIN
     cpe: cpe:2.3:h:draytek:vigor:*:*:*:*:*:*:*:*
-  tags: discovery,draytek,vigor,router,network-management
+  tags: discovery,draytek,vigor,router,network-management,soho
 http:
   - method: GET
     path:
       - "{{BaseURL}}"
       - "{{BaseURL}}/weblogin.htm"
       - "{{BaseURL}}/login.htm"
+      - "{{BaseURL}}/cgi-bin/wlogin.cgi"
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
@@ -24,3 +36,33 @@ http:
           - 'status_code == 200 && contains(tolower(body), "vigor login page") && contains(tolower(body), "draytek")'
           - 'contains(tolower(header), "www-authenticate") && contains(tolower(header), "vigor") && (contains(tolower(header), "draytek") || contains(tolower(body), "draytek"))'
           - 'status_code == 200 && contains(tolower(body), "draytek") && contains(tolower(body), "vigor") && contains(tolower(body), "weblogin")'
+      # AITF-124 — DrayTek's Vigor login page often carries a pre-auth
+      # HTML comment of the form:
+      #   <!-- ModelName=Vigor2960, FirmwareVersion=1.5.1.1 -->
+      # The ModelName token is constrained to the Vigor<digits>... shape
+      # (Vigor2960 / Vigor3220 / Vigor167 / Vigor2962n+ / VigorAP903 / ...)
+      # so this matcher only fires on the actual DrayTek convention and
+      # cannot be triggered by an unrelated page whose author happens to
+      # use a "ModelName=X, FirmwareVersion=Y" comment shape.
+      - type: regex
+        part: body
+        regex:
+          - '<!--\s*ModelName=Vigor[A-Za-z0-9_+\-]*\s*,\s*FirmwareVersion=[0-9][0-9.]*\s*-->'
+    extractors:
+      # AITF-124 — pull ModelName + FirmwareVersion out of the
+      # vendor-distinctive HTML comment. Same Vigor-prefix narrowing as
+      # the matcher above — keeps the extractor in lockstep with the
+      # matcher's specificity (no risk of capturing a foreign model
+      # string from a non-Vigor comment).
+      - type: regex
+        name: model
+        part: body
+        group: 1
+        regex:
+          - '<!--\s*ModelName=(Vigor[A-Za-z0-9_+\-]*)\s*,\s*FirmwareVersion=[0-9][0-9.]*\s*-->'
+      - type: regex
+        name: firmware
+        part: body
+        group: 1
+        regex:
+          - '<!--\s*ModelName=Vigor[A-Za-z0-9_+\-]*\s*,\s*FirmwareVersion=([0-9][0-9.]*)\s*-->'

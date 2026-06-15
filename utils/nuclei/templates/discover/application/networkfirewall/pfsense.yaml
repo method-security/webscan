@@ -1,0 +1,66 @@
+id: pfsense-firewall-detect
+info:
+  name: pfSense Firewall Web Management Detection
+  author: method-security
+  severity: info
+  description: |
+    Detects the Netgate pfSense (FreeBSD-based open-source firewall distro) web
+    management console. Identification is anchored by the pfsense.org link in
+    the login footer plus the pfSense-specific nginx body markers; the login
+    page footer regularly carries the user-facing version string
+    ("Version 2.7.2" / "Version 23.09.1-RELEASE"), captured as a named
+    extractor; version-tier detection-state promotion lands with the
+    SEC-702.A schema work (tool-factory/sec-702 / #423).
+    Catalog reference: SEC-702 — Cluster K (firewall distros).
+  metadata:
+    method-application-type: NETWORK_FIREWALL
+    method-module-name: PFSENSE
+    method-detection-state: EXPOSED_ADMIN
+    cpe: cpe:2.3:o:netgate:pfsense:*:*:*:*:*:*:*:*
+  tags: discovery,pfsense,netgate,firewall,freebsd,soho
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/index.php"
+      - "{{BaseURL}}/login.php"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers-condition: and
+    matchers:
+      # The pfsense.org link is body-anchored. We pair it with a second
+      # structural signal (login form body or copyright notice) so the
+      # template won't fire on a WordPress site that happens to mention
+      # pfSense in a blog post.
+      - type: regex
+        part: body
+        regex:
+          - '(?i)href=["'']https?://(?:www\.)?pfsense\.org'
+      - type: regex
+        part: body
+        regex:
+          - '(?i)<title[^>]*>\s*Login\s*</title>'
+          - '(?i)Netgate(?:[\s\.,])+pfSense'
+          - '(?i)pfSense\s*(?:is\s*©|©\s*\d{4})'
+          - '(?i)class=["''][^"'']*login[^"'']*["''][^>]*>\s*pfSense'
+    extractors:
+      # Footer / login version. pfSense ships forms like:
+      #   Version 2.7.2
+      #   Version 23.09.1-RELEASE
+      # The optional "-RELEASE" suffix matches the FreeBSD-derived
+      # build tag.
+      - type: regex
+        name: version
+        part: body
+        group: 1
+        regex:
+          - '(?i)Version\s+([0-9]+\.[0-9.]+(?:[-_][A-Za-z0-9]+)?)'
+      # Nginx Server header is incidental but useful for downstream
+      # correlation (pfSense ships nginx on the WebGUI by convention).
+      - type: regex
+        name: server
+        part: header
+        group: 1
+        regex:
+          - '(?i)server:\s*(nginx[/\s]*[0-9.]*)'

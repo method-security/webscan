@@ -9,7 +9,7 @@ info:
     Often deployed under ISP rebrands (Mobinnet IR, Reliance Jio IN, MTN Africa); match on structural strings not body brand text.
     Validated against TC-013 (SEOWON SLC-130 LTE CPE on Mobinnet, build 201906111053).
   metadata:
-    method-application-type: NETWORK_EDGE_APPLICATION
+    method-application-type: ROUTER
     method-module-name: SEOWON_INTECH
     method-detection-state: EXPOSED_ADMIN
     cpe: cpe:2.3:o:seowonintech:cpe_firmware:*:*:*:*:*:*:*:*

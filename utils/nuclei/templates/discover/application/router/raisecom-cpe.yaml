@@ -15,7 +15,7 @@ info:
     even though the live target may have rotated since TC-015's original capture. Devices that patched the bypass
     won't expose Raisecom-distinctive data here and will only surface via realtek-sdk-cpe-detect.
   metadata:
-    method-application-type: NETWORK_EDGE_APPLICATION
+    method-application-type: ROUTER
     method-module-name: RAISECOM
     method-detection-state: EXPOSED_ADMIN
     cpe: cpe:2.3:o:raisecom:cpe_firmware:*:*:*:*:*:*:*:*

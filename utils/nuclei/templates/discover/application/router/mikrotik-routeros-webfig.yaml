@@ -9,7 +9,7 @@ info:
     Rejects WordPress pages and Hotspot/captive-portal pages that incidentally mention MikroTik.
     Validated against TC-001 (7.17+), TC-007 (6.49.18), TC-011 (7.8 transitional).
   metadata:
-    method-application-type: NETWORK_MANAGEMENT_SYSTEM
+    method-application-type: ROUTER
     method-module-name: MIKROTIK_ROUTEROS
     method-detection-state: EXPOSED_ADMIN
     cpe: cpe:2.3:o:mikrotik:routeros:*:*:*:*:*:*:*:*

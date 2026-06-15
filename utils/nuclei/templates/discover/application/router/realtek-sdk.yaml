@@ -9,7 +9,7 @@ info:
     Tier-1 vendor-agnostic match — vendor disambiguation needs additional signals (OUI of self-disclosed MAC, etc.).
     The same Realtek SDK firmware powers the Raisecom Tier-2 Referer-bypass exposed in TC-015; this template fires before that.
   metadata:
-    method-application-type: NETWORK_EDGE_APPLICATION
+    method-application-type: ROUTER
     method-module-name: REALTEK_SDK
     method-detection-state: EXPOSED_ADMIN
     cpe: cpe:2.3:o:realtek:sdk:*:*:*:*:*:*:*:*

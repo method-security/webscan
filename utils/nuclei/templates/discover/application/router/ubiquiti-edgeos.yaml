@@ -8,7 +8,7 @@ info:
     EdgeOS UI inherits the Vyatta login chrome; anchored title plus EdgeOS JS bundle markers form the signal.
     No fixture validation — built from catalog signatures (SEC-702 description); confidence lower than TC-backed templates.
   metadata:
-    method-application-type: NETWORK_MANAGEMENT_SYSTEM
+    method-application-type: ROUTER
     method-module-name: UBIQUITI_EDGEOS
     method-detection-state: EXPOSED_ADMIN
     cpe: cpe:2.3:o:ubiquiti:edgeos:*:*:*:*:*:*:*:*

@@ -10,7 +10,7 @@ info:
     No fixture validation — built from catalog signatures (SEC-702 description); confidence lower than TC-backed templates.
     Sibling: CWMP/TR-069 on TCP/7547 (AITF-81 networkscan probe).
   metadata:
-    method-application-type: INTERNET_OF_THINGS
+    method-application-type: ROUTER
     method-module-name: ZTE_GPON_ONT
     method-detection-state: EXPOSED_ADMIN
     cpe: cpe:2.3:o:zte:gpon_ont_firmware:*:*:*:*:*:*:*:*

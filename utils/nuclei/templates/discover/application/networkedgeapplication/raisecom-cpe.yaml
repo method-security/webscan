@@ -10,7 +10,7 @@ info:
     OUI prefix 00:1A:EF in the device-info table. Generic Realtek SDK responses without a Raisecom OUI are caught by
     the realtek-sdk-cpe-detect template (module name REALTEK_SDK) instead, so we don't mis-label other OEMs on the
     same stack as Raisecom.
-    Validated against TC-015 (185.99.214.43 — ZXV-818-P/Vr.1.21, Apr 6 2021 build, OUI 00:1A:EF Raisecom).
+    Validated against TC-015 (ZXV-818-P/Vr.1.21, Apr 6 2021 build, OUI 00:1A:EF Raisecom).
     Note: the Referer-bypass is a Realtek-SDK-broad implementation flaw — the template still implements it
     even though the live target may have rotated since TC-015's original capture. Devices that patched the bypass
     won't expose Raisecom-distinctive data here and will only surface via realtek-sdk-cpe-detect.

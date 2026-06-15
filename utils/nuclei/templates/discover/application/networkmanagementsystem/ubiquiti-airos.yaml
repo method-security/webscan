@@ -7,7 +7,7 @@ info:
     Detects Ubiquiti airOS wireless-radio management interfaces (NanoStation, LiteBeam, PowerBeam, Bullet, Rocket families).
     The smoking-gun signal is the Set-Cookie: AIROS_<MAC>= response cookie — the 12-hex suffix is the device MAC,
     making MAC + OUI lookup a two-source vendor confirmation.
-    Validated against TC-004 (109.232.0.107 — AIROS_24A43C9C9528, lighttpd/1.4.39, build 160526.1224).
+    Validated against TC-004 (AirOS device, lighttpd/1.4.39, build 160526.1224).
   metadata:
     method-application-type: NETWORK_MANAGEMENT_SYSTEM
     method-module-name: UBIQUITI_AIROS

@@ -102,7 +102,10 @@ func PerformAppEnumerateGraphQLFieldWordlist(
 		wordlist = embedded
 	}
 
-	// Filter and sanitize candidate words
+	// Filter, sanitize, and deduplicate candidate words.
+	// Duplicate field names in a GraphQL selection set are invalid and cause
+	// servers to return a conflict error rather than per-field suggestions.
+	seen := make(map[string]struct{})
 	var candidates []string
 	for _, word := range wordlist {
 		trimmed := strings.TrimSpace(word)
@@ -113,6 +116,10 @@ func PerformAppEnumerateGraphQLFieldWordlist(
 			log.Debug("Skipping invalid GraphQL identifier", svc1log.SafeParam("word", trimmed))
 			continue
 		}
+		if _, duplicate := seen[trimmed]; duplicate {
+			continue
+		}
+		seen[trimmed] = struct{}{}
 		candidates = append(candidates, trimmed)
 	}
 
@@ -212,7 +219,7 @@ func sendGraphQLFieldProbe(
 	}
 	mergedHeaders["Content-Type"] = []string{"application/json"}
 
-	baseURL, parsedTargetPath, _, err := requesthelpers.SplitTargetURL(target)
+	baseURL, parsedTargetPath, queryParams, err := requesthelpers.SplitTargetURL(target)
 	if err != nil {
 		return "", 0, fmt.Errorf("failed to split target URL: %w", err)
 	}
@@ -223,6 +230,7 @@ func sendGraphQLFieldProbe(
 		Method:  common.HttpMethodPost,
 		Params: &common.HttpRequestParams{
 			Headers: mergedHeaders,
+			Query:   queryParams,
 			Body: &common.Body{
 				Kind: "json",
 				Json: &common.JsonBody{

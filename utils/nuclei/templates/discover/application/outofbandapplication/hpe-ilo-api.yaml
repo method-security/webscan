@@ -1,0 +1,39 @@
+id: hpe-ilo-api-detect
+info:
+  name: HPE iLO API Detection
+  author: method-security
+  severity: info
+  description: Detects HPE iLO API and Redfish responses using iLO headers and OEM JSON markers.
+  metadata:
+    method-application-type: OUT_OF_BAND_APPLICATION
+    method-module-name: HPE_ILO
+    cpe: cpe:2.3:a:hpe:integrated_lights-out:*:*:*:*:*:*:*:*
+  tags: discovery,hpe,hp,ilo,bmc,redfish,out-of-band,remote-management,api
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/redfish/v1/"
+      - "{{BaseURL}}/json/login_session"
+    redirects: false
+    stop-at-first-match: true
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "\"Oem\""
+          - "\"Hpe\""
+          - "\"RedfishVersion\""
+        condition: and
+      - type: word
+        part: body
+        words:
+          - "platform=\":ilo:\""
+          - "hewlett-packard"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: header
+        words:
+          - "hp-ilo"
+          - "hpe-ilo"
+        case-insensitive: true

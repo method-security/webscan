@@ -1,0 +1,23 @@
+id: cisco-dcnm-api-detect
+info:
+  name: Cisco DCNM API Detection
+  author: method-security
+  severity: info
+  description: Detects Cisco Data Center Network Manager (DCNM) REST API/version responses.
+  metadata:
+    method-application-type: NETWORK_MANAGEMENT_SYSTEM
+    method-module-name: CISCO_DCNM
+    cpe: cpe:2.3:a:cisco:data_center_network_manager:*:*:*:*:*:*:*:*
+  tags: discovery,cisco,dcnm,network-management-system,api
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/dcnm-rest/v1/"
+      - "{{BaseURL}}/dcnm-rest/"
+    redirects: false
+    stop-at-first-match: true
+    matchers:
+      - type: regex
+        part: body
+        regex:
+          - '(?i)"(dcnmVersion|dcnmVersionInfo)"'

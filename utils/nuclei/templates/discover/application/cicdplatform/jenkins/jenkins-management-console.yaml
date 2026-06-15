@@ -8,7 +8,6 @@ info:
     method-application-type: CI_CD_PLATFORM
     method-module-name: JENKINS
     method-sub-module-name: MANAGEMENT_CONSOLE
-    method-detection-state: UNAUTHENTICATED
     cpe: cpe:2.3:a:jenkins:jenkins:*:*:*:*:*:*:*:*
   tags: jenkins,unauth,management,cicd,exposure
 http:

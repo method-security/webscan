@@ -1,0 +1,31 @@
+id: tenda-router-web-ui-detect
+info:
+  name: Tenda Router Management Console Detection
+  author: method-security
+  severity: info
+  description: Detects Tenda router web management interfaces using Tenda login titles, GoAhead headers, and login/Auth endpoints.
+  metadata:
+    method-application-type: ROUTER
+    method-module-name: TENDA_ROUTER
+    method-sub-module-name: MANAGEMENT_CONSOLE
+    cpe: cpe:2.3:h:tenda:*:*:*:*:*:*:*:*:*
+  tags: discovery,tenda,router,network-management
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/login.html"
+      - "{{BaseURL}}/login/Auth"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers-condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+      - type: dsl
+        dsl:
+          - 'contains(tolower(body), "<title>tenda") && contains(tolower(body), "login/auth")'
+          - 'contains(tolower(header), "server: goahead-webs") && contains(tolower(body), "tenda") && contains(tolower(body), "login")'
+          - 'contains(tolower(body), "tenda") && contains(tolower(body), "goform") && contains(tolower(body), "password")'

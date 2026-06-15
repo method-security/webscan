@@ -1,0 +1,41 @@
+id: cisco-small-business-rv-api-detect
+info:
+  name: Cisco Small Business RV API Detection
+  author: method-security
+  severity: info
+  description: Detects Cisco Small Business RV-series API responses that expose firmware and model metadata.
+  metadata:
+    method-application-type: ROUTER
+    method-module-name: CISCO_SMALL_BUSINESS
+    cpe: cpe:2.3:o:cisco:small_business_router_firmware:*:*:*:*:*:*:*:*
+  tags: discovery,cisco,small-business,rv-series,router,network-management,soho,api
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/api/index"
+    redirects: false
+    matchers-condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+      - type: word
+        part: body
+        words:
+          - '"firmware_version"'
+          - '"model"'
+        condition: and
+        case-insensitive: true
+    extractors:
+      - type: regex
+        name: firmware_version
+        part: body
+        group: 1
+        regex:
+          - '"firmware_version"\s*:\s*"([^"]+)"'
+      - type: regex
+        name: model
+        part: body
+        group: 1
+        regex:
+          - '"model"\s*:\s*"([^"]+)"'

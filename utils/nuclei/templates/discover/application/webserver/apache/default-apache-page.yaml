@@ -8,7 +8,6 @@ info:
     method-application-type: WEB_SERVER
     method-module-name: APACHE
     method-sub-module-name: DEFAULT_PAGE
-    method-detection-state: DEFAULT_PAGE
     cpe:
       - cpe:2.3:a:apache:http_server:*:*:*:*:*:*:*:*
   tags: discovery,apache,httpd,default-page,misconfiguration

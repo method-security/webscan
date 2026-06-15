@@ -1,0 +1,42 @@
+id: cisco-meraki-webmanagement-detect
+info:
+  name: Cisco Meraki Management Console Detection
+  author: method-security
+  severity: info
+  description: >
+    High-accuracy detection of Cisco Meraki cloud-managed dashboard interfaces
+    using unique application assets, favicon hashes, and Meraki-specific UI markers.
+  metadata:
+    method-application-type: NETWORK_CONTROLLER
+    method-module-name: CISCO_MERAKI
+    method-sub-module-name: MANAGEMENT_CONSOLE
+    cpe: cpe:2.3:a:cisco:meraki_dashboard:*:*:*:*:*:*:*:*
+  tags: discovery,cisco,meraki,dashboard,network-controller
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/login"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: regex
+        name: meraki-title
+        part: body
+        regex:
+          - '(?i)<title>.*Meraki\s+Dashboard.*</title>'
+      - type: word
+        name: meraki-ui-markers
+        part: body
+        words:
+          - 'data-meraki-version='
+          - 'class="meraki-app"'
+          - 'id="meraki-dashboard"'
+        case-insensitive: true
+      - type: regex
+        name: meraki-js-bundles
+        part: body
+        regex:
+          - '(?i)/js/meraki[-_.]?(?:dashboard|login)[^"]+\.js'
+          - '(?i)/static/meraki[^"]+\.js'

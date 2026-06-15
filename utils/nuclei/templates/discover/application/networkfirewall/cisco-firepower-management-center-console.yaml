@@ -1,0 +1,31 @@
+id: cisco-firepower-management-center-detect
+info:
+  name: Cisco Firepower Management Center (FMC) Management Console Detection
+  author: method-security
+  severity: info
+  description: Detects Cisco Firepower Management Center (FMC) management console pages by identifying unique titles, login paths, and Cisco-specific assets.
+  metadata:
+    method-application-type: NETWORK_FIREWALL
+    method-module-name: CISCO_FIREPOWER_MANAGEMENT_CENTER
+    method-sub-module-name: MANAGEMENT_CONSOLE
+    cpe: cpe:2.3:a:cisco:firepower_management_center:*:*:*:*:*:*:*:*
+  tags: discovery,cisco,firepower,fmc,management-center,firewall
+requests:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/ui/login"
+      - "{{BaseURL}}/login"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: regex
+        part: body
+        regex:
+          - '(?i)/ui/assets/fmc/'
+      - type: word
+        part: body
+        words:
+          - "Firepower Management Center"
+        case-insensitive: true

@@ -13,6 +13,7 @@ func getTemplatePaths(resourceConfigType *discover.ApplicationResourceConfigType
 	// Get all supported resource types
 	supportedResourceTypes := []discover.ApplicationResourceType{
 		discover.ApplicationResourceTypeApiApplication,
+		discover.ApplicationResourceTypeCamera,
 		discover.ApplicationResourceTypeCiCdPlatform,
 		discover.ApplicationResourceTypeCloudBucket,
 		discover.ApplicationResourceTypeCollaborationApplication,
@@ -26,11 +27,13 @@ func getTemplatePaths(resourceConfigType *discover.ApplicationResourceConfigType
 		discover.ApplicationResourceTypeHypervisor,
 		discover.ApplicationResourceTypeIndustrialControlSystem,
 		discover.ApplicationResourceTypeInternetOfThings,
+		discover.ApplicationResourceTypeIpPhone,
 		discover.ApplicationResourceTypeKube,
 		discover.ApplicationResourceTypeNetworkController,
 		discover.ApplicationResourceTypeNetworkEdgeApplication,
 		discover.ApplicationResourceTypeNetworkManagementSystem,
 		discover.ApplicationResourceTypeOutOfBandApplication,
+		discover.ApplicationResourceTypePrinter,
 		discover.ApplicationResourceTypeRouter,
 		discover.ApplicationResourceTypeSecretManagementApplication,
 		discover.ApplicationResourceTypeVdiApplication,
@@ -41,6 +44,7 @@ func getTemplatePaths(resourceConfigType *discover.ApplicationResourceConfigType
 	// Map resource types to base template paths (without request method subdirectory)
 	resourceTypeToPath := map[discover.ApplicationResourceType]string{
 		discover.ApplicationResourceTypeApiApplication:                "apiapplication",
+		discover.ApplicationResourceTypeCamera:                        "internetofthings/camera",
 		discover.ApplicationResourceTypeCiCdPlatform:                  "cicdplatform",
 		discover.ApplicationResourceTypeCloudBucket:                   "cloudbucket",
 		discover.ApplicationResourceTypeCollaborationApplication:      "collaborationapplication",
@@ -54,11 +58,13 @@ func getTemplatePaths(resourceConfigType *discover.ApplicationResourceConfigType
 		discover.ApplicationResourceTypeHypervisor:                    "hypervisor",
 		discover.ApplicationResourceTypeIndustrialControlSystem:       "industrialcontrolsystem",
 		discover.ApplicationResourceTypeInternetOfThings:              "internetofthings",
+		discover.ApplicationResourceTypeIpPhone:                       "internetofthings/ipphone",
 		discover.ApplicationResourceTypeKube:                          "kube",
 		discover.ApplicationResourceTypeNetworkController:             "networkcontroller",
 		discover.ApplicationResourceTypeNetworkEdgeApplication:        "networkedgeapplication",
 		discover.ApplicationResourceTypeNetworkManagementSystem:       "networkmanagementsystem",
 		discover.ApplicationResourceTypeOutOfBandApplication:          "outofbandapplication",
+		discover.ApplicationResourceTypePrinter:                       "internetofthings/printer",
 		discover.ApplicationResourceTypeRouter:                        "router",
 		discover.ApplicationResourceTypeSecretManagementApplication:   "secretmanagementapplication",
 		discover.ApplicationResourceTypeVdiApplication:                "vdiapplication",
@@ -70,8 +76,16 @@ func getTemplatePaths(resourceConfigType *discover.ApplicationResourceConfigType
 
 	// Handle 'ALL' resource type - return all template paths
 	if resourceConfigType.GetApplicationResourceTypeAll() == discover.ApplicationResourceTypeAllAll {
-		// Add all resource type template paths for each request method
+		// The top-level IoT path is recursive, so it already includes camera,
+		// IP phone, and printer templates. Skip those nested buckets here to
+		// avoid duplicate template execution for ALL scans.
 		for _, resourceType := range supportedResourceTypes {
+			switch resourceType {
+			case discover.ApplicationResourceTypeCamera,
+				discover.ApplicationResourceTypeIpPhone,
+				discover.ApplicationResourceTypePrinter:
+				continue
+			}
 			if resourceTypeName, exists := resourceTypeToPath[resourceType]; exists {
 				templatePath := fmt.Sprintf("discover/application/%s", resourceTypeName)
 				templatePaths = append(templatePaths, templatePath)

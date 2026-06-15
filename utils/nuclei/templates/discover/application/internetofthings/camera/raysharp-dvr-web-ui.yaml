@@ -1,0 +1,138 @@
+id: raysharp-dvr-web-ui-detect
+info:
+  name: Raysharp Technology (White-Label OEM) Hybrid DVR Web UI Detection
+  author: method-security
+  severity: info
+  description: |
+    Detects Raysharp Technology white-label OEM hybrid DVRs. Raysharp deliberately ships
+    a single firmware to dozens of reseller brands (Q-See, Floureon, Defender, Swann, ESP,
+    Zmodo, generic AliExpress) — the brand text is intentionally stripped from <title>
+    and HTTP cannot disambiguate the reseller. The reseller_brand field is null by
+    DESIGN, not by missing-signal.
+    Per decision #8 (5-signal concurrence): all five anchors must fire because Boa is
+    a generic embedded HTTPd (printers, old NAS, VoIP gateways ship it) and any single
+    signal in isolation is brittle.
+      1. Server: Boa/0.94.14rc21 (exact — Raysharp's frozen Boa fork)
+      2. application/x-rs-sclient-v3 (Safari NPAPI MIME — proprietary x-rs- namespace)
+      3. application/RSVideo-plugin (Firefox NPAPI MIME — proprietary RSVideo- namespace)
+      4. id="dvrocx" (Raysharp's ActiveX object name — the long event-handler list is
+         all for="dvrocx")
+      5. Distribution asset HEAD /RSVideoOcx.cab → 200 + application/vnd.ms-cab-compressed
+         (~1.2 MB body)
+    Optional 6th signal: CLSID 357A8DEC-...-... (Raysharp's ActiveX class GUID).
+    Version extractor: var version_safari = "X.YY.Z" → CPE substitution.
+    NOTE: <title></title> is empty by design (white-label OEM brand-stripping). Do NOT
+    match on <title>Raysharp</title> — the brand text is intentionally stripped.
+    Validated against TC-017 (Raysharp white-label DVR, version_safari "3.12.5").
+  metadata:
+    method-application-type: CAMERA
+    method-module-name: RAYSHARP
+    cpe: cpe:2.3:o:raysharp:dvr_firmware:*:*:*:*:*:*:*:*
+  tags: discovery,iot,raysharp,dvr,white-label,oem,boa,surveillance
+# flow: enforce 5-of-5 concurrence — BOTH http blocks must match for a finding
+# to emit. Without this clause, Nuclei's default semantics treat http[0] OR
+# http[1] as sufficient to fire, which would defeat the documented multi-signal
+# bar (Boa 0.94.14rc21 is too generic to ship as a single anchor — see catalog
+# anti-pattern §7). Per Bugbot review on 627aeb90.
+flow: http(1) && http(2)
+http:
+  # Tier-1 probe: GET / requires 4-of-5 structural signals concurrent
+  # (Server header, both NPAPI MIMEs, dvrocx ActiveX id). Tier-2
+  # probe below confirms with the cab asset.
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers-condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+      # Signal #1: exact Boa version. Raysharp ships a frozen
+      # 0.94.14rc21 build across all reseller brands. Be exact
+      # to filter out other Boa-running devices (printers, NAS).
+      - type: regex
+        part: header
+        regex:
+          - '(?i)server:\s*Boa/0\.94\.14rc21'
+      # Signal #2: Safari NPAPI MIME — proprietary x-rs- namespace.
+      # No other vendor uses this prefix.
+      - type: word
+        part: body
+        words:
+          - "application/x-rs-sclient-v3"
+      # Signal #3: Firefox NPAPI MIME — proprietary RSVideo- namespace.
+      - type: word
+        part: body
+        words:
+          - "application/RSVideo-plugin"
+      # Signal #4: dvrocx ActiveX object id. Raysharp's web video
+      # control is always named "dvrocx" and the body has 10+
+      # event handlers all marked for="dvrocx".
+      - type: word
+        part: body
+        words:
+          - 'id="dvrocx"'
+      # Negative filter — drop WordPress/blog false-positives that
+      # mention Raysharp / "dvrocx" in body text. Brand-blog hits
+      # would otherwise carry the strings without the Boa header.
+      - type: dsl
+        dsl:
+          - >-
+            !contains(tolower(body), "wp-content") &&
+            !contains(tolower(body), "wordpress")
+    extractors:
+      # Version source — var version_safari = "X.YY.Z" is the most
+      # reliable Raysharp firmware-version disclosure. Used to
+      # populate the {version} placeholder in CPE downstream.
+      - type: regex
+        name: firmware_version
+        part: body
+        group: 1
+        regex:
+          - 'var\s+version_safari\s*=\s*"([0-9.]+)"'
+      # Firefox plugin version (typically 1.0.0.1; auxiliary).
+      - type: regex
+        name: firefox_plugin_version
+        part: body
+        group: 1
+        regex:
+          - 'var\s+version_firefox\s*=\s*"([0-9.]+)"'
+      # ActiveX CLSID. Raysharp's class GUID — globally unique.
+      - type: regex
+        name: activex_clsid
+        part: body
+        group: 1
+        regex:
+          - 'classid="CLSID:([A-F0-9]{8}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{12})"'
+
+  # Tier-2 probe — Signal #5: HEAD /RSVideoOcx.cab confirmation.
+  # 200 + application/vnd.ms-cab-compressed is dispositive on the
+  # last brittle signal. Hardens 4-of-5 above into 5-of-5 concurrence.
+  - method: HEAD
+    path:
+      - "{{BaseURL}}/RSVideoOcx.cab"
+    redirects: false
+    stop-at-first-match: true
+    matchers-condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+      - type: regex
+        part: header
+        regex:
+          - '(?i)content-type:\s*application/vnd\.ms-cab-compressed'
+      - type: regex
+        part: header
+        regex:
+          - '(?i)server:\s*Boa/0\.94\.14rc21'
+    extractors:
+      - type: regex
+        name: cab_size
+        part: header
+        group: 1
+        regex:
+          - '(?i)content-length:\s*([0-9]+)'

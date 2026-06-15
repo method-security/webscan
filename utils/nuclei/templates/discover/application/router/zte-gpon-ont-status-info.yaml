@@ -1,0 +1,43 @@
+id: zte-gpon-ont-status-info-detect
+info:
+  name: ZTE GPON ONT Status Info Detection
+  author: method-security
+  severity: info
+  description: Detects ZTE F-series GPON ONT model and firmware information from a pre-auth device config endpoint.
+  metadata:
+    method-application-type: ROUTER
+    method-module-name: ZTE_GPON_ONT
+    cpe: cpe:2.3:o:zte:gpon_ont_firmware:*:*:*:*:*:*:*:*
+  tags: discovery,zte,gpon,ont,f-series,f660,f670l,iot,isp-cpe,soho,status-info
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/manager_dev_config_t.gch"
+    redirects: false
+    matchers-condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+      - type: word
+        part: body
+        words:
+          - "ModelName"
+          - "VersionInfo"
+          - "F660"
+          - "F670"
+          - "F668"
+        case-insensitive: true
+    extractors:
+      - type: regex
+        name: model
+        part: body
+        group: 1
+        regex:
+          - '(?i)ModelName[^<>=]{0,10}["=>]\s*([A-Z0-9-]+)'
+      - type: regex
+        name: firmware_version
+        part: body
+        group: 1
+        regex:
+          - '(?i)VersionInfo[^<>=]{0,10}["=>]\s*([A-Z0-9.\-_]+)'

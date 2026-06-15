@@ -1,0 +1,29 @@
+id: inductive-automation-ignition-gateway-status-info-detect
+info:
+  name: Inductive Automation Ignition Gateway Status Info Detection
+  author: method-security
+  severity: info
+  description: Detects Inductive Automation Ignition Gateway status information from the gateway info endpoint.
+  metadata:
+    method-application-type: INDUSTRIAL_CONTROL_SYSTEM
+    method-module-name: INDUCTIVE_AUTOMATION_IGNITION_GATEWAY
+    cpe: cpe:2.3:a:inductiveautomation:ignition:*:*:*:*:*:*:*:*
+  tags: discovery,ics,ot,inductive-automation,ignition,gateway,status-info,scada
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/system/gwinfo"
+    redirects: false
+    matchers-condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+      - type: word
+        part: body
+        words:
+          - "ContextStatus="
+          - "GatewayAddress="
+          - "PlatformName=Ignition"
+        condition: and
+        case-insensitive: true

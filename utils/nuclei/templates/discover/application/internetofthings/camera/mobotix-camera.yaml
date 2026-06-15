@@ -1,0 +1,40 @@
+id: mobotix-camera-detect
+info:
+  name: MOBOTIX Camera Detection
+  author: method-security
+  severity: info
+  description: Detects MOBOTIX camera web interfaces using MOBOTIX metadata and MX web server markers.
+  metadata:
+    method-application-type: CAMERA
+    method-module-name: MOBOTIX
+    cpe: cpe:2.3:h:mobotix:*:*:*:*:*:*:*:*:*
+  tags: discovery,iot,camera,mobotix
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/control/userimage.html"
+      - "{{BaseURL}}/cgi-bin/image.jpg"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "MOBOTIX AG, Germany"
+        case-insensitive: true
+      - type: word
+        part: header
+        words:
+          - "mxhttpd/"
+          - "-MX"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "SECTION FINGERPRINT"
+          - "PRD=MOBOTIX"
+        condition: and
+        case-insensitive: true

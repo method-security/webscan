@@ -1,0 +1,39 @@
+id: dell-idrac-api-detect
+info:
+  name: Dell iDRAC API Detection
+  author: method-security
+  severity: info
+  description: Detects Dell iDRAC API and Redfish responses.
+  metadata:
+    method-application-type: OUT_OF_BAND_APPLICATION
+    method-module-name: DELL_IDRAC
+    cpe: cpe:2.3:a:dell:idrac:*:*:*:*:*:*:*:*
+  tags: discovery,dell,idrac,bmc,redfish,out-of-band,remote-management,api
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/data/login"
+      - "{{BaseURL}}/redfish/v1/"
+    redirects: false
+    stop-at-first-match: true
+    matchers:
+      - type: word
+        name: idrac-headers
+        part: header
+        words:
+          - "Set-Cookie: idrac"
+          - "Server: iDRAC"
+        case-insensitive: true
+      - type: regex
+        name: idrac-json-api
+        part: body
+        regex:
+          - "(?i)\"idrac[^\"]+\":\"[0-9A-Za-z._-]+\""
+      - type: word
+        part: body
+        words:
+          - "idrac"
+          - "redfish"
+          - "dell"
+        condition: and
+        case-insensitive: true

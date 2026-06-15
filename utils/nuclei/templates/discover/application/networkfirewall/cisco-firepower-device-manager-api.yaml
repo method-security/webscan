@@ -1,0 +1,25 @@
+id: cisco-firepower-device-manager-api-detect
+info:
+  name: Cisco Firepower Device Manager (FDM) API Detection
+  author: method-security
+  severity: info
+  description: Detects Cisco Firepower Device Manager (FDM) API responses using Firepower OS version metadata.
+  metadata:
+    method-application-type: NETWORK_FIREWALL
+    method-module-name: CISCO_FIREPOWER_DEVICE_MANAGER
+    cpe: cpe:2.3:a:cisco:firepower_device_manager:*:*:*:*:*:*:*:*
+  tags: discovery,cisco,firepower,fdm,device-manager,network-firewall,api
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/api/fdm/latest/"
+    redirects: false
+    matchers-condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+      - type: regex
+        part: body
+        regex:
+          - '(?i)"fireos_version"\s*:'

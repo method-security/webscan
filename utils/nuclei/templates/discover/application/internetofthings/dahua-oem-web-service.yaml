@@ -26,7 +26,7 @@ info:
     TC-014 (DHI-NVR4216-4KS2 enterprise late jQuery+SeaJS 2019).
   metadata:
     method-application-type: INTERNET_OF_THINGS
-    method-module-name: DAHUA_WEB_SERVICE
+    method-module-name: DAHUA_OEM
     method-detection-state: EXPOSED_ADMIN
     cpe: cpe:2.3:o:dahua:web_service:*:*:*:*:*:*:*:*
   tags: discovery,iot,camera,dvr,nvr,xvr,hcvr,ipc,dahua,oem,surveillance

@@ -8,7 +8,6 @@ import (
 
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
-
 	// External
 	rod "github.com/go-rod/rod"
 	proto "github.com/go-rod/rod/lib/proto"

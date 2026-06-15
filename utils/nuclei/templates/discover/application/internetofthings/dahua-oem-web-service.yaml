@@ -53,6 +53,8 @@ http:
   - method: GET
     path:
       - "{{BaseURL}}"
+      - "{{BaseURL}}/login.html"
+      - "{{BaseURL}}/index.html"
     redirects: true
     max-redirects: 5
     stop-at-first-match: true

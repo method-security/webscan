@@ -48,7 +48,7 @@ http:
       - type: regex
         part: body
         regex:
-          - '(?i)(?:©\s*CANON\s*INC\.|canon\.com|imageRUNNER|i-SENSYS|imageCLASS)'
+          - '(?i)(?:©\s*CANON\s*INC\.|canon\.com)'
       - type: status
         status:
           - 200

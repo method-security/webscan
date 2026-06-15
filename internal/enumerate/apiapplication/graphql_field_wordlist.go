@@ -212,9 +212,14 @@ func sendGraphQLFieldProbe(
 	}
 	mergedHeaders["Content-Type"] = []string{"application/json"}
 
+	baseURL, parsedTargetPath, _, err := requesthelpers.SplitTargetURL(target)
+	if err != nil {
+		return "", 0, fmt.Errorf("failed to split target URL: %w", err)
+	}
+
 	httpReq := common.HttpRequest{
-		BaseUrl: target,
-		Path:    "",
+		BaseUrl: baseURL,
+		Path:    parsedTargetPath,
 		Method:  common.HttpMethodPost,
 		Params: &common.HttpRequestParams{
 			Headers: mergedHeaders,

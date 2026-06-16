@@ -81,6 +81,11 @@ func getTemplatePaths(resourceConfigType *discover.ApplicationResourceConfigType
 	// Handle specific resource type
 	resourceType := resourceConfigType.GetApplicationResourceType()
 
+	// CUSTOM_TEMPLATE has no embedded path mapping — it requires --template-paths
+	if resourceType == discover.ApplicationResourceTypeCustomTemplate {
+		return nil, fmt.Errorf("resource type CUSTOM_TEMPLATE requires --template-paths to be set")
+	}
+
 	// Validate that the resource type is supported
 	resourceTypeName, exists := resourceTypeToPath[resourceType]
 	if !exists {

@@ -7,6 +7,7 @@ types:
       - ALL
   ApplicationResourceType:
     enum:
+      - CUSTOM_TEMPLATE
       - API_APPLICATION
       - CI_CD_PLATFORM
       - CLOUD_BUCKET
@@ -48,6 +49,7 @@ types:
     properties:
       targets: list<string>
       resourceType: ApplicationResourceConfigType
+      templatePaths: optional<list<string>>
       timeout: integer
       threads: integer
       proxy: optional<string>

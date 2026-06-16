@@ -77,16 +77,15 @@ func GetTemplateFileSystem(ctx context.Context, templatePaths []string) ([]fs.FS
 }
 
 // isDiskPath reports whether path should be read from the OS filesystem.
+// Only absolute paths and explicitly relative paths (./  ../) qualify;
+// bare relative paths always resolve against the embedded archive to avoid
+// CWD shadowing of built-in template names like pentest/dast.
 func isDiskPath(path string) bool {
 	if filepath.IsAbs(path) {
 		return true
 	}
-	if strings.HasPrefix(path, "./") || strings.HasPrefix(path, "../") ||
-		strings.HasPrefix(path, ".\\") || strings.HasPrefix(path, "..\\") {
-		return true
-	}
-	_, err := os.Stat(path)
-	return err == nil
+	return strings.HasPrefix(path, "./") || strings.HasPrefix(path, "../") ||
+		strings.HasPrefix(path, ".\\") || strings.HasPrefix(path, "..\\")
 }
 
 // getDiskFS returns an fs.FS backed by the OS filesystem at path.

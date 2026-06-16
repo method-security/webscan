@@ -99,9 +99,31 @@ func getDiskFS(path string) (fs.FS, error) {
 		return nil, fmt.Errorf("path not found %s: %w", abs, err)
 	}
 	if info.IsDir() {
+		count, err := countDiskTemplateFiles(abs)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan directory %s: %w", abs, err)
+		}
+		if count == 0 {
+			return nil, fmt.Errorf("no .yaml/.yml files found in %s", abs)
+		}
 		return os.DirFS(abs), nil
 	}
 	return &singleFileFS{path: abs}, nil
+}
+
+// countDiskTemplateFiles counts .yaml/.yml files recursively under dir.
+func countDiskTemplateFiles(dir string) (int, error) {
+	count := 0
+	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.IsDir() && isTemplateFile(path) {
+			count++
+		}
+		return nil
+	})
+	return count, err
 }
 
 // singleFileFS is an fs.FS containing exactly one file.

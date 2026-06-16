@@ -34,7 +34,6 @@ http:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
-    matchers-condition: or
     matchers:
       # Matcher 1: Server: Niagara Web Server/<version> — primary
       # high-confidence discriminator. Covers AX and N4.

@@ -29,7 +29,6 @@ http:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
-    matchers-condition: or
     matchers:
       # Matcher 1: Microsoft-WinCE/6.00 server header — primary
       # high-confidence discriminator (near-zero FP on public web).

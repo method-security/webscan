@@ -28,7 +28,6 @@ http:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
-    matchers-condition: or
     matchers:
       # Matcher 1: Server: WebSocket++/0.7.0 — primary high-confidence
       # discriminator. The WebSocket++ library is otherwise rare as a

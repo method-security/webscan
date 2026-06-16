@@ -26,7 +26,6 @@ http:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
-    matchers-condition: or
     matchers:
       # Matcher 1: Unitronics PLC title (highest-confidence body marker —
       # present on all exposed Vision/Samba instances).

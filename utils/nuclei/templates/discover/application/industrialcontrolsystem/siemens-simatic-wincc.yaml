@@ -27,7 +27,6 @@ http:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
-    matchers-condition: or
     matchers:
       # Matcher 1: WinCC WebUX title (hostname-prefixed) — distinguishes
       # WebUX from WinCC Unified which has no hostname prefix.
@@ -35,16 +34,17 @@ http:
         part: body
         regex:
           - "(?i)<title>[^<]+ - WinCC WebUX</title>"
-      # Matcher 2: WebUX distinctive asset paths (AlarmStyle, socket.io,
-      # angular). Any two of these together is a strong WebUX signal.
+      # Matcher 2: WebUX distinctive asset paths. At least one of the
+      # three WinCC-WebUX-specific stylesheet paths
+      # (AlarmStyle / RulerControlStyle / TagBrowserStyle) must appear —
+      # socket.io and angular alone are too generic to fingerprint
+      # WebUX without one of these CSS markers.
       - type: word
         part: body
         words:
           - "/content/AlarmStyle.css"
           - "/content/RulerControlStyle.css"
           - "/content/TagBrowserStyle.css"
-          - "/socket.io/socket.io.js"
-          - "/libs/angular.min.js"
         condition: or
       # Matcher 3: Generic SIMATIC WinCC marker pair (covers non-WebUX
       # WinCC web portals).

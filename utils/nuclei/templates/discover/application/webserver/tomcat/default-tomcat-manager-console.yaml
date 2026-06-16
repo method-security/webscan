@@ -1,6 +1,6 @@
 id: default-tomcat-manager-detect
 info:
-  name: Default Apache Tomcat Manager Console Detection
+  name: Default Apache Tomcat Management Console Detection
   author: method-security
   severity: info
   description: Detects default Apache Tomcat manager pages, these pages are protected by a basic authentication mechanism.

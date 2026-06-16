@@ -1,6 +1,6 @@
 id: kubernetes-enterprise-manager-detect
 info:
-  name: Kubernetes Enterprise Manager Console Detection
+  name: Kubernetes Enterprise Management Console Detection
   author: method-security
   severity: info
   description: Detects exposed Kubernetes Enterprise Manager applications, dashboards, and management consoles that may provide administrative access to cluster resources

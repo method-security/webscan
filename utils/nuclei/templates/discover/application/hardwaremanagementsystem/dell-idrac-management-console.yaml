@@ -5,7 +5,7 @@ info:
   severity: info
   description: High-accuracy detection of Dell iDRAC (Integrated Dell Remote Access Controller) management console pages.
   metadata:
-    method-application-type: OUT_OF_BAND_APPLICATION
+    method-application-type: HARDWARE_MANAGEMENT_SYSTEM
     method-module-name: DELL_IDRAC
     method-sub-module-name: MANAGEMENT_CONSOLE
     cpe: cpe:2.3:a:dell:idrac:*:*:*:*:*:*:*:*

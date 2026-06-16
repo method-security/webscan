@@ -5,7 +5,7 @@ info:
   severity: info
   description: Detects generic DMTF Redfish service roots exposed by out-of-band management controllers using Redfish service-root JSON markers.
   metadata:
-    method-application-type: OUT_OF_BAND_APPLICATION
+    method-application-type: HARDWARE_MANAGEMENT_SYSTEM
     method-module-name: GENERIC_REDFISH
     cpe: cpe:2.3:a:dmtf:redfish:*:*:*:*:*:*:*:*
   tags: discovery,redfish,dmtf,bmc,out-of-band,api

@@ -5,7 +5,7 @@ info:
   severity: info
   description: Detects HPE Integrated Lights-Out out-of-band management console pages using iLO login page markers.
   metadata:
-    method-application-type: OUT_OF_BAND_APPLICATION
+    method-application-type: HARDWARE_MANAGEMENT_SYSTEM
     method-module-name: HPE_ILO
     method-sub-module-name: MANAGEMENT_CONSOLE
     cpe: cpe:2.3:a:hpe:integrated_lights-out:*:*:*:*:*:*:*:*

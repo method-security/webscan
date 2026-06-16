@@ -48,6 +48,7 @@ jobs:
         run: |
           TARGET_DIR="utils/nuclei/templates/pentest/scan/cve"
           SOURCE_DIR="/tmp/nuclei-templates/http/cves"
+          PRESERVE_DIR="method-custom"
 
           # Check if source directory exists
           if [ ! -d "${SOURCE_DIR}" ]; then
@@ -55,8 +56,14 @@ jobs:
             exit 1
           fi
 
-          # Remove existing templates in the target directory
-          rm -rf ${TARGET_DIR}/*
+          # Remove existing upstream-mirrored templates while PRESERVING
+          # the method-custom/ subdirectory, which holds CVE templates that
+          # do not exist upstream in projectdiscovery/nuclei-templates and
+          # must not be wiped on each weekly sync. Anything else (year
+          # directories, stray files) gets removed.
+          find "${TARGET_DIR}" -mindepth 1 -maxdepth 1 \
+            ! -name "${PRESERVE_DIR}" \
+            -exec rm -rf {} +
 
           # Copy all CVE templates from nuclei-templates repo
           cp -r ${SOURCE_DIR}/* ${TARGET_DIR}/

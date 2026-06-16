@@ -1,32 +1,82 @@
 id: tridium-niagara-bms-console-detect
 info:
-  name: Tridium Niagara BMS Web Console Detection
+  name: Tridium Niagara Framework Detection (AX + N4)
   author: method-security
   severity: info
-  description: Detects Tridium Niagara and Niagara-based building management web consoles using Niagara Framework and Tridium-specific page markers.
+  description: |
+    Detects Tridium Niagara Framework web consoles — the dominant
+    platform for building automation (HVAC, lighting, access control),
+    also deployed in utilities. Two generations are in use:
+    - **N4 (current)**: login page loads /login/login.js, base64.js, and
+      wslogin.js under /login/scripts/; title is site-name-prefixed
+      (e.g. "<site> - Wb Px View").
+    - **AX (legacy, still widely deployed)**: body loads a Java applet
+      via archive="wbapplet-<version>.jar", code="WbApplet.class",
+      ord="file:^px/Home.px", boxmessage="Loading Niagara...".
+    The Server: Niagara Web Server/<version> header exposes the exact
+    version on both generations and is the highest-confidence
+    discriminator. Note: the companion Fox protocol on TCP/1911 also
+    leaks Niagara version, host ID, OS, and JVM version with no
+    credentials — out of scope for webscan but reachable from a
+    networkscan probe.
   metadata:
     method-application-type: INDUSTRIAL_CONTROL_SYSTEM
     method-module-name: TRIDIUM_NIAGARA_BMS_CONSOLE
     cpe: cpe:2.3:a:tridium:niagara:*:*:*:*:*:*:*:*
-  tags: discovery,ics,ot,bms,tridium,niagara,building-automation
+  tags: discovery,ics,ot,bms,tridium,niagara,niagara-ax,niagara-n4,building-automation
 http:
   - method: GET
     path:
       - "{{BaseURL}}"
       - "{{BaseURL}}/login"
       - "{{BaseURL}}/ord"
+      - "{{BaseURL}}/prelogin"
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
+    matchers-condition: or
     matchers:
+      # Matcher 1: Server: Niagara Web Server/<version> — primary
+      # high-confidence discriminator. Covers AX and N4.
+      - type: regex
+        part: header
+        regex:
+          - "(?i)Server:\\s*Niagara\\s+Web\\s+Server/"
+      # Matcher 2 (N4 branch): login page asset paths.
+      - type: word
+        part: body
+        words:
+          - "/login/login.js"
+          - "/login/scripts/wslogin.js"
+          - "/login/scripts/base64.js"
+        condition: or
+      # Matcher 3 (AX branch): Java applet markers — wbapplet-<version>.jar,
+      # WbApplet.class, and the "Loading Niagara..." box message.
+      - type: word
+        part: body
+        words:
+          - "wbapplet-"
+          - "WbApplet.class"
+          - "Loading Niagara..."
+        condition: and
+        case-insensitive: true
+      # Matcher 4 (AX branch): the ord="file:^px/Home.px" reference.
+      - type: word
+        part: body
+        words:
+          - "ord="
+          - "file:^px/Home.px"
+        condition: and
+        case-insensitive: true
+      # Matcher 5: Legacy vendor marker pair.
       - type: word
         part: body
         words:
           - "Niagara Framework"
           - "Tridium"
-          - "<title>"
         condition: and
         case-insensitive: true
+      # Matcher 6: Legacy module reference + Niagara marker.
       - type: word
         part: body
         words:
@@ -34,3 +84,21 @@ http:
           - "Niagara"
         condition: and
         case-insensitive: true
+    extractors:
+      # Surface the exact Niagara Web Server version — drives downstream
+      # VULNERABLE_VERSION gating for CVE-2017-16748 (AX <= 3.8 / N4 <= 4.4)
+      # and CVE-2025-3939 (N4 <= 4.10.10 / <= 4.14.1).
+      - type: regex
+        part: header
+        name: niagara_version
+        group: 1
+        regex:
+          - "(?i)Server:\\s*Niagara\\s+Web\\s+Server/([0-9]+(?:\\.[0-9]+){1,3})"
+      # Surface the AX applet version when present
+      # (archive="wbapplet-<version>.jar").
+      - type: regex
+        part: body
+        name: niagara_ax_applet_version
+        group: 1
+        regex:
+          - "(?i)archive=['\"]wbapplet-([0-9]+(?:\\.[0-9]+){1,3})\\.jar['\"]"

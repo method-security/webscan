@@ -3,12 +3,19 @@ info:
   name: Siemens WinCC Unified Detection
   author: method-security
   severity: info
-  description: Detects Siemens WinCC Unified web interfaces using a WinCC Unified title marker.
+  description: |
+    Detects Siemens WinCC Unified web interfaces — the modern web-native
+    successor to WinCC V7. Distinguished from WinCC WebUX by the absence
+    of a hostname prefix in the title. High-confidence markers: the
+    ID_Menu / ca-menu nav element, the /css/general.css and /css/style.css
+    asset references, and the "enable Javascript" noscript marker. The
+    security-header set (Strict-Transport-Security, X-Content-Type-Options:
+    nosniff) is corroborating.
   metadata:
     method-application-type: INDUSTRIAL_CONTROL_SYSTEM
     method-module-name: SIEMENS_WINCC_UNIFIED
     cpe: cpe:2.3:a:siemens:wincc_unified:*:*:*:*:*:*:*:*
-  tags: discovery,ics,ot,siemens,wincc-unified,hmi
+  tags: discovery,ics,ot,siemens,wincc-unified,hmi,scada
 http:
   - method: GET
     path:
@@ -18,11 +25,32 @@ http:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
+    matchers-condition: or
     matchers:
+      # Matcher 1: Title + the unified ID_Menu nav element (highest
+      # confidence — both markers must appear).
       - type: word
         part: body
         words:
-          - "Siemens"
           - "<title>WinCC Unified"
+          - "<ul id=\"ID_Menu\" class=\"ca-menu\">"
         condition: and
         case-insensitive: true
+      # Matcher 2: Title + Unified-specific asset paths + noscript marker.
+      - type: word
+        part: body
+        words:
+          - "<title>WinCC Unified"
+          - "/css/general.css"
+          - "/css/style.css"
+          - "<noscript>To use this page, please enable Javascript.</noscript>"
+        condition: and
+        case-insensitive: true
+      # Matcher 3: Title + Siemens vendor marker + the canonical security
+      # header set served by WinCC Unified.
+      - type: dsl
+        dsl:
+          - "contains_all(tolower(body), '<title>wincc unified', 'siemens')"
+          - "contains(tolower(header), 'strict-transport-security')"
+          - "contains(tolower(header), 'x-content-type-options: nosniff')"
+        condition: and

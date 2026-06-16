@@ -1,0 +1,83 @@
+id: schneider-ecostruxure-geo-scada-detect
+info:
+  name: Schneider EcoStruxure Geo SCADA Expert / ClearSCADA Detection
+  author: method-security
+  severity: info
+  description: |
+    Detects Schneider Electric EcoStruxure Geo SCADA Expert (formerly
+    ClearSCADA). The root URL returns XML rather than HTML, with the
+    product version embedded verbatim in both the Server header
+    (e.g. "Server: ClearSCADA/6.72.4560.2") and the XML page attributes
+    (majorVersion / minorVersion / buildNumber). This is one of the most
+    information-rich banners in the ICS web layer — version is always
+    visible unauthenticated and drives downstream VULNERABLE_VERSION
+    gating for CVE-2023-22610 and CVE-2023-22611 (CISA ICSA-23-017-02).
+  metadata:
+    method-application-type: INDUSTRIAL_CONTROL_SYSTEM
+    method-module-name: SCHNEIDER_ECOSTRUXURE_GEO_SCADA
+    cpe: cpe:2.3:a:schneider-electric:clearscada:*:*:*:*:*:*:*:*
+  tags: discovery,ics,ot,schneider,schneider-electric,clearscada,ecostruxure,geo-scada,scada
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/file/xsl/home.xsl"
+      - "{{BaseURL}}/webservices"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers-condition: or
+    matchers:
+      # Matcher 1: Server: ClearSCADA/<version> — primary high-confidence
+      # discriminator (version always present).
+      - type: regex
+        part: header
+        regex:
+          - "(?i)Server:\\s*ClearSCADA/"
+      # Matcher 2: ClearSCADA Home XML page root.
+      - type: word
+        part: body
+        words:
+          - "<Page title=\"ClearSCADA Home\""
+        case-insensitive: true
+      # Matcher 3: Geo SCADA Expert (rebranded) XML page root.
+      - type: word
+        part: body
+        words:
+          - "<Page title=\"Geo SCADA Expert Home\""
+        case-insensitive: true
+      # Matcher 4: XML response indicator + ClearSCADA marker — accounts
+      # for variations in the Page element while requiring the unusual
+      # XML content type at the root.
+      - type: dsl
+        dsl:
+          - "contains(tolower(header), 'content-type: text/xml')"
+          - "contains(tolower(body), 'clearscada')"
+        condition: and
+      # Matcher 5: ClearSCADA asset paths + vendor marker (covers
+      # asset-only requests where the root was not crawled).
+      - type: word
+        part: body
+        words:
+          - "/file/xsl/home.xsl"
+          - "ClearSCADA"
+        condition: and
+        case-insensitive: true
+    extractors:
+      # Surface the exact ClearSCADA / Geo SCADA version from the Server
+      # header — drives VULNERABLE_VERSION gating for CVE-2023-22610 and
+      # CVE-2023-22611 (2019-2021 release line, pre-October 2022 patch).
+      - type: regex
+        part: header
+        name: clearscada_version
+        group: 1
+        regex:
+          - "(?i)Server:\\s*ClearSCADA/([0-9]+(?:\\.[0-9]+){1,3})"
+      # Surface the major/minor/buildNumber triple from the XML root
+      # Page element when present — corroborates the Server header.
+      - type: regex
+        part: body
+        name: clearscada_xml_version
+        group: 1
+        regex:
+          - "(?i)majorVersion=\"([0-9]+)\""

@@ -1,0 +1,59 @@
+id: siemens-wincc-oa-detect
+info:
+  name: Siemens WinCC OA Detection
+  author: method-security
+  severity: info
+  description: |
+    Detects Siemens WinCC OA (Open Architecture, formerly PVSS) — the
+    distributed SCADA platform used in large-scale installations (CERN,
+    transit networks, energy). High-confidence markers: the
+    "WinCC OA WebClient" or "WinCC OA Desktop UI" title, the
+    /pictures/webClient/ logo and download_bg.png assets, deliberate
+    absence of the Server header, and the X-Frame-Options: SAMEORIGIN /
+    Strict-Transport-Security / X-XSS-Protection security-header set.
+  metadata:
+    method-application-type: INDUSTRIAL_CONTROL_SYSTEM
+    method-module-name: SIEMENS_WINCC_OA
+    cpe: cpe:2.3:a:siemens:wincc_oa:*:*:*:*:*:*:*:*
+  tags: discovery,ics,ot,siemens,wincc,wincc-oa,pvss,hmi,scada
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/data/"
+      - "{{BaseURL}}/pictures/webClient/logo.png"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers-condition: or
+    matchers:
+      # Matcher 1: WebClient title.
+      - type: word
+        part: body
+        words:
+          - "<title>WinCC OA WebClient"
+        case-insensitive: true
+      # Matcher 2: Desktop UI title.
+      - type: word
+        part: body
+        words:
+          - "<title>WinCC OA Desktop UI"
+        case-insensitive: true
+      # Matcher 3: WinCC OA marker + webClient asset path.
+      - type: word
+        part: body
+        words:
+          - "WinCC OA"
+          - "/pictures/webClient/"
+        condition: and
+        case-insensitive: true
+      # Matcher 4: WinCC OA marker + the canonical security-header set
+      # (Server header deliberately suppressed; the X-Frame /
+      # Strict-Transport / X-XSS triple is corroborating).
+      - type: dsl
+        dsl:
+          - "contains(tolower(body), 'wincc oa')"
+          - "contains(tolower(header), 'x-frame-options: sameorigin')"
+          - "contains(tolower(header), 'strict-transport-security')"
+          - "contains(tolower(header), 'x-xss-protection')"
+        condition: and

@@ -1,0 +1,56 @@
+id: unitronics-vision-plc-detect
+info:
+  name: Unitronics Vision / Samba PLC Detection
+  author: method-security
+  severity: info
+  description: |
+    Detects Unitronics Vision / Samba PLCs — integrated PLC + HMI panels
+    with a built-in HTTP/1.0 web server. The most-targeted ICS platform
+    in U.S. water/wastewater in 2023-2024 per the CISA/EPA joint
+    advisory; an Iran-linked actor (CyberAv3ngers) compromised multiple
+    water utilities via internet-exposed Unitronics HMIs. High-confidence
+    markers: the bare "Unitronics PLC" title, HTTP/1.0 protocol (the
+    built-in server does not speak HTTP/1.1), the unusual "MIME-version:
+    1.0" header, "Connection: Close", and deliberate absence of a
+    Server header.
+  metadata:
+    method-application-type: INDUSTRIAL_CONTROL_SYSTEM
+    method-module-name: UNITRONICS_VISION_PLC
+    cpe: cpe:2.3:o:unitronics:vision_plc:*:*:*:*:*:*:*:*
+  tags: discovery,ics,ot,plc,unitronics,unitronics-vision,unitronics-samba,hmi,water,wastewater
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/index.html"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers-condition: or
+    matchers:
+      # Matcher 1: Unitronics PLC title (highest-confidence body marker —
+      # present on all exposed Vision/Samba instances).
+      - type: word
+        part: body
+        words:
+          - "<title>Unitronics PLC"
+        case-insensitive: true
+      # Matcher 2: HTTP/1.0 protocol + MIME-version: 1.0 header — the
+      # built-in PLC server speaks HTTP/1.0 only, and HTTP responses do
+      # not normally carry a MIME-version header. The pair is highly
+      # distinctive.
+      - type: dsl
+        dsl:
+          - "contains(tolower(header), 'http/1.0')"
+          - "contains(tolower(header), 'mime-version: 1.0')"
+        condition: and
+      # Matcher 3: HTTP/1.0 + Connection: Close + Unitronics body marker.
+      # Connection: Close is always present; combined with the body
+      # marker this corroborates Matcher 1 on responses that bypassed
+      # the title match.
+      - type: dsl
+        dsl:
+          - "contains(tolower(header), 'http/1.0')"
+          - "contains(tolower(header), 'connection: close')"
+          - "contains(tolower(body), 'unitronics')"
+        condition: and

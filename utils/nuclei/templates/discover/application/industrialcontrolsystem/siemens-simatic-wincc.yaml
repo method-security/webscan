@@ -3,22 +3,51 @@ info:
   name: Siemens SIMATIC WinCC Detection
   author: method-security
   severity: info
-  description: Detects Siemens SIMATIC WinCC web interfaces using Siemens, SIMATIC WinCC, and web-console markers.
+  description: |
+    Detects Siemens SIMATIC WinCC web interfaces. Includes a high-confidence
+    WebUX branch — the legacy web client for WinCC Runtime Professional V7.x
+    served by IIS — distinguished from WinCC Unified by the Windows hostname
+    prefix in the title (e.g. "<machinename> - WinCC WebUX") and the
+    distinctive AlarmStyle / RulerControlStyle / TagBrowserStyle CSS assets,
+    the socket.io and angular asset paths, and the Microsoft-IIS server
+    header. A generic SIMATIC WinCC branch fingerprints other WinCC web
+    portal variants.
   metadata:
     method-application-type: INDUSTRIAL_CONTROL_SYSTEM
     method-module-name: SIEMENS_SIMATIC_WINCC
     cpe: cpe:2.3:a:siemens:simatic_wincc:*:*:*:*:*:*:*:*
-  tags: discovery,ics,ot,siemens,simatic,wincc
+  tags: discovery,ics,ot,siemens,simatic,wincc,wincc-webux,hmi,scada
 http:
   - method: GET
     path:
       - "{{BaseURL}}"
       - "{{BaseURL}}/Portal/Portal.mwsl"
       - "{{BaseURL}}/WinCC/"
+      - "{{BaseURL}}/content/AlarmStyle.css"
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
+    matchers-condition: or
     matchers:
+      # Matcher 1: WinCC WebUX title (hostname-prefixed) — distinguishes
+      # WebUX from WinCC Unified which has no hostname prefix.
+      - type: regex
+        part: body
+        regex:
+          - "(?i)<title>[^<]+ - WinCC WebUX</title>"
+      # Matcher 2: WebUX distinctive asset paths (AlarmStyle, socket.io,
+      # angular). Any two of these together is a strong WebUX signal.
+      - type: word
+        part: body
+        words:
+          - "/content/AlarmStyle.css"
+          - "/content/RulerControlStyle.css"
+          - "/content/TagBrowserStyle.css"
+          - "/socket.io/socket.io.js"
+          - "/libs/angular.min.js"
+        condition: or
+      # Matcher 3: Generic SIMATIC WinCC marker pair (covers non-WebUX
+      # WinCC web portals).
       - type: word
         part: body
         words:
@@ -26,3 +55,20 @@ http:
           - "SIMATIC WinCC"
         condition: and
         case-insensitive: true
+    extractors:
+      # Surface the IIS version when present — WebUX is served by IIS and
+      # Microsoft-IIS/{8.5,10.0} are the common variants seen in the field.
+      - type: regex
+        part: header
+        name: iis_version
+        group: 1
+        regex:
+          - "(?i)Server:\\s*Microsoft-IIS/([0-9]+\\.[0-9]+)"
+      # Surface the Windows hostname prefix from the WebUX title — useful
+      # for downstream correlation with host inventory.
+      - type: regex
+        part: body
+        name: webux_hostname
+        group: 1
+        regex:
+          - "(?i)<title>([^<]+) - WinCC WebUX</title>"

@@ -1,14 +1,23 @@
 id: ge-proficy-webspace-detect
 info:
-  name: GE Proficy WebSpace Detection
+  name: GE Vernova Proficy WebSpace Detection
   author: method-security
   severity: info
-  description: Detects GE Proficy WebSpace web interfaces using Proficy WebSpace path and vendor markers.
+  description: |
+    Detects GE Vernova Proficy WebSpace — the thin-client launcher for
+    both iFIX and Cimplicity HMI/SCADA platforms. The primary
+    discriminator is the Server: WebSocket++/0.7.0 header — no other
+    common web server emits this string. The canonical port is 491
+    (also seen on 80/443 when fronted). Secondary high-confidence
+    markers: the "<h2>Proficy WebSpace</h2>" body element, the
+    "HMI SCADA - CIMPLICITY" body marker (Cimplicity launches), the
+    ifix.html launcher reference (iFIX launches), and the GE Digital
+    support footer link.
   metadata:
     method-application-type: INDUSTRIAL_CONTROL_SYSTEM
     method-module-name: GE_PROFICY_WEBSPACE
     cpe: cpe:2.3:a:ge:proficy_webspace:*:*:*:*:*:*:*:*
-  tags: discovery,ics,ot,ge,proficy,webspace
+  tags: discovery,ics,ot,ge,ge-vernova,proficy,webspace,ifix,cimplicity,hmi,scada
 http:
   - method: GET
     path:
@@ -19,16 +28,44 @@ http:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
+    matchers-condition: or
     matchers:
+      # Matcher 1: Server: WebSocket++/0.7.0 — primary high-confidence
+      # discriminator. The WebSocket++ library is otherwise rare as a
+      # public-facing web server.
+      - type: regex
+        part: header
+        regex:
+          - "(?i)Server:\\s*WebSocket\\+\\+/0\\.7\\.0"
+      # Matcher 2: Proficy WebSpace h2 + GE Digital footer link.
+      - type: word
+        part: body
+        words:
+          - "<h2>Proficy WebSpace</h2>"
+          - "https://www.ge.com/digital/support"
+        condition: and
+        case-insensitive: true
+      # Matcher 3: Cimplicity launcher body marker + Proficy title.
       - type: word
         part: body
         words:
           - "<title>Proficy WebSpace"
+          - "HMI SCADA - CIMPLICITY"
+        condition: and
         case-insensitive: true
+      # Matcher 4: iFIX launcher reference + GE marker.
       - type: word
         part: body
         words:
+          - "ifix.html"
           - "Proficy WebSpace"
-          - "GE"
+        condition: and
+        case-insensitive: true
+      # Matcher 5: GE Digital copyright footer + WebSpace title.
+      - type: word
+        part: body
+        words:
+          - "<title>Proficy WebSpace"
+          - "GE Digital - All Rights Reserved"
         condition: and
         case-insensitive: true

@@ -3,7 +3,13 @@ info:
   name: Inductive Automation Ignition Gateway Detection
   author: method-security
   severity: info
-  description: Detects Inductive Automation Ignition Gateway web consoles using Ignition Gateway and Inductive Automation-specific web markers.
+  description: |
+    Detects Inductive Automation Ignition Gateway web consoles. Default
+    ports are 8088 (HTTP) and 8043 (HTTPS) but bare instances also expose
+    on 80/443 when fronted. High-confidence markers: the bare
+    "Ignition Gateway" title, the perspective client.js asset path, the
+    Cache-Control: no-store header, and the ContextStatus / GatewayAddress
+    / PlatformName=Ignition token triple from the gwinfo endpoint.
   metadata:
     method-application-type: INDUSTRIAL_CONTROL_SYSTEM
     method-module-name: INDUCTIVE_AUTOMATION_IGNITION_GATEWAY
@@ -15,10 +21,13 @@ http:
       - "{{BaseURL}}"
       - "{{BaseURL}}/web/home"
       - "{{BaseURL}}/system/gwinfo"
+      - "{{BaseURL}}/res/perspective/client.js"
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
+    matchers-condition: or
     matchers:
+      # Matcher 1: Title + Inductive Automation vendor marker.
       - type: word
         part: body
         words:
@@ -26,6 +35,7 @@ http:
           - "Inductive Automation"
         condition: and
         case-insensitive: true
+      # Matcher 2: gwinfo token triple.
       - type: word
         part: body
         words:
@@ -34,3 +44,18 @@ http:
           - "PlatformName=Ignition"
         condition: and
         case-insensitive: true
+      # Matcher 3: Title + perspective client.js asset path — picks up
+      # named-instance gateways where the title carries a site-name prefix
+      # (e.g. "<site> - Ignition Gateway").
+      - type: dsl
+        dsl:
+          - "contains(tolower(body), 'ignition gateway')"
+          - "contains(body, '/res/perspective/client.js')"
+        condition: and
+      # Matcher 4: Title + Cache-Control: no-store — corroborating signal
+      # for the gateway HTTP server.
+      - type: dsl
+        dsl:
+          - "contains(tolower(body), '<title>ignition gateway')"
+          - "contains(tolower(header), 'cache-control: no-store')"
+        condition: and

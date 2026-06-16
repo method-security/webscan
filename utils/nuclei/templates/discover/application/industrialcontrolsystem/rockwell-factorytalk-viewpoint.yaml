@@ -3,26 +3,66 @@ info:
   name: Rockwell FactoryTalk ViewPoint Detection
   author: method-security
   severity: info
-  description: Detects Rockwell Automation FactoryTalk ViewPoint web interfaces.
+  description: |
+    Detects Rockwell Automation FactoryTalk ViewPoint web interfaces — the
+    web-based HMI client for FactoryTalk View SE (enterprise) and ME
+    (machine-level). The primary discriminator is the
+    Server: Microsoft-WinCE/6.00 header, which is highly anomalous on a
+    public-facing web server and yields a near-zero false-positive rate.
+    Secondary high-confidence markers: the VPAdminHTML5 Angular app
+    attribute, the bootstrap.css and jQuery 1.10.2 asset paths under
+    /FTVP/VPAdminHTML5/, the ViewPoint Logon title, and the
+    __RequestVerificationToken / ASP.NET_SessionId session cookies.
   metadata:
     method-application-type: INDUSTRIAL_CONTROL_SYSTEM
     method-module-name: ROCKWELL_FACTORYTALK_VIEWPOINT
     cpe: cpe:2.3:a:rockwellautomation:factorytalk_viewpoint:*:*:*:*:*:*:*:*
-  tags: discovery,ics,ot,rockwell,factorytalk,viewpoint
+  tags: discovery,ics,ot,rockwell,factorytalk,viewpoint,hmi,scada
 http:
   - method: GET
     path:
       - "{{BaseURL}}"
       - "{{BaseURL}}/FTViewPoint/"
       - "{{BaseURL}}/ViewPoint/"
+      - "{{BaseURL}}/FTVP/VPAdminHTML5/"
+      - "{{BaseURL}}/FTVP/VPAdminHTML5/Content/bootstrap.css"
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
+    matchers-condition: or
     matchers:
+      # Matcher 1: Microsoft-WinCE/6.00 server header — primary
+      # high-confidence discriminator (near-zero FP on public web).
+      - type: regex
+        part: header
+        regex:
+          - "(?i)Server:\\s*Microsoft-WinCE/6\\.00"
+      # Matcher 2: VPAdminHTML5 Angular app attribute.
       - type: word
         part: body
         words:
+          - "ng-app=\"VPAdminHTML5\""
+        case-insensitive: true
+      # Matcher 3: FactoryTalk ViewPoint title variants.
+      - type: word
+        part: body
+        words:
+          - "<title>FactoryTalk ViewPoint Logon"
+          - "<title>FactoryTalk ViewPoint"
           - "<title>FTVP"
+        condition: or
+        case-insensitive: true
+      # Matcher 4: VPAdminHTML5 asset path + ViewPoint cookie.
+      - type: dsl
+        dsl:
+          - "contains(body, '/FTVP/VPAdminHTML5/')"
+          - "contains_any(tolower(header), '__requestverificationtoken', 'asp.net_sessionid')"
+        condition: and
+      # Matcher 5: Legacy ViewPoint.aspx login marker.
+      - type: word
+        part: body
+        words:
           - "ViewPoint.aspx"
+          - "FactoryTalk"
         condition: and
         case-insensitive: true

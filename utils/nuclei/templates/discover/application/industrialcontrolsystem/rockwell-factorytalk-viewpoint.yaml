@@ -42,13 +42,15 @@ http:
         words:
           - "ng-app=\"VPAdminHTML5\""
         case-insensitive: true
-      # Matcher 3: FactoryTalk ViewPoint title variants.
+      # Matcher 3: full-form FactoryTalk ViewPoint title variants
+      # (legacy `<title>FTVP` is left to Matcher 5 paired with the
+      # ViewPoint.aspx / FactoryTalk markers, because `FTVP` on its
+      # own is too short to fingerprint reliably).
       - type: word
         part: body
         words:
           - "<title>FactoryTalk ViewPoint Logon"
           - "<title>FactoryTalk ViewPoint"
-          - "<title>FTVP"
         condition: or
         case-insensitive: true
       # Matcher 4: VPAdminHTML5 asset path + ViewPoint cookie.

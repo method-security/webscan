@@ -1,19 +1,55 @@
 imports:
   common: ./common.yml
 types:
-  # Specfic GraphQL Structs
+  # Specific GraphQL Structs
+  GraphQlTypeRef:
+    docs: |
+      Recursive reference to a GraphQL type. Mirrors the __TypeRef shape returned
+      by introspection, supporting deep traversal via ofType (LIST/NON_NULL wrappers).
+    properties:
+      kind: optional<string>
+      name: optional<string>
+      ofType: optional<GraphQlTypeRef>
+  GraphQlInputValue:
+    properties:
+      name: string
+      description: optional<string>
+      type: optional<GraphQlTypeRef>
+      defaultValue: optional<string>
+  GraphQlEnumValue:
+    properties:
+      name: string
+      description: optional<string>
+      isDeprecated: optional<boolean>
+      deprecationReason: optional<string>
   GraphQlField:
     properties:
       name: string
+      description: optional<string>
+      args: optional<list<GraphQlInputValue>>
+      type: optional<GraphQlTypeRef>
+      isDeprecated: optional<boolean>
+      deprecationReason: optional<string>
+  GraphQlDirective:
+    properties:
+      name: string
+      description: optional<string>
+      locations: optional<list<string>>
+      args: optional<list<GraphQlInputValue>>
   GraphQlType:
     properties:
       name: string
       kind: string
       description: optional<string>
       fields: optional<list<GraphQlField>>
+      inputFields: optional<list<GraphQlInputValue>>
+      interfaces: optional<list<GraphQlTypeRef>>
+      enumValues: optional<list<GraphQlEnumValue>>
+      possibleTypes: optional<list<GraphQlTypeRef>>
   GraphQlSchemaData:
     properties:
       types: optional<list<GraphQlType>>
+      directives: optional<list<GraphQlDirective>>
   GraphQlData:
     properties:
       __schema: optional<GraphQlSchemaData>
@@ -28,9 +64,11 @@ types:
     properties:
       target: string
       headers: optional<map<string, string>>
+      cookies: optional<map<string, string>>
       timeout: optional<integer>
       query: optional<string>
       variables: optional<string>
+      allowMutations: optional<boolean>
   EnumerateGraphqlData:
     properties:
       apiType: common.ApiType
@@ -41,6 +79,7 @@ types:
       securitySchemes: optional<map<string, common.SecurityScheme>>
       security: optional<list<common.SecurityRequirement>>
       queries: optional<list<GraphQlQuery>>
+      directives: optional<list<GraphQlDirective>>
       queryResponse: optional<string>
       raw: string
   EnumerateGraphqlResult:

@@ -10,7 +10,7 @@ info:
     method-sub-module-name: MANAGEMENT_CONSOLE
     cpe: cpe:2.3:a:cisco:firepower_management_center:*:*:*:*:*:*:*:*
   tags: discovery,cisco,firepower,fmc,management-center,firewall
-requests:
+http:
   - method: GET
     path:
       - "{{BaseURL}}"

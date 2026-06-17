@@ -12,7 +12,7 @@ info:
     method-module-name: CISCO_ASA
     cpe: cpe:2.3:a:cisco:adaptive_security_appliance:*:*:*:*:*:*:*:*
   tags: discovery,cisco,asa,asdm,network-firewall,vpn,webvpn
-requests:
+http:
   - method: GET
     path:
       - "{{BaseURL}}"

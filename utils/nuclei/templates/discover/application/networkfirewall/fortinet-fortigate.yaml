@@ -13,7 +13,7 @@ info:
     method-module-name: FORTINET_FORTIGATE
     cpe: cpe:2.3:a:fortinet:fortigate:*:*:*:*:*:*:*:*
   tags: discovery,fortinet,fortigate,network-firewall,ssl-vpn,webvpn,admin
-requests:
+http:
   - method: GET
     path:
       - "{{BaseURL}}/"

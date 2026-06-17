@@ -20,11 +20,106 @@ import (
 
 const defaultGraphQLTimeout = 30
 
-const introspectionQuery = `{"query":"{ __schema { types { name kind description fields { name } } } }"}`
+// introspectionQuery is the standard full-depth introspection query used by GraphiQL/Apollo
+// clients. It walks types via FullType -> InputValue -> TypeRef seven levels deep (the depth
+// the reference Apollo client uses for production schemas), capturing args, input fields,
+// interfaces, enum values, possible types, and directives.
+const introspectionQuery = `query IntrospectionQuery {
+  __schema {
+    queryType { name }
+    mutationType { name }
+    subscriptionType { name }
+    types {
+      ...FullType
+    }
+    directives {
+      name
+      description
+      locations
+      args {
+        ...InputValue
+      }
+    }
+  }
+}
+
+fragment FullType on __Type {
+  kind
+  name
+  description
+  fields(includeDeprecated: true) {
+    name
+    description
+    args {
+      ...InputValue
+    }
+    type {
+      ...TypeRef
+    }
+    isDeprecated
+    deprecationReason
+  }
+  inputFields {
+    ...InputValue
+  }
+  interfaces {
+    ...TypeRef
+  }
+  enumValues(includeDeprecated: true) {
+    name
+    description
+    isDeprecated
+    deprecationReason
+  }
+  possibleTypes {
+    ...TypeRef
+  }
+}
+
+fragment InputValue on __InputValue {
+  name
+  description
+  type { ...TypeRef }
+  defaultValue
+}
+
+fragment TypeRef on __Type {
+  kind
+  name
+  ofType {
+    kind
+    name
+    ofType {
+      kind
+      name
+      ofType {
+        kind
+        name
+        ofType {
+          kind
+          name
+          ofType {
+            kind
+            name
+            ofType {
+              kind
+              name
+              ofType {
+                kind
+                name
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}`
 
 // PerformAppEnumerateGraphQL performs a GraphQL scan against a target URL and returns the report.
 // When config.Query is set, the ad-hoc query is executed and its raw response returned instead
-// of running schema introspection.
+// of running schema introspection. Mutation and subscription operations are rejected at the AST
+// level unless config.AllowMutations is explicitly true.
 func PerformAppEnumerateGraphQL(ctx context.Context, config enumerateapiapplicationfern.EnumerateGraphqlConfig) enumerateapiapplicationfern.EnumerateGraphqlReport {
 	log := svc1log.FromContext(ctx)
 	log.Info("Performing GraphQL scan", svc1log.SafeParam("target", config.Target))
@@ -33,13 +128,25 @@ func PerformAppEnumerateGraphQL(ctx context.Context, config enumerateapiapplicat
 	report.Result = &enumerateapiapplicationfern.EnumerateGraphqlResult{}
 	data := &enumerateapiapplicationfern.EnumerateGraphqlData{}
 
+	// AST gate: if the caller supplied an ad-hoc query, classify its operation type and reject
+	// mutations and subscriptions unless explicitly allowed. The introspection query is always
+	// safe (read-only), so we only gate when config.Query is set.
+	if config.Query != nil && *config.Query != "" {
+		allowMutations := config.AllowMutations != nil && *config.AllowMutations
+		if err := validateQueryOperations(*config.Query, allowMutations); err != nil {
+			report.Errors = append(report.Errors, err.Error())
+			report.Result.Data = data
+			return report
+		}
+	}
+
 	requestBody, err := buildGraphQLRequestBody(config)
 	if err != nil {
 		report.Errors = append(report.Errors, err.Error())
 		return report
 	}
 
-	body, err := fetchGraphQL(ctx, config.Target, requestBody, config.Headers, config.Timeout)
+	body, err := fetchGraphQL(ctx, config.Target, requestBody, config.Headers, config.Cookies, config.Timeout)
 	if err != nil {
 		report.Errors = append(report.Errors, err.Error())
 		return report
@@ -75,17 +182,19 @@ func PerformAppEnumerateGraphQL(ctx context.Context, config enumerateapiapplicat
 	typeFields := extractTypeFields(schema)
 
 	populateReportWithQueries(data, schema, typeFields)
+	populateReportWithDirectives(data, schema)
 
 	// Marshal Report data
 	report.Result.Data = data
 	return report
 }
 
-// buildGraphQLRequestBody returns the JSON POST body. Defaults to the introspection
+// buildGraphQLRequestBody returns the JSON POST body. Defaults to the deep introspection
 // query; when an ad-hoc query is supplied it is JSON-encoded with optional variables.
 func buildGraphQLRequestBody(config enumerateapiapplicationfern.EnumerateGraphqlConfig) ([]byte, error) {
 	if config.Query == nil || *config.Query == "" {
-		return []byte(introspectionQuery), nil
+		payload := map[string]interface{}{"query": introspectionQuery}
+		return json.Marshal(payload)
 	}
 
 	payload := map[string]interface{}{"query": *config.Query}
@@ -99,7 +208,7 @@ func buildGraphQLRequestBody(config enumerateapiapplicationfern.EnumerateGraphql
 	return json.Marshal(payload)
 }
 
-func fetchGraphQL(ctx context.Context, target string, requestBody []byte, headers map[string]string, timeout *int) ([]byte, error) {
+func fetchGraphQL(ctx context.Context, target string, requestBody []byte, headers map[string]string, cookies map[string]string, timeout *int) ([]byte, error) {
 	log := svc1log.FromContext(ctx)
 
 	effectiveTimeout := defaultGraphQLTimeout
@@ -114,6 +223,9 @@ func fetchGraphQL(ctx context.Context, target string, requestBody []byte, header
 	req.Header.Set("Content-Type", "application/json")
 	for key, value := range headers {
 		req.Header.Set(key, value)
+	}
+	for name, value := range cookies {
+		req.AddCookie(&http.Cookie{Name: name, Value: value})
 	}
 
 	client := &http.Client{Timeout: time.Duration(effectiveTimeout) * time.Second}
@@ -193,4 +305,210 @@ func populateReportWithQueries(data *enumerateapiapplicationfern.EnumerateGraphq
 			}
 		}
 	}
+}
+
+func populateReportWithDirectives(data *enumerateapiapplicationfern.EnumerateGraphqlData, schema enumerateapiapplicationfern.GraphQlSchema) {
+	if schema.Data == nil || schema.Data.Schema == nil || schema.Data.Schema.Directives == nil {
+		return
+	}
+	data.Directives = schema.Data.Schema.Directives
+}
+
+// validateQueryOperations performs a lightweight scan of the supplied GraphQL document and
+// rejects any top-level `mutation` or `subscription` operation when allowMutations is false.
+//
+// The scan is intentionally not a full GraphQL parser. It tracks brace/paren/bracket depth,
+// skips line comments (`#...`) and string literals (block strings and ordinary strings), and
+// only inspects identifiers found at depth 0. That's enough to classify every well-formed
+// GraphQL document: per the spec, operation definitions can only appear at the top level.
+// Anything that fails this check (e.g., a malformed document with unbalanced braces) errors
+// out conservatively rather than letting a mutation slip through.
+func validateQueryOperations(query string, allowMutations bool) error {
+	// Short-circuit when the caller has explicitly opted in. The scanner below is
+	// intentionally conservative; with --allow-mutations the operator is telling us
+	// "send whatever I supplied and let the server reject it," so we skip our own
+	// parsing rather than block on a malformed-but-server-acceptable document.
+	if allowMutations {
+		return nil
+	}
+	operations, err := topLevelOperationKinds(query)
+	if err != nil {
+		return fmt.Errorf("failed to parse query for operation gating: %v", err)
+	}
+	for _, op := range operations {
+		if op == "mutation" || op == "subscription" {
+			return fmt.Errorf(
+				"rejecting %s operation: pass --allow-mutations to permit mutation or subscription operations",
+				op,
+			)
+		}
+	}
+	return nil
+}
+
+// topLevelOperationKinds extracts the list of operation kinds ("query", "mutation",
+// "subscription", or "anonymous" for shorthand `{...}` queries) found at depth 0 of the
+// supplied document. It is a conservative scanner — it does not understand variable
+// definitions, directives on operation definitions, etc., but it recognizes enough to
+// identify operation keywords reliably.
+//
+// The scanner tracks atConstructStart: only the FIRST identifier of each top-level
+// construct is treated as the construct's kind keyword. This prevents misclassifying a
+// fragment name (`fragment mutation on Query { ... }`) or a named-query's operation name
+// (`query mutation { x }`) as a top-level mutation operation. atConstructStart starts
+// true, flips to false once the construct's kind has been consumed (or once a shorthand
+// `{` opens the construct), and flips back to true only when a `}` returns the depth to
+// 0 — `)`/`]` returning to depth 0 (e.g. after variable definitions like
+// `query Foo($x: Int)`) do NOT reset the flag because the construct's selection set
+// hasn't opened yet.
+func topLevelOperationKinds(query string) ([]string, error) {
+	const (
+		opQuery        = "query"
+		opMutation     = "mutation"
+		opSubscription = "subscription"
+		opFragment     = "fragment"
+	)
+
+	var ops []string
+	depth := 0
+	atConstructStart := true
+	i := 0
+	n := len(query)
+
+	for i < n {
+		c := query[i]
+
+		// Whitespace and commas (commas are syntactic whitespace in GraphQL).
+		if c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == ',' {
+			i++
+			continue
+		}
+
+		// Line comment: skip to end of line.
+		if c == '#' {
+			for i < n && query[i] != '\n' {
+				i++
+			}
+			continue
+		}
+
+		// Block string `"""..."""` — skip the entire literal.
+		if c == '"' && i+2 < n && query[i+1] == '"' && query[i+2] == '"' {
+			i += 3
+			for i+2 < n {
+				if query[i] == '"' && query[i+1] == '"' && query[i+2] == '"' {
+					i += 3
+					break
+				}
+				// Block strings allow `\"""` to escape the terminator.
+				if query[i] == '\\' && i+1 < n {
+					i += 2
+					continue
+				}
+				i++
+			}
+			continue
+		}
+
+		// Ordinary string literal.
+		if c == '"' {
+			i++
+			for i < n && query[i] != '"' {
+				if query[i] == '\\' && i+1 < n {
+					i += 2
+					continue
+				}
+				if query[i] == '\n' {
+					return nil, fmt.Errorf("unterminated string literal at offset %d", i)
+				}
+				i++
+			}
+			if i < n {
+				i++ // consume closing quote
+			}
+			continue
+		}
+
+		// Braces/parens/brackets: track depth.
+		if c == '{' {
+			if depth == 0 && atConstructStart {
+				// Shorthand operation: anonymous query at the start of a construct.
+				ops = append(ops, "anonymous")
+				atConstructStart = false
+			}
+			depth++
+			i++
+			continue
+		}
+		if c == '}' {
+			depth--
+			if depth < 0 {
+				return nil, fmt.Errorf("unbalanced closing brace at offset %d", i)
+			}
+			if depth == 0 {
+				// Construct's selection set just closed; next construct may start.
+				atConstructStart = true
+			}
+			i++
+			continue
+		}
+		if c == '(' || c == '[' {
+			depth++
+			i++
+			continue
+		}
+		if c == ')' || c == ']' {
+			depth--
+			if depth < 0 {
+				return nil, fmt.Errorf("unbalanced closing bracket at offset %d", i)
+			}
+			// Returning to depth 0 via `)`/`]` does NOT reset atConstructStart — the
+			// construct's selection set hasn't opened yet (we're still inside
+			// e.g. `query Foo($x: Int) { ... }` after the variable-definition `)`).
+			i++
+			continue
+		}
+
+		// Identifier (or keyword).
+		if isIdentStart(c) {
+			start := i
+			for i < n && isIdentPart(query[i]) {
+				i++
+			}
+			ident := query[start:i]
+			if depth == 0 && atConstructStart {
+				switch ident {
+				case opQuery, opMutation, opSubscription:
+					ops = append(ops, ident)
+				case opFragment:
+					// Fragment definition — not an operation, but a top-level construct.
+					// Don't add it to ops.
+				default:
+					// Some other top-level extension keyword (e.g., `schema`, `extend`,
+					// `type`, `enum`) — uncommon in a query document but allowed.
+				}
+				// Whatever the first identifier was, we've now consumed the kind slot;
+				// any subsequent identifiers in this construct (operation name, "on",
+				// fragment type, directive names, etc.) must NOT be re-classified.
+				atConstructStart = false
+			}
+			continue
+		}
+
+		// Anything else (e.g., `@`, `$`, `=`, `!`, `:`, `.`) — just consume it.
+		i++
+	}
+
+	if depth != 0 {
+		return nil, fmt.Errorf("unbalanced braces in document (depth %d at end)", depth)
+	}
+	return ops, nil
+}
+
+func isIdentStart(c byte) bool {
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'
+}
+
+func isIdentPart(c byte) bool {
+	return isIdentStart(c) || (c >= '0' && c <= '9')
 }

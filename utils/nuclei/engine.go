@@ -43,7 +43,7 @@ func RunNucleiEngine(ctx context.Context, config nuclei.NucleiConfig) ([]*nuclei
 	var err error
 
 	// Get template file systems
-	if config.TemplatePaths != nil {
+	if len(config.TemplatePaths) > 0 {
 		templateFileSystems, err = templates.GetTemplateFileSystem(ctx, config.TemplatePaths)
 		if err != nil {
 			return nil, err
@@ -51,7 +51,7 @@ func RunNucleiEngine(ctx context.Context, config nuclei.NucleiConfig) ([]*nuclei
 	}
 
 	// Get workflow file systems
-	if config.WorkflowPaths != nil {
+	if len(config.WorkflowPaths) > 0 {
 		workflowFileSystems, err = templates.GetTemplateFileSystem(ctx, config.WorkflowPaths)
 		if err != nil {
 			return nil, err

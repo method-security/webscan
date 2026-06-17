@@ -1,0 +1,28 @@
+id: cisco-firepower-management-center-api-detect
+info:
+  name: Cisco Firepower Management Center (FMC) API Detection
+  author: method-security
+  severity: info
+  description: Detects Cisco Firepower Management Center (FMC) API/version responses.
+  metadata:
+    method-application-type: NETWORK_FIREWALL
+    method-module-name: CISCO_FIREPOWER_MANAGEMENT_CENTER
+    cpe: cpe:2.3:a:cisco:firepower_management_center:*:*:*:*:*:*:*:*
+  tags: discovery,cisco,firepower,fmc,management-center,firewall,api
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/api/fmc_platform/v1/info/serverversion"
+      - "{{BaseURL}}/api/fmc_config/v1/domain/default"
+    redirects: false
+    stop-at-first-match: true
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "Firepower Management Center"
+        case-insensitive: true
+      - type: regex
+        part: body
+        regex:
+          - '(?i)"(?:serverVersion|version|productName)"\s*:'

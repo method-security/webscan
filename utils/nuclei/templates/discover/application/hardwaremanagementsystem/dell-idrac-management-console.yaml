@@ -1,0 +1,33 @@
+id: dell-idrac-detect
+info:
+  name: Dell iDRAC Management Console Detection
+  author: method-security
+  severity: info
+  description: High-accuracy detection of Dell iDRAC (Integrated Dell Remote Access Controller) management console pages.
+  metadata:
+    method-application-type: HARDWARE_MANAGEMENT_SYSTEM
+    method-module-name: DELL_IDRAC
+    method-sub-module-name: MANAGEMENT_CONSOLE
+    cpe: cpe:2.3:a:dell:idrac:*:*:*:*:*:*:*:*
+  tags: discovery,dell,idrac,bmc,redfish,out-of-band,remote-management
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/login.html"
+      - "{{BaseURL}}/sysmgmt/2012/server/login"
+      - "{{BaseURL}}/restgui/start.html"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: regex
+        name: idrac-title
+        part: body
+        regex:
+          - "(?i)<title>.*iDRAC.*</title>"
+      - type: word
+        part: body
+        words:
+          - "integrated dell remote access controller"
+        case-insensitive: true

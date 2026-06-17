@@ -1,7 +1,7 @@
 id: fortinet-fortigate-webmanagement-detect
 
 info:
-  name: Fortinet FortiGate Web Management Interface Detection
+  name: Fortinet FortiGate Device Detection
   author: method-security
   severity: info
   description: >

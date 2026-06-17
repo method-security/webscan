@@ -6,7 +6,7 @@ info:
   description: Detects InfluxDB web administration UI using InfluxDB-specific bootstrap and static asset markers.
   metadata:
     method-application-type: DATABASE_MANAGEMENT_APPLICATION
-    method-module-name: INFLUXDB_UI
+    method-module-name: INFLUXDB
     cpe: cpe:2.3:a:influxdata:influxdb:*:*:*:*:*:*:*:*
   tags: discovery,database,admin,influxdb
 http:

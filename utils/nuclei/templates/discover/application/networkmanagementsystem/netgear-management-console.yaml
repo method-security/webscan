@@ -1,0 +1,32 @@
+id: netgear-network-management-detect
+info:
+  name: NETGEAR Network Management Console Detection
+  author: method-security
+  severity: info
+  description: Detects NETGEAR switch/router web management interfaces using NETGEAR-specific management UI and model markers.
+  metadata:
+    method-application-type: NETWORK_MANAGEMENT_SYSTEM
+    method-module-name: NETGEAR
+    method-sub-module-name: MANAGEMENT_CONSOLE
+    cpe: cpe:2.3:h:netgear:*:*:*:*:*:*:*:*:*
+  tags: discovery,netgear,switch,router,network-management
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/login.htm"
+      - "{{BaseURL}}/login.html"
+      - "{{BaseURL}}/base/main_login.html"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers-condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+      - type: dsl
+        dsl:
+          - 'contains(tolower(body), "netgear") && contains(tolower(body), "prosafe") && contains(tolower(body), "login")'
+          - 'contains(tolower(body), "netgear") && contains(tolower(body), "smart managed") && contains(tolower(body), "switch")'
+          - 'contains(tolower(body), "netgear") && contains(tolower(body), "base/main_login.html")'

@@ -1,0 +1,58 @@
+id: realtek-sdk-cpe-detect
+info:
+  name: Realtek SDK Embedded Management Console Detection
+  author: method-security
+  severity: info
+  description: |
+    Detects the Realtek SDK stock embedded webserver (RTK Web 0.9) used cross-vendor across the Realtek ecosystem
+    (Raisecom, Zhone, Comtrend, and many Chinese white-label OEM DSL/SOHO modems).
+    Tier-1 vendor-agnostic match — vendor disambiguation needs additional signals (OUI of self-disclosed MAC, etc.).
+    The same Realtek SDK firmware powers the Raisecom Tier-2 Referer-bypass exposed in TC-015; this template fires before that.
+  metadata:
+    method-application-type: ROUTER
+    method-module-name: REALTEK_SDK
+    method-sub-module-name: MANAGEMENT_CONSOLE
+    cpe: cpe:2.3:o:realtek:sdk:*:*:*:*:*:*:*:*
+  tags: discovery,realtek,realtek-sdk,rtk,cpe,dsl,modem,network-edge,soho,oem
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/login.htm"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers-condition: and
+    matchers:
+      # Smoking gun: Realtek SDK ships lighttpd-style "RTK Web 0.9"
+      # Server header — vendor-specific string with negligible
+      # collision on the open internet.
+      - type: regex
+        part: header
+        regex:
+          - '(?i)server:\s*RTK Web 0\.9'
+      # Structural co-signal: the stock Realtek SDK login template
+      # ships /reset.css + /base.css + /style.css together (plus
+      # inline paj's md5.js hex_md5/rstr_md5 functions). Either the
+      # asset triple OR the inline MD5 library is dispositive when
+      # paired with the Server header.
+      - type: dsl
+        dsl:
+          - >-
+            contains(body, "reset.css") &&
+            contains(body, "base.css") &&
+            contains(body, "style.css")
+          - >-
+            contains(body, "function hex_md5") &&
+            contains(body, "function rstr_md5")
+          - >-
+            contains(body, "parent.location=\"/login.htm\"") ||
+            contains(body, "parent.location='/login.htm'")
+    extractors:
+      # Server header value for downstream correlation.
+      - type: regex
+        name: server
+        part: header
+        group: 1
+        regex:
+          - '(?i)server:\s*(RTK Web [0-9]+\.[0-9]+)'

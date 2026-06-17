@@ -1,0 +1,43 @@
+id: vmware-vsphere-detect
+info:
+  name: VMware vSphere / vCenter Management Console Detection
+  author: method-security
+  severity: info
+  description: Detects VMware vSphere/vCenter Server installations
+  metadata:
+    method-application-type: HYPERVISOR
+    method-module-name: VMWARE_VSPHERE
+    method-sub-module-name: MANAGEMENT_CONSOLE
+    cpe: cpe:2.3:a:vmware:vcenter_server:*:*:*:*:*:*:*:*
+  tags: discovery,vmware,vsphere,vcenter,hypervisor
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/ui/"
+      - "{{BaseURL}}/folder"
+      - "{{BaseURL}}/mob/"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: word
+        part: header
+        words:
+          - "VMware vCenter Server"
+          - "VMware-CSRF-Token"
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "VMware vSphere"
+          - "VMware vCenter Server"
+          - "VMware VirtualCenter"
+          - "vsphere-client"
+        case-insensitive: true
+      - type: regex
+        part: body
+        regex:
+          - "(?i)VMware\\s+vSphere\\s+Client"
+          - "(?i)vCenter\\s+Server\\s+[0-9]+\\.[0-9]+"
+          - "(?i)VMware.*vCenter.*Server.*[0-9]+\\.[0-9]+"

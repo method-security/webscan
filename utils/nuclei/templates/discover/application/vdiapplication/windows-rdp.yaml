@@ -6,7 +6,7 @@ info:
   description: Detects Windows RDP Gateway and Remote Desktop Web Access installations
   metadata:
     method-application-type: VDI_APPLICATION
-    method-module-name: WINDOWS_RDP
+    method-module-name: MICROSOFT_REMOTE_DESKTOP_GATEWAY
     cpe: cpe:2.3:a:microsoft:remote_desktop_gateway:*:*:*:*:*:*:*:*
   tags: discovery,microsoft,rdp,vdi
 http:

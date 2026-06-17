@@ -1,0 +1,50 @@
+id: zte-gpon-ont-detect
+info:
+  name: ZTE GPON ONT Management Console Detection
+  author: method-security
+  severity: info
+  description: |
+    Detects ZTE F-series GPON ONT (F660, F670L, F668, F612W, etc.) web management interfaces.
+    Anchored ZTE title and F-series model markers identify the management console.
+    No fixture validation — built from catalog signatures (SEC-702 description); confidence lower than TC-backed templates.
+    Sibling: CWMP/TR-069 on TCP/7547 (AITF-81 networkscan probe).
+  metadata:
+    method-application-type: ROUTER
+    method-module-name: ZTE_GPON_ONT
+    method-sub-module-name: MANAGEMENT_CONSOLE
+    cpe: cpe:2.3:o:zte:gpon_ont_firmware:*:*:*:*:*:*:*:*
+  tags: discovery,zte,gpon,ont,f-series,f660,f670l,iot,isp-cpe,soho
+http:
+  # Probe 1: anchored title — ZTE prefix or F-series model.
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/login.gch"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers-condition: and
+    matchers:
+      # Anchored title — must be ZTE (the brand) or an F-series model
+      # explicitly. Rejects pages that only mention ZTE in body text.
+      - type: regex
+        part: body
+        regex:
+          - '(?i)<title>\s*(?:ZTE|F[0-9]{3,4}[A-Z]?)'
+      # Co-signal: .gch is ZTE's CGI extension across F-series firmware.
+      # Either a .gch reference or "zteN" namespace or a Copyright-ZTE
+      # string outside the title is sufficient when combined with the
+      # title anchor above.
+      - type: dsl
+        dsl:
+          - >-
+            contains(body, ".gch") ||
+            contains(body, "zteN") ||
+            (contains(tolower(body), "copyright") && contains(tolower(body), "zte"))
+    extractors:
+      - type: regex
+        name: model
+        part: body
+        group: 1
+        regex:
+          - '(?i)<title>\s*(F[0-9]{3,4}[A-Z]?)'

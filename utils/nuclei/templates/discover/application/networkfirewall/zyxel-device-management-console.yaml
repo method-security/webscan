@@ -1,0 +1,62 @@
+id: zyxel-device-detect
+info:
+  name: Zyxel Device Management Console Detection
+  author: method-security
+  severity: info
+  description: Detects exposed Zyxel network devices including firewalls, routers, gateways, and access points by identifying device-specific headers, authentication realms, and management interfaces.
+  metadata:
+    method-application-type: NETWORK_FIREWALL
+    method-module-name: ZYXEL_DEVICE
+    method-sub-module-name: MANAGEMENT_CONSOLE
+    cpe: cpe:2.3:h:zyxel:*:*:*:*:*:*:*:*:*
+  tags: discovery,zyxel,firewall,router,gateway,network-device,management-console
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/login.asp"
+      - "{{BaseURL}}/Main_Login.asp"
+      - "{{BaseURL}}/cgi-bin/luci"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: word
+        part: header
+        words:
+          - "Server: ZyXEL-RomPager"
+          - "Server: Zyxel"
+          - "Server: Zyxel USG"
+        case-insensitive: true
+      - type: regex
+        part: header
+        regex:
+          - '(?i)Server:\s*ZyXEL-RomPager\/[\d\.]+'
+          - '(?i)Server:\s*Zyxel\s+USG\s+FLEX\s+\d+'
+          - '(?i)Server:\s*Zyxel\s+(USG|ZyWALL|Keenetic)'
+      - type: regex
+        part: header
+        regex:
+          - '(?i)WWW-Authenticate:.*realm="ZyXEL.*"'
+          - '(?i)WWW-Authenticate:.*realm=".*Keenetic.*"'
+          - '(?i)WWW-Authenticate:.*realm=".*ZyWALL.*"'
+      - type: word
+        part: body
+        words:
+          - "ZyXEL Communications Corp."
+          - "ZyXEL Technology Corporation"
+        case-insensitive: true
+      - type: regex
+        part: body
+        regex:
+          - '(?i)zyxel.*keenetic'
+          - '(?i)zyxel.*usg.*flex'
+          - '(?i)zywall.*firewall'
+          - '(?i)zyxel.*vdsl.*router'
+      - type: dsl
+        dsl:
+          - '(contains(tolower(body), "keenetic") || contains(tolower(body), "zywall") || contains(tolower(body), "usg flex")) && contains(tolower(body), "zyxel") && (contains(tolower(body), "login") || contains(tolower(body), "management") || contains(tolower(body), "configuration"))'
+      - type: regex
+        part: body
+        regex:
+          - '(?i)<title[^>]*>.*(Zyxel|ZyWALL).*(Login|Management|Configuration).*</title>'

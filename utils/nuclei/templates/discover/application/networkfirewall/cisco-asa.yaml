@@ -1,6 +1,6 @@
 id: cisco-asa-webmanagement-detect
 info:
-  name: Cisco ASA Web Management Interface Detection
+  name: Cisco ASA Device Detection
   author: method-security
   severity: info
   description: >

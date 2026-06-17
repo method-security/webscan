@@ -1,0 +1,65 @@
+id: huawei-gpon-ont-detect
+info:
+  name: Huawei GPON ONT Management Console Detection
+  author: method-security
+  severity: info
+  description: |
+    Detects Huawei HG / HN / EchoLife / OptiXstar GPON ONT (Optical Network Terminal) web management interfaces.
+    Title "HUAWEI HOME GATEWAY" or model-bearing titles (HG8245 / HG8245H / HN8245 etc.) identify the management console.
+    No fixture validation — built from catalog signatures (SEC-702 description); confidence lower than TC-backed templates.
+    Sibling: CWMP/TR-069 on TCP/7547 (AITF-81 networkscan probe).
+  metadata:
+    method-application-type: ROUTER
+    method-module-name: HUAWEI_GPON_ONT
+    method-sub-module-name: MANAGEMENT_CONSOLE
+    cpe: cpe:2.3:o:huawei:home_gateway_firmware:*:*:*:*:*:*:*:*
+  tags: discovery,huawei,gpon,ont,hg8245,echolife,iot,isp-cpe,soho
+http:
+  # Probe 1: anchored title — HOME GATEWAY or HG-prefix model — PLUS a
+  # required brand-confirmation co-signal somewhere else in the response
+  # (body word or Server header). The HG/HN/EG model-in-title regex
+  # alone could mis-fire on vendor catalog pages, eBay listings, or
+  # support forums that happen to use the same naming; pairing it with
+  # an independent Huawei-brand marker addresses the Tier-1 multi-signal
+  # guard. Huawei ONT firmware reliably emits at least one of these
+  # in addition to the title.
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/index.asp"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers-condition: and
+    matchers:
+      - type: regex
+        part: body
+        regex:
+          - '(?i)<title>\s*HUAWEI\s+HOME\s+GATEWAY'
+          - '(?i)<title>\s*(?:HG|HN|EG)[0-9]{3,5}[A-Z]?'
+      # Co-signal: at least one of these brand/firmware markers must
+      # also be present *outside* the title. We deliberately do NOT
+      # accept a bare "huawei" body word here — for the HOME GATEWAY
+      # title variant that's already in the title regex, so it would
+      # be trivially self-satisfied and provide no real co-signal.
+      # Accepted markers:
+      # - EchoLife / OptiXstar product-line strings (distinct from
+      #   the HG/HN/EG model regex above)
+      # - /asp/ CGI-path references in body (Huawei HG/HN firmware
+      #   uses .asp extension for its management UI)
+      # - `Server: RomPager` (Allegro RomPager is the canonical
+      #   embedded webserver across Huawei HG/HN ONT firmware)
+      - type: dsl
+        dsl:
+          - >-
+            contains(tolower(body), "echolife") ||
+            contains(tolower(body), "optixstar") ||
+            contains(tolower(body), "/asp/") ||
+            (contains(tolower(header), "server") && contains(tolower(header), "rompager"))
+    extractors:
+      - type: regex
+        name: model
+        part: body
+        group: 1
+        regex:
+          - '(?i)<title>\s*((?:HG|HN|EG)[0-9]{3,5}[A-Z]?)'

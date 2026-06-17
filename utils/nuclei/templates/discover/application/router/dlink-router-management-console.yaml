@@ -1,0 +1,34 @@
+id: dlink-router-web-ui-detect
+info:
+  name: D-Link Router Management Console Detection
+  author: method-security
+  severity: info
+  description: Detects D-Link router web management interfaces using D-Link model titles and login form markers.
+  metadata:
+    method-application-type: ROUTER
+    method-module-name: DLINK_ROUTER
+    method-sub-module-name: MANAGEMENT_CONSOLE
+    cpe: cpe:2.3:h:dlink:*:*:*:*:*:*:*:*:*
+  tags: discovery,dlink,router,network-management
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/login.htm"
+      - "{{BaseURL}}/Main_Login.asp"
+      - "{{BaseURL}}/login.asp"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers-condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+      - type: dsl
+        dsl:
+          - 'contains(tolower(body), "d-link") && contains(tolower(body), "login") && (contains(tolower(body), "dir-") || contains(tolower(body), "dsl-") || contains(tolower(body), "dap-"))'
+          - 'contains(tolower(body), "d-link systems") && contains(tolower(body), "login") && contains(tolower(body), "password")'
+          - 'contains(tolower(body), "main_login.asp") && contains(tolower(body), "d-link")'
+          - 'contains(tolower(body), "<title>d-link corporation") && contains(tolower(body), "wireless router") && contains(tolower(body), "login")'
+          - '(contains(tolower(body), "<title>d-link dsl-") || contains(tolower(body), "<title>d-link router management system") || contains(tolower(body), "<title>d-link : unified services router") || contains(tolower(body), "<title>d-link voip wireless router"))'

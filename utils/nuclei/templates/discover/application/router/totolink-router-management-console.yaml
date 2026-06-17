@@ -1,0 +1,31 @@
+id: totolink-router-web-ui-detect
+info:
+  name: TOTOLINK Router Management Console Detection
+  author: method-security
+  severity: info
+  description: Detects TOTOLINK router web management interfaces using TOTOLINK-specific login endpoints and form markers.
+  metadata:
+    method-application-type: ROUTER
+    method-module-name: TOTOLINK_ROUTER
+    method-sub-module-name: MANAGEMENT_CONSOLE
+    cpe: cpe:2.3:h:totolink:*:*:*:*:*:*:*:*:*
+  tags: discovery,totolink,router,network-management
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/login.html"
+      - "{{BaseURL}}/formLogin"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers-condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+      - type: dsl
+        dsl:
+          - 'contains(tolower(body), "totolink") && contains(tolower(body), "formlogin")'
+          - 'contains(tolower(body), "<title>totolink") && contains(tolower(body), "login")'
+          - 'contains(tolower(body), "totolink") && contains(tolower(body), "setcookie") && contains(tolower(body), "password")'

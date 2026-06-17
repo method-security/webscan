@@ -1,0 +1,33 @@
+id: cisco-firepower-device-manager-detect
+info:
+  name: Cisco Firepower Device Manager (FDM) Management Console Detection
+  author: method-security
+  severity: info
+  description: Detects Cisco Firepower Device Manager (FDM) management console pages by identifying unique titles and Cisco-specific UI assets.
+  metadata:
+    method-application-type: NETWORK_FIREWALL
+    method-module-name: CISCO_FIREPOWER_DEVICE_MANAGER
+    method-sub-module-name: MANAGEMENT_CONSOLE
+    cpe: cpe:2.3:a:cisco:firepower_device_manager:*:*:*:*:*:*:*:*
+  tags: discovery,cisco,firepower,fdm,device-manager,network-firewall
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/ui/login"
+      - "{{BaseURL}}/ui/"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: regex
+        part: body
+        regex:
+          - '(?i)<title[^>]*>.*Firepower\s+Device\s+Manager.*</title>'
+          - '(?i)/ui/js/[^"]*fdm'
+          - '(?i)/ui/assets/fdm/'
+      - type: word
+        part: body
+        words:
+          - "Cisco Firepower Device Manager"
+        case-insensitive: true

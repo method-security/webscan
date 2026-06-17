@@ -1,0 +1,100 @@
+id: mikrotik-routeros-webfig-detect
+info:
+  name: MikroTik RouterOS WebFig Management Console Detection
+  author: method-security
+  severity: info
+  description: |
+    Detects MikroTik RouterOS WebFig management interfaces across three UI eras: 6.x, 7.0-7.16 transitional, and 7.17+ post-redesign.
+    Uses anchored title + mikrotik_logo + (h1 RouterOS regex | content-hashed asset paths) signals.
+    Rejects WordPress pages and Hotspot/captive-portal pages that incidentally mention MikroTik.
+    Validated against TC-001 (7.17+), TC-007 (6.49.18), TC-011 (7.8 transitional).
+  metadata:
+    method-application-type: ROUTER
+    method-module-name: MIKROTIK_ROUTEROS
+    method-sub-module-name: MANAGEMENT_CONSOLE
+    cpe: cpe:2.3:o:mikrotik:routeros:*:*:*:*:*:*:*:*
+  tags: discovery,mikrotik,routeros,webfig,network-management,soho
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/webfig/"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      # Era 1: RouterOS 6.x — long title + mikrotik_logo.png + v6 h1.
+      # The v6 h1 is required (NOT alternated with the "If this device
+      # is not in your possession" disclaimer) because transitional 7.x
+      # firmware (TC-011) keeps the same long title AND the same
+      # disclaimer line; alternating on the disclaimer would let a 7.x
+      # page satisfy both routeros-6x and routeros-7-transitional and
+      # mis-label the UI era downstream.
+      - type: dsl
+        name: routeros-6x
+        dsl:
+          - >-
+            status_code == 200 &&
+            !contains(tolower(body), "wp-content") &&
+            !contains(tolower(body), "wp-includes") &&
+            !contains(tolower(body), "wordpress") &&
+            !contains(tolower(body), "hotspot") &&
+            contains(body, "<title>RouterOS router configuration page</title>") &&
+            contains(tolower(body), "mikrotik_logo.png") &&
+            regex("<h1>RouterOS v6\\.[0-9]+", body)
+      # Era 2: RouterOS 7.0-7.16 transitional — same legacy title carried over,
+      # h1 anchors a v7.x version. Distinct from Era 1 by the explicit v7 h1.
+      - type: dsl
+        name: routeros-7-transitional
+        dsl:
+          - >-
+            status_code == 200 &&
+            !contains(tolower(body), "wp-content") &&
+            !contains(tolower(body), "wp-includes") &&
+            !contains(tolower(body), "wordpress") &&
+            !contains(tolower(body), "hotspot") &&
+            contains(body, "<title>RouterOS router configuration page</title>") &&
+            contains(tolower(body), "mikrotik_logo.png") &&
+            regex("<h1>RouterOS v7\\.[0-9]+", body)
+      # Era 3: RouterOS 7.17+ post-redesign — short anchored title +
+      # mikrotik_logo.svg (NOT .png) + (c) MikroTik footer + content-hashed
+      # /assets/style-<hash>.css and/or /assets/script-<hash>.js paths.
+      # The h1 version regex no longer fires; the asset hash is the
+      # canonical version source (resolved by the engine via the
+      # mikrotik_asset_hash lookup table).
+      - type: dsl
+        name: routeros-7-17-plus
+        dsl:
+          - >-
+            status_code == 200 &&
+            !contains(tolower(body), "wp-content") &&
+            !contains(tolower(body), "wp-includes") &&
+            !contains(tolower(body), "wordpress") &&
+            !contains(tolower(body), "hotspot") &&
+            contains(body, "<title>RouterOS</title>") &&
+            contains(tolower(body), "mikrotik_logo.svg") &&
+            contains(body, "MikroTik") &&
+            regex("/assets/(?:style|script)-[a-f0-9]{12}\\.(?:css|js)", body)
+    extractors:
+      # Primary version source for 6.x and 7.0-7.16: h1 carries the
+      # dotted RouterOS version directly. group=1 captures the version
+      # triple (or v.major.minor for 7.x where the patch may be absent).
+      - type: regex
+        name: routeros_version
+        part: body
+        group: 1
+        regex:
+          - '<h1>RouterOS v([0-9]+\.[0-9]+(?:\.[0-9]+)?)</h1>'
+      # 7.17+ asset content hash. Either style-<hash>.css or
+      # script-<hash>.js — they pair to the same version, so either
+      # capture is dispositive. Surfaced via the extractor field so
+      # downstream consumers can correlate the hash with a build.
+      # The hash → RouterOS version lookup table + engine wiring is
+      # tracked separately under SEC-702.A / the helper-table work
+      # in #423 and lands in a follow-on PR once that merges.
+      - type: regex
+        name: mikrotik_asset_hash
+        part: body
+        group: 1
+        regex:
+          - '/assets/(?:style|script)-([a-f0-9]{12})\.(?:css|js)'

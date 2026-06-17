@@ -1,0 +1,39 @@
+id: reolink-camera-detect
+info:
+  name: Reolink Camera Detection
+  author: method-security
+  severity: info
+  description: Detects Reolink camera web interfaces using Reolink title and web application markers.
+  metadata:
+    method-application-type: CAMERA
+    method-module-name: REOLINK
+    cpe: cpe:2.3:h:reolink:*:*:*:*:*:*:*:*:*
+  tags: discovery,iot,camera,reolink
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/index.html"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "data-application=web"
+          - "appTitle>Reolink</title>"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - 'data-application="web"'
+          - "appTitle>Reolink</title>"
+        condition: and
+        case-insensitive: true
+      - type: regex
+        part: body
+        regex:
+          - '(?i)data-application=["'']?web[\s\S]{0,1000}<title[^>]*>\s*Reolink\s*</title>'
+          - '(?i)<title[^>]*>\s*Reolink\s*</title>[\s\S]{0,1000}data-application=["'']?web'

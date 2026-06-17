@@ -1,0 +1,66 @@
+id: linksys-router-detect
+info:
+  name: Linksys Smart Wi-Fi / WRT / E-Series Management Console Detection
+  author: method-security
+  severity: info
+  description: |
+    Detects Linksys consumer router management console pages across Smart Wi-Fi, WRT54G, and WRT/E-series firmware.
+    No fixture validation — built from catalog signatures (SEC-702 description); confidence lower than TC-backed templates.
+  metadata:
+    method-application-type: ROUTER
+    method-module-name: LINKSYS
+    method-sub-module-name: MANAGEMENT_CONSOLE
+    cpe: cpe:2.3:o:linksys:router_firmware:*:*:*:*:*:*:*:*
+  tags: discovery,linksys,smart-wifi,wrt,e-series,router,network-management,soho
+http:
+  # Probe 1: brand+product anchor in HTML title OR basic-auth realm.
+  # Two alternative firmware response variants modelled as OR'd dsl
+  # expressions — each variant is itself a *multi-token composite*
+  # signal that combines status code + brand + product-line / model
+  # tokens. The OR is across firmware response shapes (Smart Wi-Fi
+  # HTML login vs WRT/E-series 401 with realm), not across single
+  # generic anchors, so each variant individually satisfies the
+  # Tier-1 multi-signal guard.
+  #
+  # Pattern follows draytek-vigor-web-ui.yaml (sibling template) —
+  # one dsl matcher with multiple AND'd variants OR'd at the dsl-list
+  # level.
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/ui/dynamic/login.html"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          # Variant 1: Smart Wi-Fi (modern) HTML login (status 200)
+          # with anchored "Linksys Smart Wi-Fi" title — note the
+          # anchor is strict (no preamble allowed before "Linksys"),
+          # which rejects review / blog / marketing pages whose
+          # `<title>` merely *contains* the phrase. PLUS a
+          # Smart-Wi-Fi-device-specific co-signal that is NOT
+          # trivially present in the title text — the "/ui/dynamic/"
+          # asset path family or a JNAP API reference. The bare
+          # body word "linksys" is deliberately NOT in this list —
+          # it would be self-satisfied by the title itself.
+          - >-
+            status_code == 200 &&
+            regex("(?i)<title>\\s*Linksys\\s+Smart\\s+Wi-?Fi", body) &&
+            (contains(tolower(body), "/ui/dynamic/") || contains(tolower(body), "jnap"))
+          # Variant 2: WRT54G / E-series 401 with model-bearing
+          # basic-auth realm — status 401 + auth scheme "Basic" +
+          # brand "Linksys" + model token (Exxx / WRTxx). Realm
+          # itself is a multi-token anchor combined with status.
+          - >-
+            status_code == 401 &&
+            regex("(?i)Basic\\s+realm=\"Linksys\\s+[A-Z0-9]+\"", header)
+    extractors:
+      # Realm-derived model.
+      - type: regex
+        name: model
+        part: header
+        group: 1
+        regex:
+          - '(?i)WWW-Authenticate:\s*Basic\s+realm="Linksys\s+([A-Z0-9]+)"'

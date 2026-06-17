@@ -1,0 +1,54 @@
+id: hpe-ilo-detect
+info:
+  name: HPE iLO Management Console Detection
+  author: method-security
+  severity: info
+  description: Detects HPE Integrated Lights-Out out-of-band management console pages using iLO login page markers.
+  metadata:
+    method-application-type: HARDWARE_MANAGEMENT_SYSTEM
+    method-module-name: HPE_ILO
+    method-sub-module-name: MANAGEMENT_CONSOLE
+    cpe: cpe:2.3:a:hpe:integrated_lights-out:*:*:*:*:*:*:*:*
+  tags: discovery,hpe,hp,ilo,bmc,redfish,out-of-band,remote-management
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/login.html"
+      - "{{BaseURL}}/html/login.html"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "integrated lights-out"
+          - "hewlett packard"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "integrated lights-out"
+          - "hewlett-packard"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "integrated lights-out"
+          - "hpe"
+        condition: and
+        case-insensitive: true
+      - type: word
+        part: body
+        words:
+          - "hpe ilo"
+          - "hp ilo"
+        case-insensitive: true
+      - type: regex
+        part: body
+        regex:
+          - '(?i)<title[^>]*>.*(?:HPE|HP|Hewlett[ -]Packard)\s+iLO\b.*</title>'
+          - '(?i)<title[^>]*>.*\biLO\b.*(?:HPE|HP|Hewlett[ -]Packard).*</title>'

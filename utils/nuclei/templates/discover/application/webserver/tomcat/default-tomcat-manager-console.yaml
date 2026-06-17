@@ -1,0 +1,33 @@
+id: default-tomcat-manager-detect
+info:
+  name: Default Apache Tomcat Management Console Detection
+  author: method-security
+  severity: info
+  description: Detects default Apache Tomcat manager pages, these pages are protected by a basic authentication mechanism.
+  metadata:
+    method-application-type: WEB_SERVER
+    method-module-name: TOMCAT
+    method-sub-module-name: MANAGEMENT_CONSOLE
+    cpe: cpe:2.3:a:apache:tomcat:*:*:*:*:*:*:*:*
+  tags: discovery,tomcat,default-page,manager,misconfiguration
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/manager/html"
+      - "{{BaseURL}}/manager/status"
+      - "{{BaseURL}}/host-manager/html"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers-condition: and
+    matchers:
+      - type: status
+        status:
+          - 401
+      - type: word
+        part: header
+        words:
+          - "Tomcat Web Application Manager"
+          - "Tomcat Manager Application"
+        case-insensitive: true

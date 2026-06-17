@@ -1,14 +1,55 @@
 id: dahua-oem-web-service-detect
 info:
-  name: Dahua/OEM Web Service Detection
+  name: Dahua OEM Web Service (IPC / NVR / DVR / XVR / HCVR) Detection
   author: method-security
   severity: info
-  description: Detects Dahua-derived OEM camera, DVR, and NVR web interfaces using Web Service asset markers.
+  description: |
+    Detects Dahua Web Service interfaces across four UI eras (early jQuery+SeaJS 2015-2017,
+    late jQuery+SeaJS 2018-2019, ExtJS 2019-2022, React+Less 2023+) plus three plugin tiers
+    (WebView_L light, WebActiveX medium, WebActiveEXE enterprise NVR).
+    Tier-1 anchors on the title regex <title>WEB(?: SERVICE)?</title> + the stable P3P header
+    (P3P: CP=CAO PSA OUR) + at least one era-specific structural marker (baseProj/ext-all.js,
+    jsBase/lib/jquery.js+sea.js, style/color.<hash>.less). Tier-2 enrichment via /cap.js
+    (devType = full model on 2017+ firmware) and /pluginVersion.js (PLUGINS_NAME = tier,
+    VERSION_GUI = CPE source) when reachable.
+    DEFENSIVE NEGATIVE: rejects Server: DNVRS-Webs targets — that header is HIKVISION
+    (D = Digital NVR Server), NOT Dahua. See TC-012 worked example in the SEC-702 catalog.
+    Amcrest is a Dahua-platform OEM rebrand; an "amcrest" body marker plus the Dahua
+    structural anchors below produces an Amcrest finding via the amcrest_marker extractor —
+    no live Amcrest fixture available (sourced from public Amcrest UI corpus).
+    The /cgi-bin/magicBox.cgi realm-leak probe (which exposes plaintext device serial on
+    2017-era firmware) is deliberately OMITTED from Tier-2: Dahua's anti-scan IDS rate-limits
+    that endpoint per source-IP and can ban a scanner that chains it with other probes.
+    Realm-extraction is deferred to a single-shot WS-3 follow-up template.
+    Validated against TC-002 (DH-XVR5108HS-I3 ExtJS 2021), TC-005 (DHI-NVR608-32-4KS2 ExtJS 2024),
+    TC-008 (HCVR jQuery+SeaJS 2017 OEM rebrand), TC-010 (DH-XVR5108HS-I3 React+Less 2023),
+    TC-014 (DHI-NVR4216-4KS2 enterprise late jQuery+SeaJS 2019).
   metadata:
     method-application-type: INTERNET_OF_THINGS
-    method-module-name: DAHUA_WEB_SERVICE
-  tags: discovery,iot,camera,dvr,nvr,dahua,oem
+    method-module-name: DAHUA_OEM
+    method-detection-state: EXPOSED_ADMIN
+    cpe: cpe:2.3:o:dahua:web_service:*:*:*:*:*:*:*:*
+  tags: discovery,iot,camera,dvr,nvr,xvr,hcvr,ipc,dahua,oem,surveillance
+# flow: enforce vendor-confirmation discipline — Tier-1 (GET / + title + P3P
+# + era marker + DNVRS-Webs negative) is MANDATORY; at least one of the two
+# Tier-2 JS-endpoint enrichments (/cap.js OR /pluginVersion.js) must also
+# fire. Without this clause, Nuclei's default OR-semantics treat each of
+# the three http blocks as sufficient on its own — meaning a non-Dahua
+# server happening to carry "var devType=" or "PLUGINS_NAME" tokens could
+# emit a finding without the vendor-confirming title+P3P+era gate. The
+# OR-between-Tier-2/3 is intentional: hardened firmware sometimes restricts
+# /pluginVersion.js but keeps /cap.js (and vice versa); requiring either
+# preserves match coverage. Per Bugbot review on 0dbfaa0f. Pattern mirrors
+# the existing prometheus.yaml flow.
+flow: http(1) && (http(2) || http(3))
 http:
+  # Tier-1 probe: vendor confirmation via title + P3P header + era marker.
+  # Era marker is one of: ExtJS (baseProj + ext/ext-all.js), early
+  # jQuery+SeaJS (jsBase/lib/jquery.js + jsBase/lib/sea.js), late
+  # jQuery+SeaJS (jsBase/lib/jquery.pubsub.js + jsCore/mToken.js
+  # enterprise USB-key 2FA), or React+Less (32 style/color.*.less themes
+  # + <div id="root">). All four are gated on the title+P3P-header pair.
+  # Negative gate: drop on Server: DNVRS-Webs (Hikvision, not Dahua).
   - method: GET
     path:
       - "{{BaseURL}}"
@@ -17,20 +58,192 @@ http:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
+    matchers-condition: and
     matchers:
+      # Status code 200 — login screen is exposed (we're not gating on
+      # 401 since Dahua serves a public login page).
+      - type: status
+        status:
+          - 200
+      # Title regex: WEB or WEB SERVICE. Both forms — the 2023+ React+Less
+      # era shortened the title to <title>WEB</title>; pre-2023 firmware
+      # uses <title>WEB SERVICE</title>.
+      - type: regex
+        part: body
+        regex:
+          - '<title>WEB(?: SERVICE)?</title>'
+      # P3P header is the most stable cross-era Dahua signal — present
+      # on every UI era from 2015 through 2024. The exact value is
+      # always "CP=CAO PSA OUR".
+      - type: regex
+        part: header
+        regex:
+          - '(?i)p3p:\s*CP=CAO\s+PSA\s+OUR'
+      # NEGATIVE GATE — Server: DNVRS-Webs is Hikvision (D = Digital
+      # NVR Server), NOT Dahua. The TC-012 worked example in the
+      # SEC-702 catalog is the canonical case: a target with this
+      # header was mis-attributed to Dahua initially because of
+      # "D for Dahua". Reject before going further.
+      - type: dsl
+        dsl:
+          - '!contains(tolower(header), "server: dnvrs-webs")'
+      # Era marker — at least one of four era-shapes must be present
+      # in the body. Using DSL with || so a single matcher block
+      # captures all four eras without spawning four sibling matchers.
+      - type: dsl
+        dsl:
+          # ExtJS era (2019-2022): ext/ext-all.js + baseProj favicon path.
+          - >-
+            contains(body, "ext/ext-all.js") &&
+            contains(body, "baseProj/images/favicon.ico")
+          # Early jQuery+SeaJS era (2015-2017): jquery.js + sea.js with
+          # no pubsub/mToken extensions. The legacy era ships the IE6/7/8
+          # compat meta plus jsBase/lib/jquery.js + jsBase/lib/sea.js.
+          - >-
+            contains(body, "jsBase/lib/jquery.js") &&
+            contains(body, "jsBase/lib/sea.js") &&
+            !contains(body, "jsBase/lib/jquery.pubsub.js")
+          # Late jQuery+SeaJS era (2018-2019, enterprise NVR): adds
+          # jquery.pubsub + seajs-text + mToken USB-key auth.
+          - >-
+            contains(body, "jsBase/lib/jquery.pubsub.js") &&
+            contains(body, "jsCore/mToken.js")
+          # React+Less era (2023+): 32 hash-keyed less stylesheets +
+          # React root div. style/color.<hash>.less is Dahua-unique;
+          # the regex accepts both color.<hash>.less and the more
+          # common color.<hash>.<N>.less form (e.g., color.7661345.1.less)
+          # via the optional numeric-segment group (?:\.[0-9]+)?.
+          - >-
+            contains(body, "<div id=\"root\"") &&
+            regex("style/color\\.[a-f0-9]{7}(?:\\.[0-9]+)?\\.less", body)
+    extractors:
+      # Amcrest body marker. Amcrest is widely rebranded Dahua firmware
+      # (typical: <title>WEB SERVICE</title> + the literal token
+      # "amcrest" anywhere in body or asset references). Emit
+      # amcrest_marker so downstream consumers can tag subModule
+      # accordingly. No live Amcrest fixture — sourced from public
+      # Amcrest UI corpus.
+      - type: regex
+        name: amcrest_marker
+        part: body
+        group: 1
+        regex:
+          - '(?i)(amcrest)'
+      # Era marker — surface which UI era fired so the operator can
+      # cross-correlate with firmware age. Best-effort heuristic;
+      # not a primary fingerprint.
+      - type: dsl
+        name: ui_era
+        dsl:
+          - >-
+            contains(body, "<div id=\"root\"") ? "react-less-2023+" :
+            (contains(body, "jsBase/lib/jquery.pubsub.js") ? "late-jquery-seajs-2018-2019" :
+            (contains(body, "ext/ext-all.js") ? "extjs-2019-2022" :
+            (contains(body, "jsBase/lib/jquery.js") ? "early-jquery-seajs-2015-2017" : "unknown")))
+      # Last-Modified on / is a build-date hint (catalog Pattern §1).
+      # A pre-2010 Date header alongside Dahua structural anchors
+      # is also an "abandoned device" signal — we surface the
+      # Last-Modified here and leave correlation to the consumer.
+      - type: regex
+        name: last_modified
+        part: header
+        group: 1
+        regex:
+          - '(?i)last-modified:\s*([^\r\n]+)'
+
+  # Tier-2 probe: /cap.js — pre-auth device-capability disclosure.
+  # devType carries either a generic family code (HCVR — TC-008 2017
+  # firmware) or a full model number (DH-XVR5108HS-I3 — TC-002/010,
+  # DHI-NVR608-32-4KS2 — TC-005, DHI-NVR4216-4KS2 — TC-014). Sub-brand
+  # prefix discrimination: DH- = consumer/channel, DHI- = enterprise.
+  - method: GET
+    path:
+      - "{{BaseURL}}/cap.js"
+    redirects: false
+    stop-at-first-match: true
+    matchers-condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
       - type: word
         part: body
         words:
-          - "<title>WEB SERVICE</title>"
-          - "baseProj/images/favicon.ico"
-          - "projectPath.js"
+          - "var devType="
+          - "var capTcpPort"
         condition: and
-        case-insensitive: true
+    extractors:
+      # devType — the full model OR the family code. Both shapes
+      # are valid. Length-bounded to avoid runaway captures on
+      # malformed bodies.
+      - type: regex
+        name: dev_type
+        part: body
+        group: 1
+        regex:
+          - "var devType='([A-Z0-9-]{3,40})';"
+      # capTcpPort — DHIP sibling port (default 37777). Surfacing
+      # this lets a network-layer follow-up probe target the
+      # right port even when the host runs HTTP on a non-default
+      # port.
+      - type: regex
+        name: dhip_port
+        part: body
+        group: 1
+        regex:
+          - 'var capTcpPort\s*=\s*([0-9]+);'
+
+  # Tier-2 probe: /pluginVersion.js — plugin tier + version disclosure.
+  # PLUGINS_NAME enumerates three product tiers:
+  #   WebView_L.Plugin.1     light (consumer HCVR/IPC; TC-008)
+  #   WebActiveX.Plugin.*    medium (enterprise XVR; TC-002/005)
+  #   WebActiveEXE.Plugin.1  enterprise NVR (TC-014; ships TIMEAXES_CLASSID)
+  # VERSION_GUI is the comma-form firmware version on older builds; the
+  # newer /webVersion.js path supersedes it. Both formats handled.
+  - method: GET
+    path:
+      - "{{BaseURL}}/pluginVersion.js"
+    redirects: false
+    stop-at-first-match: true
+    matchers-condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
       - type: word
         part: body
         words:
-          - "baseProj"
-          - "ext/ext-all.js"
-          - "WEB SERVICE"
-        condition: and
-        case-insensitive: true
+          - "PLUGINS_NAME"
+    extractors:
+      # Plugin tier name. Captures WebView_L.Plugin.1 / WebActiveX.Plugin.*
+      # / WebActiveEXE.Plugin.* etc. — the consumer-vs-enterprise tier.
+      - type: regex
+        name: plugins_name
+        part: body
+        group: 1
+        regex:
+          - 'PLUGINS_NAME\s*=\s*[''"]([^''"]+)[''"]'
+      # Plugin version (typical four-octet form like 4.1.511.1017600).
+      - type: regex
+        name: plugins_version
+        part: body
+        group: 1
+        regex:
+          - 'PLUGINS_VERSION\s*=\s*[''"]([0-9.]+)[''"]'
+      # VERSION_GUI — comma form, present on older firmware. Surfaces
+      # the GUI version for CPE correlation; "3,2,7,76382" → "3.2.7.76382".
+      - type: regex
+        name: version_gui
+        part: body
+        group: 1
+        regex:
+          - 'VERSION_GUI\s*=\s*[''"]version=([0-9,]+)[''"]'
+      # TIMEAXES_CLASSID — NVR-distinctive (only enterprise NVR firmware
+      # ships the time-axes playback plugin). When present, this is a
+      # high-confidence NVR signal.
+      - type: regex
+        name: timeaxes_classid
+        part: body
+        group: 1
+        regex:
+          - 'TIMEAXES_CLASSID\s*=\s*[''"]([A-F0-9-]{36})[''"]'

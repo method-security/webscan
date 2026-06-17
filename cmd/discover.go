@@ -99,8 +99,14 @@ func (a *WebScan) InitDiscoverCommand() {
 				return
 			}
 
+			templatePaths, err := cmd.Flags().GetStringSlice("template-paths")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
 			// Create config
-			config, err := getDiscoverApplicationConfig(targets, resourceType, timeout, threads, proxy, verboseLogs, globalRateLimit, globalTimeout)
+			config, err := getDiscoverApplicationConfig(targets, resourceType, templatePaths, timeout, threads, proxy, verboseLogs, globalRateLimit, globalTimeout)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -118,6 +124,7 @@ func (a *WebScan) InitDiscoverCommand() {
 	discoverApplicationCmd.Flags().StringSlice("targets", []string{}, "URL targets to perform fingerprinting against")
 	// Config Flags
 	discoverApplicationCmd.Flags().String("resource-type", "ALL", "Type of resource to fingerprint (e.g., web, api, cms)")
+	discoverApplicationCmd.Flags().StringSlice("template-paths", []string{}, "Custom nuclei template file or directory paths; overrides --resource-type when set")
 	discoverApplicationCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
 	discoverApplicationCmd.Flags().Int("threads", 25, "Number of concurrent threads for scanning")
 	discoverApplicationCmd.Flags().String("proxy", "", "Optional HTTP proxy URL")
@@ -1302,7 +1309,7 @@ func parseDiscoverRequestFiles(pairs []string) ([]*discover.RequestFile, error) 
 }
 
 // getDiscoverApplicationConfig builds the config for application fingerprinting discovery.
-func getDiscoverApplicationConfig(targets []string, resource string, timeout int, threads int, proxy string, verboseLogs bool, globalRateLimit int, globalTimeout int) (*discover.DiscoverApplicationConfig, error) {
+func getDiscoverApplicationConfig(targets []string, resource string, templatePaths []string, timeout int, threads int, proxy string, verboseLogs bool, globalRateLimit int, globalTimeout int) (*discover.DiscoverApplicationConfig, error) {
 	resourceEnum, err := getDiscoverApplicationResourceConfigTypeFromString(resource)
 	if err != nil {
 		return nil, fmt.Errorf("invalid resource type: %s", resource)
@@ -1311,6 +1318,7 @@ func getDiscoverApplicationConfig(targets []string, resource string, timeout int
 	config := &discover.DiscoverApplicationConfig{
 		Targets:         targets,
 		ResourceType:    &resourceEnum,
+		TemplatePaths:   templatePaths,
 		Timeout:         timeout,
 		Threads:         threads,
 		Proxy:           &proxy,

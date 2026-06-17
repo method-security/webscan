@@ -78,11 +78,17 @@ func convertNucleiAttemptToFingerprintAttemptStruct(nucleiAttempt *nuclei.Nuclei
 func createDiscoverApplicationNucleiConfig(ctx context.Context, config *discover.DiscoverApplicationConfig) (nuclei.NucleiConfig, error) {
 	log := svc1log.FromContext(ctx)
 
-	// Get template paths based on resource type
-	templatePaths, err := getTemplatePaths(config.ResourceType)
-	if err != nil {
-		log.Error("Failed to get template paths", svc1log.SafeParam("error", err.Error()))
-		return nuclei.NucleiConfig{}, err
+	// Get template paths — use user-supplied paths if provided, otherwise derive from resource type
+	var templatePaths []string
+	if len(config.TemplatePaths) > 0 {
+		templatePaths = config.TemplatePaths
+	} else {
+		var err error
+		templatePaths, err = getTemplatePaths(config.ResourceType)
+		if err != nil {
+			log.Error("Failed to get template paths", svc1log.SafeParam("error", err.Error()))
+			return nuclei.NucleiConfig{}, err
+		}
 	}
 
 	log.Info("Built Nuclei config for application discovery",

@@ -18,25 +18,26 @@ http:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
+    matchers-condition: and
     matchers:
-      - type: word
-        part: body
-        words:
-          - "sharefile"
-          - "citrix"
-        condition: and
-        case-insensitive: true
-      - type: word
-        part: body
-        words:
-          - "sf-login"
-          - "sharefile"
-        condition: and
-        case-insensitive: true
+      - type: status
+        status:
+          - 200
+      - type: dsl
+        dsl:
+          - 'contains(tolower(body), "welcome! enter your details to sign in to sharefile")'
+          - 'contains(tolower(body), "sharefile") && contains(tolower(body), "remember me") && contains(tolower(body), "privacy policy")'
+          - 'contains(tolower(all), "sharefile") && contains(tolower(all), "auth.sharefile.io")'
+        condition: or
       - type: word
         part: all
         words:
-          - "sf-api"
-          - "sharefile"
-        condition: and
+          - "x-storefront-instanceid"
+          - "receiver for web"
+          - "citrix workspace"
+          - "logonpoint/receiver"
+          - "ctxs."
+          - "storeweb"
+        condition: or
+        negative: true
         case-insensitive: true

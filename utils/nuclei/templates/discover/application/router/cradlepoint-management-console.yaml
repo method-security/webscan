@@ -18,13 +18,14 @@ http:
     redirects: true
     max-redirects: 3
     stop-at-first-match: true
-    matchers-condition: and
     matchers:
-      - type: word
-        part: body
-        words:
-          - "cplogin"
-      - type: word
-        part: header
-        words:
-          - "CradlepointHTTPService"
+      - type: dsl
+        dsl:
+          - >-
+            contains(tolower(header), "cradlepointhttpservice") &&
+            (
+              contains(tolower(body), "cplogin") ||
+              contains(tolower(body), "cradlepoint.com") ||
+              contains(tolower(body), "cradlepoint, inc.") ||
+              regex("(?i)<title>\\s*Content Filter :: [A-Z0-9-]+\\s*</title>", body)
+            )

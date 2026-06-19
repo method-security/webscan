@@ -81,6 +81,31 @@ func BuildAuthHeaders(headers map[string]string, cookies map[string]string) map[
 	return result
 }
 
+// NormalizeHeaders trims and drops empty response header values so serialized
+// header maps always conform to map<string, list<string>> without null values.
+func NormalizeHeaders(headers map[string][]string) map[string][]string {
+	normalized := make(map[string][]string, len(headers))
+	for key, values := range headers {
+		var normalizedValues []string
+		for _, value := range values {
+			// CDP can expose duplicate response headers as newline-delimited
+			// strings. Content-Type parameters may contain commas, so only split
+			// on line breaks.
+			splitValues := splitHeaderValue(key, value)
+			for _, v := range splitValues {
+				trimmed := strings.TrimSpace(v)
+				if trimmed != "" {
+					normalizedValues = append(normalizedValues, trimmed)
+				}
+			}
+		}
+		if len(normalizedValues) > 0 {
+			normalized[key] = normalizedValues
+		}
+	}
+	return normalized
+}
+
 // ParseCookiePairs converts a slice of "name=value" strings (as supplied via a
 // repeated --cookie CLI flag) into a map[string]string. Pairs that do not
 // contain an equals sign are silently ignored. Leading and trailing whitespace is
@@ -322,24 +347,7 @@ func IsDetectedBinaryBody(bodyData []byte) bool {
 
 // CreateHTTPResponseFromBytes creates an HttpResponse struct from HttpResponse data using byte array
 func CreateHTTPResponseFromBytes(statusCode int, redirectChain []string, headers map[string][]string, responseBody []byte) common.HttpResponse {
-	// Process headers to split newline-delimited duplicate values from CDP.
-	processedHeaders := make(map[string][]string)
-	for key, values := range headers {
-		var processedValues []string
-		for _, value := range values {
-			// CDP can expose duplicate response headers as newline-delimited
-			// strings. Content-Type parameters may contain commas, so only split
-			// that header on line breaks.
-			splitValues := splitHeaderValue(key, value)
-			for _, v := range splitValues {
-				trimmed := strings.TrimSpace(v)
-				if trimmed != "" {
-					processedValues = append(processedValues, trimmed)
-				}
-			}
-		}
-		processedHeaders[key] = processedValues
-	}
+	processedHeaders := NormalizeHeaders(headers)
 
 	// Get content type from headers
 	contentType := GetContentTypeFromHeaderMap(processedHeaders)

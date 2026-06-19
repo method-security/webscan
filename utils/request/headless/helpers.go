@@ -489,11 +489,7 @@ func IsTransientHeadlessError(err error) bool {
 }
 
 func cloneHeaders(headers map[string][]string) map[string][]string {
-	result := make(map[string][]string, len(headers))
-	for key, values := range headers {
-		result[key] = append([]string(nil), values...)
-	}
-	return result
+	return requesthelpers.NormalizeHeaders(headers)
 }
 
 func isInternalBrowserURL(raw string) bool {

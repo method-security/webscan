@@ -26,6 +26,7 @@ types:
       httpMethod: http.HttpMethod
       headers: optional<map<string, string>>
       jsonBody: optional<string>
+      jsonBodyBase64: optional<string>
       textBody: optional<string>
       formData: optional<map<string, string>>
       files: optional<list<RequestFile>>

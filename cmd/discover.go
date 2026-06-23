@@ -2,6 +2,7 @@ package cmd
 
 import (
 	// Standard
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"strings"
@@ -531,14 +532,35 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 			headers := requesthelpers.ParseHeaderPairs(headerPairs)
 
-			// JSON body flag
+			// JSON body flags. json-body-base64 is transport-safe for callers that
+			// construct commands through an intermediate shell string; when supplied,
+			// decode it into JsonBody and preserve the decoded JSON in the report.
 			jsonBodyStr, err := cmd.Flags().GetString("json-body")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			jsonBodyBase64Str, err := cmd.Flags().GetString("json-body-base64")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			if jsonBodyStr != "" && jsonBodyBase64Str != "" {
+				a.OutputSignal.AddError(fmt.Errorf("only one of --json-body or --json-body-base64 may be provided"))
+				return
+			}
 			var jsonBody *string
-			if jsonBodyStr != "" {
+			var jsonBodyBase64 *string
+			if jsonBodyBase64Str != "" {
+				decoded, decodeErr := base64.StdEncoding.DecodeString(jsonBodyBase64Str)
+				if decodeErr != nil {
+					a.OutputSignal.AddError(fmt.Errorf("invalid --json-body-base64 value: %w", decodeErr))
+					return
+				}
+				decodedStr := string(decoded)
+				jsonBody = &decodedStr
+				jsonBodyBase64 = &jsonBodyBase64Str
+			} else if jsonBodyStr != "" {
 				jsonBody = &jsonBodyStr
 			}
 
@@ -638,6 +660,7 @@ func (a *WebScan) InitDiscoverCommand() {
 				HttpMethod:                 httpMethod,
 				Headers:                    headers,
 				JsonBody:                   jsonBody,
+				JsonBodyBase64:             jsonBodyBase64,
 				TextBody:                   textBody,
 				FormData:                   formData,
 				Files:                      files,
@@ -662,6 +685,7 @@ func (a *WebScan) InitDiscoverCommand() {
 	discoverRequestCmd.Flags().String("http-method", "GET", "HTTP method (GET,POST,PUT,DELETE,PATCH,HEAD,OPTIONS)")
 	discoverRequestCmd.Flags().StringArray("header", []string{}, "Request headers as 'Key: Value' pairs (repeatable)")
 	discoverRequestCmd.Flags().String("json-body", "", "Request body as JSON string")
+	discoverRequestCmd.Flags().String("json-body-base64", "", "Request body as base64-encoded JSON string")
 	discoverRequestCmd.Flags().String("text-body", "", "Request body as plain text")
 	discoverRequestCmd.Flags().StringArray("form-data", []string{}, "Form data as 'key=value' pairs (repeatable)")
 	discoverRequestCmd.Flags().StringArray("file", []string{}, "Multipart file part as 'fieldName|fileName|contentType|base64' (repeatable; contentType may be empty)")

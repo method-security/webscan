@@ -33,7 +33,14 @@ func ConstructURL(ctx context.Context, request *common.HttpRequest) (*string, er
 			standardizedPath = strings.ReplaceAll(standardizedPath, fmt.Sprintf("{%s}", k), url.PathEscape(v))
 		}
 	}
-	parsedURL.Path = standardizedPath
+	parsedURL.RawPath = ""
+	decodedPath, err := url.PathUnescape(standardizedPath)
+	if err == nil && decodedPath != standardizedPath {
+		parsedURL.Path = decodedPath
+		parsedURL.RawPath = standardizedPath
+	} else {
+		parsedURL.Path = standardizedPath
+	}
 
 	// Query
 	q := parsedURL.Query()

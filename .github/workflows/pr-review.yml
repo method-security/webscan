@@ -17,13 +17,14 @@ permissions:
 
 jobs:
   code-gen:
-    name: 🔄 Generate Fern Code
+    name: 🔄 Generate Code And Assets
     uses: ./.github/workflows/code-gen.yml
     secrets: inherit
 
   codeql:
     name: 🚨 CodeQL Analysis
     uses: ./.github/workflows/codeql.yml
+    needs: code-gen
     secrets: inherit
 
   ratchet:

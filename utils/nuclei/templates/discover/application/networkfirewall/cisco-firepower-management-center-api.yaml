@@ -16,13 +16,30 @@ http:
       - "{{BaseURL}}/api/fmc_config/v1/domain/default"
     redirects: false
     stop-at-first-match: true
+    matchers-condition: and
     matchers:
+      - type: status
+        status:
+          - 200
+      - type: word
+        part: header
+        words:
+          - "application/json"
+        case-insensitive: true
       - type: word
         part: body
         words:
           - "Firepower Management Center"
+          - "geoVersion"
+          - "ruleUpdateVersion"
+          - "lspVersion"
+          - "sruVersion"
+          - "vdbVersion"
         case-insensitive: true
+        condition: or
       - type: regex
         part: body
         regex:
-          - '(?i)"(?:serverVersion|version|productName)"\s*:'
+          - '(?i)"serverVersion"\s*:\s*"[0-9]+(?:\.[0-9]+){1,3}(?:\s*\(build\s+[0-9]+\)|[-+][^"]+)?"'
+          - '(?i)"productName"\s*:\s*"[^"]*(?:Cisco|Firepower|FMC)[^"]*"'
+        condition: or

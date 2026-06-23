@@ -38,10 +38,9 @@ http:
       - type: status
         status:
           - 200
-      - type: word
-        part: body
-        words:
-          - "__schema"
-          - "queryType"
+      - type: dsl
+        dsl:
+          - 'contains(tolower(header), "application/json")'
+          - 'contains(body, "\"__schema\"") && contains(body, "\"queryType\"")'
+          - 'starts_with(trim_space(body), "{")'
         condition: and
-        case-insensitive: true

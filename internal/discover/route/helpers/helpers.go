@@ -284,7 +284,7 @@ func URLRemoveQueryParams(rawURL string) (string, error) {
 	return parsedURL.String(), nil
 }
 
-// SplitURLBaseAndPath returns the URL origin and path as separate route fields.
+// SplitURLBaseAndPath returns the URL origin and escaped path as separate route fields.
 func SplitURLBaseAndPath(rawURL string) (string, string, error) {
 	parsedURL, err := url.Parse(rawURL)
 	if err != nil {
@@ -298,7 +298,7 @@ func SplitURLBaseAndPath(rawURL string) (string, string, error) {
 		baseURL = "//" + parsedURL.Host
 	}
 
-	return strings.TrimRight(baseURL, "/"), parsedURL.Path, nil
+	return strings.TrimRight(baseURL, "/"), parsedURL.EscapedPath(), nil
 }
 
 // IsURLAllowed checks if a target URL is allowed based on base URL and domain matching.

@@ -36,18 +36,18 @@ If you'd like to clean this output up, you can run
 
 Nuclei templates, wordlists, fingerprints, and other bundled scan data live in plaintext under `utils/nuclei/templates/` and `configs/`. The binary embeds compressed archives generated from those directories so raw template strings are not stored directly in the executable.
 
-After changing any of those assets, regenerate the embedded archives:
+CI generates the embedded archives for PR validation and release builds. To build or test locally after cloning or changing any of those assets, generate the archives:
 
 ```bash
 go generate ./configs
 ```
 
-This command refreshes:
+This command generates:
 
 - `configs/embedded/configs.tar.gz`
 - `utils/nuclei/templates/embedded/templates.tar.gz`
 
-Commit plaintext asset changes and any tracked regenerated archive changes together. `utils/nuclei/templates/embedded/templates.tar.gz` is generated locally and in CI, but is not committed. Do not edit archive files directly.
+The archives are generated outputs and are ignored by git. Commit only plaintext asset changes and do not edit archive files directly.
 
 ## Testing releases locally
 

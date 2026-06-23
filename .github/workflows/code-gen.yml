@@ -1,4 +1,4 @@
-name: 🔄 Generate Fern Code
+name: 🔄 Generate Code And Assets
 
 on:
   workflow_call:
@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   generate_fern_go:
-    name: Generate Fern Code (Go)
+    name: Generate Fern Code And Embedded Assets
     runs-on: ubuntu-latest
 
     steps:
@@ -30,9 +30,27 @@ jobs:
         env:
           FERN_TOKEN: ${{ secrets.FERN_TOKEN }}
 
+      - name: Setup Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # ratchet:actions/setup-go@v6
+        with:
+          go-version: "1.26"
+          cache: true
+
+      - name: Generate Embedded Asset Archives
+        run: go generate ./configs
+
       - name: Upload Fern Generated Code
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # ratchet:actions/upload-artifact@v7
         with:
           name: fern-generated-code
           path: generated/
+          retention-days: 3
+
+      - name: Upload Embedded Asset Archives
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # ratchet:actions/upload-artifact@v7
+        with:
+          name: embedded-asset-archives
+          path: |
+            configs/embedded/configs.tar.gz
+            utils/nuclei/templates/embedded/templates.tar.gz
           retention-days: 3

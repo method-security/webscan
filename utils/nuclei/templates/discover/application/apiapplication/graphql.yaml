@@ -43,3 +43,4 @@ http:
           - 'contains(tolower(header), "application/json")'
           - 'contains(body, "\"__schema\"") && contains(body, "\"queryType\"")'
           - 'starts_with(trim_space(body), "{")'
+        condition: and

@@ -19,6 +19,12 @@ jobs:
           name: fern-generated-code
           path: generated/
 
+      - name: Download Embedded Asset Archives
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # ratchet:actions/download-artifact@v8
+        with:
+          name: embedded-asset-archives
+          path: .
+
       - name: Setup Go
         uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # ratchet:actions/setup-go@v6
         with:

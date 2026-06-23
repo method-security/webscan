@@ -47,6 +47,10 @@ go.work.sum
 # Webscan binary
 /webscan
 
+# Generated embedded asset archives
+/configs/embedded/configs.tar.gz
+/utils/nuclei/templates/embedded/templates.tar.gz
+
 # .DS_Store
 .DS_Store
 webscan-mac

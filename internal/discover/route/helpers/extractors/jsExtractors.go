@@ -647,9 +647,11 @@ func fetchSourceMapRoutes(ctx context.Context, sourceMapURL string, baseURL stri
 	urls := []string{}
 	errors := []string{}
 
-	if routeCaptureConfig.IgnoreCrossDomain && !discoverroutehelpers.IsSubdomain(baseURL, sourceMapURL) {
-		return routes, urls, errors
-	}
+	// The source map is fetched only as a source to mine for endpoints; its URL
+	// is never recorded as a route. Like the bundle it belongs to, fetching is
+	// exempt from cross-domain policy so CDN-hosted maps are honored. Endpoints
+	// discovered inside the map remain scoped to the target domain by
+	// extractScriptContentRoutes.
 
 	bodyBytes, _, statusCode, err := fetchJSResource(ctx, sourceMapURL, routeCaptureConfig)
 	if err != nil {
@@ -743,14 +745,12 @@ func ExtractScriptRoutes(ctx context.Context, doc *goquery.Document, baseURL str
 
 			fullURL := discoverroutehelpers.ResolveURL(baseURL, src)
 
-			if routeCaptureConfig.IgnoreCrossDomain && !discoverroutehelpers.IsSubdomain(baseURL, fullURL) {
-				return
-			}
-
-			// Check if the URL is allowed
-			if !discoverroutehelpers.IsURLAllowed(baseURL, fullURL, routeCaptureConfig.IgnoreCrossDomain, routeCaptureConfig.CollectStaticAssets) {
-				return
-			}
+			// Bundles are fetched only as a source to mine for endpoints; the
+			// bundle URL itself is never recorded as a route. Fetching is gated
+			// by MaxBundles (checked above) and is intentionally exempt from
+			// static-asset and cross-domain policy so that CDN-hosted bundles are
+			// still scanned. Endpoints discovered inside the bundle remain scoped
+			// to the target domain by extractScriptContentRoutes.
 
 			// Fetch the JavaScript content via utils/request so the surrounding
 			// DiscoverRouteConfig (TLS, UA, timeout) is honored.
@@ -827,9 +827,12 @@ func ExtractBundleURLRoutes(ctx context.Context, bundleURLs []string, baseURL st
 		// Resolve relative bundle URLs
 		fullURL := discoverroutehelpers.ResolveURL(baseURL, bundleURL)
 
-		if !discoverroutehelpers.IsURLAllowed(baseURL, fullURL, routeCaptureConfig.IgnoreCrossDomain, routeCaptureConfig.CollectStaticAssets) {
-			continue
-		}
+		// These bundle URLs are explicitly supplied by the operator and are
+		// fetched only to mine for endpoints; the bundle URL itself is never
+		// recorded as a route. Fetching is intentionally exempt from cross-domain
+		// policy so CDN-hosted bundles are honored. Endpoints discovered inside
+		// the bundle remain scoped to the target domain by
+		// extractScriptContentRoutes.
 
 		// Fetch the JS bundle via utils/request so the surrounding
 		// DiscoverRouteConfig (TLS, UA, timeout) is honored.

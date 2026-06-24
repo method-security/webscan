@@ -260,6 +260,11 @@ func PerformWordlistCapture(ctx context.Context, config discover.DiscoverWordlis
 	visitedURLs := make(map[string]struct{})
 	allCrawled := []string{}
 	var errors []string
+	// Explicit truncation flags — set only when we actually skip work due
+	// to a cap. Inferring truncation from `len(visitedURLs) >= cap` at the
+	// end would also fire on a crawl that naturally finished with exactly
+	// the cap, falsely reporting truncation on a complete run.
+	var visitTruncated, wordTruncated bool
 
 	// BFS setup
 	urlsToVisit := []string{config.Target}
@@ -297,6 +302,7 @@ func PerformWordlistCapture(ctx context.Context, config discover.DiscoverWordlis
 					return
 				}
 				if len(visitedURLs) >= maxVisitedURLs {
+					visitTruncated = true
 					mu.Unlock()
 					return
 				}
@@ -361,11 +367,17 @@ func PerformWordlistCapture(ctx context.Context, config discover.DiscoverWordlis
 
 				// Record crawled URL; also mark the final redirect destination as
 				// visited so that if another path discovers the canonical URL directly
-				// it isn't fetched a second time.
+				// it isn't fetched a second time. The redirect-marker insert also
+				// respects maxVisitedURLs so a redirect-heavy crawl can't grow the
+				// visited set past the bound.
 				mu.Lock()
 				allCrawled = append(allCrawled, targetURL)
 				if finalURL != targetURL {
-					visitedURLs[strings.TrimRight(finalURL, "/")] = struct{}{}
+					if len(visitedURLs) < maxVisitedURLs {
+						visitedURLs[strings.TrimRight(finalURL, "/")] = struct{}{}
+					} else {
+						visitTruncated = true
+					}
 				}
 				mu.Unlock()
 
@@ -382,6 +394,7 @@ func PerformWordlistCapture(ctx context.Context, config discover.DiscoverWordlis
 					for _, w := range words {
 						key := strings.ToLower(w)
 						if _, present := wordCounts[key]; !present && len(wordCounts) >= maxUniqueWords {
+							wordTruncated = true
 							continue
 						}
 						wordCounts[key]++
@@ -449,12 +462,12 @@ func PerformWordlistCapture(ctx context.Context, config discover.DiscoverWordlis
 	report.Result.TotalUnique = &totalUnique
 	report.Result.UrlsCrawled = allCrawled
 
-	// Surface truncation: callers should know a run was bounded by either cap
-	// (rather than naturally completing) so they can adjust scope or filters.
-	if len(visitedURLs) >= maxVisitedURLs {
+	// Surface truncation: only when we actually dropped work due to a cap,
+	// not when a run happened to finish with exactly the cap size.
+	if visitTruncated {
 		errors = append(errors, fmt.Sprintf("BFS truncated: hit maxVisitedURLs=%d cap; remaining links not crawled", maxVisitedURLs))
 	}
-	if len(wordCounts) >= maxUniqueWords {
+	if wordTruncated {
 		errors = append(errors, fmt.Sprintf("word collection truncated: hit maxUniqueWords=%d cap; later unique tokens dropped", maxUniqueWords))
 	}
 

@@ -301,8 +301,17 @@ func SplitURLBaseAndPath(rawURL string) (string, string, error) {
 	return strings.TrimRight(baseURL, "/"), parsedURL.EscapedPath(), nil
 }
 
-// IsURLAllowed checks if a target URL is allowed based on base URL and domain matching.
-func IsURLAllowed(baseURL string, targetURL string, ignoreCrossDomain bool, _ bool) bool {
+// IsURLAllowed checks if a target URL is allowed based on base URL, domain
+// matching, and static-asset policy. When captureStaticAssets is false, static
+// asset URLs (e.g. PDFs, images, archives, and JS bundles) are rejected so they
+// are not recorded as routes or queued for spidering. JS bundle fetching for
+// route discovery is gated separately by MaxBundles in the bundle extractors and
+// intentionally bypasses this allowlist; endpoints discovered inside a bundle
+// are still filtered through IsURLAllowed against the target domain.
+func IsURLAllowed(baseURL string, targetURL string, ignoreCrossDomain bool, captureStaticAssets bool) bool {
+	if !captureStaticAssets && utils.IsStaticAsset(targetURL) {
+		return false
+	}
 	if ignoreCrossDomain {
 		return IsSubdomain(baseURL, targetURL)
 	}

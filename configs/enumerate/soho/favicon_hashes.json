@@ -53,7 +53,7 @@
       "product": "asuswrt",
       "models": ["GT-AC5300", "GT-AC2900", "GT-AX11000", "TUF-AX3000", "RT-AC3100", "RT-AX88U"],
       "firmware_range": "3.0.0.4.386+",
-      "notes": "ASUSWRT stock firmware favicon. Confirmed by direct fetch from 2 independent live Asus router admin interfaces (GT-AC5300 at 47.91.125.239:8145, GT-AC2900 at 94.74.80.88:12178). Favicon served at /images/favicon.ico, 6772 bytes.",
+      "notes": "ASUSWRT stock firmware favicon. Confirmed by direct fetch from 2 independent live Asus router admin interfaces (GT-AC5300, GT-AC2900). Favicon served at /images/favicon.ico, 6772 bytes.",
       "shodan_verified": true,
       "shodan_count_approx": 17,
       "shodan_query": "http.title:\"ASUS Wireless Router\""

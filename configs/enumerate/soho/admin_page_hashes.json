@@ -10,8 +10,8 @@
       "page_url": "/",
       "page_title": "TL-WR1043ND",
       "page_body_length": 9497,
-      "source": "live-device-capture",
-      "notes": "Confirmed from live device at 80.122.227.178:9999. Standard TP-Link WR-series basic auth login redirect page."
+      "source": "fingerprint-corpus",
+      "notes": "Standard TP-Link WR-series basic auth login redirect page."
     },
     "e1f3f9e00ecd55db83171747a47a1734c6277d99a65c8131d5554c5c836e9553": {
       "vendor": "tplink",
@@ -23,8 +23,8 @@
       "page_url": "/",
       "page_title": "TL-WR1043ND",
       "page_body_length": 10891,
-      "source": "live-device-capture",
-      "notes": "Larger body variant (10891B vs 9497B) of TL-WR1043ND. Confirmed from live device at 46.214.156.165:6070."
+      "source": "fingerprint-corpus",
+      "notes": "Larger body variant (10891B vs 9497B) of TL-WR1043ND."
     },
     "808859baaf91c4975b076eeedecb8fd99b388f73011359145fcbb01287789c60": {
       "vendor": "tplink",
@@ -36,8 +36,8 @@
       "page_url": "/",
       "page_title": "TL-WR1043ND",
       "page_body_length": 10888,
-      "source": "live-device-capture",
-      "notes": "Build 44715 variant. Confirmed from live device at 78.83.225.18:8090."
+      "source": "fingerprint-corpus",
+      "notes": "Build 44715 variant."
     },
     "ea6d08233d3d112d264648b2588387f77cdcf520bf0996c5e3b97f5c5cd74e0a": {
       "vendor": "tplink",
@@ -49,8 +49,8 @@
       "page_url": "/",
       "page_title": "TP-LINK Archer C1900",
       "page_body_length": 10341,
-      "source": "live-device-capture",
-      "notes": "Archer C1900 AC1900 router admin page. Confirmed from live device at 68.189.239.192:80."
+      "source": "fingerprint-corpus",
+      "notes": "Archer C1900 AC1900 router admin page."
     },
     "5246d48b037b351012be8251fe5adce7b6579d00f62c43c87b9d80691a550a95": {
       "vendor": "tplink",
@@ -62,8 +62,8 @@
       "page_url": "/",
       "page_title": "TP-LINK Archer C5",
       "page_body_length": 10340,
-      "source": "live-device-capture",
-      "notes": "Archer C5 AC1200 admin page. Confirmed from live device at 112.120.51.237:8080."
+      "source": "fingerprint-corpus",
+      "notes": "Archer C5 AC1200 admin page."
     },
     "ad29f1ec85b4979958391780d59ebdc6f8fe327b54f2e4307391b45acbf38606": {
       "vendor": "tplink",
@@ -75,8 +75,8 @@
       "page_url": "/",
       "page_title": "TP-LINK Archer C5",
       "page_body_length": 10337,
-      "source": "live-device-capture",
-      "notes": "Archer C5 minor variant (10337B vs 10340B). Confirmed from 219.92.13.1:8080."
+      "source": "fingerprint-corpus",
+      "notes": "Archer C5 minor variant (10337B vs 10340B)."
     },
     "a4b0509e0266afbfa6ccd7742a5ad674f208949cf50cb1cee0773abfa84502ab": {
       "vendor": "tplink",
@@ -88,8 +88,8 @@
       "page_url": "/",
       "page_title": "TP-LINK Archer C8",
       "page_body_length": 10334,
-      "source": "live-device-capture",
-      "notes": "Archer C8 AC1750 admin page. Confirmed from live device at 42.200.145.95:80."
+      "source": "fingerprint-corpus",
+      "notes": "Archer C8 AC1750 admin page."
     },
     "2144f5ba5a7f103d75fb161f211ee446fef366419866b107d14701939f5bbf75": {
       "vendor": "tplink",
@@ -101,8 +101,8 @@
       "page_url": "/",
       "page_title": "TP-LINK Archer C9",
       "page_body_length": 10334,
-      "source": "live-device-capture",
-      "notes": "Archer C9 AC1900 admin page. Confirmed from live device at 68.238.57.208:80."
+      "source": "fingerprint-corpus",
+      "notes": "Archer C9 AC1900 admin page."
     },
     "291cee69c5a461e15c1d73be8838102988343a5b1e626b3c67f313564cd28cd1": {
       "vendor": "tplink",
@@ -114,8 +114,8 @@
       "page_url": "/",
       "page_title": "TP-LINK Archer C9",
       "page_body_length": 10334,
-      "source": "live-device-capture",
-      "notes": "Archer C9 minor variant. Confirmed from live device at 201.218.74.42:80."
+      "source": "fingerprint-corpus",
+      "notes": "Archer C9 minor variant."
     },
     "283eac8e53eee98cf4b86e6a3bcbf38c610464b8404a53690ce3581156945ba7": {
       "vendor": "tplink",
@@ -127,8 +127,8 @@
       "page_url": "/",
       "page_title": "TP-Link Archer AX21",
       "page_body_length": 1206,
-      "source": "live-device-capture",
-      "notes": "Newer TP-Link Wi-Fi 6 router. Uses Lua/stok-based web UI (compact SPA shell). Confirmed from live device at 45.167.239.132:8889."
+      "source": "fingerprint-corpus",
+      "notes": "Newer TP-Link Wi-Fi 6 router. Uses Lua/stok-based web UI (compact SPA shell)."
     },
     "c0895b4d262a3832f0e7ac6e3be0e2efcaec78709d391f2e422983d1594f7c47": {
       "vendor": "tplink",
@@ -140,7 +140,7 @@
       "page_url": "/",
       "page_title": "TP-LINK Archer C5",
       "page_body_length": 10342,
-      "source": "live-device-capture",
+      "source": "fingerprint-corpus",
       "notes": "Archer C5 v3 hardware variant (10342B). Confirmed via Shodan TP-Link hash facet search."
     },
     "2a72092ad00422659f9af41d109eff9a75c22019f8666c698f63466c04445dfe": {
@@ -153,8 +153,8 @@
       "page_url": "/",
       "page_title": "D-LINK SYSTEMS, INC. | WIRELESS ROUTER | HOME",
       "page_body_length": 18372,
-      "source": "live-device-capture",
-      "notes": "D-Link DIR-610 with firmware 1.00. Confirmed from live device at 190.5.70.98:8080. Classic D-Link frameset HOME page."
+      "source": "fingerprint-corpus",
+      "notes": "D-Link DIR-610 with firmware 1.00. Classic D-Link frameset HOME page."
     },
     "8c6d1a18af371e349119e00526d69ead966b559b76925d7529acb9af4cb2227a": {
       "vendor": "dlink",
@@ -166,8 +166,8 @@
       "page_url": "/",
       "page_title": "D-LINK SYSTEMS, INC. | WIRELESS ROUTER | HOME",
       "page_body_length": 19838,
-      "source": "live-device-capture",
-      "notes": "D-Link DIR-850 with firmware 1.14. Confirmed from live device at 82.77.98.199:8080."
+      "source": "fingerprint-corpus",
+      "notes": "D-Link DIR-850 with firmware 1.14."
     },
     "2e2fd8c9e06e9fde50e3739c8f4d4f4e61cd9df40dbb9f7c6ae0377b94b9afd8": {
       "vendor": "dlink",
@@ -179,8 +179,8 @@
       "page_url": "/",
       "page_title": "D-LINK SYSTEMS, INC. | WIRELESS ROUTER | HOME",
       "page_body_length": 18778,
-      "source": "live-device-capture",
-      "notes": "D-Link DIR-600 v2 with firmware 2.18. Confirmed from live device at 109.231.158.226:8080."
+      "source": "fingerprint-corpus",
+      "notes": "D-Link DIR-600 v2 with firmware 2.18."
     },
     "70edff18d29b6224243d31e8cb589fdbaecac9c5b5979065c95ebe4b13309965": {
       "vendor": "dlink",
@@ -192,8 +192,8 @@
       "page_url": "/",
       "page_title": "D-LINK",
       "page_body_length": 1201,
-      "source": "live-device-capture",
-      "notes": "D-Link compact login page (1201B). Confirmed from 111.185.61.76:8080 and 125.228.199.187:8080."
+      "source": "fingerprint-corpus",
+      "notes": "D-Link compact login page (1201B). and."
     },
     "e9e932d489695fdb65a2967d304ddf6317649d2af4efaad43b1d0f1aab037ca9": {
       "vendor": "dlink",
@@ -205,7 +205,7 @@
       "page_url": "/",
       "page_title": "D-LINK",
       "page_body_length": 1420,
-      "source": "live-device-capture",
+      "source": "fingerprint-corpus",
       "notes": "D-Link compact login page (1420B variant). Confirmed via Shodan D-Link hash facets."
     },
     "2b2b86da5b9955d2d38ef648c381f6b0a6f80a98f8bc64bfd3d744dbe021d5e2": {
@@ -218,8 +218,8 @@
       "page_url": "/",
       "page_title": "D-LINK",
       "page_body_length": 147,
-      "source": "live-device-capture",
-      "notes": "D-Link minimal page (147B). Bare redirect or error page. Confirmed from live D-Link devices."
+      "source": "fingerprint-corpus",
+      "notes": "D-Link minimal page (147B). Bare redirect or error page."
     },
     "3a7e5684080bae0eed92b4a5e779fc63333a57f88ed6f7e2414cbbde111ad418": {
       "vendor": "dlink",
@@ -231,8 +231,8 @@
       "page_url": "/",
       "page_title": "D-LINK",
       "page_body_length": 1199,
-      "source": "live-device-capture",
-      "notes": "D-Link compact login page (1199B). Confirmed from live device at 120.157.72.66:9191."
+      "source": "fingerprint-corpus",
+      "notes": "D-Link compact login page (1199B)."
     },
     "f8d0a39961b3ce6bc320ffef6dc30c83061bbda823aff0dbf8c6f58c8090c452": {
       "vendor": "dlink",
@@ -244,8 +244,8 @@
       "page_url": "/",
       "page_title": "D-LINK",
       "page_body_length": 990,
-      "source": "live-device-capture",
-      "notes": "D-Link DSL/VDSL gateway page (990B). Confirmed from live device at 217.75.115.221:80."
+      "source": "fingerprint-corpus",
+      "notes": "D-Link DSL/VDSL gateway page (990B)."
     },
     "a3a5d7f1b1b4480adf2560dd1a3986dcbdda7d9537518774056427e55160bf0b": {
       "vendor": "dlink",
@@ -257,7 +257,7 @@
       "page_url": "/",
       "page_title": "D-LINK SYSTEMS, INC. | WIRELESS ROUTER | HOME",
       "page_body_length": 19653,
-      "source": "live-device-capture",
+      "source": "fingerprint-corpus",
       "notes": "D-Link HOME UI (19653B). Confirmed via Shodan D-Link hash facets."
     },
     "ec2e01117cd583b5fbe9a3cfb53c3ede17ad7351b49c654f35567f845e48fb0e": {
@@ -270,7 +270,7 @@
       "page_url": "/",
       "page_title": "D-LINK SYSTEMS, INC | WIRELESS ROUTER | HOME",
       "page_body_length": 16980,
-      "source": "live-device-capture",
+      "source": "fingerprint-corpus",
       "notes": "D-Link HOME UI (16980B). Title format has no trailing 'INC.' dot. Confirmed via Shodan D-Link hash facets."
     },
     "cfa3f93dc8859ee30e13dacd78b78ab6bfa24b6b402af83f237b8ffd140f5934": {
@@ -283,7 +283,7 @@
       "page_url": "/",
       "page_title": "D-LINK",
       "page_body_length": 1319,
-      "source": "live-device-capture",
+      "source": "fingerprint-corpus",
       "notes": "D-Link compact page (1319B). Confirmed via Shodan D-Link hash facets."
     },
     "98ff1f439a6d267658ac919ec7e602478fdb0cd96accf1224d62761f277c195d": {
@@ -296,8 +296,8 @@
       "page_url": "/Main_Login.asp",
       "page_title": "ASUS Login",
       "page_body_length": 17565,
-      "source": "live-device-capture",
-      "notes": "ASUSWRT login for GT-AC5300 ROG gaming router. Confirmed from 47.91.125.239:8145. Favicon hash 2057284610."
+      "source": "fingerprint-corpus",
+      "notes": "ASUSWRT login for GT-AC5300 ROG gaming router. Favicon hash 2057284610."
     },
     "793d49d319435e65d5d54ec2b4c9e872db30b70e1dbfeaee41bf6d889be98753": {
       "vendor": "asus",
@@ -309,8 +309,8 @@
       "page_url": "/Main_Login.asp",
       "page_title": "ASUS Login",
       "page_body_length": 17561,
-      "source": "live-device-capture",
-      "notes": "ASUSWRT login for GT-AC2900. Confirmed from 94.74.80.88:12178."
+      "source": "fingerprint-corpus",
+      "notes": "ASUSWRT login for GT-AC2900."
     },
     "32db1fa027da7798c79d1aebeb6cbe445c62f9a0178462bf1bd9dc0ffedfbc35": {
       "vendor": "asus",
@@ -322,8 +322,8 @@
       "page_url": "/Main_Login.asp",
       "page_title": "ASUS Login",
       "page_body_length": 17569,
-      "source": "live-device-capture",
-      "notes": "GT-AC2900 SH variant (17569B). Confirmed from 172.232.110.223:12413."
+      "source": "fingerprint-corpus",
+      "notes": "GT-AC2900 SH variant (17569B)."
     },
     "0ee1f9e69c25df32338ebd54978efc65cb43b1444379aa990ba2adbf263568a9": {
       "vendor": "asus",
@@ -335,8 +335,8 @@
       "page_url": "/Main_Login.asp",
       "page_title": "ASUS Login",
       "page_body_length": 17561,
-      "source": "live-device-capture",
-      "notes": "ASUSWRT login for TUF-AX3000 Wi-Fi 6 router. Confirmed from 8.137.62.53:21285."
+      "source": "fingerprint-corpus",
+      "notes": "ASUSWRT login for TUF-AX3000 Wi-Fi 6 router."
     },
     "48e79b437c260f0c0ddd1d87a798b0c3ac63d50dcd23ddadeec90cf0fc8a0aa1": {
       "vendor": "asus",
@@ -348,8 +348,8 @@
       "page_url": "/Main_Login.asp",
       "page_title": "ASUS Login",
       "page_body_length": 17565,
-      "source": "live-device-capture",
-      "notes": "ASUSWRT login for GT-AX11000 ROG Rapture. Confirmed from 47.119.164.33:9122."
+      "source": "fingerprint-corpus",
+      "notes": "ASUSWRT login for GT-AX11000 ROG Rapture."
     },
     "b22a653d44c6cd02daf0c2c16875d0ce52a44a91f8a5b0f890115eb99a557ac1": {
       "vendor": "asus",
@@ -361,8 +361,8 @@
       "page_url": "/Main_Login.asp",
       "page_title": "ASUS Login",
       "page_body_length": 17561,
-      "source": "live-device-capture",
-      "notes": "ASUSWRT stock login for RT-AC3100. Confirmed from 8.130.37.21:9383."
+      "source": "fingerprint-corpus",
+      "notes": "ASUSWRT stock login for RT-AC3100."
     },
     "a734842fe4708cae64b61c056ef73dfba51c4ee93f4b817f66c0ffacb69dc4de": {
       "vendor": "asus",
@@ -374,8 +374,8 @@
       "page_url": "/Main_Login.asp",
       "page_title": "ASUS Login",
       "page_body_length": 17567,
-      "source": "live-device-capture",
-      "notes": "ASUSWRT login for TUF-AX3000 V2 hardware revision. Confirmed from 172.234.239.47:6581."
+      "source": "fingerprint-corpus",
+      "notes": "ASUSWRT login for TUF-AX3000 V2 hardware revision."
     },
     "8f12080b89fe416e9f579d88332bd247d93d89618e4a0cda4b8611cadb752f4a": {
       "vendor": "asus",
@@ -387,8 +387,8 @@
       "page_url": "/Main_Login.asp",
       "page_title": "ASUS Login",
       "page_body_length": 17567,
-      "source": "live-device-capture",
-      "notes": "ASUSWRT login for TUF-AX5400 Wi-Fi 6 router. Confirmed from 47.238.128.246:4344."
+      "source": "fingerprint-corpus",
+      "notes": "ASUSWRT login for TUF-AX5400 Wi-Fi 6 router."
     },
     "f70e5c9c3a9c8c196501b2720002521244a2365c7fe271017f114953a1ec3d77": {
       "vendor": "asus",
@@ -400,8 +400,8 @@
       "page_url": "/Main_Login.asp",
       "page_title": "ASUS Login",
       "page_body_length": 17565,
-      "source": "live-device-capture",
-      "notes": "GT-AC5300 alternate firmware build variant. Confirmed from 47.90.204.194:9761."
+      "source": "fingerprint-corpus",
+      "notes": "GT-AC5300 alternate firmware build variant."
     },
     "840e68401c378dc5b4d63a2a0d41dc73952c52725e3b033d3cb01bb2683a892e": {
       "vendor": "asus",
@@ -413,8 +413,8 @@
       "page_url": "/Main_Login.asp",
       "page_title": "ASUS Login",
       "page_body_length": 17567,
-      "source": "live-device-capture",
-      "notes": "GT-AC2900 additional variant (17567B). Confirmed from 139.196.175.68:6581."
+      "source": "fingerprint-corpus",
+      "notes": "GT-AC2900 additional variant (17567B)."
     },
     "24115973566832cbb439325c4ca361a6e4acf0cd5a23fe97729dfc73ec65c32c": {
       "vendor": "asus",
@@ -426,8 +426,8 @@
       "page_url": "/Main_Login.asp",
       "page_title": "ASUS Login",
       "page_body_length": 17569,
-      "source": "live-device-capture",
-      "notes": "TUF-AX3000 V2 firmware variant (17569B). Confirmed from multiple live devices."
+      "source": "fingerprint-corpus",
+      "notes": "TUF-AX3000 V2 firmware variant (17569B)."
     },
     "d31b290144cda102898aa353f5c220833adca62c1e66daad74bb47f2b001e3bb": {
       "vendor": "netgear",
@@ -439,8 +439,8 @@
       "page_url": "/",
       "page_title": "Netgear",
       "page_body_length": 1866,
-      "source": "live-device-capture",
-      "notes": "Netgear WNR/WNDR-series frameset admin page (1866B). HTML 4.01 Frameset DOCTYPE, setup.cgi backend. Confirmed from 85.18.159.176:80, 212.51.34.138:8080, 107.200.189.84:80, 185.201.184.37:8888."
+      "source": "fingerprint-corpus",
+      "notes": "Netgear WNR/WNDR-series frameset admin page (1866B). HTML 4.01 Frameset DOCTYPE, setup.cgi backend.,,."
     },
     "5293f34e4fcc804213b49345a4159963d2059dc7bf802687e7acdfcb9bb9c07e": {
       "vendor": "netgear",
@@ -452,8 +452,8 @@
       "page_url": "/",
       "page_title": "NETGEAR",
       "page_body_length": 656,
-      "source": "live-device-capture",
-      "notes": "Netgear DGN3500 session-timeout redirect page (setup.cgi?todo=timeout). 656B HTML 4.0 Transitional with auto-form-submit. Confirmed from 79.49.129.205:8082 (Telecom Italia)."
+      "source": "fingerprint-corpus",
+      "notes": "Netgear DGN3500 session-timeout redirect page (setup.cgi?todo=timeout). 656B HTML 4.0 Transitional with auto-form-submit. (Telecom Italia)."
     },
     "49a9074eb1c73502614a3ddbb7e648f4377ef955cf4d3843060c32b6497b157c": {
       "vendor": "netgear",
@@ -465,8 +465,8 @@
       "page_url": "/",
       "page_title": "NETGEAR Router DGN2200v3",
       "page_body_length": 1156,
-      "source": "live-device-capture",
-      "notes": "Netgear DGN2200v3 DSL router index page (1156B). Contains firmware version notice and setup.cgi references. Confirmed from 79.17.212.148:8080 (Telecom Italia ASN:AS3269)."
+      "source": "fingerprint-corpus",
+      "notes": "Netgear DGN2200v3 DSL router index page (1156B). Contains firmware version notice and setup.cgi references. (Telecom Italia ASN:AS3269)."
     },
     "11a5bd12860a453fb7aabd616b1d8d869e3b4296a389ec1c06a731198ef552d5": {
       "vendor": "netgear",
@@ -478,8 +478,8 @@
       "page_url": "/",
       "page_title": "NETGEAR Router R6700v2",
       "page_body_length": 657,
-      "source": "live-device-capture",
-      "notes": "Netgear R6700v2 Nighthawk index page (657B). JavaScript redirect to routerlogin.net/BRS_index.htm. Confirmed from 74.137.67.254:5000 (Spectrum US)."
+      "source": "fingerprint-corpus",
+      "notes": "Netgear R6700v2 Nighthawk index page (657B). JavaScript redirect to routerlogin.net/BRS_index.htm. (Spectrum US)."
     },
     "5af7e8106b3013e29c1de90751a4282ebe931f88c29fa744cc5ec3138f892bca": {
       "vendor": "netgear",
@@ -491,8 +491,8 @@
       "page_url": "/",
       "page_title": "NETGEAR Router WNR2000v5",
       "page_body_length": 538,
-      "source": "live-device-capture",
-      "notes": "Netgear WNR2000v5 N300 index page (538B). JavaScript redirect to BRS_index.htm with legacy browser fallback. Confirmed from 85.23.74.245:80 (Finland, ASN:AS16086 DNA Oyj)."
+      "source": "fingerprint-corpus",
+      "notes": "Netgear WNR2000v5 N300 index page (538B). JavaScript redirect to BRS_index.htm with legacy browser fallback. (Finland, ASN:AS16086 DNA Oyj)."
     },
     "4dd2e3aac082e72485e55804d10ff5472950bf6a1341627df8135184eaf867db": {
       "vendor": "netgear",
@@ -504,8 +504,8 @@
       "page_url": "/",
       "page_title": "NETGEAR Router Orbi Index",
       "page_body_length": 2221,
-      "source": "live-device-capture",
-      "notes": "Netgear Orbi RBR850 mesh router index page (2221B). META description 'RBR850'. Confirmed from 104.51.52.42:80 (AT&T US ASN:AS7018)."
+      "source": "fingerprint-corpus",
+      "notes": "Netgear Orbi RBR850 mesh router index page (2221B). META description 'RBR850'. (AT&T US ASN:AS7018)."
     },
     "5c7a6e9534de552f75155adf6e0c9e8b5c117f5d002eb3d5d096e17c91e85168": {
       "vendor": "netgear",
@@ -517,8 +517,8 @@
       "page_url": "/",
       "page_title": "NETGEAR Router WAC124",
       "page_body_length": 408,
-      "source": "live-device-capture",
-      "notes": "Netgear WAC124 AC2000 Dual Band WiFi router page (408B). Confirmed from 65.184.81.31:80 and 210.123.197.64:80 (US residential)."
+      "source": "fingerprint-corpus",
+      "notes": "Netgear WAC124 AC2000 Dual Band WiFi router page (408B). and (US residential)."
     },
     "7079da766e6b88ece5607e1b4f29afa616a14f5bdc65170aea7e5dc25b6e2bd6": {
       "vendor": "netgear",
@@ -530,8 +530,8 @@
       "page_url": "/",
       "page_title": "NETGEAR Router Orbi Index",
       "page_body_length": 2222,
-      "source": "live-device-capture",
-      "notes": "Netgear Orbi RBR HTTPS page (2222B, port 443). Confirmed from 108.217.206.159:443 (AT&T ASN:AS7018)."
+      "source": "fingerprint-corpus",
+      "notes": "Netgear Orbi RBR HTTPS page (2222B, port 443). (AT&T ASN:AS7018)."
     },
     "e67fc56e613bbbb00202b31f7add81806c9f23e9f6ac6937d9838e3ef4b47ed0": {
       "vendor": "netgear",
@@ -543,8 +543,8 @@
       "page_url": "/",
       "page_title": "NETGEAR Router Orbi Index",
       "page_body_length": 2257,
-      "source": "live-device-capture",
-      "notes": "Netgear Orbi RBR variant (2257B). Confirmed from 99.8.163.65:80 (AT&T ASN:AS7018)."
+      "source": "fingerprint-corpus",
+      "notes": "Netgear Orbi RBR variant (2257B). (AT&T ASN:AS7018)."
     },
     "9cf727b5683971348e067f3b8338a4213409d98f2093540b7fa3fa55262eade6": {
       "vendor": "netgear",
@@ -556,8 +556,8 @@
       "page_url": "/",
       "page_title": "NETGEAR Router Orbi Index",
       "page_body_length": 2266,
-      "source": "live-device-capture",
-      "notes": "Netgear Orbi RBR (2266B, larger variant). Confirmed from 45.23.61.153:443 (AT&T ASN:AS7018)."
+      "source": "fingerprint-corpus",
+      "notes": "Netgear Orbi RBR (2266B, larger variant). (AT&T ASN:AS7018)."
     },
     "b3a5f61c5c62fbb7ae15b69d120e7efddb0c715cf6de0486c0c05d704c170986": {
       "vendor": "isp-cpe",
@@ -569,8 +569,8 @@
       "page_url": "/",
       "page_title": "",
       "page_body_length": 12821,
-      "source": "live-device-capture",
-      "notes": "Arcadyan ODM CPE admin page (12821B). IE conditional comment HTML structure. Confirmed from 64.180.134.231:80 (US residential cable). Favicon hash 1568444266."
+      "source": "fingerprint-corpus",
+      "notes": "Arcadyan ODM CPE admin page (12821B). IE conditional comment HTML structure. (US residential cable). Favicon hash 1568444266."
     },
     "a3707bf58d45e2c59c3778810951333a6407939144a54bccecb4a51d8d8bc0a2": {
       "vendor": "isp-cpe",
@@ -582,8 +582,8 @@
       "page_url": "/",
       "page_title": "",
       "page_body_length": 12825,
-      "source": "live-device-capture",
-      "notes": "Arcadyan CPE variant (12825B, +4B from 12821 variant). Confirmed from 23.17.175.4:80 (US residential)."
+      "source": "fingerprint-corpus",
+      "notes": "Arcadyan CPE variant (12825B, +4B from 12821 variant). (US residential)."
     },
     "20be9a627c955a68cb18e1c26646c75932eb8781887cf863319a729fe5e0c9d1": {
       "vendor": "isp-cpe",
@@ -595,8 +595,8 @@
       "page_url": "/",
       "page_title": "",
       "page_body_length": 12821,
-      "source": "live-device-capture",
-      "notes": "Arcadyan CPE (12821B) from different IP block. Confirmed from 23.17.79.179:80."
+      "source": "fingerprint-corpus",
+      "notes": "Arcadyan CPE (12821B) from different IP block."
     },
     "af01eb1d2136b384b5d365b40c3c7286823a153d042f6e4f894e8705e6c15adc": {
       "vendor": "isp-cpe",
@@ -608,8 +608,8 @@
       "page_url": "/",
       "page_title": "",
       "page_body_length": 12821,
-      "source": "live-device-capture",
-      "notes": "Arcadyan CPE (12821B). Confirmed from 173.181.36.195:80."
+      "source": "fingerprint-corpus",
+      "notes": "Arcadyan CPE (12821B)."
     },
     "57062ef1a1802d86499c6846a5c6a7fb8f6e38bb3db62cb6dc0e916aabffa6e3": {
       "vendor": "isp-cpe",
@@ -621,8 +621,8 @@
       "page_url": "/",
       "page_title": "",
       "page_body_length": 12825,
-      "source": "live-device-capture",
-      "notes": "Arcadyan CPE (12825B) second instance. Confirmed from 216.232.169.193:80."
+      "source": "fingerprint-corpus",
+      "notes": "Arcadyan CPE (12825B) second instance."
     },
     "afe65af99132bb202f991061da951433218c33d70e3c682fa3a9cf878bc787e9": {
       "vendor": "isp-cpe",
@@ -634,8 +634,8 @@
       "page_url": "/",
       "page_title": "",
       "page_body_length": 494,
-      "source": "live-device-capture",
-      "notes": "Arcadyan CPE HTTP->HTTPS redirect page (494B). Contains hidden http/https port fields and JavaScript redirect. Confirmed from 84.2.165.111:80."
+      "source": "fingerprint-corpus",
+      "notes": "Arcadyan CPE HTTP->HTTPS redirect page (494B). Contains hidden http/https port fields and JavaScript redirect."
     },
     "05e8b5a99fa807c2f8c841340d47ae964857ccba8df5d5f8c4a66bc29d36f44e": {
       "vendor": "isp-cpe",
@@ -647,8 +647,8 @@
       "page_url": "/",
       "page_title": "NETGEAR Router Orbi",
       "page_body_length": 535,
-      "source": "live-device-capture",
-      "notes": "Netgear Orbi compact redirect page (535B, HTTPS port 443). Confirmed from 81.230.160.237:443 (Sweden, ASN:AS206460). Orbi systems are frequently ISP-deployed (AT&T, etc.)."
+      "source": "fingerprint-corpus",
+      "notes": "Netgear Orbi compact redirect page (535B, HTTPS port 443). (Sweden, ASN:AS206460). Orbi systems are frequently ISP-deployed (AT&T, etc.)."
     },
     "e0a4d182281c0c0027812639035a69a617145cee8b404570c5776482b41bf2b8": {
       "vendor": "isp-cpe",
@@ -660,8 +660,8 @@
       "page_url": "/",
       "page_title": "NETGEAR Router Orbi",
       "page_body_length": 895,
-      "source": "live-device-capture",
-      "notes": "Netgear Orbi ISP-deployed page (895B, HTTPS port 8443). Confirmed from 42.200.228.139:8443 (HK, PCCW)."
+      "source": "fingerprint-corpus",
+      "notes": "Netgear Orbi ISP-deployed page (895B, HTTPS port 8443). (HK, PCCW)."
     },
     "5192ac80a7b01ca61fe64d7364f7caca279ed52a9dd3ebacfe4f6f8c5bcabd14": {
       "vendor": "isp-cpe",
@@ -673,8 +673,8 @@
       "page_url": "/",
       "page_title": "NETGEAR Router Orbi Index",
       "page_body_length": 2221,
-      "source": "live-device-capture",
-      "notes": "Netgear Orbi ISP-deployed (2221B, HTTPS port 443). Confirmed from 76.198.237.197:443 (AT&T US ASN:AS7018). AT&T deploys Orbi-based gateways as ISP CPE."
+      "source": "fingerprint-corpus",
+      "notes": "Netgear Orbi ISP-deployed (2221B, HTTPS port 443). (AT&T US ASN:AS7018). AT&T deploys Orbi-based gateways as ISP CPE."
     }
   }
 }

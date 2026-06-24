@@ -59,7 +59,6 @@ types:
       verboseLogs: boolean
       globalRateLimit: integer
       globalTimeout: integer
-      verifyTls: boolean
   # Application Fingerprint Attempt Struct
   ApplicationFingerprintAttempt:
     properties:

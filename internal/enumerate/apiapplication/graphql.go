@@ -4,6 +4,7 @@ import (
 	// Standard
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -146,7 +147,7 @@ func PerformAppEnumerateGraphQL(ctx context.Context, config enumerateapiapplicat
 		return report
 	}
 
-	body, err := fetchGraphQL(ctx, config.Target, requestBody, config.Headers, config.Cookies, config.Timeout)
+	body, err := fetchGraphQL(ctx, config.Target, requestBody, config.Headers, config.Cookies, config.Timeout, config.VerifyTls)
 	if err != nil {
 		report.Errors = append(report.Errors, err.Error())
 		return report
@@ -208,7 +209,7 @@ func buildGraphQLRequestBody(config enumerateapiapplicationfern.EnumerateGraphql
 	return json.Marshal(payload)
 }
 
-func fetchGraphQL(ctx context.Context, target string, requestBody []byte, headers map[string]string, cookies map[string]string, timeout *int) ([]byte, error) {
+func fetchGraphQL(ctx context.Context, target string, requestBody []byte, headers map[string]string, cookies map[string]string, timeout *int, verifyTls bool) ([]byte, error) {
 	log := svc1log.FromContext(ctx)
 
 	effectiveTimeout := defaultGraphQLTimeout
@@ -228,7 +229,12 @@ func fetchGraphQL(ctx context.Context, target string, requestBody []byte, header
 		req.AddCookie(&http.Cookie{Name: name, Value: value})
 	}
 
-	client := &http.Client{Timeout: time.Duration(effectiveTimeout) * time.Second}
+	client := &http.Client{
+		Timeout: time.Duration(effectiveTimeout) * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: !verifyTls},
+		},
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		log.Error("Failed to fetch GraphQL response", svc1log.SafeParam("error", err))

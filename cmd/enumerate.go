@@ -105,11 +105,18 @@ func (a *WebScan) InitEnumerateCommand() {
 				return
 			}
 
+			verifyTLS, err := cmd.Flags().GetBool("verify-tls")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
 			config := enumerateapiapplicationfern.EnumerateGraphqlConfig{
-				Target:  target,
-				Headers: headers,
-				Cookies: cookies,
-				Timeout: &timeout,
+				Target:    target,
+				Headers:   headers,
+				Cookies:   cookies,
+				Timeout:   &timeout,
+				VerifyTls: verifyTLS,
 			}
 			if query != "" {
 				config.Query = &query
@@ -136,6 +143,7 @@ func (a *WebScan) InitEnumerateCommand() {
 	enumerateAPIApplicationGraphqlCmd.Flags().String("query", "", "Execute this ad-hoc GraphQL query instead of schema introspection")
 	enumerateAPIApplicationGraphqlCmd.Flags().String("variables", "", "JSON-encoded variables for the ad-hoc --query")
 	enumerateAPIApplicationGraphqlCmd.Flags().Bool("allow-mutations", false, "Permit mutation and subscription operations (default rejects them at the AST level)")
+	enumerateAPIApplicationGraphqlCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
 
 	// Mark required flags
 	_ = enumerateAPIApplicationGraphqlCmd.MarkFlagRequired("target")
@@ -209,6 +217,12 @@ func (a *WebScan) InitEnumerateCommand() {
 				return
 			}
 
+			verifyTLS, err := cmd.Flags().GetBool("verify-tls")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
 			config := enumerateapiapplicationfern.EnumerateSwaggerConfig{
 				Target:         target,
 				Timeout:        timeout,
@@ -216,6 +230,7 @@ func (a *WebScan) InitEnumerateCommand() {
 				Headers:        headers,
 				Cookies:        cookies,
 				CandidatePaths: candidatePaths,
+				VerifyTls:      verifyTLS,
 			}
 			if specUrl != "" {
 				config.SpecUrl = &specUrl
@@ -235,6 +250,7 @@ func (a *WebScan) InitEnumerateCommand() {
 	enumerateAPIApplicationSwaggerCmd.Flags().StringArray("cookie", []string{}, "Cookies as 'name=value' pairs (repeatable)")
 	enumerateAPIApplicationSwaggerCmd.Flags().StringSlice("candidate-paths", []string{}, "Additional spec paths to probe before built-in paths (comma-separated)")
 	enumerateAPIApplicationSwaggerCmd.Flags().String("spec-url", "", "Direct URL to OpenAPI/Swagger spec; skips all probing when set")
+	enumerateAPIApplicationSwaggerCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
 	// User Agent Flag
 	enumerateAPIApplicationSwaggerCmd.Flags().String("user-agent", "RANDOM", "User-Agent preset (RANDOM, CHROME, FIREFOX, SAFARI, EDGE)")
 

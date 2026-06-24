@@ -100,6 +100,18 @@ func (a *WebScan) InitDiscoverCommand() {
 				return
 			}
 
+			verifyTLS, err := cmd.Flags().GetBool("verify-tls")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			// TODO: Wire verifyTLS into the nuclei runner once the nuclei lib exposes an
+			// InsecureSkipVerify / TlsVerify toggle. NetworkConfig in
+			// vendor/github.com/projectdiscovery/nuclei/v3/lib/config.go currently has
+			// no such field. Flag is accepted + carried through the Fern config so the
+			// ontology surface stays uniform.
+			_ = verifyTLS
+
 			templatePaths, err := cmd.Flags().GetStringSlice("template-paths")
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -107,7 +119,7 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Create config
-			config, err := getDiscoverApplicationConfig(targets, resourceType, templatePaths, timeout, threads, proxy, verboseLogs, globalRateLimit, globalTimeout)
+			config, err := getDiscoverApplicationConfig(targets, resourceType, templatePaths, timeout, threads, proxy, verboseLogs, globalRateLimit, globalTimeout, verifyTLS)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -132,6 +144,7 @@ func (a *WebScan) InitDiscoverCommand() {
 	discoverApplicationCmd.Flags().Bool("verbose-logs", false, "Verbose logs")
 	discoverApplicationCmd.Flags().Int("global-rate-limit", 10, "Global rate limit in requests per second")
 	discoverApplicationCmd.Flags().Int("global-timeout", 0, "Maximum total scan time in seconds")
+	discoverApplicationCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
 	// TODO: Add --user-agent flag here once the nuclei runner supports UserAgentPreset.
 	// Skipped for now because application discovery uses nuclei, not the standard HTTP client.
 
@@ -1333,7 +1346,7 @@ func parseDiscoverRequestFiles(pairs []string) ([]*discover.RequestFile, error) 
 }
 
 // getDiscoverApplicationConfig builds the config for application fingerprinting discovery.
-func getDiscoverApplicationConfig(targets []string, resource string, templatePaths []string, timeout int, threads int, proxy string, verboseLogs bool, globalRateLimit int, globalTimeout int) (*discover.DiscoverApplicationConfig, error) {
+func getDiscoverApplicationConfig(targets []string, resource string, templatePaths []string, timeout int, threads int, proxy string, verboseLogs bool, globalRateLimit int, globalTimeout int, verifyTLS bool) (*discover.DiscoverApplicationConfig, error) {
 	resourceEnum, err := getDiscoverApplicationResourceConfigTypeFromString(resource)
 	if err != nil {
 		return nil, fmt.Errorf("invalid resource type: %s", resource)
@@ -1349,6 +1362,7 @@ func getDiscoverApplicationConfig(targets []string, resource string, templatePat
 		VerboseLogs:     verboseLogs,
 		GlobalRateLimit: max(0, globalRateLimit),
 		GlobalTimeout:   max(0, globalTimeout),
+		VerifyTls:       verifyTLS,
 	}
 	return config, nil
 }

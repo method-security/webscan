@@ -272,7 +272,12 @@ func PerformWordlistCapture(ctx context.Context, config discover.DiscoverWordlis
 
 	for len(urlsToVisit) > 0 && currentDepth < config.SpiderDepth {
 		urlsAtDepth := urlsToVisit
-		var nextDepthURLs []string
+		// nextDepthSet dedupes across pages within the same depth so that links
+		// pointing to the same URL from different pages don't accumulate multiple
+		// copies in the frontier. Combined with the maxVisitedURLs cap, this
+		// keeps total memory bounded even when many pages reference the same
+		// already-visited (or cap-skipped) target.
+		nextDepthSet := make(map[string]struct{})
 		var nextDepthMu sync.Mutex
 
 		log.Info("Visiting URLs at depth", svc1log.SafeParam("depth", currentDepth))
@@ -421,11 +426,12 @@ func PerformWordlistCapture(ctx context.Context, config discover.DiscoverWordlis
 					mu.Lock()
 					_, alreadyVisited := visitedURLs[link]
 					mu.Unlock()
-					if !alreadyVisited {
-						nextDepthMu.Lock()
-						nextDepthURLs = append(nextDepthURLs, link)
-						nextDepthMu.Unlock()
+					if alreadyVisited {
+						continue
 					}
+					nextDepthMu.Lock()
+					nextDepthSet[link] = struct{}{}
+					nextDepthMu.Unlock()
 				}
 			}(rawURL)
 		}
@@ -437,6 +443,21 @@ func PerformWordlistCapture(ctx context.Context, config discover.DiscoverWordlis
 			errors = append(errors, e)
 		}
 
+		// Materialize the deduped frontier. If the visited cap is already
+		// exhausted, stop descending — every URL here would be skipped by
+		// the per-goroutine cap check anyway, so iterating wastes work and
+		// only inflates errors.
+		mu.Lock()
+		capExhausted := len(visitedURLs) >= maxVisitedURLs
+		mu.Unlock()
+		if capExhausted {
+			visitTruncated = true
+			break
+		}
+		nextDepthURLs := make([]string, 0, len(nextDepthSet))
+		for link := range nextDepthSet {
+			nextDepthURLs = append(nextDepthURLs, link)
+		}
 		urlsToVisit = nextDepthURLs
 		currentDepth++
 	}

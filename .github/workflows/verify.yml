@@ -13,6 +13,16 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Warn on test artifacts in changed code
+        run: |
+          base="${{ github.base_ref }}"
+          if [ -n "$base" ]; then
+            git fetch --no-tags origin "$base" || true
+            python3 scripts/check-test-artifacts.py --base "origin/$base" --github
+          else
+            python3 scripts/check-test-artifacts.py --base "HEAD~1" --github
+          fi
+
       - name: Download Fern Generated Code (Go)
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # ratchet:actions/download-artifact@v8
         with:

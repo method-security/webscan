@@ -12,7 +12,7 @@
 //  3. ParseCookiePairs / ParseFormDataPairs do NOT comma-join; cookies and
 //     form fields with the same name are last-write-wins (cookies follow
 //     RFC 6265 set-cookie semantics; form-data has no multi-value contract).
-package helpers
+package request
 
 import (
 	"strings"

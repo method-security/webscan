@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Non-blocking warning for test artifacts (public IPs) in staged changes.
 # Enable once per clone:  git config core.hooksPath .githooks
 set -euo pipefail
 

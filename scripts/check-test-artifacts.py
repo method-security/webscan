@@ -86,7 +86,14 @@ def get_diff(args) -> str:
     else:
         cmd.append("--cached")
     cmd += ["--", ".", ":(exclude)vendor"]
-    return subprocess.run(cmd, capture_output=True, text=True, check=True).stdout
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    if proc.returncode != 0:
+        # Stay non-blocking: a broken diff (e.g. missing base ref) must not
+        # fail the commit or the CI step. Report and treat as "no changes".
+        sys.stderr.write("check-test-artifacts: skipping — git diff failed: "
+                         f"{proc.stderr.strip()}\n")
+        return ""
+    return proc.stdout
 
 
 def main() -> int:

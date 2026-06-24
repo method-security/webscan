@@ -17,10 +17,17 @@ jobs:
         run: |
           base="${{ github.base_ref }}"
           if [ -n "$base" ]; then
+            # Pull request: scan the full PR range against the target branch.
             git fetch --no-tags origin "$base" || true
             python3 scripts/check-test-artifacts.py --base "origin/$base" --github
           else
-            python3 scripts/check-test-artifacts.py --base "HEAD~1" --github
+            # Push: scan the whole pushed range (event.before...HEAD), not just
+            # the tip commit. event.before is all-zeros on branch creation.
+            before="${{ github.event.before }}"
+            case "$before" in
+              ""|0000000000000000000000000000000000000000) before="HEAD~1" ;;
+            esac
+            python3 scripts/check-test-artifacts.py --base "$before" --github
           fi
 
       - name: Download Fern Generated Code (Go)

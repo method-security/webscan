@@ -146,9 +146,9 @@ type singleFileDirHandle struct {
 	offset int
 }
 
-func (d *singleFileDirHandle) Stat() (fs.FileInfo, error) { return &dirInfo{name: "."}, nil }
-func (d *singleFileDirHandle) Read([]byte) (int, error)   { return 0, fmt.Errorf("is a directory") }
-func (d *singleFileDirHandle) Close() error               { return nil }
+func (d *singleFileDirHandle) Stat() (fs.FileInfo, error)  { return &dirInfo{name: "."}, nil }
+func (d *singleFileDirHandle) Read([]byte) (int, error)    { return 0, fmt.Errorf("is a directory") }
+func (d *singleFileDirHandle) Close() error                { return nil }
 
 func (d *singleFileDirHandle) ReadDir(n int) ([]fs.DirEntry, error) {
 	info, err := os.Stat(d.fsys.path)

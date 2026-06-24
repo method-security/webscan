@@ -28,17 +28,6 @@ import (
 	"golang.org/x/net/publicsuffix"
 )
 
-// Hard upper bounds on the BFS to prevent unbounded memory growth on
-// pathological targets. The BFS is depth-limited via config.SpiderDepth but
-// not breadth-limited — at depth N with K links/page it can enqueue N×K URLs
-// per page with no cap. Cap visited URLs and the accumulated word set to
-// keep the worst case bounded; surface as errors when the cap is hit so the
-// operator knows the run was truncated rather than complete.
-const (
-	maxVisitedURLs = 10000
-	maxUniqueWords = 100000
-)
-
 // commentRegex matches HTML comments <!-- ... -->
 var commentRegex = regexp.MustCompile(`<!--(.*?)-->`)
 
@@ -260,11 +249,6 @@ func PerformWordlistCapture(ctx context.Context, config discover.DiscoverWordlis
 	visitedURLs := make(map[string]struct{})
 	allCrawled := []string{}
 	var errors []string
-	// Explicit truncation flags — set only when we actually skip work due
-	// to a cap. Inferring truncation from `len(visitedURLs) >= cap` at the
-	// end would also fire on a crawl that naturally finished with exactly
-	// the cap, falsely reporting truncation on a complete run.
-	var visitTruncated, wordTruncated bool
 
 	// BFS setup
 	urlsToVisit := []string{config.Target}
@@ -272,12 +256,7 @@ func PerformWordlistCapture(ctx context.Context, config discover.DiscoverWordlis
 
 	for len(urlsToVisit) > 0 && currentDepth < config.SpiderDepth {
 		urlsAtDepth := urlsToVisit
-		// nextDepthSet dedupes across pages within the same depth so that links
-		// pointing to the same URL from different pages don't accumulate multiple
-		// copies in the frontier. Combined with the maxVisitedURLs cap, this
-		// keeps total memory bounded even when many pages reference the same
-		// already-visited (or cap-skipped) target.
-		nextDepthSet := make(map[string]struct{})
+		var nextDepthURLs []string
 		var nextDepthMu sync.Mutex
 
 		log.Info("Visiting URLs at depth", svc1log.SafeParam("depth", currentDepth))
@@ -299,15 +278,9 @@ func PerformWordlistCapture(ctx context.Context, config discover.DiscoverWordlis
 				defer wg.Done()
 				defer func() { <-semaphore }()
 
-				// Skip already-visited URLs and enforce the hard cap on total
-				// crawled URLs to prevent unbounded BFS growth.
+				// Skip already-visited URLs
 				mu.Lock()
 				if _, visited := visitedURLs[targetURL]; visited {
-					mu.Unlock()
-					return
-				}
-				if len(visitedURLs) >= maxVisitedURLs {
-					visitTruncated = true
 					mu.Unlock()
 					return
 				}
@@ -372,17 +345,11 @@ func PerformWordlistCapture(ctx context.Context, config discover.DiscoverWordlis
 
 				// Record crawled URL; also mark the final redirect destination as
 				// visited so that if another path discovers the canonical URL directly
-				// it isn't fetched a second time. The redirect-marker insert also
-				// respects maxVisitedURLs so a redirect-heavy crawl can't grow the
-				// visited set past the bound.
+				// it isn't fetched a second time.
 				mu.Lock()
 				allCrawled = append(allCrawled, targetURL)
 				if finalURL != targetURL {
-					if len(visitedURLs) < maxVisitedURLs {
-						visitedURLs[strings.TrimRight(finalURL, "/")] = struct{}{}
-					} else {
-						visitTruncated = true
-					}
+					visitedURLs[strings.TrimRight(finalURL, "/")] = struct{}{}
 				}
 				mu.Unlock()
 
@@ -397,12 +364,7 @@ func PerformWordlistCapture(ctx context.Context, config discover.DiscoverWordlis
 					words := extractWords(bodyStr, config)
 					mu.Lock()
 					for _, w := range words {
-						key := strings.ToLower(w)
-						if _, present := wordCounts[key]; !present && len(wordCounts) >= maxUniqueWords {
-							wordTruncated = true
-							continue
-						}
-						wordCounts[key]++
+						wordCounts[strings.ToLower(w)]++
 					}
 					mu.Unlock()
 				}
@@ -426,12 +388,11 @@ func PerformWordlistCapture(ctx context.Context, config discover.DiscoverWordlis
 					mu.Lock()
 					_, alreadyVisited := visitedURLs[link]
 					mu.Unlock()
-					if alreadyVisited {
-						continue
+					if !alreadyVisited {
+						nextDepthMu.Lock()
+						nextDepthURLs = append(nextDepthURLs, link)
+						nextDepthMu.Unlock()
 					}
-					nextDepthMu.Lock()
-					nextDepthSet[link] = struct{}{}
-					nextDepthMu.Unlock()
 				}
 			}(rawURL)
 		}
@@ -443,21 +404,6 @@ func PerformWordlistCapture(ctx context.Context, config discover.DiscoverWordlis
 			errors = append(errors, e)
 		}
 
-		// Materialize the deduped frontier. If the visited cap is already
-		// exhausted, stop descending — every URL here would be skipped by
-		// the per-goroutine cap check anyway, so iterating wastes work and
-		// only inflates errors.
-		mu.Lock()
-		capExhausted := len(visitedURLs) >= maxVisitedURLs
-		mu.Unlock()
-		if capExhausted {
-			visitTruncated = true
-			break
-		}
-		nextDepthURLs := make([]string, 0, len(nextDepthSet))
-		for link := range nextDepthSet {
-			nextDepthURLs = append(nextDepthURLs, link)
-		}
 		urlsToVisit = nextDepthURLs
 		currentDepth++
 	}
@@ -482,16 +428,6 @@ func PerformWordlistCapture(ctx context.Context, config discover.DiscoverWordlis
 	report.Result.Words = words
 	report.Result.TotalUnique = &totalUnique
 	report.Result.UrlsCrawled = allCrawled
-
-	// Surface truncation: only when we actually dropped work due to a cap,
-	// not when a run happened to finish with exactly the cap size.
-	if visitTruncated {
-		errors = append(errors, fmt.Sprintf("BFS truncated: hit maxVisitedURLs=%d cap; remaining links not crawled", maxVisitedURLs))
-	}
-	if wordTruncated {
-		errors = append(errors, fmt.Sprintf("word collection truncated: hit maxUniqueWords=%d cap; later unique tokens dropped", maxUniqueWords))
-	}
-
 	report.Errors = errors
 
 	return report

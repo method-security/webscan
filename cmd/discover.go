@@ -438,10 +438,26 @@ func (a *WebScan) InitDiscoverCommand() {
 
 			// Set Config
 			config := getDiscoverPageConfig(target, sensitiveContentDetection, sensitiveContentFingerprintsPath, responseCodes, maxRedirects, verifyTLS, timeout, ignoreCrossDomainRedirects, takeScreenshot, userAgentPreset, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
-			config.Headers = requesthelpers.ParseHeaderPairs(headerPairs)
-			config.Cookies = requesthelpers.ParseFormDataPairs(cookiePairs)
-			config.LocalStorage = requesthelpers.ParseFormDataPairs(localStoragePairs)
-			config.SessionStorage = requesthelpers.ParseFormDataPairs(sessionStoragePairs)
+			config.Headers, err = requesthelpers.ParseHeaderPairs(headerPairs)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			config.Cookies, err = requesthelpers.ParseFormDataPairs(cookiePairs)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			config.LocalStorage, err = requesthelpers.ParseFormDataPairs(localStoragePairs)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			config.SessionStorage, err = requesthelpers.ParseFormDataPairs(sessionStoragePairs)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
 
 			// Load sensitive content fingerprints if sensitive content detection is enabled and no fingerprints are found, return an error
 			var sensitiveContentFingerprints *discover.SensitiveContentFingerprints
@@ -486,8 +502,8 @@ func (a *WebScan) InitDiscoverCommand() {
 	discoverPageCmd.Flags().Bool("browserbase-proxy", false, "Use Browserbase proxy for requests")
 	discoverPageCmd.Flags().StringSlice("browserbase-countries", []string{}, "List of countries to use for Browserbase proxy")
 	// Authenticated-capture flags
-	discoverPageCmd.Flags().StringArray("header", []string{}, "Request header for authenticated capture as 'Name: Value' (repeatable)")
-	discoverPageCmd.Flags().StringArray("cookie", []string{}, "Cookie for authenticated capture as 'name=value' (repeatable)")
+	discoverPageCmd.Flags().StringArray("header", []string{}, "Request header for authenticated capture as 'Name: Value' (repeatable; missing colon errors; repeated names are case-insensitively comma-joined per RFC 7230 §3.2.2)")
+	discoverPageCmd.Flags().StringArray("cookie", []string{}, "Cookie for authenticated capture as 'name=value' (repeatable; missing equals errors)")
 	discoverPageCmd.Flags().StringArray("local-storage", []string{}, "localStorage entry as 'key=value' injected before page load (repeatable, headless only)")
 	discoverPageCmd.Flags().StringArray("session-storage", []string{}, "sessionStorage entry as 'key=value' injected before page load (repeatable, headless only)")
 
@@ -530,7 +546,11 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			headers := requesthelpers.ParseHeaderPairs(headerPairs)
+			headers, err := requesthelpers.ParseHeaderPairs(headerPairs)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
 
 			// JSON body flags. json-body-base64 is transport-safe for callers that
 			// construct commands through an intermediate shell string; when supplied,
@@ -581,7 +601,11 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			formData := requesthelpers.ParseFormDataPairs(formDataPairs)
+			formData, err := requesthelpers.ParseFormDataPairs(formDataPairs)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
 
 			// Multipart file upload flag (repeated)
 			filePairs, err := cmd.Flags().GetStringArray("file")
@@ -683,11 +707,11 @@ func (a *WebScan) InitDiscoverCommand() {
 	discoverRequestCmd.Flags().String("target", "", "URL to send the HTTP request to")
 	// Request Flags
 	discoverRequestCmd.Flags().String("http-method", "GET", "HTTP method (GET,POST,PUT,DELETE,PATCH,HEAD,OPTIONS)")
-	discoverRequestCmd.Flags().StringArray("header", []string{}, "Request headers as 'Key: Value' pairs (repeatable)")
+	discoverRequestCmd.Flags().StringArray("header", []string{}, "Request header as 'Name: Value' (repeatable; each value must contain a colon; repeated names are case-insensitively comma-joined per RFC 7230 §3.2.2 — e.g. two --header \"Accept: application/json\" and --header \"Accept: text/html\" send Accept: application/json, text/html)")
 	discoverRequestCmd.Flags().String("json-body", "", "Request body as JSON string")
 	discoverRequestCmd.Flags().String("json-body-base64", "", "Request body as base64-encoded JSON string")
 	discoverRequestCmd.Flags().String("text-body", "", "Request body as plain text")
-	discoverRequestCmd.Flags().StringArray("form-data", []string{}, "Form data as 'key=value' pairs (repeatable)")
+	discoverRequestCmd.Flags().StringArray("form-data", []string{}, "Form data as 'key=value' (repeatable; missing equals errors)")
 	discoverRequestCmd.Flags().StringArray("file", []string{}, "Multipart file part as 'fieldName|fileName|contentType|base64' (repeatable; contentType may be empty)")
 	discoverRequestCmd.Flags().String("binary-body", "", "Raw request body as base64-encoded bytes")
 	discoverRequestCmd.Flags().String("binary-body-mime-type", "", "Content-Type for --binary-body (default application/octet-stream)")
@@ -955,10 +979,26 @@ func (a *WebScan) InitDiscoverCommand() {
 
 			// Set Config
 			config := getDiscoverRouteConfig(target, ignoreCrossDomain, collectStaticAssets, spiderDepth, maxRedirects, verifyTLS, timeout, sleep, jitter, threads, userAgentPreset, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig, bundleURLs, fetchSourceMaps, maxBundles)
-			config.Headers = requesthelpers.ParseHeaderPairs(headerPairs)
-			config.Cookies = requesthelpers.ParseFormDataPairs(cookiePairs)
-			config.LocalStorage = requesthelpers.ParseFormDataPairs(localStoragePairs)
-			config.SessionStorage = requesthelpers.ParseFormDataPairs(sessionStoragePairs)
+			config.Headers, err = requesthelpers.ParseHeaderPairs(headerPairs)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			config.Cookies, err = requesthelpers.ParseFormDataPairs(cookiePairs)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			config.LocalStorage, err = requesthelpers.ParseFormDataPairs(localStoragePairs)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			config.SessionStorage, err = requesthelpers.ParseFormDataPairs(sessionStoragePairs)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
 
 			// Generate a report
 			report := discoverroute.PerformRouteCapture(cmd.Context(), config, requestMethodConfig.BrowserbaseSecrets)
@@ -992,8 +1032,8 @@ func (a *WebScan) InitDiscoverCommand() {
 	discoverRouteCmd.Flags().Bool("fetch-source-maps", true, "Fetch and scan source maps for additional routes")
 	discoverRouteCmd.Flags().Int("max-bundles", -1, "Maximum number of JS bundles to process (-1 = unlimited, 0 = disabled)")
 	// Authenticated-crawl flags
-	discoverRouteCmd.Flags().StringArray("header", []string{}, "Request header for authenticated crawl as 'Name: Value' (repeatable)")
-	discoverRouteCmd.Flags().StringArray("cookie", []string{}, "Cookie for authenticated crawl as 'name=value' (repeatable)")
+	discoverRouteCmd.Flags().StringArray("header", []string{}, "Request header for authenticated crawl as 'Name: Value' (repeatable; missing colon errors; repeated names are case-insensitively comma-joined per RFC 7230 §3.2.2)")
+	discoverRouteCmd.Flags().StringArray("cookie", []string{}, "Cookie for authenticated crawl as 'name=value' (repeatable; missing equals errors)")
 	discoverRouteCmd.Flags().StringArray("local-storage", []string{}, "localStorage entry as 'key=value' injected before page load (repeatable, headless only)")
 	discoverRouteCmd.Flags().StringArray("session-storage", []string{}, "sessionStorage entry as 'key=value' injected before page load (repeatable, headless only)")
 

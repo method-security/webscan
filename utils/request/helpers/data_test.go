@@ -195,6 +195,42 @@ func TestParseHeaderPairs_ColonInValuePreserved(t *testing.T) {
 	}
 }
 
+// TestParseHeaderPairs_CookieUsesSemicolonSeparator — RFC 6265 §5.4 says
+// the request Cookie header is the one combinable header that uses "; "
+// as a pair separator, NOT "," like RFC 7230 §3.2.2 prescribes for generic
+// combinable headers. Two `--header "Cookie: ..."` flags must merge as
+// `Cookie: a=b; c=d` not `Cookie: a=b, c=d` — the latter is what most
+// servers will either reject or parse as a single (malformed) cookie name.
+func TestParseHeaderPairs_CookieUsesSemicolonSeparator(t *testing.T) {
+	got, err := ParseHeaderPairs([]string{
+		"Cookie: session=abc",
+		"Cookie: csrf=xyz",
+	})
+	if err != nil {
+		t.Fatalf("errored: %v", err)
+	}
+	if got["Cookie"] != "session=abc; csrf=xyz" {
+		t.Fatalf("Cookie merge used wrong separator:\n got %q\nwant %q", got["Cookie"], "session=abc; csrf=xyz")
+	}
+}
+
+// TestParseHeaderPairs_CookieCaseInsensitive — the Cookie semicolon rule
+// must apply regardless of how the operator cased the header name, since
+// `cookie:` is just as valid as `Cookie:` on the wire per RFC 7230 §3.2.
+func TestParseHeaderPairs_CookieCaseInsensitive(t *testing.T) {
+	got, err := ParseHeaderPairs([]string{
+		"cookie: session=abc",
+		"COOKIE: csrf=xyz",
+	})
+	if err != nil {
+		t.Fatalf("errored: %v", err)
+	}
+	// First-seen casing wins, so the key here is "cookie".
+	if got["cookie"] != "session=abc; csrf=xyz" {
+		t.Fatalf("Cookie merge (case-insensitive) used wrong separator:\n got %q\nwant %q", got["cookie"], "session=abc; csrf=xyz")
+	}
+}
+
 func TestParseCookiePairs_Empty(t *testing.T) {
 	got, err := ParseCookiePairs(nil)
 	if err != nil || got != nil {

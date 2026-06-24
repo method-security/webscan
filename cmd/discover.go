@@ -443,7 +443,7 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			config.Cookies, err = requesthelpers.ParseFormDataPairs(cookiePairs)
+			config.Cookies, err = requesthelpers.ParseCookiePairs(cookiePairs)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -984,7 +984,7 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			config.Cookies, err = requesthelpers.ParseFormDataPairs(cookiePairs)
+			config.Cookies, err = requesthelpers.ParseCookiePairs(cookiePairs)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return

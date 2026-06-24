@@ -213,7 +213,7 @@ func (a *WebScan) InitEnumerateCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			cookies, err := requesthelpers.ParseFormDataPairs(cookiePairs)
+			cookies, err := requesthelpers.ParseCookiePairs(cookiePairs)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return

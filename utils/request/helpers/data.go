@@ -68,9 +68,19 @@ func ParseHeaderPairs(pairs []string) (map[string]string, error) {
 			}
 		}
 		if existing, ok := headers[mergeKey]; ok && existing != "" {
-			// Don't append an empty value (would leave a trailing ", ").
+			// Don't append an empty value (would leave a trailing separator).
 			if value != "" {
-				headers[mergeKey] = existing + ", " + value
+				// Cookie is RFC 6265's outlier — its values are pairs separated
+				// by "; " on the wire, NOT "," like RFC 7230 §3.2.2 prescribes
+				// for generic combinable headers. Merging two
+				// --header "Cookie: a=b" + "Cookie: c=d" with a comma would
+				// produce "Cookie: a=b, c=d" which servers either reject or
+				// parse as a single (corrupt) cookie name.
+				sep := ", "
+				if strings.EqualFold(mergeKey, "Cookie") {
+					sep = "; "
+				}
+				headers[mergeKey] = existing + sep + value
 			}
 		} else {
 			headers[mergeKey] = value

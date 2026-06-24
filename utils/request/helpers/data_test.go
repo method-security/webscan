@@ -165,6 +165,23 @@ func TestParseHeaderPairs_EmptyValueOK(t *testing.T) {
 	}
 }
 
+// TestParseHeaderPairs_EmptyValueAfterNonEmptyDoesNotTrail — guard against a
+// trailing ", " when a non-empty value is followed by an empty one for the
+// same header. The merge must not append an empty value onto the existing
+// content.
+func TestParseHeaderPairs_EmptyValueAfterNonEmptyDoesNotTrail(t *testing.T) {
+	got, err := ParseHeaderPairs([]string{
+		"Accept: application/json",
+		"Accept:", // intentionally empty
+	})
+	if err != nil {
+		t.Fatalf("errored: %v", err)
+	}
+	if got["Accept"] != "application/json" {
+		t.Fatalf("empty merge produced trailing comma: %q", got["Accept"])
+	}
+}
+
 // TestParseHeaderPairs_ColonInValuePreserved — the value side of "Name: Value"
 // can legitimately contain colons (e.g. Authorization: Basic user:pass-base64
 // or a URL in a custom header). We split on the FIRST colon only.

@@ -68,7 +68,10 @@ func ParseHeaderPairs(pairs []string) (map[string]string, error) {
 			}
 		}
 		if existing, ok := headers[mergeKey]; ok && existing != "" {
-			headers[mergeKey] = existing + ", " + value
+			// Don't append an empty value (would leave a trailing ", ").
+			if value != "" {
+				headers[mergeKey] = existing + ", " + value
+			}
 		} else {
 			headers[mergeKey] = value
 		}

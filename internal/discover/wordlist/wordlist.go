@@ -28,6 +28,17 @@ import (
 	"golang.org/x/net/publicsuffix"
 )
 
+// Hard upper bounds on the BFS to prevent unbounded memory growth on
+// pathological targets. The BFS is depth-limited via config.SpiderDepth but
+// not breadth-limited — at depth N with K links/page it can enqueue N×K URLs
+// per page with no cap. Cap visited URLs and the accumulated word set to
+// keep the worst case bounded; surface as errors when the cap is hit so the
+// operator knows the run was truncated rather than complete.
+const (
+	maxVisitedURLs = 10000
+	maxUniqueWords = 100000
+)
+
 // commentRegex matches HTML comments <!-- ... -->
 var commentRegex = regexp.MustCompile(`<!--(.*?)-->`)
 
@@ -278,9 +289,14 @@ func PerformWordlistCapture(ctx context.Context, config discover.DiscoverWordlis
 				defer wg.Done()
 				defer func() { <-semaphore }()
 
-				// Skip already-visited URLs
+				// Skip already-visited URLs and enforce the hard cap on total
+				// crawled URLs to prevent unbounded BFS growth.
 				mu.Lock()
 				if _, visited := visitedURLs[targetURL]; visited {
+					mu.Unlock()
+					return
+				}
+				if len(visitedURLs) >= maxVisitedURLs {
 					mu.Unlock()
 					return
 				}
@@ -364,7 +380,11 @@ func PerformWordlistCapture(ctx context.Context, config discover.DiscoverWordlis
 					words := extractWords(bodyStr, config)
 					mu.Lock()
 					for _, w := range words {
-						wordCounts[strings.ToLower(w)]++
+						key := strings.ToLower(w)
+						if _, present := wordCounts[key]; !present && len(wordCounts) >= maxUniqueWords {
+							continue
+						}
+						wordCounts[key]++
 					}
 					mu.Unlock()
 				}
@@ -428,6 +448,16 @@ func PerformWordlistCapture(ctx context.Context, config discover.DiscoverWordlis
 	report.Result.Words = words
 	report.Result.TotalUnique = &totalUnique
 	report.Result.UrlsCrawled = allCrawled
+
+	// Surface truncation: callers should know a run was bounded by either cap
+	// (rather than naturally completing) so they can adjust scope or filters.
+	if len(visitedURLs) >= maxVisitedURLs {
+		errors = append(errors, fmt.Sprintf("BFS truncated: hit maxVisitedURLs=%d cap; remaining links not crawled", maxVisitedURLs))
+	}
+	if len(wordCounts) >= maxUniqueWords {
+		errors = append(errors, fmt.Sprintf("word collection truncated: hit maxUniqueWords=%d cap; later unique tokens dropped", maxUniqueWords))
+	}
+
 	report.Errors = errors
 
 	return report

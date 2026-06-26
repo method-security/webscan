@@ -56,25 +56,52 @@ func ExtractFaviconURL(html, finalURL string) string {
 	return fmt.Sprintf("%s://%s/favicon.ico", parsed.Scheme, parsed.Host)
 }
 
-// FetchFavicon downloads the favicon at faviconURL using an HTTP client that
-// respects verifyTLS and timeout. Returns the raw bytes and a Shodan-compatible
-// mmh3-32 hash (signed int32, decimal string). On non-2xx, network error, or
-// empty body, it returns nil, "", nil (caller treats this as not found).
-func FetchFavicon(ctx context.Context, faviconURL string, timeout int, verifyTLS bool) ([]byte, string, error) {
+// FetchFavicon downloads the favicon at faviconURL using a fresh HTTP client
+// that respects verifyTLS and timeout. The caller supplies userAgent (typically
+// the resolved discover-page UA) so favicon traffic matches what the headless
+// browser advertised — servers that vary their favicon on UA work correctly.
+//
+// IMPORTANT: a fresh context is derived from `ctx` instead of using `ctx` as a
+// deadline-bearing parent. The combined headless capture exhausts most of its
+// own `requestCtx` window during navigation + DOM stabilization; if we reused
+// that deadline here, the favicon fetch could see ~0s of slack and always
+// time out. We still inherit cancellation by piggy-backing on `ctx.Done()`
+// (so a parent cancel propagates) but reset the timeout to a fresh budget.
+//
+// Returns the raw bytes and a Shodan-compatible mmh3-32 hash (signed int32,
+// decimal string). On non-2xx, network error, or empty body, it returns
+// (nil, "", nil) — caller treats this as not found.
+func FetchFavicon(ctx context.Context, faviconURL string, timeout int, verifyTLS bool, userAgent string) ([]byte, string, error) {
 	if faviconURL == "" {
 		return nil, "", nil
 	}
 
+	fetchTimeout := time.Duration(timeout) * time.Second
+
+	// Derive a fresh-timeout context that still cancels when the parent does.
+	fetchCtx, cancel := context.WithTimeout(context.Background(), fetchTimeout)
+	defer cancel()
+	go func() {
+		select {
+		case <-ctx.Done():
+			cancel()
+		case <-fetchCtx.Done():
+		}
+	}()
+
 	client := &http.Client{
-		Timeout: time.Duration(timeout) * time.Second,
+		Timeout: fetchTimeout,
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: !verifyTLS}, //nolint:gosec
 		},
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, faviconURL, nil)
+	req, err := http.NewRequestWithContext(fetchCtx, http.MethodGet, faviconURL, nil)
 	if err != nil {
 		return nil, "", nil
+	}
+	if userAgent != "" {
+		req.Header.Set("User-Agent", userAgent)
 	}
 
 	resp, err := client.Do(req)

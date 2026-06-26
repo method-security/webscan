@@ -16,6 +16,7 @@ import (
 	//Utils
 	headless "github.com/Method-Security/webscan/utils/request/headless"
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
+	"github.com/Method-Security/webscan/utils/useragent"
 
 	// External
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
@@ -127,7 +128,13 @@ func PerformPageCapture(
 			}
 			faviconURL := discoverpagehelpers.ExtractFaviconURL(htmlContent, finalURLStr)
 			if faviconURL != "" {
-				if faviconBytes, faviconHash, faviconErr := discoverpagehelpers.FetchFavicon(requestCtx, faviconURL, config.Timeout, config.VerifyTls); faviconErr == nil && len(faviconBytes) > 0 {
+				// Use the resolved discover-page User-Agent so the favicon fetch
+				// matches what the headless browser advertised. Pass the outer
+				// `ctx`, not `requestCtx` — the favicon helper derives a fresh
+				// timeout (the combined headless capture has already consumed
+				// most of `requestCtx`'s budget).
+				resolvedUA := useragent.Resolve(config.UserAgent)
+				if faviconBytes, faviconHash, faviconErr := discoverpagehelpers.FetchFavicon(ctx, faviconURL, config.Timeout, config.VerifyTls, resolvedUA); faviconErr == nil && len(faviconBytes) > 0 {
 					result.Favicon = &faviconBytes
 					result.FaviconHash = &faviconHash
 				}

@@ -18,8 +18,8 @@ import (
 )
 
 const (
-	maxFaviconBytes    = 1 << 20 // 1 MiB
-	shodanLineLength   = 76
+	maxFaviconBytes  = 1 << 20 // 1 MiB
+	shodanLineLength = 76
 )
 
 // ExtractFaviconURL parses rendered HTML for a favicon link tag and resolves

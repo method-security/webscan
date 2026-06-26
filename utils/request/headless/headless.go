@@ -210,16 +210,15 @@ func (b *Requester) sendRequestWithArtifactsOnce(ctx context.Context, config com
 	// REQUEST EXECUTION
 	// =========================================================================================
 	var (
-		once               sync.Once
-		requestComplete    = make(chan struct{})
-		browsersErr        = make(chan error, 1)
-		redirectChain      = []string{*constructedURL}
-		redirectChainMu    sync.Mutex
-		browserErr         error
-		navigationErr      error
-		statusCode         int
-		capturedHtmlTitle  string
-		capturedFinalURL   string
+		once              sync.Once
+		requestComplete   = make(chan struct{})
+		browsersErr       = make(chan error, 1)
+		redirectChain     = []string{*constructedURL}
+		redirectChainMu   sync.Mutex
+		browserErr        error
+		navigationErr     error
+		statusCode        int
+		capturedHtmlTitle string
 	)
 
 	// Set the request sent timestamp
@@ -438,8 +437,8 @@ func (b *Requester) sendRequestWithArtifactsOnce(ctx context.Context, config com
 
 		log.Info("Final URL", svc1log.SafeParam("url", finalURL))
 
-		// Capture finalURL and htmlTitle for outer scope (returned from the requester).
-		capturedFinalURL = finalURL
+		// Capture htmlTitle for outer scope (returned to caller via PageMetadata).
+		// finalURL is plumbed onto response.FinalUrl below; no outer-scope copy needed.
 		capturedHtmlTitle = htmlTitle
 
 		// Check if Chrome error page using batch result
@@ -574,7 +573,6 @@ func (b *Requester) sendRequestWithArtifactsOnce(ctx context.Context, config com
 
 	// Surface metadata captured inside the closure scope.
 	metadata.HtmlTitle = capturedHtmlTitle
-	_ = capturedFinalURL // already plumbed via response.FinalUrl inside the closure
 
 	return report, screenshot, metadata, finalErr
 }

@@ -69,7 +69,11 @@ func (a *WebScan) InitEnumerateCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			headers := requesthelpers.ParseHeaderPairs(headerPairs)
+			headers, err := requesthelpers.ParseHeaderPairs(headerPairs)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
 
 			// Timeout flag
 			timeout, err := cmd.Flags().GetInt("timeout")
@@ -96,7 +100,11 @@ func (a *WebScan) InitEnumerateCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			cookies := requesthelpers.ParseCookiePairs(cookiePairs)
+			cookies, err := requesthelpers.ParseCookiePairs(cookiePairs)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
 
 			// Allow-mutations flag (gates AST-level rejection of mutation/subscription operations)
 			allowMutations, err := cmd.Flags().GetBool("allow-mutations")
@@ -105,11 +113,18 @@ func (a *WebScan) InitEnumerateCommand() {
 				return
 			}
 
+			verifyTLS, err := cmd.Flags().GetBool("verify-tls")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
 			config := enumerateapiapplicationfern.EnumerateGraphqlConfig{
-				Target:  target,
-				Headers: headers,
-				Cookies: cookies,
-				Timeout: &timeout,
+				Target:    target,
+				Headers:   headers,
+				Cookies:   cookies,
+				Timeout:   &timeout,
+				VerifyTls: verifyTLS,
 			}
 			if query != "" {
 				config.Query = &query
@@ -130,12 +145,13 @@ func (a *WebScan) InitEnumerateCommand() {
 	// Target Flags
 	enumerateAPIApplicationGraphqlCmd.Flags().String("target", "", "URL target to perform GraphQL enumeration against")
 	// Config Flags
-	enumerateAPIApplicationGraphqlCmd.Flags().StringArray("header", []string{}, "Request headers as 'Key: Value' pairs (repeatable)")
+	enumerateAPIApplicationGraphqlCmd.Flags().StringArray("header", []string{}, "Request header as 'Name: Value' (repeatable; missing colon errors; repeated names are case-insensitively comma-joined per RFC 7230 §3.2.2)")
 	enumerateAPIApplicationGraphqlCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
-	enumerateAPIApplicationGraphqlCmd.Flags().StringArray("cookie", []string{}, "Request cookies as 'name=value' pairs (repeatable)")
+	enumerateAPIApplicationGraphqlCmd.Flags().StringArray("cookie", []string{}, "Request cookie as 'name=value' (repeatable; missing equals errors)")
 	enumerateAPIApplicationGraphqlCmd.Flags().String("query", "", "Execute this ad-hoc GraphQL query instead of schema introspection")
 	enumerateAPIApplicationGraphqlCmd.Flags().String("variables", "", "JSON-encoded variables for the ad-hoc --query")
 	enumerateAPIApplicationGraphqlCmd.Flags().Bool("allow-mutations", false, "Permit mutation and subscription operations (default rejects them at the AST level)")
+	enumerateAPIApplicationGraphqlCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
 
 	// Mark required flags
 	_ = enumerateAPIApplicationGraphqlCmd.MarkFlagRequired("target")
@@ -185,7 +201,11 @@ func (a *WebScan) InitEnumerateCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			headers := requesthelpers.ParseHeaderPairs(headerPairs)
+			headers, err := requesthelpers.ParseHeaderPairs(headerPairs)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
 
 			// Cookie flag (repeated)
 			cookiePairs, err := cmd.Flags().GetStringArray("cookie")
@@ -193,7 +213,11 @@ func (a *WebScan) InitEnumerateCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			cookies := requesthelpers.ParseFormDataPairs(cookiePairs)
+			cookies, err := requesthelpers.ParseCookiePairs(cookiePairs)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
 
 			// Candidate spec paths flag
 			candidatePaths, err := cmd.Flags().GetStringSlice("candidate-paths")
@@ -209,6 +233,12 @@ func (a *WebScan) InitEnumerateCommand() {
 				return
 			}
 
+			verifyTLS, err := cmd.Flags().GetBool("verify-tls")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
 			config := enumerateapiapplicationfern.EnumerateSwaggerConfig{
 				Target:         target,
 				Timeout:        timeout,
@@ -216,6 +246,7 @@ func (a *WebScan) InitEnumerateCommand() {
 				Headers:        headers,
 				Cookies:        cookies,
 				CandidatePaths: candidatePaths,
+				VerifyTls:      verifyTLS,
 			}
 			if specUrl != "" {
 				config.SpecUrl = &specUrl
@@ -231,10 +262,11 @@ func (a *WebScan) InitEnumerateCommand() {
 	// Config Flags
 	enumerateAPIApplicationSwaggerCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
 	enumerateAPIApplicationSwaggerCmd.Flags().String("headless-path", "", "Path to headless browser executable")
-	enumerateAPIApplicationSwaggerCmd.Flags().StringArray("header", []string{}, "Request headers as 'Key: Value' pairs (repeatable)")
-	enumerateAPIApplicationSwaggerCmd.Flags().StringArray("cookie", []string{}, "Cookies as 'name=value' pairs (repeatable)")
+	enumerateAPIApplicationSwaggerCmd.Flags().StringArray("header", []string{}, "Request header as 'Name: Value' (repeatable; missing colon errors; repeated names are case-insensitively comma-joined per RFC 7230 §3.2.2)")
+	enumerateAPIApplicationSwaggerCmd.Flags().StringArray("cookie", []string{}, "Cookie as 'name=value' (repeatable; missing equals errors)")
 	enumerateAPIApplicationSwaggerCmd.Flags().StringSlice("candidate-paths", []string{}, "Additional spec paths to probe before built-in paths (comma-separated)")
 	enumerateAPIApplicationSwaggerCmd.Flags().String("spec-url", "", "Direct URL to OpenAPI/Swagger spec; skips all probing when set")
+	enumerateAPIApplicationSwaggerCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
 	// User Agent Flag
 	enumerateAPIApplicationSwaggerCmd.Flags().String("user-agent", "RANDOM", "User-Agent preset (RANDOM, CHROME, FIREFOX, SAFARI, EDGE)")
 

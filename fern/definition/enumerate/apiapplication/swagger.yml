@@ -11,6 +11,7 @@ types:
       cookies: optional<map<string, string>>
       specUrl: optional<string>
       candidatePaths: optional<list<string>>
+      verifyTls: boolean
   EnumerateSwaggerResult:
     properties:
       apiType: common.ApiType

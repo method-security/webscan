@@ -28,20 +28,65 @@ func FlattenHeaders(headers map[string][]string) map[string]string {
 }
 
 // ParseHeaderPairs converts a slice of "Name: Value" strings (as supplied via a
-// repeated --header CLI flag) into a map[string]string. Pairs that do not
-// contain a colon are silently ignored. Leading and trailing whitespace is
-// trimmed from both the name and the value. Returns nil when pairs is empty.
-func ParseHeaderPairs(pairs []string) map[string]string {
+// repeated --header CLI flag) into a map[string]string. Each value must contain
+// a colon; pairs that do not are returned as an error so the operator learns
+// their header was malformed instead of having it silently dropped. Leading and
+// trailing whitespace is trimmed from both the name and the value.
+//
+// Repeated header names are case-insensitively merged into a single comma-
+// joined value per RFC 7230 §3.2.2 ("a recipient MAY combine multiple header
+// fields with the same field name into one ... by appending each subsequent
+// field value to the combined field value in order, separated by a comma").
+// The first-seen casing of the header name is preserved. This makes repeated
+// `--header "Accept: application/json"` + `--header "Accept: text/html"` emit
+// `Accept: application/json, text/html` rather than dropping the second value.
+//
+// Returns (nil, nil) when pairs is empty.
+func ParseHeaderPairs(pairs []string) (map[string]string, error) {
 	if len(pairs) == 0 {
-		return nil
+		return nil, nil
 	}
 	headers := make(map[string]string, len(pairs))
 	for _, pair := range pairs {
-		if kv := strings.SplitN(pair, ":", 2); len(kv) == 2 {
-			headers[strings.TrimSpace(kv[0])] = strings.TrimSpace(kv[1])
+		kv := strings.SplitN(pair, ":", 2)
+		if len(kv) != 2 {
+			return nil, fmt.Errorf("malformed --header %q: expected \"Name: Value\"", pair)
+		}
+		name := strings.TrimSpace(kv[0])
+		value := strings.TrimSpace(kv[1])
+		if name == "" {
+			return nil, fmt.Errorf("malformed --header %q: header name is empty", pair)
+		}
+		// Header names are case-insensitive per RFC 7230 §3.2; find any
+		// existing entry that matches case-insensitively and merge into it,
+		// preserving the first-seen casing.
+		mergeKey := name
+		for existingKey := range headers {
+			if strings.EqualFold(existingKey, name) {
+				mergeKey = existingKey
+				break
+			}
+		}
+		if existing, ok := headers[mergeKey]; ok && existing != "" {
+			// Don't append an empty value (would leave a trailing separator).
+			if value != "" {
+				// Cookie is RFC 6265's outlier — its values are pairs separated
+				// by "; " on the wire, NOT "," like RFC 7230 §3.2.2 prescribes
+				// for generic combinable headers. Merging two
+				// --header "Cookie: a=b" + "Cookie: c=d" with a comma would
+				// produce "Cookie: a=b, c=d" which servers either reject or
+				// parse as a single (corrupt) cookie name.
+				sep := ", "
+				if strings.EqualFold(mergeKey, "Cookie") {
+					sep = "; "
+				}
+				headers[mergeKey] = existing + sep + value
+			}
+		} else {
+			headers[mergeKey] = value
 		}
 	}
-	return headers
+	return headers, nil
 }
 
 // BuildAuthHeaders merges explicit request headers and cookies into a single
@@ -107,37 +152,55 @@ func NormalizeHeaders(headers map[string][]string) map[string][]string {
 }
 
 // ParseCookiePairs converts a slice of "name=value" strings (as supplied via a
-// repeated --cookie CLI flag) into a map[string]string. Pairs that do not
-// contain an equals sign are silently ignored. Leading and trailing whitespace is
-// trimmed from both the name and the value. Returns nil when pairs is empty.
-func ParseCookiePairs(pairs []string) map[string]string {
+// repeated --cookie CLI flag) into a map[string]string. Each value must contain
+// an equals sign; pairs that do not are returned as an error so the operator
+// learns their cookie was malformed instead of having it silently dropped.
+// Leading and trailing whitespace is trimmed from both the name and the value.
+// Returns (nil, nil) when pairs is empty.
+func ParseCookiePairs(pairs []string) (map[string]string, error) {
 	if len(pairs) == 0 {
-		return nil
+		return nil, nil
 	}
 	cookies := make(map[string]string, len(pairs))
 	for _, pair := range pairs {
-		if kv := strings.SplitN(pair, "=", 2); len(kv) == 2 {
-			cookies[strings.TrimSpace(kv[0])] = strings.TrimSpace(kv[1])
+		kv := strings.SplitN(pair, "=", 2)
+		if len(kv) != 2 {
+			return nil, fmt.Errorf("malformed --cookie %q: expected \"name=value\"", pair)
 		}
+		name := strings.TrimSpace(kv[0])
+		value := strings.TrimSpace(kv[1])
+		if name == "" {
+			return nil, fmt.Errorf("malformed --cookie %q: cookie name is empty", pair)
+		}
+		cookies[name] = value
 	}
-	return cookies
+	return cookies, nil
 }
 
 // ParseFormDataPairs converts a slice of "key=value" strings (as supplied via a
-// repeated --form-data CLI flag) into a map[string]string. Pairs that do not
-// contain an equals sign are silently ignored. Leading and trailing whitespace is
-// trimmed from both the key and the value. Returns nil when pairs is empty.
-func ParseFormDataPairs(pairs []string) map[string]string {
+// repeated --form-data CLI flag) into a map[string]string. Each value must
+// contain an equals sign; pairs that do not are returned as an error so the
+// operator learns their value was malformed instead of having it silently
+// dropped. Leading and trailing whitespace is trimmed from both the key and
+// the value. Returns (nil, nil) when pairs is empty.
+func ParseFormDataPairs(pairs []string) (map[string]string, error) {
 	if len(pairs) == 0 {
-		return nil
+		return nil, nil
 	}
 	form := make(map[string]string, len(pairs))
 	for _, pair := range pairs {
-		if kv := strings.SplitN(pair, "=", 2); len(kv) == 2 {
-			form[strings.TrimSpace(kv[0])] = strings.TrimSpace(kv[1])
+		kv := strings.SplitN(pair, "=", 2)
+		if len(kv) != 2 {
+			return nil, fmt.Errorf("malformed --form-data %q: expected \"key=value\"", pair)
 		}
+		key := strings.TrimSpace(kv[0])
+		value := strings.TrimSpace(kv[1])
+		if key == "" {
+			return nil, fmt.Errorf("malformed --form-data %q: key is empty", pair)
+		}
+		form[key] = value
 	}
-	return form
+	return form, nil
 }
 
 // RemoveScheme removes http:// or https:// from the beginning of a string

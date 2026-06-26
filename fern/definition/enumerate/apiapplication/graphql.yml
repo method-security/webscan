@@ -69,6 +69,7 @@ types:
       query: optional<string>
       variables: optional<string>
       allowMutations: optional<boolean>
+      verifyTls: boolean
   EnumerateGraphqlData:
     properties:
       apiType: common.ApiType

@@ -1,5 +1,6 @@
 imports:
   http: ../../common/http.yml
+  method: ../../common/method.yml
   parameter: ./parameter.yml
 types:
   # Nuclei Enum and Structs
@@ -24,4 +25,5 @@ types:
       verboseLogs: boolean
       globalRateLimit: integer
       globalTimeout: integer
+      userAgent: method.UserAgentPreset
 

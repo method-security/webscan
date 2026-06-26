@@ -107,6 +107,7 @@ func createDiscoverApplicationNucleiConfig(ctx context.Context, config *discover
 		VerboseLogs:     config.VerboseLogs,
 		GlobalRateLimit: config.GlobalRateLimit,
 		GlobalTimeout:   config.GlobalTimeout,
+		UserAgent:       config.UserAgent,
 	}, nil
 }
 

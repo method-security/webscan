@@ -1,5 +1,6 @@
 imports:
   http: ../common/http.yml
+  method: ../common/method.yml
 types:
   # Application Enums
   ApplicationResourceTypeAll:
@@ -59,6 +60,7 @@ types:
       verboseLogs: boolean
       globalRateLimit: integer
       globalTimeout: integer
+      userAgent: method.UserAgentPreset
   # Application Fingerprint Attempt Struct
   ApplicationFingerprintAttempt:
     properties:

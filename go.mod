@@ -5,6 +5,7 @@ go 1.26.0
 require (
 	github.com/Method-Security/pkg v0.0.6
 	github.com/PuerkitoBio/goquery v1.10.3
+	github.com/corona10/goimagehash v1.1.0
 	github.com/go-rod/rod v0.116.2
 	github.com/gobwas/ws v1.4.0
 	github.com/google/uuid v1.6.0
@@ -15,6 +16,7 @@ require (
 	github.com/projectdiscovery/nuclei/v3 v3.4.7
 	github.com/projectdiscovery/useragent v0.0.101
 	github.com/robertkrimen/otto v0.4.0
+	github.com/spaolacci/murmur3 v1.1.0
 	github.com/spf13/cobra v1.9.1
 	github.com/stretchr/testify v1.11.1
 	github.com/ysmood/gson v0.7.3
@@ -223,6 +225,7 @@ require (
 	github.com/montanaflynn/stats v0.7.1 // indirect
 	github.com/muesli/reflow v0.3.0 // indirect
 	github.com/muesli/termenv v0.16.0 // indirect
+	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646 // indirect
 	github.com/nwaples/rardecode/v2 v2.1.0 // indirect
 	github.com/oasdiff/yaml v0.0.0-20250309154309-f31be36b4037 // indirect
 	github.com/oasdiff/yaml3 v0.0.0-20250309153720-d2182401db90 // indirect
@@ -294,7 +297,6 @@ require (
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/skeema/knownhosts v1.3.1 // indirect
 	github.com/sorairolake/lzip-go v0.3.5 // indirect
-	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/spf13/cast v1.9.2 // indirect
 	github.com/spf13/pflag v1.0.6 // indirect
 	github.com/syndtr/goleveldb v1.0.0 // indirect

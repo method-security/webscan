@@ -83,6 +83,12 @@ func (b *Requester) InitializeBrowser(ctx context.Context) error {
 	return nil
 }
 
+// PageMetadata carries headless-capture metadata that is not part of the wire
+// HttpResponse but is useful to downstream callers (e.g. the <title> tag).
+type PageMetadata struct {
+	HtmlTitle string
+}
+
 // SendRequest navigates to a URL using the headless browser and captures the response
 func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpRequestConfig) (common.HttpRequestResponse, error) {
 	log := svc1log.FromContext(ctx)
@@ -120,11 +126,14 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 
 // SendRequestWithScreenshot performs one headless navigation and captures both
 // the HTTP response artifact and a screenshot from the same stabilized page.
-func (b *Requester) SendRequestWithScreenshot(ctx context.Context, config common.SendHttpRequestConfig) (common.HttpRequestResponse, []byte, error) {
+// The returned PageMetadata carries fields harvested from the live DOM
+// (e.g. <title>) that are not part of the HttpResponse contract.
+func (b *Requester) SendRequestWithScreenshot(ctx context.Context, config common.SendHttpRequestConfig) (common.HttpRequestResponse, []byte, PageMetadata, error) {
 	log := svc1log.FromContext(ctx)
 	attempts := headlessCaptureAttempts(config.Request.Method)
 	var lastReport common.HttpRequestResponse
 	var lastScreenshot []byte
+	var lastMetadata PageMetadata
 	var lastErr error
 
 	for attempt := 1; attempt <= attempts; attempt++ {
@@ -134,16 +143,17 @@ func (b *Requester) SendRequestWithScreenshot(ctx context.Context, config common
 			}
 		}
 
-		report, screenshot, err := b.sendRequestWithArtifactsOnce(ctx, config, true)
+		report, screenshot, metadata, err := b.sendRequestWithArtifactsOnce(ctx, config, true)
 		if err == nil {
-			return report, screenshot, nil
+			return report, screenshot, metadata, nil
 		}
 
 		lastReport = report
 		lastScreenshot = screenshot
+		lastMetadata = metadata
 		lastErr = err
 		if attempt == attempts || !IsTransientHeadlessError(err) || ctx.Err() != nil {
-			return report, screenshot, err
+			return report, screenshot, metadata, err
 		}
 
 		log.Warn("Retrying transient headless capture failure",
@@ -153,15 +163,16 @@ func (b *Requester) SendRequestWithScreenshot(ctx context.Context, config common
 		b.restartOwnedBrowser(ctx, cleanErrMsg(err))
 	}
 
-	return lastReport, lastScreenshot, lastErr
+	return lastReport, lastScreenshot, lastMetadata, lastErr
 }
 
 func (b *Requester) sendRequestOnce(ctx context.Context, config common.SendHttpRequestConfig) (common.HttpRequestResponse, error) {
-	report, _, err := b.sendRequestWithArtifactsOnce(ctx, config, false)
+	// Discard PageMetadata for the non-screenshot path.
+	report, _, _, err := b.sendRequestWithArtifactsOnce(ctx, config, false)
 	return report, err
 }
 
-func (b *Requester) sendRequestWithArtifactsOnce(ctx context.Context, config common.SendHttpRequestConfig, captureScreenshot bool) (common.HttpRequestResponse, []byte, error) {
+func (b *Requester) sendRequestWithArtifactsOnce(ctx context.Context, config common.SendHttpRequestConfig, captureScreenshot bool) (common.HttpRequestResponse, []byte, PageMetadata, error) {
 	// =========================================================================================
 	// SETUP
 	// =========================================================================================
@@ -169,17 +180,18 @@ func (b *Requester) sendRequestWithArtifactsOnce(ctx context.Context, config com
 
 	report := common.HttpRequestResponse{Request: config.Request}
 	var screenshot []byte
+	var metadata PageMetadata
 
 	constructedURL, err := standardhelpers.ConstructURL(ctx, config.Request)
 	if err != nil {
-		return report, screenshot, fmt.Errorf("URL construction failed: %v", err)
+		return report, screenshot, metadata, fmt.Errorf("URL construction failed: %v", err)
 	}
 	log.Info("Requesting", svc1log.SafeParam("url", *constructedURL))
 
 	// Initialize browser if not already done
 	if b.Browser == nil {
 		if err := b.InitializeBrowser(ctx); err != nil {
-			return report, screenshot, fmt.Errorf("browser initialization failed: %v", err) // Do not change, DD Metric is based on this error message
+			return report, screenshot, metadata, fmt.Errorf("browser initialization failed: %v", err) // Do not change, DD Metric is based on this error message
 		}
 		log.Info("Connected to browser")
 	}
@@ -189,7 +201,7 @@ func (b *Requester) sendRequestWithArtifactsOnce(ctx context.Context, config com
 		err = b.Browser.IgnoreCertErrors(true)
 		if err != nil {
 			log.Warn("Failed to disable certificate error checking", svc1log.SafeParam("error", err.Error()))
-			return report, screenshot, fmt.Errorf("failed to disable certificate error checking: %v", err)
+			return report, screenshot, metadata, fmt.Errorf("failed to disable certificate error checking: %v", err)
 		}
 		log.Info("Certificate error checking disabled")
 	}
@@ -198,14 +210,16 @@ func (b *Requester) sendRequestWithArtifactsOnce(ctx context.Context, config com
 	// REQUEST EXECUTION
 	// =========================================================================================
 	var (
-		once            sync.Once
-		requestComplete = make(chan struct{})
-		browsersErr     = make(chan error, 1)
-		redirectChain   = []string{*constructedURL}
-		redirectChainMu sync.Mutex
-		browserErr      error
-		navigationErr   error
-		statusCode      int
+		once               sync.Once
+		requestComplete    = make(chan struct{})
+		browsersErr        = make(chan error, 1)
+		redirectChain      = []string{*constructedURL}
+		redirectChainMu    sync.Mutex
+		browserErr         error
+		navigationErr      error
+		statusCode         int
+		capturedHtmlTitle  string
+		capturedFinalURL   string
 	)
 
 	// Set the request sent timestamp
@@ -347,13 +361,15 @@ func (b *Requester) sendRequestWithArtifactsOnce(ctx context.Context, config com
 				performanceStatus: (() => {
 					const entries = performance.getEntriesByType('navigation');
 					return entries.length > 0 && entries[0].responseStatus ? entries[0].responseStatus : 0;
-				})()
+				})(),
+				htmlTitle: document.title || ""
 			};
 		}`
 
 		batchResult, err := page.Eval(batchJS)
 		var finalURL string
 		var isErrorPage bool
+		var htmlTitle string
 
 		if err != nil {
 			log.Warn("Failed to execute batch JavaScript, falling back to individual calls", svc1log.SafeParam("error", err.Error()))
@@ -369,6 +385,7 @@ func (b *Requester) sendRequestWithArtifactsOnce(ctx context.Context, config com
 				}
 			}
 			isErrorPage = isChromeErrorPage(page)
+			htmlTitle, _ = safeEval(page, `() => document.title || ""`)
 		} else {
 			// Parse batch results
 			resultMap := batchResult.Value.Map()
@@ -389,6 +406,9 @@ func (b *Requester) sendRequestWithArtifactsOnce(ctx context.Context, config com
 				}
 				if statusCode == 0 && browserErr == nil && navigationErr == nil {
 					statusCode = 200 // Default for successful navigation
+				}
+				if val, ok := resultMap["htmlTitle"]; ok {
+					htmlTitle = val.Str()
 				}
 			}
 		}
@@ -417,6 +437,10 @@ func (b *Requester) sendRequestWithArtifactsOnce(ctx context.Context, config com
 		redirectChainMu.Unlock()
 
 		log.Info("Final URL", svc1log.SafeParam("url", finalURL))
+
+		// Capture finalURL and htmlTitle for outer scope (returned from the requester).
+		capturedFinalURL = finalURL
+		capturedHtmlTitle = htmlTitle
 
 		// Check if Chrome error page using batch result
 		if isErrorPage {
@@ -491,6 +515,13 @@ func (b *Requester) sendRequestWithArtifactsOnce(ctx context.Context, config com
 			responseBody,
 		)
 
+		// Surface the final navigated URL on HttpResponse so downstream consumers
+		// don't have to reconstruct it from redirectChain[-1]. gowitness parity.
+		if finalURL != "" {
+			finalURLCopy := finalURL
+			response.FinalUrl = &finalURLCopy
+		}
+
 		// Attach captured console logs and page cookies when requested.
 		if console != nil {
 			response.ConsoleLogs = console.snapshot()
@@ -537,9 +568,13 @@ func (b *Requester) sendRequestWithArtifactsOnce(ctx context.Context, config com
 		finalURL := finalRedirectChain[len(finalRedirectChain)-1]
 		if isCrossDomainRedirect(originalURL, finalURL) {
 			log.Info("Cross-domain redirect detected in redirect chain", svc1log.SafeParam("from", originalURL), svc1log.SafeParam("to", finalURL))
-			return common.HttpRequestResponse{Request: config.Request}, screenshot, fmt.Errorf("cross-domain redirect blocked: %s -> %s", originalURL, finalURL)
+			return common.HttpRequestResponse{Request: config.Request}, screenshot, metadata, fmt.Errorf("cross-domain redirect blocked: %s -> %s", originalURL, finalURL)
 		}
 	}
 
-	return report, screenshot, finalErr
+	// Surface metadata captured inside the closure scope.
+	metadata.HtmlTitle = capturedHtmlTitle
+	_ = capturedFinalURL // already plumbed via response.FinalUrl inside the closure
+
+	return report, screenshot, metadata, finalErr
 }

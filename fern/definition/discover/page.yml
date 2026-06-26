@@ -50,6 +50,10 @@ types:
     properties:
       request: optional<http.HttpRequestResponse>
       screenshot: optional<base64>
+      screenshotPerceptualHash: optional<string>
+      favicon: optional<base64>
+      faviconHash: optional<string>
+      htmlTitle: optional<string>
       sensitiveContents: optional<list<SensitiveContent>>
   # Report Struct
   DiscoverPageReport:

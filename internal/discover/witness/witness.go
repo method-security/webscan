@@ -205,6 +205,7 @@ func processTarget(
 	config discover.DiscoverWitnessConfig,
 	sensitiveContentFingerprints *discover.SensitiveContentFingerprints,
 	nucleiResults map[string][]*discover.ApplicationFingerprintAttempt,
+	browserbaseSecrets *common.BrowserbaseRequestSecrets,
 ) *discover.DiscoverWitnessTargetResult {
 	log := svc1log.FromContext(ctx)
 	result := &discover.DiscoverWitnessTargetResult{
@@ -215,7 +216,7 @@ func processTarget(
 
 	// Run page capture via the existing DiscoverPage substrate
 	pageConfig := pageConfigFromWitnessConfig(target, config)
-	pageReport := discoverpage.PerformPageCapture(ctx, pageConfig, sensitiveContentFingerprints, nil)
+	pageReport := discoverpage.PerformPageCapture(ctx, pageConfig, sensitiveContentFingerprints, browserbaseSecrets)
 
 	// Copy page errors
 	targetErrors = append(targetErrors, pageReport.Errors...)
@@ -256,8 +257,18 @@ func processTarget(
 			}
 		}
 
-		// Extract TLS certificates if HTTPS target
-		tlsCerts := extractTLSFromTarget(ctx, target, config)
+		// Extract TLS certificates — use the final URL (post-redirect) so a target
+		// that started as http:// but redirected to https:// still gets its TLS
+		// cert extracted, and a target that started https:// but ended http://
+		// is skipped naturally.
+		tlsTarget := target
+		if pageReport.Result != nil && pageReport.Result.Request != nil &&
+			pageReport.Result.Request.Response != nil &&
+			pageReport.Result.Request.Response.FinalUrl != nil &&
+			*pageReport.Result.Request.Response.FinalUrl != "" {
+			tlsTarget = *pageReport.Result.Request.Response.FinalUrl
+		}
+		tlsCerts := extractTLSFromTarget(ctx, tlsTarget, config)
 		if len(tlsCerts) > 0 {
 			result.TlsCertificates = tlsCerts
 		}
@@ -277,7 +288,7 @@ func processTarget(
 }
 
 // RunWitness orchestrates the single-pass witness scan across all targets.
-func RunWitness(ctx context.Context, config discover.DiscoverWitnessConfig) (*discover.DiscoverWitnessReport, error) {
+func RunWitness(ctx context.Context, config discover.DiscoverWitnessConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) (*discover.DiscoverWitnessReport, error) {
 	log := svc1log.FromContext(ctx)
 
 	report := &discover.DiscoverWitnessReport{
@@ -318,7 +329,7 @@ func RunWitness(ctx context.Context, config discover.DiscoverWitnessConfig) (*di
 	results := make([]*discover.DiscoverWitnessTargetResult, 0, len(targets))
 	for _, target := range targets {
 		log.Info("Processing target", svc1log.SafeParam("target", target))
-		targetResult := processTarget(ctx, target, config, sensitiveContentFingerprints, nucleiResults)
+		targetResult := processTarget(ctx, target, config, sensitiveContentFingerprints, nucleiResults, browserbaseSecrets)
 		results = append(results, targetResult)
 	}
 

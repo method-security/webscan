@@ -1527,7 +1527,7 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Generate report
-			report, err := discoverwitness.RunWitness(ctx, config)
+			report, err := discoverwitness.RunWitness(ctx, config, requestMethodConfig.BrowserbaseSecrets)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return

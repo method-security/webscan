@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
 
@@ -100,7 +101,9 @@ func runNucleiForTargets(ctx context.Context, targets []string, config discover.
 		return nil, err
 	}
 
-	// Build per-target attempt map from raw nuclei results
+	// Build per-target attempt map from raw nuclei results, keyed by a
+	// normalized URL form so processTarget can look them up regardless of
+	// trailing slashes, casing, query string ordering, etc.
 	perTarget := make(map[string][]*discover.ApplicationFingerprintAttempt)
 	for _, nucleiTarget := range nucleiReport {
 		if len(nucleiTarget.Attempts) == 0 {
@@ -114,11 +117,33 @@ func runNucleiForTargets(ctx context.Context, targets []string, config discover.
 			seenTemplateIds[attempt.TemplateId] = true
 			converted := convertNucleiAttempt(attempt)
 			if converted != nil {
-				perTarget[nucleiTarget.Target] = append(perTarget[nucleiTarget.Target], converted)
+				key := normalizeTargetKey(nucleiTarget.Target)
+				perTarget[key] = append(perTarget[key], converted)
 			}
 		}
 	}
 	return perTarget, nil
+}
+
+// normalizeTargetKey returns a canonical key for matching input targets to
+// nuclei result keys. It lowercases the scheme + host and strips one trailing
+// slash from the path so that "https://example.com/", "https://Example.com",
+// and "https://example.com" all collide. On parse failure it falls back to the
+// raw input lowercased.
+func normalizeTargetKey(s string) string {
+	if s == "" {
+		return s
+	}
+	u, err := url.Parse(strings.TrimSpace(s))
+	if err != nil || u.Host == "" {
+		return strings.ToLower(strings.TrimRight(strings.TrimSpace(s), "/"))
+	}
+	u.Scheme = strings.ToLower(u.Scheme)
+	u.Host = strings.ToLower(u.Host)
+	if u.Path != "/" {
+		u.Path = strings.TrimRight(u.Path, "/")
+	}
+	return u.String()
 }
 
 // convertNucleiAttempt converts a nuclei attempt to an ApplicationFingerprintAttempt.
@@ -274,9 +299,11 @@ func processTarget(
 		}
 	}
 
-	// Attach nuclei fingerprints for this target if available
+	// Attach nuclei fingerprints for this target if available. Nuclei normalizes
+	// its target URLs (trailing slashes, host casing, etc.) so look up by the
+	// normalized form, not the raw input.
 	if nucleiResults != nil {
-		if attempts, ok := nucleiResults[target]; ok {
+		if attempts, ok := nucleiResults[normalizeTargetKey(target)]; ok {
 			result.NucleiFingerprints = attempts
 		}
 	}

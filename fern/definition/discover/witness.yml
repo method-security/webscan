@@ -1,0 +1,60 @@
+imports:
+  http: ../common/http.yml
+  method: ../common/method.yml
+  request: ./request.yml
+  application: ./application.yml
+  page: ./page.yml
+
+types:
+  DetectedTechnology:
+    properties:
+      name: string
+      version: optional<string>
+      categories: list<string>
+      cpe: optional<string>
+      description: optional<string>
+      website: optional<string>
+
+  DiscoverWitnessConfig:
+    properties:
+      target: optional<string>
+      targetsFile: optional<string>
+      sensitiveContentDetection: boolean
+      sensitiveContentFingerprintsPath: optional<string>
+      responseCodes: string
+      screenshot: boolean
+      maxRedirects: integer
+      verifyTls: boolean
+      timeout: integer
+      ignoreCrossDomainRedirects: boolean
+      userAgent: method.UserAgentPreset
+      requestMethod: method.RequestMethod
+      headlessConfig: optional<method.HeadlessRequestConfig>
+      browserbaseConfig: optional<method.BrowserbaseRequestConfig>
+      headers: optional<map<string, string>>
+      cookies: optional<map<string, string>>
+      localStorage: optional<map<string, string>>
+      sessionStorage: optional<map<string, string>>
+      nucleiTemplatePaths: optional<list<string>>
+      nucleiThreads: integer
+
+  DiscoverWitnessTargetResult:
+    properties:
+      target: string
+      request: optional<http.HttpRequestResponse>
+      screenshot: optional<base64>
+      screenshotPerceptualHash: optional<string>
+      favicon: optional<base64>
+      faviconHash: optional<string>
+      htmlTitle: optional<string>
+      technologies: list<DetectedTechnology>
+      nucleiFingerprints: optional<list<application.ApplicationFingerprintAttempt>>
+      tlsCertificates: optional<list<request.TlsCertificate>>
+      sensitiveContents: optional<list<page.SensitiveContent>>
+      errors: optional<list<string>>
+
+  DiscoverWitnessReport:
+    properties:
+      config: DiscoverWitnessConfig
+      results: list<DiscoverWitnessTargetResult>
+      errors: optional<list<string>>

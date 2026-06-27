@@ -11,14 +11,15 @@ import (
 	"time"
 
 	// Generated
+	common "github.com/Method-Security/webscan/generated/go/common"
 	nuclei "github.com/Method-Security/webscan/generated/go/common/nuclei"
 	// Utils
 	report "github.com/Method-Security/webscan/utils/nuclei/report"
+	useragent "github.com/Method-Security/webscan/utils/useragent"
 	// External
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 	nucleilib "github.com/projectdiscovery/nuclei/v3/lib"
 	"github.com/projectdiscovery/nuclei/v3/pkg/catalog/disk"
-	useragent "github.com/projectdiscovery/useragent"
 )
 
 type Config struct {
@@ -34,6 +35,7 @@ type Config struct {
 	Timeout         int
 	GlobalRateLimit int
 	GlobalTimeout   int
+	UserAgent       common.UserAgentPreset
 }
 
 func validateConfig(cfg *Config) error {
@@ -222,9 +224,10 @@ func buildNucleiOptions(cfg Config, templateDir, workflowDir string) []nucleilib
 		opts = append(opts, nucleilib.WithVerbosity(nucleilib.VerbosityOptions{Silent: false, Debug: true, Verbose: true}))
 	}
 
-	// Add random user agent
-	randomUserAgent := useragent.PickRandom()
-	opts = append(opts, nucleilib.WithHeaders([]string{fmt.Sprintf("User-Agent:%s", randomUserAgent.Raw)}))
+	// Resolve the User-Agent from the configured preset. An empty/RANDOM preset
+	// resolves to a random browser UA, preserving prior default behavior.
+	resolvedUserAgent := useragent.Resolve(cfg.UserAgent)
+	opts = append(opts, nucleilib.WithHeaders([]string{fmt.Sprintf("User-Agent:%s", resolvedUserAgent)}))
 
 	if cfg.RunMode == nuclei.NucleiRunModeDast {
 		opts = append(opts, nucleilib.DASTMode())
@@ -291,6 +294,7 @@ func GetRunnerConfig(templateFileSystems, workflowFileSystems []fs.FS, config nu
 		Timeout:         config.Timeout,
 		GlobalRateLimit: config.GlobalRateLimit,
 		GlobalTimeout:   config.GlobalTimeout,
+		UserAgent:       config.UserAgent,
 	}
 	return rconfig
 }

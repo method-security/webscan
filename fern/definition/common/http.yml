@@ -79,6 +79,7 @@ types:
   HttpResponse:
     properties:
       redirectChain: optional<list<string>>
+      finalUrl: optional<string>
       statusCode: optional<integer>
       responseHeaders: optional<map<string, list<string>>>
       responseBody: optional<Body>

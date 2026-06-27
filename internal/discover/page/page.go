@@ -16,6 +16,7 @@ import (
 	//Utils
 	headless "github.com/Method-Security/webscan/utils/request/headless"
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
+	"github.com/Method-Security/webscan/utils/useragent"
 
 	// External
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
@@ -87,16 +88,56 @@ func PerformPageCapture(
 		defer requestCancel()
 
 		requester := headless.NewRequester(config.Timeout, config.HeadlessConfig)
-		response, img, err := requester.SendRequestWithScreenshot(requestCtx, requestConfig)
+		response, img, metadata, err := requester.SendRequestWithScreenshot(requestCtx, requestConfig)
 		httpRequestResponse = &response
 		if len(img) > 0 {
 			result.Screenshot = &img
+			// Perceptual hash (gowitness parity, AITF-139) — best-effort.
+			if phash, phashErr := discoverpagehelpers.ComputeScreenshotPerceptualHash(img); phashErr == nil {
+				result.ScreenshotPerceptualHash = &phash
+			} else {
+				log.Warn("Failed to compute screenshot perceptual hash", svc1log.SafeParam("error", phashErr.Error()))
+			}
+		}
+		if metadata.HtmlTitle != "" {
+			title := metadata.HtmlTitle
+			result.HtmlTitle = &title
 		}
 		if err != nil {
 			errors = append(errors, err.Error())
 			if response.Response == nil {
 				report.Errors = errors
 				return &report
+			}
+		}
+
+		// Favicon (gowitness parity, AITF-139) — best-effort, never fatal.
+		// Use the final navigated URL plus rendered HTML to resolve a favicon URL.
+		if response.Response != nil {
+			var finalURLStr string
+			if response.Response.FinalUrl != nil && *response.Response.FinalUrl != "" {
+				finalURLStr = *response.Response.FinalUrl
+			} else {
+				finalURLStr = config.Target
+			}
+			var htmlContent string
+			if response.Response.ResponseBody != nil {
+				if bodyStr := requesthelpers.GetResponseBodyStringFromBodyStruct(response.Response.ResponseBody); bodyStr != nil {
+					htmlContent = *bodyStr
+				}
+			}
+			faviconURL := discoverpagehelpers.ExtractFaviconURL(htmlContent, finalURLStr)
+			if faviconURL != "" {
+				// Use the resolved discover-page User-Agent so the favicon fetch
+				// matches what the headless browser advertised. Pass the outer
+				// `ctx`, not `requestCtx` — the favicon helper derives a fresh
+				// timeout (the combined headless capture has already consumed
+				// most of `requestCtx`'s budget).
+				resolvedUA := useragent.Resolve(config.UserAgent)
+				if faviconBytes, faviconHash, faviconErr := discoverpagehelpers.FetchFavicon(ctx, faviconURL, config.Timeout, config.VerifyTls, resolvedUA); faviconErr == nil && len(faviconBytes) > 0 {
+					result.Favicon = &faviconBytes
+					result.FaviconHash = &faviconHash
+				}
 			}
 		}
 	} else {

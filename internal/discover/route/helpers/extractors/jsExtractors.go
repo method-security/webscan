@@ -267,6 +267,12 @@ func extractRoutesFromPatterns(content string, baseURL string, routeCaptureConfi
 			// Resolve relative URLs
 			fullURL := discoverroutehelpers.ResolveURL(baseURL, urlStr)
 
+			// Static assets are diverted to the StaticAssets output rather than
+			// recorded as routes.
+			if discoverroutehelpers.CaptureStaticAssetReference(urls, baseURL, fullURL, routeCaptureConfig.IgnoreCrossDomain, routeCaptureConfig.CollectStaticAssets) {
+				continue
+			}
+
 			// Check if the URL is allowed
 			if !discoverroutehelpers.IsURLAllowed(baseURL, fullURL, routeCaptureConfig.IgnoreCrossDomain, routeCaptureConfig.CollectStaticAssets) {
 				continue
@@ -505,6 +511,11 @@ func (v *visitor) handleVariableStatement(node *ast.VariableStatement) {
 		if allCapsVarPattern.MatchString(varName) && strings.HasPrefix(strVal, "/") {
 			// Resolve and emit a route
 			fullURL := discoverroutehelpers.ResolveURL(v.baseURL, strVal)
+			// Static assets are diverted to the StaticAssets output rather than
+			// recorded as routes.
+			if discoverroutehelpers.CaptureStaticAssetReference(v.urls, v.baseURL, fullURL, v.baseURLsOnly, v.captureStaticAssets) {
+				continue
+			}
 			if discoverroutehelpers.IsURLAllowed(v.baseURL, fullURL, v.baseURLsOnly, v.captureStaticAssets) {
 				urlNoQuery, err := discoverroutehelpers.URLRemoveQueryParams(fullURL)
 				if err == nil {
@@ -575,6 +586,12 @@ func (v *visitor) processFetchCall(node *ast.CallExpression) {
 	}
 
 	fullURL := discoverroutehelpers.ResolveURL(v.baseURL, urlStr)
+
+	// Static assets are diverted to the StaticAssets output rather than recorded
+	// as routes.
+	if discoverroutehelpers.CaptureStaticAssetReference(v.urls, v.baseURL, fullURL, v.baseURLsOnly, v.captureStaticAssets) {
+		return
+	}
 
 	// Check if the URL is allowed
 	// Only consider URLs that are part of the base URL if specified

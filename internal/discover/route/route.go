@@ -100,6 +100,12 @@ func ExtractRedirectRoutes(redirectChain []string, baseURL string, routeCaptureC
 			continue
 		}
 
+		// Static assets are diverted to the StaticAssets output rather than
+		// recorded as routes.
+		if discoverroutehelpers.CaptureStaticAssetReference(urls, baseURL, redirectURL, routeCaptureConfig.IgnoreCrossDomain, routeCaptureConfig.CollectStaticAssets) {
+			continue
+		}
+
 		// Check if the URL is allowed
 		if !discoverroutehelpers.IsURLAllowed(baseURL, redirectURL, routeCaptureConfig.IgnoreCrossDomain, routeCaptureConfig.CollectStaticAssets) {
 			continue

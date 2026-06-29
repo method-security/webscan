@@ -11,7 +11,6 @@ import (
 
 	// Internal
 	discoverroutehelpers "github.com/Method-Security/webscan/internal/discover/route/helpers"
-	"github.com/Method-Security/webscan/utils"
 
 	// External
 	goquery "github.com/PuerkitoBio/goquery"
@@ -39,6 +38,12 @@ func ExtractFormRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig
 
 		// Resolve the action URL relative to the base URL
 		fullURL := discoverroutehelpers.ResolveURL(baseURL, action)
+
+		// Static assets are diverted to the StaticAssets output rather than
+		// recorded as routes.
+		if discoverroutehelpers.CaptureStaticAssetReference(urls, baseURL, fullURL, routeCaptureConfig.IgnoreCrossDomain, routeCaptureConfig.CollectStaticAssets) {
+			return
+		}
 
 		// Check if the URL is allowed
 		if !discoverroutehelpers.IsURLAllowed(baseURL, fullURL, routeCaptureConfig.IgnoreCrossDomain, routeCaptureConfig.CollectStaticAssets) {
@@ -112,6 +117,12 @@ func ExtractAnchorRoutes(doc *goquery.Document, baseURL string, routeCaptureConf
 		if exists && href != "" {
 			fullURL := discoverroutehelpers.ResolveURL(baseURL, href)
 
+			// Static assets are diverted to the StaticAssets output rather than
+			// recorded as routes.
+			if discoverroutehelpers.CaptureStaticAssetReference(urls, baseURL, fullURL, routeCaptureConfig.IgnoreCrossDomain, routeCaptureConfig.CollectStaticAssets) {
+				return
+			}
+
 			// Parse the full URL to extract query parameters before removing them
 			parsedFullURL, err := url.Parse(fullURL)
 			if err != nil {
@@ -175,13 +186,9 @@ func ExtractLinkRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig
 		if exists && href != "" {
 			fullURL := discoverroutehelpers.ResolveURL(baseURL, href)
 
-			// Skip if this is a static asset
-			if utils.IsStaticAsset(fullURL) {
-				// Only collect static assets that are in scope.
-				if routeCaptureConfig.CollectStaticAssets &&
-					discoverroutehelpers.IsURLAllowed(baseURL, fullURL, routeCaptureConfig.IgnoreCrossDomain, routeCaptureConfig.CollectStaticAssets) {
-					urls[fullURL] = struct{}{}
-				}
+			// Static assets are diverted to the StaticAssets output rather than
+			// recorded as routes.
+			if discoverroutehelpers.CaptureStaticAssetReference(urls, baseURL, fullURL, routeCaptureConfig.IgnoreCrossDomain, routeCaptureConfig.CollectStaticAssets) {
 				return
 			}
 

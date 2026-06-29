@@ -204,9 +204,23 @@ func ParseQueryParams(reqURL *url.URL) []*discover.RouteQueryParam {
 		if key == "" {
 			continue
 		}
+
+		// Set Max Size and Length of Examples
+		// Max Value Length is 256 characters
+		// Max Example Values is 5 values
+		filteredValues := make([]string, 0, len(values))
+		for _, value := range values {
+			if len(value) <= 256 {
+				filteredValues = append(filteredValues, value)
+			}
+		}
+		if len(filteredValues) > 5 {
+			filteredValues = filteredValues[:5]
+		}
+
 		queryParams = append(queryParams, &discover.RouteQueryParam{
 			Name:          key,
-			ExampleValues: values,
+			ExampleValues: filteredValues,
 		})
 	}
 	return queryParams
@@ -314,6 +328,23 @@ func IsURLAllowed(baseURL string, targetURL string, ignoreCrossDomain bool, capt
 	}
 	if ignoreCrossDomain {
 		return IsSubdomain(baseURL, targetURL)
+	}
+	return true
+}
+
+// CaptureStaticAssetReference centralizes the static-asset-vs-route decision so
+// every route extractor behaves identically. It reports whether fullURL refers to
+// a static asset (e.g. a PDF, image, or archive), in which case the caller must
+// NOT record it as a route. When it is a static asset and static-asset collection
+// is enabled (and the asset is in scope), the asset is added to the urls set so it
+// surfaces in the StaticAssets output instead. A non-asset URL returns false and
+// is left for the caller to handle as a normal route.
+func CaptureStaticAssetReference(urls map[string]struct{}, baseURL string, fullURL string, ignoreCrossDomain bool, captureStaticAssets bool) bool {
+	if !utils.IsStaticAsset(fullURL) {
+		return false
+	}
+	if IsURLAllowed(baseURL, fullURL, ignoreCrossDomain, captureStaticAssets) {
+		urls[fullURL] = struct{}{}
 	}
 	return true
 }

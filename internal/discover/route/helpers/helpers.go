@@ -210,7 +210,7 @@ func ParseQueryParams(reqURL *url.URL) []*discover.RouteQueryParam {
 		// Max Example Values is 5 values
 		filteredValues := make([]string, 0, len(values))
 		for _, value := range values {
-			if len(value) < 256 {
+			if len(value) <= 256 {
 				filteredValues = append(filteredValues, value)
 			}
 		}

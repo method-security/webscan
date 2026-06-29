@@ -15,6 +15,7 @@ require (
 	github.com/pb33f/libopenapi v0.16.11
 	github.com/projectdiscovery/nuclei/v3 v3.4.7
 	github.com/projectdiscovery/useragent v0.0.101
+	github.com/projectdiscovery/wappalyzergo v0.2.35
 	github.com/robertkrimen/otto v0.4.0
 	github.com/spaolacci/murmur3 v1.1.0
 	github.com/spf13/cobra v1.9.1
@@ -278,7 +279,6 @@ require (
 	github.com/projectdiscovery/tlsx v1.1.9 // indirect
 	github.com/projectdiscovery/uncover v1.1.0 // indirect
 	github.com/projectdiscovery/utils v0.4.21 // indirect
-	github.com/projectdiscovery/wappalyzergo v0.2.35 // indirect
 	github.com/projectdiscovery/yamldoc-go v1.0.6 // indirect
 	github.com/redis/go-redis/v9 v9.11.0 // indirect
 	github.com/refraction-networking/utls v1.7.0 // indirect

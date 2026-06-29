@@ -21,6 +21,7 @@ import (
 	discoverroute "github.com/Method-Security/webscan/internal/discover/route"
 	discoversaas "github.com/Method-Security/webscan/internal/discover/saas/active"
 	discoversaashelpers "github.com/Method-Security/webscan/internal/discover/saas/active/helpers"
+	discoverwitness "github.com/Method-Security/webscan/internal/discover/witness"
 	discoverwordlist "github.com/Method-Security/webscan/internal/discover/wordlist"
 
 	// Utils
@@ -1338,6 +1339,236 @@ func (a *WebScan) InitDiscoverCommand() {
 
 	// Add Command to 'Discover' Command
 	discoverCmd.AddCommand(discoverWordlistCmd)
+
+	// Witness Command
+	discoverWitnessCmd := &cobra.Command{
+		Use:   "witness",
+		Short: "Single-pass web witness: screenshot, HTTP capture, favicon, tech fingerprinting, and TLS extraction",
+		Long:  `Perform a single-pass web witness scan: navigate to each target URL, capture a screenshot, extract HTTP metadata, fetch favicons, run Wappalyzer technology fingerprinting, optionally run Nuclei templates, and extract TLS certificates.`,
+		Run: func(cmd *cobra.Command, args []string) {
+			defer a.OutputSignal.PanicHandler(cmd.Context())
+
+			ctx := cmd.Context()
+
+			// Target flags (mutually exclusive, one required)
+			target, err := cmd.Flags().GetString("target")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			targetsFile, err := cmd.Flags().GetString("targets-file")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Config flags
+			var sensitiveContentFingerprintsPath string
+			sensitiveContentDetection, err := cmd.Flags().GetBool("sensitive-content-detection")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			if sensitiveContentDetection {
+				sensitiveContentFingerprintsPath, err = cmd.Flags().GetString("sensitive-content-fingerprints-path")
+				if err != nil {
+					a.OutputSignal.AddError(err)
+					return
+				}
+			}
+			responseCodes, err := cmd.Flags().GetString("response-codes")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			takeScreenshot, err := cmd.Flags().GetBool("screenshot")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			maxRedirects, err := cmd.Flags().GetInt("max-redirects")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			verifyTLS, err := cmd.Flags().GetBool("verify-tls")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			timeout, err := cmd.Flags().GetInt("timeout")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			ignoreCrossDomainRedirects, err := cmd.Flags().GetBool("ignore-cross-domain-redirects")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// User agent and request method
+			userAgentPreset, err := requesthelpers.GetUserAgentFlag(cmd)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			requestMethodConfig, err := requesthelpers.GetRequestMethodFlags(cmd)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			if err := requesthelpers.ValidateUserAgentWithRequestMethod(userAgentPreset, requestMethodConfig.RequestMethodEnum, cmd.Flags().Changed("user-agent")); err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Screenshot requires headless
+			if takeScreenshot && (requestMethodConfig.RequestMethodEnum == common.RequestMethodStandard || requestMethodConfig.RequestMethodEnum == common.RequestMethodBrowserbase) {
+				a.OutputSignal.AddError(fmt.Errorf("screenshot flag is not supported for standard or browserbase capture methods"))
+				return
+			}
+
+			// Authenticated-capture flags
+			headerPairs, err := cmd.Flags().GetStringArray("header")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			cookiePairs, err := cmd.Flags().GetStringArray("cookie")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			localStoragePairs, err := cmd.Flags().GetStringArray("local-storage")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			sessionStoragePairs, err := cmd.Flags().GetStringArray("session-storage")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			headers, err := requesthelpers.ParseHeaderPairs(headerPairs)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			cookies, err := requesthelpers.ParseCookiePairs(cookiePairs)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			localStorageMap, err := requesthelpers.ParseFormDataPairs(localStoragePairs)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			sessionStorageMap, err := requesthelpers.ParseFormDataPairs(sessionStoragePairs)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Nuclei flags
+			nucleiTemplatePaths, err := cmd.Flags().GetStringSlice("nuclei-template-paths")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			nucleiThreads, err := cmd.Flags().GetInt("nuclei-threads")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Build config
+			config := discover.DiscoverWitnessConfig{
+				SensitiveContentDetection:  sensitiveContentDetection,
+				ResponseCodes:              responseCodes,
+				Screenshot:                 takeScreenshot,
+				MaxRedirects:               max(maxRedirects, 0),
+				VerifyTls:                  verifyTLS,
+				Timeout:                    max(timeout, 0),
+				IgnoreCrossDomainRedirects: ignoreCrossDomainRedirects,
+				UserAgent:                  userAgentPreset,
+				RequestMethod:              requestMethodConfig.RequestMethodEnum,
+				HeadlessConfig:             requestMethodConfig.HeadlessConfig,
+				BrowserbaseConfig:          requestMethodConfig.BrowserbaseConfig,
+				Headers:                    headers,
+				Cookies:                    cookies,
+				LocalStorage:               localStorageMap,
+				SessionStorage:             sessionStorageMap,
+				NucleiTemplatePaths:        nucleiTemplatePaths,
+				NucleiThreads:              nucleiThreads,
+			}
+			if target != "" {
+				config.Target = &target
+			}
+			if targetsFile != "" {
+				config.TargetsFile = &targetsFile
+			}
+			if sensitiveContentFingerprintsPath != "" {
+				config.SensitiveContentFingerprintsPath = &sensitiveContentFingerprintsPath
+			}
+
+			// Load sensitive content fingerprints if needed
+			if config.SensitiveContentDetection {
+				scFingerprints, scErr := discoverpagehelpers.LoadSensitiveConentFingerprints(ctx, config.SensitiveContentFingerprintsPath)
+				if scErr != nil {
+					a.OutputSignal.AddError(scErr)
+					return
+				}
+				if scFingerprints == nil || len(scFingerprints.Fingerprints) == 0 {
+					a.OutputSignal.AddError(errors.New("no sensitive content fingerprints found"))
+					return
+				}
+			}
+
+			// Generate report
+			report, err := discoverwitness.RunWitness(ctx, config, requestMethodConfig.BrowserbaseSecrets)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			a.OutputSignal.Content = report
+		},
+	}
+	// Target Flags (mutually exclusive, one required)
+	discoverWitnessCmd.Flags().String("target", "", "Single URL target for witness scan")
+	discoverWitnessCmd.Flags().String("targets-file", "", "File containing one URL per line for witness scan")
+	discoverWitnessCmd.MarkFlagsMutuallyExclusive("target", "targets-file")
+	discoverWitnessCmd.MarkFlagsOneRequired("target", "targets-file")
+	// Config Flags
+	discoverWitnessCmd.Flags().Bool("sensitive-content-detection", true, "Enable sensitive content detection")
+	discoverWitnessCmd.Flags().String("sensitive-content-fingerprints-path", "", "Path to a custom sensitive content fingerprints file")
+	discoverWitnessCmd.Flags().String("response-codes", "200-299", "Response codes to consider as valid responses")
+	discoverWitnessCmd.Flags().Bool("screenshot", false, "Capture a screenshot of each page (headless only)")
+	discoverWitnessCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
+	discoverWitnessCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
+	discoverWitnessCmd.Flags().Int("timeout", 180, "Timeout per request in seconds")
+	// User Agent Flag
+	discoverWitnessCmd.Flags().String("user-agent", "RANDOM", "User-Agent preset (RANDOM, CHROME, FIREFOX, SAFARI, EDGE)")
+	// Request Method Flags
+	discoverWitnessCmd.Flags().String("request-method", "HEADLESS", "Request method to use (standard, headless, browserbase)")
+	discoverWitnessCmd.Flags().String("headless-path", "", "Path to headless browser executable")
+	discoverWitnessCmd.Flags().Int("min-dom-stabalize-time", 20, "Minimum time to wait for DOM stabilization in seconds")
+	discoverWitnessCmd.Flags().String("browserbase-token", "", "Browserbase API token for cloud browser access")
+	discoverWitnessCmd.Flags().String("browserbase-project", "", "Browserbase project ID")
+	discoverWitnessCmd.Flags().Bool("browserbase-proxy", false, "Use Browserbase proxy for requests")
+	discoverWitnessCmd.Flags().StringSlice("browserbase-countries", []string{}, "List of countries to use for Browserbase proxy")
+	// Authenticated-capture flags
+	discoverWitnessCmd.Flags().StringArray("header", []string{}, "Request header for authenticated capture as 'Name: Value' (repeatable)")
+	discoverWitnessCmd.Flags().StringArray("cookie", []string{}, "Cookie for authenticated capture as 'name=value' (repeatable)")
+	discoverWitnessCmd.Flags().StringArray("local-storage", []string{}, "localStorage entry as 'key=value' injected before page load (repeatable, headless only)")
+	discoverWitnessCmd.Flags().StringArray("session-storage", []string{}, "sessionStorage entry as 'key=value' injected before page load (repeatable, headless only)")
+	// Nuclei Flags
+	discoverWitnessCmd.Flags().StringSlice("nuclei-template-paths", []string{}, "Nuclei template paths to run against targets (leave empty to skip Nuclei)")
+	discoverWitnessCmd.Flags().Int("nuclei-threads", 25, "Number of concurrent Nuclei threads")
+
+	// Add Command to 'Discover' Command
+	discoverCmd.AddCommand(discoverWitnessCmd)
 
 	// Add Command to Root Command
 	a.RootCmd.AddCommand(discoverCmd)

@@ -6,6 +6,15 @@ types:
     enum:
       - HTTP
       - HTTPS
+  # WebServer socket — the (ip, port, application protocol) triple identifying a
+  # specific HTTP/HTTPS listener. Carried verbatim through the probe report so the
+  # ontology processor can link the discovered WebApplication to the upstream
+  # WebServer entity (typically created by a prior service-fingerprint pass).
+  WebServerSocket:
+    properties:
+      ipAddress: string
+      port: integer
+      applicationProtocol: WebProtocol
   # Http Method Enum
   HttpMethod:
     enum:

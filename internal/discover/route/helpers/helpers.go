@@ -208,8 +208,13 @@ func ParseQueryParams(reqURL *url.URL) []*discover.RouteQueryParam {
 		// Set Max Size and Length of Examples
 		// Max Value Length is 256 characters
 		// Max Example Values is 5 values
+		// Empty values carry no example information, so omit them rather than
+		// recording an empty string.
 		filteredValues := make([]string, 0, len(values))
 		for _, value := range values {
+			if value == "" {
+				continue
+			}
 			if len(value) <= 256 {
 				filteredValues = append(filteredValues, value)
 			}
@@ -261,9 +266,18 @@ func ParseBodyParams(postData string) ([]*discover.RouteBodyParam, error) {
 				if key == "" {
 					continue
 				}
+				// Empty values carry no example information, so omit them rather
+				// than recording an empty string.
+				filteredValues := make([]string, 0, len(values))
+				for _, value := range values {
+					if value == "" {
+						continue
+					}
+					filteredValues = append(filteredValues, value)
+				}
 				bodyParams = append(bodyParams, &discover.RouteBodyParam{
 					Name:          key,
-					ExampleValues: values,
+					ExampleValues: filteredValues,
 				})
 			}
 		} else {

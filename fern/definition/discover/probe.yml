@@ -17,10 +17,6 @@ types:
       requestMethod: method.RequestMethod
       headlessConfig: optional<method.HeadlessRequestConfig>
       browserbaseConfig: optional<method.BrowserbaseRequestConfig>
-      # Identifies the WebServer listener the probe is running against. Carried
-      # through to the report verbatim so the ontology processor can link the
-      # discovered WebApplication.web_server to the matching WebServer entity
-      # (typically created by an upstream service-fingerprint pass).
       webServer: optional<http.WebServerSocket>
   DiscoverProbeResult:
     properties:

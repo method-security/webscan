@@ -11,7 +11,6 @@ import (
 
 	// Internal
 	discoverroutehelpers "github.com/Method-Security/webscan/internal/discover/route/helpers"
-
 	// External
 	goquery "github.com/PuerkitoBio/goquery"
 )

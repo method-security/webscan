@@ -815,8 +815,24 @@ func (a *WebScan) InitDiscoverCommand() {
 				return
 			}
 
+			webServerIPAddress, err := cmd.Flags().GetString("web-server-ip-address")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			webServerPort, err := cmd.Flags().GetInt("web-server-port")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			webServerApplicationProtocol, err := cmd.Flags().GetString("web-server-application-protocol")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
 			// Set Config
-			config := getDiscoverProbeConfig(targets, protocol, maxRedirects, verifyTLS, timeout, sleep, jitter, ignoreCrossDomainRedirects, userAgentPreset, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
+			config := getDiscoverProbeConfig(targets, protocol, maxRedirects, verifyTLS, timeout, sleep, jitter, ignoreCrossDomainRedirects, userAgentPreset, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig, webServerIPAddress, webServerPort, webServerApplicationProtocol)
 
 			// Generate report
 			report, err := discoverprobe.PerformWebProbe(cmd.Context(), config, requestMethodConfig.BrowserbaseSecrets)
@@ -846,6 +862,10 @@ func (a *WebScan) InitDiscoverCommand() {
 	discoverProbeCmd.Flags().String("browserbase-project", "", "Browserbase project ID")
 	discoverProbeCmd.Flags().Bool("browserbase-proxy", false, "Use Browserbase proxy for requests")
 	discoverProbeCmd.Flags().StringSlice("browserbase-countries", []string{}, "List of countries to use for Browserbase proxy")
+
+	discoverProbeCmd.Flags().String("web-server-ip-address", "", "IP address of the WebServer listener this probe is running against")
+	discoverProbeCmd.Flags().Int("web-server-port", 0, "Port of the WebServer listener this probe is running against")
+	discoverProbeCmd.Flags().String("web-server-application-protocol", "", "Application protocol of the WebServer listener this probe is running against (HTTP, HTTPS)")
 
 	// Mark Required Flags
 	_ = discoverProbeCmd.MarkFlagRequired("targets")
@@ -1652,7 +1672,7 @@ func getDiscoverPageConfig(target string, sensitiveContentDetection bool, sensit
 }
 
 // getDiscoverProbeConfig builds the config for probe discovery.
-func getDiscoverProbeConfig(targets []string, protocol string, maxRedirects int, verifyTLS bool, timeout int, sleep int, jitter int, ignoreCrossDomainRedirects bool, userAgent common.UserAgentPreset, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) *discover.DiscoverProbeConfig {
+func getDiscoverProbeConfig(targets []string, protocol string, maxRedirects int, verifyTLS bool, timeout int, sleep int, jitter int, ignoreCrossDomainRedirects bool, userAgent common.UserAgentPreset, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig, webServerIPAddress string, webServerPort int, webServerApplicationProtocol string) *discover.DiscoverProbeConfig {
 	config := &discover.DiscoverProbeConfig{
 		Targets:                    targets,
 		MaxRedirects:               maxRedirects,
@@ -1679,6 +1699,23 @@ func getDiscoverProbeConfig(targets []string, protocol string, maxRedirects int,
 		default:
 			// Invalid protocol - will be handled by validation in the probe function
 			// For now, leave it unset to maintain existing behavior
+		}
+	}
+
+	if webServerIPAddress != "" && webServerPort > 0 && webServerApplicationProtocol != "" {
+		var wsProtocol common.WebProtocol
+		switch strings.ToUpper(webServerApplicationProtocol) {
+		case "HTTP":
+			wsProtocol = common.WebProtocolHttp
+		case "HTTPS":
+			wsProtocol = common.WebProtocolHttps
+		default:
+			return config
+		}
+		config.WebServer = &common.WebServerSocket{
+			IpAddress:           webServerIPAddress,
+			Port:                webServerPort,
+			ApplicationProtocol: wsProtocol,
 		}
 	}
 

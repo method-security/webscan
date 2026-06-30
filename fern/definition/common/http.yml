@@ -6,6 +6,11 @@ types:
     enum:
       - HTTP
       - HTTPS
+  WebServerSocket:
+    properties:
+      ipAddress: string
+      port: integer
+      applicationProtocol: WebProtocol
   # Http Method Enum
   HttpMethod:
     enum:

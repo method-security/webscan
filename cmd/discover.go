@@ -1702,20 +1702,20 @@ func getDiscoverProbeConfig(targets []string, protocol string, maxRedirects int,
 		}
 	}
 
-	if webServerIPAddress != "" && webServerPort > 0 && webServerApplicationProtocol != "" {
-		var wsProtocol common.WebProtocol
+	if webServerIPAddress != "" {
+		config.WebServerIpAddress = &webServerIPAddress
+	}
+	if webServerPort > 0 {
+		config.WebServerPort = &webServerPort
+	}
+	if webServerApplicationProtocol != "" {
 		switch strings.ToUpper(webServerApplicationProtocol) {
 		case "HTTP":
-			wsProtocol = common.WebProtocolHttp
+			wsProtocol := common.WebProtocolHttp
+			config.WebServerApplicationProtocol = &wsProtocol
 		case "HTTPS":
-			wsProtocol = common.WebProtocolHttps
-		default:
-			return config
-		}
-		config.WebServer = &common.WebServerSocket{
-			IpAddress:           webServerIPAddress,
-			Port:                webServerPort,
-			ApplicationProtocol: wsProtocol,
+			wsProtocol := common.WebProtocolHttps
+			config.WebServerApplicationProtocol = &wsProtocol
 		}
 	}
 

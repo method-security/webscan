@@ -16,7 +16,7 @@ import (
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
 )
 
-func createSendHTTPRequestConfig(baseURL, path string, queryParams map[string]string, config *discover.DiscoverProbeConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) common.SendHttpRequestConfig {
+func createSendHTTPRequestConfig(ctx context.Context, baseURL, path string, queryParams map[string]string, config *discover.DiscoverProbeConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) common.SendHttpRequestConfig {
 	request := common.HttpRequest{
 		BaseUrl: baseURL,
 		Path:    path,
@@ -25,7 +25,8 @@ func createSendHTTPRequestConfig(baseURL, path string, queryParams map[string]st
 			Query: queryParams,
 		},
 	}
-	return common.SendHttpRequestConfig{
+	
+	sendConfig := common.SendHttpRequestConfig{
 		Request:                    &request,
 		MaxRedirects:               config.MaxRedirects,
 		VerifyTls:                  config.VerifyTls,
@@ -37,6 +38,11 @@ func createSendHTTPRequestConfig(baseURL, path string, queryParams map[string]st
 		BrowserbaseConfig:          config.BrowserbaseConfig,
 		BrowserbaseSecrets:         browserbaseSecrets,
 	}
+	
+	// Add proxy settings from context
+	requesthelpers.ApplyProxySettings(ctx, &sendConfig)
+	
+	return sendConfig
 }
 
 // sendRequestWithProtocol attempts to connect to a target using the specified protocol
@@ -49,7 +55,7 @@ func sendRequestWithProtocol(ctx context.Context, target string, protocol string
 		return nil, fmt.Errorf("invalid address %s: %v", fullURL, err)
 	}
 
-	requestConfig := createSendHTTPRequestConfig(baseURL, path, queryParams, config, browserbaseSecrets)
+	requestConfig := createSendHTTPRequestConfig(ctx, baseURL, path, queryParams, config, browserbaseSecrets)
 	httpRequestResponse, err := request.SendRequest(ctx, requestConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to probe %s - %s", fullURL, err)

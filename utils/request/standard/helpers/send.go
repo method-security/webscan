@@ -7,6 +7,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	neturl "net/url"
 	"time"
@@ -20,18 +21,54 @@ import (
 
 	// External
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
+	"golang.org/x/net/proxy"
 )
 
 func SendHTTPRequest(ctx context.Context, url string, headers map[string]string, bodyReader io.Reader, config common.SendHttpRequestConfig) (*http.Response, []string, error) {
 	log := svc1log.FromContext(ctx)
 	log.Debug("Sending request", svc1log.SafeParam("url", url), svc1log.SafeParam("maxRedirects", config.MaxRedirects))
 
+	// Configure HTTP Transport
+	transport := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: !config.VerifyTls},
+	}
+
+	// Configure proxy if specified
+	if config.HttpProxy != nil && *config.HttpProxy != "" {
+		proxyURL, err := neturl.Parse(*config.HttpProxy)
+		if err != nil {
+			log.Error("Failed to parse HTTP proxy URL", svc1log.SafeParam("proxy", *config.HttpProxy), svc1log.SafeParam("error", err.Error()))
+			return nil, []string{url}, fmt.Errorf("invalid HTTP proxy URL: %v", err)
+		}
+		transport.Proxy = http.ProxyURL(proxyURL)
+		log.Debug("Using HTTP proxy", svc1log.SafeParam("proxy", *config.HttpProxy))
+	} else if config.SocksProxy != nil && *config.SocksProxy != "" {
+		proxyURL, err := neturl.Parse(*config.SocksProxy)
+		if err != nil {
+			log.Error("Failed to parse SOCKS proxy URL", svc1log.SafeParam("proxy", *config.SocksProxy), svc1log.SafeParam("error", err.Error()))
+			return nil, []string{url}, fmt.Errorf("invalid SOCKS proxy URL: %v", err)
+		}
+		// For SOCKS proxies, we need to use a different approach
+		// The standard http.Transport.Proxy doesn't directly support SOCKS
+		// We'll use golang.org/x/net/proxy for SOCKS support
+		if proxyURL.Scheme == "socks5" || proxyURL.Scheme == "socks5h" {
+			dialer, err := createSOCKS5Dialer(proxyURL)
+			if err != nil {
+				log.Error("Failed to create SOCKS5 dialer", svc1log.SafeParam("error", err.Error()))
+				return nil, []string{url}, fmt.Errorf("failed to create SOCKS5 dialer: %v", err)
+			}
+			transport.Dial = dialer.Dial
+			log.Debug("Using SOCKS5 proxy", svc1log.SafeParam("proxy", *config.SocksProxy))
+		} else {
+			log.Error("Unsupported SOCKS proxy scheme", svc1log.SafeParam("scheme", proxyURL.Scheme))
+			return nil, []string{url}, fmt.Errorf("unsupported SOCKS proxy scheme: %s (use socks5:// or socks5h://)", proxyURL.Scheme)
+		}
+	}
+
 	// Configure HTTP Client
 	client := &http.Client{
-		Timeout: time.Duration(config.Timeout) * time.Second,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: !config.VerifyTls},
-		},
+		Timeout:   time.Duration(config.Timeout) * time.Second,
+		Transport: transport,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse
 		},
@@ -186,4 +223,28 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 	}
 
 	return nil, redirectChain, fmt.Errorf("maximum redirects (%d) exceeded for %s", config.MaxRedirects, url)
+}
+
+// createSOCKS5Dialer creates a SOCKS5 proxy dialer from the provided proxy URL
+func createSOCKS5Dialer(proxyURL *neturl.URL) (proxy.Dialer, error) {
+	// Extract auth credentials if present
+	var auth *proxy.Auth
+	if proxyURL.User != nil {
+		password, _ := proxyURL.User.Password()
+		auth = &proxy.Auth{
+			User:     proxyURL.User.Username(),
+			Password: password,
+		}
+	}
+
+	// Create SOCKS5 dialer
+	dialer, err := proxy.SOCKS5("tcp", proxyURL.Host, auth, &net.Dialer{
+		Timeout:   30 * time.Second,
+		KeepAlive: 30 * time.Second,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return dialer, nil
 }

@@ -203,6 +203,9 @@ func PerformRequest(ctx context.Context, config discover.DiscoverRequestConfig) 
 		RequestMethod:              common.RequestMethodStandard,
 	}
 
+	// Add proxy settings from context
+	requesthelpers.ApplyProxySettings(ctx, &sendConfig)
+
 	// Construct URL
 	constructedURL, err := standardhelpers.ConstructURL(ctx, request)
 	if err != nil {

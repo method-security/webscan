@@ -62,10 +62,11 @@ func resolveEffectiveTarget(ctx context.Context, target string, config discover.
 		VerifyTls:    config.VerifyTls,
 		Timeout:      config.Timeout,
 		// IgnoreCrossDomainRedirects is the transport-layer flag — a strict
-		// hostname-string equality check. The route allowlist (IsURLAllowed /
-		// IsSubdomain) handles cross-domain scoping at discover time and is
-		// subdomain-aware. Match legacy HEAD-resolve behavior so apex → www
-		// and other in-scope hostname-changing redirects still resolve.
+		// hostname-string equality check. Leave it false here so this HEAD
+		// resolve still follows hostname-changing redirects (e.g. apex → www)
+		// and lands on the final effective target host. The route allowlist
+		// (IsURLAllowed / IsHostInScope) then scopes discovery to that resolved
+		// host and its subdomains at discover time.
 		IgnoreCrossDomainRedirects: false,
 		UserAgent:                  config.UserAgent,
 		RequestMethod:              common.RequestMethodStandard,
@@ -332,7 +333,7 @@ func extractRoutes(ctx context.Context, httpRequestResponse *common.HttpRequestR
 	staticAssets := make(map[string]struct{})
 	for url := range urls {
 		if routeCaptureConfig.CollectStaticAssets && utils.IsStaticAsset(url) {
-			if discoverroutehelpers.IsSubdomain(redirectedURLBase, url) || !routeCaptureConfig.IgnoreCrossDomain {
+			if utils.IsHostInScope(redirectedURLBase, url) || !routeCaptureConfig.IgnoreCrossDomain {
 				staticAssets[url] = struct{}{}
 			}
 		}

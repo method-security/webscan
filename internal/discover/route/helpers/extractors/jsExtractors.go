@@ -57,11 +57,10 @@ func fetchJSResource(ctx context.Context, fullURL string, routeCaptureConfig dis
 		VerifyTls:    routeCaptureConfig.VerifyTls,
 		Timeout:      routeCaptureConfig.Timeout,
 		// IgnoreCrossDomainRedirects is the transport-layer flag — a strict
-		// hostname-string equality check. The route allowlist (IsURLAllowed /
-		// IsSubdomain) already handles cross-domain scoping at discover time
-		// and is subdomain-aware. Match legacy http.Get redirect-following so
-		// apex → www and other in-scope hostname-changing redirects still
-		// resolve.
+		// hostname-string equality check. Leave it false here so bundle fetches
+		// still follow hostname-changing redirects (e.g. apex → www). The route
+		// allowlist (IsURLAllowed / IsHostInScope) then scopes any discovered
+		// endpoints to the target host and its subdomains at discover time.
 		IgnoreCrossDomainRedirects: false,
 		UserAgent:                  routeCaptureConfig.UserAgent,
 		RequestMethod:              common.RequestMethodStandard,

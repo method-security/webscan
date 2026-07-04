@@ -318,6 +318,7 @@ func extractRoutes(ctx context.Context, httpRequestResponse *common.HttpRequestR
 			PathToBrowser:              requestConfig.HeadlessConfig.PathToBrowserShell,
 			MinDOMStabalizeTimeSeconds: requestConfig.HeadlessConfig.MinDomStabalizeTime,
 		}
+		browser.SetProxyConfigFromRequest(requestConfig)
 		err := browser.InitializeBrowser(networkRouteCtx)
 		if err != nil {
 			log.Error("Failed to initialize browser", svc1log.SafeParam("error", err))

@@ -61,7 +61,7 @@ func NewRequesterWithClient(client *cdp.Client, timeout int, minDOMStabalizeTime
 }
 
 // SetProxyConfig stores launch-scoped proxy configuration for browser instances
-// created by this requester. SOCKS takes precedence when both proxies are set.
+// created by this requester. HTTP takes precedence when both proxies are set.
 func (b *Requester) SetProxyConfig(httpProxy, socksProxy string) {
 	b.HttpProxy = httpProxy
 	b.SocksProxy = socksProxy
@@ -81,8 +81,8 @@ func (b *Requester) SetProxyConfigFromRequest(config common.SendHttpRequestConfi
 }
 
 func (b *Requester) proxyServer() string {
-	if b.SocksProxy != "" {
-		return b.SocksProxy
+	if b.HttpProxy != "" {
+		return b.HttpProxy
 	}
-	return b.HttpProxy
+	return b.SocksProxy
 }

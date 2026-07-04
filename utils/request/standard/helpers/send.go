@@ -178,8 +178,7 @@ func newHTTPClient(config common.SendHttpRequestConfig) *httpclient.Client {
 	}
 	if config.HttpProxy != nil && *config.HttpProxy != "" {
 		options = append(options, httpclient.WithHTTPProxy(*config.HttpProxy))
-	}
-	if config.SocksProxy != nil && *config.SocksProxy != "" {
+	} else if config.SocksProxy != nil && *config.SocksProxy != "" {
 		options = append(options, httpclient.WithSOCKSProxy(*config.SocksProxy))
 	}
 	return httpclient.New(options...)

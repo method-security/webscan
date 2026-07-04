@@ -12,8 +12,9 @@ func ApplyProxySettings(ctx context.Context, config *common.SendHttpRequestConfi
 	proxyConfig := appconfig.GetProxyConfig(ctx)
 	if proxyConfig.HttpProxy != "" {
 		config.HttpProxy = &proxyConfig.HttpProxy
-	}
-	if proxyConfig.SocksProxy != "" {
+		config.SocksProxy = nil
+	} else if proxyConfig.SocksProxy != "" {
 		config.SocksProxy = &proxyConfig.SocksProxy
+		config.HttpProxy = nil
 	}
 }

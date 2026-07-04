@@ -25,7 +25,7 @@ func createSendHTTPRequestConfig(ctx context.Context, baseURL, path string, quer
 			Query: queryParams,
 		},
 	}
-	
+
 	sendConfig := common.SendHttpRequestConfig{
 		Request:                    &request,
 		MaxRedirects:               config.MaxRedirects,
@@ -38,10 +38,10 @@ func createSendHTTPRequestConfig(ctx context.Context, baseURL, path string, quer
 		BrowserbaseConfig:          config.BrowserbaseConfig,
 		BrowserbaseSecrets:         browserbaseSecrets,
 	}
-	
+
 	// Add proxy settings from context
 	requesthelpers.ApplyProxySettings(ctx, &sendConfig)
-	
+
 	return sendConfig
 }
 

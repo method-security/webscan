@@ -20,3 +20,5 @@ types:
       sessionStorage: optional<map<string, string>>
       captureConsoleLogs: optional<boolean>
       captureCookies: optional<boolean>
+      httpProxy: optional<string>
+      socksProxy: optional<string>

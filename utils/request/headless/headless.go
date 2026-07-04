@@ -68,6 +68,10 @@ func (b *Requester) InitializeBrowser(ctx context.Context) error {
 	defer launchCancel()
 
 	launch := launcher.New().Headless(true).Bin(binPath).NoSandbox(true).Context(launchCtx)
+	if proxyServer := b.proxyServer(); proxyServer != "" {
+		log.Info("Using headless browser proxy", svc1log.SafeParam("proxy", proxyServer))
+		launch.Proxy(proxyServer)
+	}
 	browserURL, err := launch.Launch()
 	if err != nil {
 		return fmt.Errorf("browser launch failed: %v", err)

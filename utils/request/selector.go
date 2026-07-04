@@ -50,6 +50,7 @@ func SendRequest(ctx context.Context, config common.SendHttpRequestConfig) (*com
 		} else {
 			headlessRequester = headless.NewRequester(config.Timeout, config.HeadlessConfig)
 		}
+		headlessRequester.SetProxyConfigFromRequest(config)
 		httpRequestResponse, err := headlessRequester.SendRequest(requestCtx, config)
 		if err != nil {
 			return nil, fmt.Errorf("browser capture failed: %w", err)
@@ -59,6 +60,9 @@ func SendRequest(ctx context.Context, config common.SendHttpRequestConfig) (*com
 	// Browserbase capture
 	case common.RequestMethodBrowserbase:
 		log.Debug("Sending browserbase request")
+		if hasProxyConfig(config) {
+			return nil, fmt.Errorf("browserbase capture does not support --http-proxy or --socks-proxy; use Browserbase proxy options instead")
+		}
 		client := browserbase.NewBrowserbaseClient(config.BrowserbaseConfig, config.BrowserbaseSecrets)
 		browserbase := browserbase.NewBrowserbaseRequester(ctx, *client, config.Timeout, config.HeadlessConfig.MinDomStabalizeTime)
 		if browserbase == nil {
@@ -74,4 +78,8 @@ func SendRequest(ctx context.Context, config common.SendHttpRequestConfig) (*com
 	default:
 		return nil, fmt.Errorf("invalid request method: %s", config.RequestMethod)
 	}
+}
+
+func hasProxyConfig(config common.SendHttpRequestConfig) bool {
+	return (config.HttpProxy != nil && *config.HttpProxy != "") || (config.SocksProxy != nil && *config.SocksProxy != "")
 }

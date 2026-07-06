@@ -267,13 +267,14 @@ func extractRoutesFromPatterns(content string, baseURL string, routeCaptureConfi
 			fullURL := discoverroutehelpers.ResolveURL(baseURL, urlStr)
 
 			// Static assets are diverted to the StaticAssets output rather than
-			// recorded as routes.
-			if discoverroutehelpers.CaptureStaticAssetReference(urls, baseURL, fullURL, routeCaptureConfig.IgnoreCrossDomain, routeCaptureConfig.CollectStaticAssets) {
+			// recorded as routes. Scope is anchored on the original target, not the
+			// per-page (post-redirect) base URL.
+			if discoverroutehelpers.CaptureStaticAssetReference(urls, routeCaptureConfig.Target, fullURL, routeCaptureConfig.IgnoreCrossDomainStaticAssets, routeCaptureConfig.CollectStaticAssets) {
 				continue
 			}
 
 			// Check if the URL is allowed
-			if !discoverroutehelpers.IsURLAllowed(baseURL, fullURL, routeCaptureConfig.IgnoreCrossDomain, routeCaptureConfig.CollectStaticAssets) {
+			if !discoverroutehelpers.IsURLAllowed(routeCaptureConfig.Target, fullURL, routeCaptureConfig.IgnoreCrossDomainRoutes, routeCaptureConfig.CollectStaticAssets) {
 				continue
 			}
 
@@ -409,13 +410,15 @@ func extractScriptContentRoutes(ctx context.Context, scriptContent string, baseU
 
 	// If parsing succeeds, use AST traversal
 	v := &visitor{
-		routes:              &routes,
-		urls:                urls,
-		baseURL:             baseURL,
-		baseURLsOnly:        routeCaptureConfig.IgnoreCrossDomain,
-		captureStaticAssets: routeCaptureConfig.CollectStaticAssets,
-		errors:              &errors,
-		symbolTable:         make(map[string]string),
+		routes:                        &routes,
+		urls:                          urls,
+		baseURL:                       baseURL,
+		scopeURL:                      routeCaptureConfig.Target,
+		ignoreCrossDomainRoutes:       routeCaptureConfig.IgnoreCrossDomainRoutes,
+		ignoreCrossDomainStaticAssets: routeCaptureConfig.IgnoreCrossDomainStaticAssets,
+		captureStaticAssets:           routeCaptureConfig.CollectStaticAssets,
+		errors:                        &errors,
+		symbolTable:                   make(map[string]string),
 	}
 	ast.Walk(v, program)
 
@@ -424,14 +427,22 @@ func extractScriptContentRoutes(ctx context.Context, scriptContent string, baseU
 
 // visitor struct for AST traversal
 type visitor struct {
-	routes              *[]*discover.RouteDetails
-	urls                map[string]struct{}
-	baseURL             string
-	baseURLsOnly        bool
-	captureStaticAssets bool
-	errors              *[]string
-	symbolTable         map[string]string   // current (innermost) scope
-	scopeStack          []map[string]string // outer scopes, index 0 = outermost
+	routes *[]*discover.RouteDetails
+	urls   map[string]struct{}
+	// baseURL is the page URL used to resolve relative references.
+	baseURL string
+	// scopeURL is the scope anchor (config.Target) used for the in-scope check;
+	// it is intentionally distinct from baseURL so scope stays tight to the
+	// original target rather than the per-page post-redirect host.
+	scopeURL string
+	// ignoreCrossDomainRoutes / ignoreCrossDomainStaticAssets gate the scope check
+	// separately for discovered routes and static assets.
+	ignoreCrossDomainRoutes       bool
+	ignoreCrossDomainStaticAssets bool
+	captureStaticAssets           bool
+	errors                        *[]string
+	symbolTable                   map[string]string   // current (innermost) scope
+	scopeStack                    []map[string]string // outer scopes, index 0 = outermost
 }
 
 // pushScope creates a new inner scope for function bodies.
@@ -511,11 +522,11 @@ func (v *visitor) handleVariableStatement(node *ast.VariableStatement) {
 			// Resolve and emit a route
 			fullURL := discoverroutehelpers.ResolveURL(v.baseURL, strVal)
 			// Static assets are diverted to the StaticAssets output rather than
-			// recorded as routes.
-			if discoverroutehelpers.CaptureStaticAssetReference(v.urls, v.baseURL, fullURL, v.baseURLsOnly, v.captureStaticAssets) {
+			// recorded as routes. Scope is anchored on the original target.
+			if discoverroutehelpers.CaptureStaticAssetReference(v.urls, v.scopeURL, fullURL, v.ignoreCrossDomainStaticAssets, v.captureStaticAssets) {
 				continue
 			}
-			if discoverroutehelpers.IsURLAllowed(v.baseURL, fullURL, v.baseURLsOnly, v.captureStaticAssets) {
+			if discoverroutehelpers.IsURLAllowed(v.scopeURL, fullURL, v.ignoreCrossDomainRoutes, v.captureStaticAssets) {
 				urlNoQuery, err := discoverroutehelpers.URLRemoveQueryParams(fullURL)
 				if err == nil {
 					routeBaseURL, routePath, err := discoverroutehelpers.SplitURLBaseAndPath(urlNoQuery)
@@ -587,14 +598,14 @@ func (v *visitor) processFetchCall(node *ast.CallExpression) {
 	fullURL := discoverroutehelpers.ResolveURL(v.baseURL, urlStr)
 
 	// Static assets are diverted to the StaticAssets output rather than recorded
-	// as routes.
-	if discoverroutehelpers.CaptureStaticAssetReference(v.urls, v.baseURL, fullURL, v.baseURLsOnly, v.captureStaticAssets) {
+	// as routes. Scope is anchored on the original target.
+	if discoverroutehelpers.CaptureStaticAssetReference(v.urls, v.scopeURL, fullURL, v.ignoreCrossDomainStaticAssets, v.captureStaticAssets) {
 		return
 	}
 
 	// Check if the URL is allowed
-	// Only consider URLs that are part of the base URL if specified
-	if !discoverroutehelpers.IsURLAllowed(v.baseURL, fullURL, v.baseURLsOnly, v.captureStaticAssets) {
+	// Only consider URLs that are part of the target's scope if specified
+	if !discoverroutehelpers.IsURLAllowed(v.scopeURL, fullURL, v.ignoreCrossDomainRoutes, v.captureStaticAssets) {
 		return
 	}
 

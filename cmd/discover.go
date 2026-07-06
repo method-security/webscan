@@ -875,7 +875,12 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Get Config flags
-			ignoreCrossDomain, err := cmd.Flags().GetBool("ignore-cross-domain")
+			ignoreCrossDomainRoutes, err := cmd.Flags().GetBool("ignore-cross-domain-routes")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			ignoreCrossDomainStaticAssets, err := cmd.Flags().GetBool("ignore-cross-domain-static-assets")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -989,7 +994,7 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Set Config
-			config := getDiscoverRouteConfig(target, ignoreCrossDomain, collectStaticAssets, spiderDepth, maxRedirects, verifyTLS, timeout, sleep, jitter, threads, userAgentPreset, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig, bundleURLs, fetchSourceMaps, maxBundles)
+			config := getDiscoverRouteConfig(target, ignoreCrossDomainRoutes, ignoreCrossDomainStaticAssets, collectStaticAssets, spiderDepth, maxRedirects, verifyTLS, timeout, sleep, jitter, threads, userAgentPreset, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig, bundleURLs, fetchSourceMaps, maxBundles)
 			config.Headers, err = requesthelpers.ParseHeaderPairs(headerPairs)
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -1019,7 +1024,8 @@ func (a *WebScan) InitDiscoverCommand() {
 	// Target Flags
 	discoverRouteCmd.Flags().String("target", "", "URL target to discover routes from")
 	// Config Flags
-	discoverRouteCmd.Flags().Bool("ignore-cross-domain", true, "Ignore routes that do not share the target's base URL")
+	discoverRouteCmd.Flags().Bool("ignore-cross-domain-routes", true, "Ignore discovered routes whose host is not the target host or a subdomain of it")
+	discoverRouteCmd.Flags().Bool("ignore-cross-domain-static-assets", true, "Ignore discovered static assets whose host is not the target host or a subdomain of it")
 	discoverRouteCmd.Flags().Bool("collect-static-assets", false, "Collect static assets from route discovery")
 	discoverRouteCmd.Flags().Int("spider-depth", 1, "Maximum depth for route spidering")
 	discoverRouteCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
@@ -1692,24 +1698,25 @@ func getDiscoverProbeConfig(targets []string, protocol string, maxRedirects int,
 }
 
 // getDiscoverRouteConfig builds the config for route discovery.
-func getDiscoverRouteConfig(target string, ignoreCrossDomain bool, collectStaticAssets bool, spiderDepth int, maxRedirects int, verifyTLS bool, timeout int, sleep int, jitter int, threads int, userAgent common.UserAgentPreset, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig, bundleURLs []string, fetchSourceMaps bool, maxBundles int) discover.DiscoverRouteConfig {
+func getDiscoverRouteConfig(target string, ignoreCrossDomainRoutes bool, ignoreCrossDomainStaticAssets bool, collectStaticAssets bool, spiderDepth int, maxRedirects int, verifyTLS bool, timeout int, sleep int, jitter int, threads int, userAgent common.UserAgentPreset, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig, bundleURLs []string, fetchSourceMaps bool, maxBundles int) discover.DiscoverRouteConfig {
 	config := discover.DiscoverRouteConfig{
-		Target:              target,
-		CollectStaticAssets: collectStaticAssets,
-		IgnoreCrossDomain:   ignoreCrossDomain,
-		SpiderDepth:         spiderDepth,
-		MaxRedirects:        maxRedirects,
-		VerifyTls:           verifyTLS,
-		Timeout:             max(timeout, 0),
-		Sleep:               max(sleep, 0),
-		Jitter:              max(jitter, 0),
-		Threads:             max(threads, 0),
-		UserAgent:           userAgent,
-		RequestMethod:       requestMethod,
-		HeadlessConfig:      headlessConfig,
-		BrowserbaseConfig:   browserbaseConfig,
-		FetchSourceMaps:     fetchSourceMaps,
-		MaxBundles:          maxBundles,
+		Target:                        target,
+		CollectStaticAssets:           collectStaticAssets,
+		IgnoreCrossDomainRoutes:       ignoreCrossDomainRoutes,
+		IgnoreCrossDomainStaticAssets: ignoreCrossDomainStaticAssets,
+		SpiderDepth:                   spiderDepth,
+		MaxRedirects:                  maxRedirects,
+		VerifyTls:                     verifyTLS,
+		Timeout:                       max(timeout, 0),
+		Sleep:                         max(sleep, 0),
+		Jitter:                        max(jitter, 0),
+		Threads:                       max(threads, 0),
+		UserAgent:                     userAgent,
+		RequestMethod:                 requestMethod,
+		HeadlessConfig:                headlessConfig,
+		BrowserbaseConfig:             browserbaseConfig,
+		FetchSourceMaps:               fetchSourceMaps,
+		MaxBundles:                    maxBundles,
 	}
 
 	if len(bundleURLs) > 0 {

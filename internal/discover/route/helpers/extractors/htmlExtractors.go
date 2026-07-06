@@ -40,13 +40,14 @@ func ExtractFormRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig
 		fullURL := discoverroutehelpers.ResolveURL(baseURL, action)
 
 		// Static assets are diverted to the StaticAssets output rather than
-		// recorded as routes.
-		if discoverroutehelpers.CaptureStaticAssetReference(urls, baseURL, fullURL, routeCaptureConfig.IgnoreCrossDomain, routeCaptureConfig.CollectStaticAssets) {
+		// recorded as routes. Scope is anchored on the original target, not the
+		// per-page (post-redirect) base URL.
+		if discoverroutehelpers.CaptureStaticAssetReference(urls, routeCaptureConfig.Target, fullURL, routeCaptureConfig.IgnoreCrossDomainStaticAssets, routeCaptureConfig.CollectStaticAssets) {
 			return
 		}
 
 		// Check if the URL is allowed
-		if !discoverroutehelpers.IsURLAllowed(baseURL, fullURL, routeCaptureConfig.IgnoreCrossDomain, routeCaptureConfig.CollectStaticAssets) {
+		if !discoverroutehelpers.IsURLAllowed(routeCaptureConfig.Target, fullURL, routeCaptureConfig.IgnoreCrossDomainRoutes, routeCaptureConfig.CollectStaticAssets) {
 			return
 		}
 
@@ -118,8 +119,9 @@ func ExtractAnchorRoutes(doc *goquery.Document, baseURL string, routeCaptureConf
 			fullURL := discoverroutehelpers.ResolveURL(baseURL, href)
 
 			// Static assets are diverted to the StaticAssets output rather than
-			// recorded as routes.
-			if discoverroutehelpers.CaptureStaticAssetReference(urls, baseURL, fullURL, routeCaptureConfig.IgnoreCrossDomain, routeCaptureConfig.CollectStaticAssets) {
+			// recorded as routes. Scope is anchored on the original target, not the
+			// per-page (post-redirect) base URL.
+			if discoverroutehelpers.CaptureStaticAssetReference(urls, routeCaptureConfig.Target, fullURL, routeCaptureConfig.IgnoreCrossDomainStaticAssets, routeCaptureConfig.CollectStaticAssets) {
 				return
 			}
 
@@ -144,7 +146,7 @@ func ExtractAnchorRoutes(doc *goquery.Document, baseURL string, routeCaptureConf
 			}
 
 			// Check if the URL is allowed
-			if !discoverroutehelpers.IsURLAllowed(baseURL, fullURL, routeCaptureConfig.IgnoreCrossDomain, routeCaptureConfig.CollectStaticAssets) {
+			if !discoverroutehelpers.IsURLAllowed(routeCaptureConfig.Target, fullURL, routeCaptureConfig.IgnoreCrossDomainRoutes, routeCaptureConfig.CollectStaticAssets) {
 				return
 			}
 			urls[urlNoQuery] = struct{}{}
@@ -187,8 +189,9 @@ func ExtractLinkRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig
 			fullURL := discoverroutehelpers.ResolveURL(baseURL, href)
 
 			// Static assets are diverted to the StaticAssets output rather than
-			// recorded as routes.
-			if discoverroutehelpers.CaptureStaticAssetReference(urls, baseURL, fullURL, routeCaptureConfig.IgnoreCrossDomain, routeCaptureConfig.CollectStaticAssets) {
+			// recorded as routes. Scope is anchored on the original target, not the
+			// per-page (post-redirect) base URL.
+			if discoverroutehelpers.CaptureStaticAssetReference(urls, routeCaptureConfig.Target, fullURL, routeCaptureConfig.IgnoreCrossDomainStaticAssets, routeCaptureConfig.CollectStaticAssets) {
 				return
 			}
 
@@ -200,7 +203,7 @@ func ExtractLinkRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig
 			}
 
 			// Check if the URL is allowed
-			if !discoverroutehelpers.IsURLAllowed(baseURL, fullURL, routeCaptureConfig.IgnoreCrossDomain, routeCaptureConfig.CollectStaticAssets) {
+			if !discoverroutehelpers.IsURLAllowed(routeCaptureConfig.Target, fullURL, routeCaptureConfig.IgnoreCrossDomainRoutes, routeCaptureConfig.CollectStaticAssets) {
 				return
 			}
 

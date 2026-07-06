@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	neturl "net/url"
 	"time"
 
 	// Generated
@@ -54,6 +53,26 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 
 	// Handle Redirects (Runs once if MaxRedirects == 0 which is for requests that don't follow redirects)
 	currentURL := url
+
+	// finalizeResponse enforces the standardized cross-domain policy on the FINAL
+	// landed URL only. Intermediate hops may traverse any host (e.g.
+	// example.com -> 127.0.0.1 -> www.example.com); only the host we ultimately land
+	// on must be the original request host or a subdomain of it (utils.IsHostInScope).
+	// This mirrors the headless transport, which compares the first and last entries of
+	// the redirect chain rather than every hop.
+	finalizeResponse := func(resp *http.Response) (*http.Response, []string, error) {
+		if config.IgnoreCrossDomainRedirects && !utils.IsHostInScope(url, currentURL) {
+			log.Info("Blocking cross-domain redirect", svc1log.SafeParam("from", url), svc1log.SafeParam("to", currentURL))
+			if resp != nil {
+				if closeErr := resp.Body.Close(); closeErr != nil {
+					log.Error("Failed to close response body", svc1log.SafeParam("error", closeErr.Error()))
+				}
+			}
+			return nil, redirectChain, fmt.Errorf("cross-domain redirect blocked: %s -> %s", url, currentURL) // Dont change this comment used for DD metric
+		}
+		return resp, redirectChain, nil
+	}
+
 	for redirects := 0; redirects <= config.MaxRedirects; redirects++ {
 		var reqBody io.Reader
 		if bodyBuffer != nil {
@@ -99,7 +118,7 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 			if currentURL != redirectChain[len(redirectChain)-1] {
 				redirectChain[len(redirectChain)-1] = currentURL
 			}
-			return resp, redirectChain, nil
+			return finalizeResponse(resp)
 		}
 
 		// Get Location Header (Case Insensitive)
@@ -109,7 +128,7 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 			if currentURL != redirectChain[len(redirectChain)-1] {
 				redirectChain[len(redirectChain)-1] = currentURL
 			}
-			return resp, redirectChain, nil
+			return finalizeResponse(resp)
 		}
 
 		// Parse Redirect Location first — we need the resolved URL to decide
@@ -137,24 +156,9 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 			continue
 		}
 
-		// Check if redirect is cross-domain and should be blocked.  This runs
-		// BEFORE the budget gate so that callers with IgnoreCrossDomainRedirects=true
-		// still get a cross-domain error even when MaxRedirects=0 — matching the
-		// original behaviour where the cross-domain guard was always evaluated before
-		// the loop counter increment that caused the budget to be exceeded.
-		if config.IgnoreCrossDomainRedirects {
-			originalURL, parseErr := neturl.Parse(url)
-			if parseErr == nil && originalURL.Hostname() != nextURL.Hostname() {
-				log.Info("Blocking cross-domain redirect", svc1log.SafeParam("from", currentURL), svc1log.SafeParam("to", nextURL.String()))
-				err = resp.Body.Close()
-				if err != nil {
-					log.Error("Failed to close response body", svc1log.SafeParam("error", err.Error()))
-				}
-				return nil, redirectChain, fmt.Errorf("cross-domain redirect blocked: %s -> %s", currentURL, nextURL.String()) // Dont change this comment used for DD metric
-			}
-		}
-
-		// Budget check — only for non-trailing-slash, non-cross-domain redirects.
+		// Budget check — only for non-trailing-slash redirects. The cross-domain
+		// policy is intentionally NOT applied per hop; intermediate hosts may be
+		// traversed and only the final landed URL is validated via finalizeResponse.
 		// With MaxRedirects=0 the caller opts into "give me the redirect response
 		// as-is so I can read Location/Set-Cookie" (e.g. wp-login.php success
 		// detection where the 302 to /wp-admin/ IS the success signal).  Without
@@ -169,7 +173,7 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 			if currentURL != redirectChain[len(redirectChain)-1] {
 				redirectChain[len(redirectChain)-1] = currentURL
 			}
-			return resp, redirectChain, nil
+			return finalizeResponse(resp)
 		}
 
 		// Close Response Body

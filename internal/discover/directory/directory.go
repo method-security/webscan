@@ -3,16 +3,12 @@ package discoverdirectory
 import (
 	// Standard
 	"context"
-	"errors"
 	"fmt"
-	"math"
 	"runtime"
 	"strings"
 	"sync"
 	"time"
 
-	// Configs
-	"github.com/Method-Security/webscan/configs"
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
 	discover "github.com/Method-Security/webscan/generated/go/discover"
@@ -25,28 +21,6 @@ import (
 	// External
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
-
-// createDirectorySendHTTPRequestConfig builds the config for directory discovery.
-func createDirectorySendHTTPRequestConfig(baseURL, path string, method common.HttpMethod, requestParams common.HttpRequestParams, MaxRedirects int, config *discover.DiscoverDirectoryConfig) common.SendHttpRequestConfig {
-	request := common.HttpRequest{
-		BaseUrl: baseURL,
-		Path:    path,
-		Method:  method,
-		Params:  &requestParams,
-	}
-	return common.SendHttpRequestConfig{
-		Request:                    &request,
-		MaxRedirects:               MaxRedirects,
-		VerifyTls:                  config.VerifyTls,
-		Timeout:                    config.Timeout,
-		IgnoreCrossDomainRedirects: config.IgnoreCrossDomainRedirects,
-		UserAgent:                  config.UserAgent,
-		RequestMethod:              common.RequestMethodStandard,
-		HeadlessConfig:             nil,
-		BrowserbaseConfig:          nil,
-		BrowserbaseSecrets:         nil,
-	}
-}
 
 // RunDirectoryDiscovery launches the directory discovery engine with multi-threading support
 func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirectoryConfig) (*discover.DiscoverDirectoryReport, error) {
@@ -159,6 +133,13 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 		var attempts []*common.HttpRequestResponse
 		var attemptsMutex sync.Mutex
 		var wg sync.WaitGroup
+
+		// Aggregate per-target request failures so we emit one grouped summary per
+		// category instead of one error per path (which is noise for large wordlists).
+		disallowedStatusCounts := map[int]int{}
+		var sendFailureCount int
+		var sendFailureSample string
+
 		threads := config.Threads
 		if threads == 0 {
 			threads = runtime.NumCPU()
@@ -179,13 +160,15 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 					if ctx.Err() != nil {
 						// Wait for any running goroutines to complete before returning partial results
 						wg.Wait()
+						errors = append(errors, groupRequestFailures(baseURL, disallowedStatusCounts, sendFailureCount, sendFailureSample)...)
 						if len(attempts) > 0 {
 							targetInfo.Attempts = attempts
 							targets = append(targets, &targetInfo)
 						}
 						result.Targets = targets
+						errors = append(errors, fmt.Sprintf("directory discovery operation timed out after %d seconds during request processing", config.MaxRuntime))
 						report.Result = &result
-						report.Errors = append(report.Errors, fmt.Sprintf("directory discovery operation timed out after %d seconds during request processing", config.MaxRuntime))
+						report.Errors = errors
 						return &report, nil
 					}
 
@@ -213,7 +196,10 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 							// Don't add errors if context was cancelled
 							if ctx.Err() == nil {
 								attemptsMutex.Lock()
-								errors = append(errors, fmt.Sprintf("failed to send request: %v", err))
+								sendFailureCount++
+								if sendFailureSample == "" {
+									sendFailureSample = err.Error()
+								}
 								attemptsMutex.Unlock()
 							}
 							return
@@ -225,15 +211,15 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 						}
 
 						// Analyze response
-						isValid, errMsg := AnalyzeResponse(ctx, *httpRequest, validCodes, config.IgnoreBaseContentMatch, config.OmitStandardResponses, baselineSizeInt, baselineWordsInt, baselineSizeRandomPath, baselineWordsRandomPath, config.Threshold)
+						isValid, disallowedStatus := AnalyzeResponse(ctx, *httpRequest, validCodes, config.IgnoreBaseContentMatch, config.OmitStandardResponses, baselineSizeInt, baselineWordsInt, baselineSizeRandomPath, baselineWordsRandomPath, config.Threshold)
 
 						if isValid {
 							attemptsMutex.Lock()
 							attempts = append(attempts, httpRequest)
 							attemptsMutex.Unlock()
-						} else if errMsg != "" {
+						} else if disallowedStatus != 0 {
 							attemptsMutex.Lock()
-							errors = append(errors, errMsg)
+							disallowedStatusCounts[disallowedStatus]++
 							attemptsMutex.Unlock()
 						}
 
@@ -253,6 +239,9 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 		// Wait for all goroutines to complete
 		wg.Wait()
 
+		// Collapse this target's request failures into grouped summaries
+		errors = append(errors, groupRequestFailures(baseURL, disallowedStatusCounts, sendFailureCount, sendFailureSample)...)
+
 		// Always add results if we have any, even if context expired
 		if len(attempts) > 0 {
 			targetInfo.Attempts = attempts
@@ -262,8 +251,9 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 		// Check if context expired during processing - still return partial results
 		if ctx.Err() != nil {
 			result.Targets = targets
+			errors = append(errors, fmt.Sprintf("directory discovery operation timed out after %d seconds during processing, returning partial results", config.MaxRuntime))
 			report.Result = &result
-			report.Errors = append(report.Errors, fmt.Sprintf("directory discovery operation timed out after %d seconds during processing, returning partial results", config.MaxRuntime))
+			report.Errors = errors
 			return &report, nil
 		}
 	}
@@ -273,180 +263,4 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 	report.Result = &result
 	report.Errors = errors
 	return &report, nil
-}
-
-// AnalyzeResponse checks if the response signifies that directory/file was found based on the response code and the baseline size and word count
-func AnalyzeResponse(ctx context.Context, request common.HttpRequestResponse, validCodes map[int]bool, checkBaseContentMatch bool, omitStandardResponses bool, baselineSize, baselineWords int, baselineSizeRandomPath *int, baselineWordsRandomPath *int, threshold float64) (bool, string) {
-	log := svc1log.FromContext(ctx)
-	if request.Response == nil || request.Response.StatusCode == nil {
-		return false, ""
-	}
-	if !validCodes[*request.Response.StatusCode] {
-		errMsg := fmt.Sprintf("%s%s returned status code %d which is not in the allowed response codes", request.Request.BaseUrl, request.Request.Path, *request.Response.StatusCode)
-		log.Info(errMsg,
-			svc1log.SafeParam("url", request.Request.BaseUrl),
-			svc1log.SafeParam("path", request.Request.Path),
-			svc1log.SafeParam("status_code", *request.Response.StatusCode))
-		return false, errMsg
-	}
-
-	bodyStr := requesthelpers.GetResponseBodyStringFromBodyStruct(request.Response.ResponseBody)
-	if bodyStr == nil {
-		return false, ""
-	}
-	bodySize := len(*bodyStr)
-	if bodySize == 0 {
-		return false, ""
-	}
-
-	// Some servers return a 200 (or another allowed status code) while the body is actually a
-	// standard response (e.g. a soft 404 or a WAF rejection). Treat those as not found to
-	// reduce false positives.
-	if omitStandardResponses && isStandardResponseBody(*bodyStr) {
-		errMsg := fmt.Sprintf("%s%s returned an allowed status code but the body matched a standard response, treating as not found", request.Request.BaseUrl, request.Request.Path)
-		log.Info(errMsg,
-			svc1log.SafeParam("url", request.Request.BaseUrl),
-			svc1log.SafeParam("path", request.Request.Path))
-		return false, ""
-	}
-
-	wordCount := len(strings.Fields(*bodyStr))
-	// If the response is similar to the baseline or the baseline random path, then it is not a valid finding
-	// This is to prevent false positives from remote configurations that dont redirect but give blanket responses on all paths
-	if checkBaseContentMatch {
-		if (areSimilar(bodySize, baselineSize, threshold) && areSimilar(wordCount, baselineWords, threshold)) ||
-			(baselineSizeRandomPath != nil && baselineWordsRandomPath != nil && areSimilar(bodySize, *baselineSizeRandomPath, threshold) && areSimilar(wordCount, *baselineWordsRandomPath, threshold)) {
-			return false, ""
-		}
-	}
-	log.Info("Valid directory/file found", svc1log.SafeParam("url", request.Request.BaseUrl), svc1log.SafeParam("path", request.Request.Path), svc1log.SafeParam("size", bodySize), svc1log.SafeParam("words", wordCount))
-	return true, ""
-}
-
-// standardResponseFingerprints are substrings that commonly appear in the body of standard
-// responses (soft 404s, WAF blocks, generic server errors, etc). When any of these are
-// present in a response body we should not treat the path as a valid finding, even if the
-// status code is in the allowed set.
-//
-// Matching is done via strings.Contains, so each entry must be the shortest distinctive
-// phrase for the response it represents. Do not add longer phrases that already contain one
-// of these substrings (e.g. "404 not found" is redundant with "not found").
-var standardResponseFingerprints = []string{
-	// Missing / not found resource
-	"not found",
-	"could not be found",
-	"can't be found",
-	"couldn't find",
-	"does not exist",
-	"doesn't exist",
-	"no longer exists",
-	"no longer available",
-	"no such file or directory",
-	"nothing found",
-	"no results found",
-	"nothing matched your search",
-	"the page you are looking for",
-	"the resource you are looking for",
-	"the file you are looking for",
-	// Access denied / WAF rejection
-	"access denied",
-	"403 forbidden",
-	"access forbidden",
-	"401 unauthorized",
-	"permission to access",
-	"request blocked",
-	"you have been blocked",
-	"requested url was rejected",
-	// Generic server / gateway errors
-	"internal server error",
-	"bad gateway",
-	"service unavailable",
-	"gateway timeout",
-	"unexpected error",
-	"error occurred while processing your request",
-	"something went wrong",
-	"temporarily unavailable",
-	"under maintenance",
-}
-
-// isStandardResponseBody reports whether the provided response body matches the fingerprint
-// of a standard response (e.g. soft 404, WAF rejection, or generic server error).
-func isStandardResponseBody(responseBody string) bool {
-	responseBodyLower := strings.ToLower(responseBody)
-	for _, fingerprint := range standardResponseFingerprints {
-		if strings.Contains(responseBodyLower, fingerprint) {
-			return true
-		}
-	}
-	return false
-}
-
-// baseLine gets the baseline size and word count of the target to be used for validation of the response
-func baseLine(ctx context.Context, baseURL string, path string, validCodes map[int]bool, maxRedirects int, config *discover.DiscoverDirectoryConfig) (*common.HttpRequestResponse, *int, *int, error) {
-	// set request config
-	requestConfig := createDirectorySendHTTPRequestConfig(baseURL, path, common.HttpMethodGet, common.HttpRequestParams{}, maxRedirects, config)
-
-	// send request
-	request, err := request.SendRequest(ctx, requestConfig)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	// For baseline, we accept any response as long as we get one - even 403, 404, etc.
-	// The baseline is used for comparison, so we need content regardless of status code
-	if request.Response == nil {
-		return nil, nil, nil, errors.New("baseline request failed - no response received")
-	}
-
-	baseBodyStr := requesthelpers.GetResponseBodyStringFromBodyStruct(request.Response.ResponseBody)
-	if baseBodyStr == nil {
-		return nil, nil, nil, errors.New("baseline request failed - no response body received")
-	}
-	bodySize := len(*baseBodyStr)
-	wordCount := len(strings.Fields(*baseBodyStr))
-
-	return request, &bodySize, &wordCount, nil
-}
-
-// gatherPaths gathers all paths from the config
-func gatherPaths(paths []string, wordlistType *discover.WordlistType, wordlistSize *discover.WordlistSize) ([]string, error) {
-	var allPaths []string
-
-	// Add manual paths
-	allPaths = append(allPaths, paths...)
-
-	// Add paths from automatic wordlist selection
-	if wordlistType != nil && wordlistSize != nil {
-		embeddedPath := getWordlistEmbeddedPath(*wordlistType, *wordlistSize)
-
-		wordlistPaths, err := configs.ReadLines(embeddedPath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load embedded wordlist %s: %v", embeddedPath, err)
-		}
-		allPaths = append(allPaths, wordlistPaths...)
-	}
-
-	return allPaths, nil
-}
-
-// getWordlistEmbeddedPath returns the embedded config path for a directory wordlist.
-func getWordlistEmbeddedPath(wordlistType discover.WordlistType, wordlistSize discover.WordlistSize) string {
-	typeStr := strings.ToLower(string(wordlistType))
-	sizeStr := strings.ToLower(string(wordlistSize))
-	return fmt.Sprintf("discover/directory/raft-%s-%s-lowercase.txt", sizeStr, typeStr)
-}
-
-// areSimilar is a function that checks if the value is similar to the baseline with a given tolerance
-// Examples:
-// 0 is exact match
-// .50 is 50% difference
-// 1.00 is 100% difference
-// 2.00 is 200% difference
-func areSimilar(value, baseline int, tolerance float64) bool {
-	if baseline == 0 {
-		return value == 0
-	}
-	difference := math.Abs(float64(value - baseline))
-	percent := difference / float64(baseline)
-	return percent <= tolerance
 }

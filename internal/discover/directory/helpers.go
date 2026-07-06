@@ -24,14 +24,14 @@ import (
 )
 
 // createDirectorySendHTTPRequestConfig builds the config for directory discovery.
-func createDirectorySendHTTPRequestConfig(baseURL, path string, method common.HttpMethod, requestParams common.HttpRequestParams, MaxRedirects int, config *discover.DiscoverDirectoryConfig) common.SendHttpRequestConfig {
+func createDirectorySendHTTPRequestConfig(ctx context.Context, baseURL, path string, method common.HttpMethod, requestParams common.HttpRequestParams, MaxRedirects int, config *discover.DiscoverDirectoryConfig) common.SendHttpRequestConfig {
 	request := common.HttpRequest{
 		BaseUrl: baseURL,
 		Path:    path,
 		Method:  method,
 		Params:  &requestParams,
 	}
-	return common.SendHttpRequestConfig{
+	sendConfig := common.SendHttpRequestConfig{
 		Request:                    &request,
 		MaxRedirects:               MaxRedirects,
 		VerifyTls:                  config.VerifyTls,
@@ -43,6 +43,11 @@ func createDirectorySendHTTPRequestConfig(baseURL, path string, method common.Ht
 		BrowserbaseConfig:          nil,
 		BrowserbaseSecrets:         nil,
 	}
+
+	// Add proxy settings from context
+	requesthelpers.ApplyProxySettings(ctx, &sendConfig)
+
+	return sendConfig
 }
 
 // groupRequestFailures collapses a target's per-request failures into grouped summary
@@ -185,7 +190,7 @@ func isStandardResponseBody(responseBody string) bool {
 // baseLine gets the baseline size and word count of the target to be used for validation of the response
 func baseLine(ctx context.Context, baseURL string, path string, validCodes map[int]bool, maxRedirects int, config *discover.DiscoverDirectoryConfig) (*common.HttpRequestResponse, *int, *int, error) {
 	// set request config
-	requestConfig := createDirectorySendHTTPRequestConfig(baseURL, path, common.HttpMethodGet, common.HttpRequestParams{}, maxRedirects, config)
+	requestConfig := createDirectorySendHTTPRequestConfig(ctx, baseURL, path, common.HttpMethodGet, common.HttpRequestParams{}, maxRedirects, config)
 
 	// send request
 	request, err := request.SendRequest(ctx, requestConfig)

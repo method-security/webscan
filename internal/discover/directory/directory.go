@@ -3,16 +3,13 @@ package discoverdirectory
 import (
 	// Standard
 	"context"
-	"errors"
 	"fmt"
-	"math"
 	"runtime"
 	"strings"
 	"sync"
 	"time"
 
 	// Generated
-	"github.com/Method-Security/webscan/configs"
 	common "github.com/Method-Security/webscan/generated/go/common"
 	discover "github.com/Method-Security/webscan/generated/go/discover"
 
@@ -24,33 +21,6 @@ import (
 	// External
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
-
-// createDirectorySendHTTPRequestConfig builds the config for directory discovery.
-func createDirectorySendHTTPRequestConfig(ctx context.Context, baseURL, path string, method common.HttpMethod, requestParams common.HttpRequestParams, MaxRedirects int, config *discover.DiscoverDirectoryConfig) common.SendHttpRequestConfig {
-	request := common.HttpRequest{
-		BaseUrl: baseURL,
-		Path:    path,
-		Method:  method,
-		Params:  &requestParams,
-	}
-	sendConfig := common.SendHttpRequestConfig{
-		Request:                    &request,
-		MaxRedirects:               MaxRedirects,
-		VerifyTls:                  config.VerifyTls,
-		Timeout:                    config.Timeout,
-		IgnoreCrossDomainRedirects: config.IgnoreCrossDomainRedirects,
-		UserAgent:                  config.UserAgent,
-		RequestMethod:              common.RequestMethodStandard,
-		HeadlessConfig:             nil,
-		BrowserbaseConfig:          nil,
-		BrowserbaseSecrets:         nil,
-	}
-
-	// Add proxy settings from context
-	requesthelpers.ApplyProxySettings(ctx, &sendConfig)
-
-	return sendConfig
-}
 
 // RunDirectoryDiscovery launches the directory discovery engine with multi-threading support
 func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirectoryConfig) (*discover.DiscoverDirectoryReport, error) {
@@ -298,111 +268,4 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 	report.Result = &result
 	report.Errors = errors
 	return &report, nil
-}
-
-// AnalyzeResponse checks if the response signifies that directory/file was found based on the response code and the baseline size and word count
-func AnalyzeResponsse(ctx context.Context, request common.HttpRequestResponse, validCodes map[int]bool, checkBaseContentMatch bool, baselineSize, baselineWords int, baselineSizeRandomPath *int, baselineWordsRandomPath *int, threshold float64) (bool, string) {
-	log := svc1log.FromContext(ctx)
-	if request.Response == nil || request.Response.StatusCode == nil {
-		return false, ""
-	}
-	if !validCodes[*request.Response.StatusCode] {
-		errMsg := fmt.Sprintf("%s%s returned status code %d which is not in the allowed response codes", request.Request.BaseUrl, request.Request.Path, *request.Response.StatusCode)
-		log.Info(errMsg,
-			svc1log.SafeParam("url", request.Request.BaseUrl),
-			svc1log.SafeParam("path", request.Request.Path),
-			svc1log.SafeParam("status_code", *request.Response.StatusCode))
-		return false, errMsg
-	}
-
-	bodyStr := requesthelpers.GetResponseBodyStringFromBodyStruct(request.Response.ResponseBody)
-	if bodyStr == nil {
-		return false, ""
-	}
-	bodySize := len(*bodyStr)
-	if bodySize == 0 {
-		return false, ""
-	}
-
-	wordCount := len(strings.Fields(*bodyStr))
-	// If the response is similar to the baseline or the baseline random path, then it is not a valid finding
-	// This is to prevent false positives from remote configurations that dont redirect but give blanket responses on all paths
-	if checkBaseContentMatch {
-		if (areSimilar(bodySize, baselineSize, threshold) && areSimilar(wordCount, baselineWords, threshold)) ||
-			(baselineSizeRandomPath != nil && baselineWordsRandomPath != nil && areSimilar(bodySize, *baselineSizeRandomPath, threshold) && areSimilar(wordCount, *baselineWordsRandomPath, threshold)) {
-			return false, ""
-		}
-	}
-	log.Info("Valid directory/file found", svc1log.SafeParam("url", request.Request.BaseUrl), svc1log.SafeParam("path", request.Request.Path), svc1log.SafeParam("size", bodySize), svc1log.SafeParam("words", wordCount))
-	return true, ""
-}
-
-// baseLine gets the baseline size and word count of the target to be used for validation of the response
-func baseLine(ctx context.Context, baseURL string, path string, validCodes map[int]bool, maxRedirects int, config *discover.DiscoverDirectoryConfig) (*common.HttpRequestResponse, *int, *int, error) {
-	// set request config
-	requestConfig := createDirectorySendHTTPRequestConfig(baseURL, path, common.HttpMethodGet, common.HttpRequestParams{}, maxRedirects, config)
-
-	// send request
-	request, err := request.SendRequest(ctx, requestConfig)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	// For baseline, we accept any response as long as we get one - even 403, 404, etc.
-	// The baseline is used for comparison, so we need content regardless of status code
-	if request.Response == nil {
-		return nil, nil, nil, errors.New("baseline request failed - no response received")
-	}
-
-	baseBodyStr := requesthelpers.GetResponseBodyStringFromBodyStruct(request.Response.ResponseBody)
-	if baseBodyStr == nil {
-		return nil, nil, nil, errors.New("baseline request failed - no response body received")
-	}
-	bodySize := len(*baseBodyStr)
-	wordCount := len(strings.Fields(*baseBodyStr))
-
-	return request, &bodySize, &wordCount, nil
-}
-
-// gatherPaths gathers all paths from the config
-func gatherPaths(paths []string, wordlistType *discover.WordlistType, wordlistSize *discover.WordlistSize) ([]string, error) {
-	var allPaths []string
-
-	// Add manual paths
-	allPaths = append(allPaths, paths...)
-
-	// Add paths from automatic wordlist selection
-	if wordlistType != nil && wordlistSize != nil {
-		embeddedPath := getWordlistEmbeddedPath(*wordlistType, *wordlistSize)
-
-		wordlistPaths, err := configs.ReadLines(embeddedPath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load embedded wordlist %s: %v", embeddedPath, err)
-		}
-		allPaths = append(allPaths, wordlistPaths...)
-	}
-
-	return allPaths, nil
-}
-
-// getWordlistEmbeddedPath returns the embedded config path for a directory wordlist.
-func getWordlistEmbeddedPath(wordlistType discover.WordlistType, wordlistSize discover.WordlistSize) string {
-	typeStr := strings.ToLower(string(wordlistType))
-	sizeStr := strings.ToLower(string(wordlistSize))
-	return fmt.Sprintf("discover/directory/raft-%s-%s-lowercase.txt", sizeStr, typeStr)
-}
-
-// areSimilar is a function that checks if the value is similar to the baseline with a given tolerance
-// Examples:
-// 0 is exact match
-// .50 is 50% difference
-// 1.00 is 100% difference
-// 2.00 is 200% difference
-func areSimilar(value, baseline int, tolerance float64) bool {
-	if baseline == 0 {
-		return value == 0
-	}
-	difference := math.Abs(float64(value - baseline))
-	percent := difference / float64(baseline)
-	return percent <= tolerance
 }

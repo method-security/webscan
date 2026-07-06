@@ -140,6 +140,9 @@ func AnalyzeResponse(ctx context.Context, request common.HttpRequestResponse, va
 var standardResponseFingerprints = []string{
 	// Missing / not found resource
 	"not found",
+	"404 error",
+	"error 404",
+	"404 status code",
 	"could not be found",
 	"can't be found",
 	"couldn't find",
@@ -154,6 +157,7 @@ var standardResponseFingerprints = []string{
 	"the page you are looking for",
 	"the resource you are looking for",
 	"the file you are looking for",
+	"this page can't be displayed",
 	// Access denied / WAF rejection
 	"access denied",
 	"403 forbidden",
@@ -163,6 +167,10 @@ var standardResponseFingerprints = []string{
 	"request blocked",
 	"you have been blocked",
 	"requested url was rejected",
+	"unauthorized activity",
+	"unauthorized access",
+	"unauthorized request",
+	"incident id",
 	// Generic server / gateway errors
 	"internal server error",
 	"bad gateway",

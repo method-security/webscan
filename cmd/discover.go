@@ -222,6 +222,11 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			omitStandardResponses, err := cmd.Flags().GetBool("omit-standard-responses")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
 			verifyTLS, err := cmd.Flags().GetBool("verify-tls")
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -289,7 +294,7 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Set config
-			config := getDiscoverDirectoryConfig(targets, paths, wordlistType, wordlistSize, httpMethods, responseCodes, ignoreBaseContentMatch, verifyTLS, threshold, timeout, ignoreCrossDomainRedirects, maxRedirectsBaselineRequest, threads, maxRuntime, retries, sleep, jitter, userAgentPreset)
+			config := getDiscoverDirectoryConfig(targets, paths, wordlistType, wordlistSize, httpMethods, responseCodes, ignoreBaseContentMatch, omitStandardResponses, verifyTLS, threshold, timeout, ignoreCrossDomainRedirects, maxRedirectsBaselineRequest, threads, maxRuntime, retries, sleep, jitter, userAgentPreset)
 
 			// Generate a report
 			rep, err := discoverdirectory.RunDirectoryDiscovery(cmd.Context(), config)
@@ -310,6 +315,7 @@ func (a *WebScan) InitDiscoverCommand() {
 	// Config Flags
 	discoverDirectoryCmd.Flags().String("response-codes", "200-299", "Response codes to consider as valid responses")
 	discoverDirectoryCmd.Flags().Bool("ignore-base-content-match", true, "Ignores valid responses with identical size and word length to the base path, typically signifying a web backend redirect")
+	discoverDirectoryCmd.Flags().Bool("omit-standard-responses", true, "Omits responses whose body matches a standard web page error (e.g. soft 404s, WAF blocks, generic server errors), even if the status code is allowed")
 	discoverDirectoryCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
 	discoverDirectoryCmd.Flags().Float64("threshold", 0.25, "Threshold for successful results")
 	discoverDirectoryCmd.Flags().Int("timeout", 20, "Timeout per request in seconds")
@@ -1734,13 +1740,14 @@ func getDiscoverSaasConfig(orgs []string, saasCompanies []string, ssoCompanies [
 }
 
 // getDiscoverDirectoryConfig builds the config for directory discovery.
-func getDiscoverDirectoryConfig(targets []string, paths []string, wordlistType string, wordlistSize string, httpMethods []common.HttpMethod, responseCodes string, ignoreBaseContentMatch bool, verifyTLS bool, threshold float64, timeout int, ignoreCrossDomainRedirects bool, maxRedirectsBaselineRequest int, threads int, maxRuntime int, retries int, sleep int, jitter int, userAgent common.UserAgentPreset) discover.DiscoverDirectoryConfig {
+func getDiscoverDirectoryConfig(targets []string, paths []string, wordlistType string, wordlistSize string, httpMethods []common.HttpMethod, responseCodes string, ignoreBaseContentMatch bool, omitStandardResponses bool, verifyTLS bool, threshold float64, timeout int, ignoreCrossDomainRedirects bool, maxRedirectsBaselineRequest int, threads int, maxRuntime int, retries int, sleep int, jitter int, userAgent common.UserAgentPreset) discover.DiscoverDirectoryConfig {
 	config := discover.DiscoverDirectoryConfig{
 		Targets:                     targets,
 		Paths:                       paths,
 		HttpMethods:                 httpMethods,
 		ResponseCodes:               responseCodes,
 		IgnoreBaseContentMatch:      ignoreBaseContentMatch,
+		OmitStandardResponses:       omitStandardResponses,
 		VerifyTls:                   verifyTLS,
 		Threshold:                   threshold,
 		Timeout:                     timeout,

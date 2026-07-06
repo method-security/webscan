@@ -225,7 +225,7 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 						}
 
 						// Analyze response
-						isValid, errMsg := AnalyzeResponse(ctx, *httpRequest, validCodes, config.IgnoreBaseContentMatch, baselineSizeInt, baselineWordsInt, baselineSizeRandomPath, baselineWordsRandomPath, config.Threshold)
+						isValid, errMsg := AnalyzeResponse(ctx, *httpRequest, validCodes, config.IgnoreBaseContentMatch, config.OmitStandardResponses, baselineSizeInt, baselineWordsInt, baselineSizeRandomPath, baselineWordsRandomPath, config.Threshold)
 
 						if isValid {
 							attemptsMutex.Lock()
@@ -276,7 +276,7 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 }
 
 // AnalyzeResponse checks if the response signifies that directory/file was found based on the response code and the baseline size and word count
-func AnalyzeResponse(ctx context.Context, request common.HttpRequestResponse, validCodes map[int]bool, checkBaseContentMatch bool, baselineSize, baselineWords int, baselineSizeRandomPath *int, baselineWordsRandomPath *int, threshold float64) (bool, string) {
+func AnalyzeResponse(ctx context.Context, request common.HttpRequestResponse, validCodes map[int]bool, checkBaseContentMatch bool, omitStandardResponses bool, baselineSize, baselineWords int, baselineSizeRandomPath *int, baselineWordsRandomPath *int, threshold float64) (bool, string) {
 	log := svc1log.FromContext(ctx)
 	if request.Response == nil || request.Response.StatusCode == nil {
 		return false, ""
@@ -299,6 +299,17 @@ func AnalyzeResponse(ctx context.Context, request common.HttpRequestResponse, va
 		return false, ""
 	}
 
+	// Some servers return a 200 (or another allowed status code) while the body is actually a
+	// standard response (e.g. a soft 404 or a WAF rejection). Treat those as not found to
+	// reduce false positives.
+	if omitStandardResponses && isStandardResponseBody(*bodyStr) {
+		errMsg := fmt.Sprintf("%s%s returned an allowed status code but the body matched a standard response, treating as not found", request.Request.BaseUrl, request.Request.Path)
+		log.Info(errMsg,
+			svc1log.SafeParam("url", request.Request.BaseUrl),
+			svc1log.SafeParam("path", request.Request.Path))
+		return false, ""
+	}
+
 	wordCount := len(strings.Fields(*bodyStr))
 	// If the response is similar to the baseline or the baseline random path, then it is not a valid finding
 	// This is to prevent false positives from remote configurations that dont redirect but give blanket responses on all paths
@@ -310,6 +321,64 @@ func AnalyzeResponse(ctx context.Context, request common.HttpRequestResponse, va
 	}
 	log.Info("Valid directory/file found", svc1log.SafeParam("url", request.Request.BaseUrl), svc1log.SafeParam("path", request.Request.Path), svc1log.SafeParam("size", bodySize), svc1log.SafeParam("words", wordCount))
 	return true, ""
+}
+
+// standardResponseFingerprints are substrings that commonly appear in the body of standard
+// responses (soft 404s, WAF blocks, generic server errors, etc). When any of these are
+// present in a response body we should not treat the path as a valid finding, even if the
+// status code is in the allowed set.
+//
+// Matching is done via strings.Contains, so each entry must be the shortest distinctive
+// phrase for the response it represents. Do not add longer phrases that already contain one
+// of these substrings (e.g. "404 not found" is redundant with "not found").
+var standardResponseFingerprints = []string{
+	// Missing / not found resource
+	"not found",
+	"could not be found",
+	"can't be found",
+	"couldn't find",
+	"does not exist",
+	"doesn't exist",
+	"no longer exists",
+	"no longer available",
+	"no such file or directory",
+	"nothing found",
+	"no results found",
+	"nothing matched your search",
+	"the page you are looking for",
+	"the resource you are looking for",
+	"the file you are looking for",
+	// Access denied / WAF rejection
+	"access denied",
+	"403 forbidden",
+	"access forbidden",
+	"401 unauthorized",
+	"permission to access",
+	"request blocked",
+	"you have been blocked",
+	"requested url was rejected",
+	// Generic server / gateway errors
+	"internal server error",
+	"bad gateway",
+	"service unavailable",
+	"gateway timeout",
+	"unexpected error",
+	"error occurred while processing your request",
+	"something went wrong",
+	"temporarily unavailable",
+	"under maintenance",
+}
+
+// isStandardResponseBody reports whether the provided response body matches the fingerprint
+// of a standard response (e.g. soft 404, WAF rejection, or generic server error).
+func isStandardResponseBody(responseBody string) bool {
+	responseBodyLower := strings.ToLower(responseBody)
+	for _, fingerprint := range standardResponseFingerprints {
+		if strings.Contains(responseBodyLower, fingerprint) {
+			return true
+		}
+	}
+	return false
 }
 
 // baseLine gets the baseline size and word count of the target to be used for validation of the response

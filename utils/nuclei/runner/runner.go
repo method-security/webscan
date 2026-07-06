@@ -13,9 +13,11 @@ import (
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
 	nuclei "github.com/Method-Security/webscan/generated/go/common/nuclei"
+
 	// Utils
 	report "github.com/Method-Security/webscan/utils/nuclei/report"
 	useragent "github.com/Method-Security/webscan/utils/useragent"
+
 	// External
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 	nucleilib "github.com/projectdiscovery/nuclei/v3/lib"

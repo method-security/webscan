@@ -72,6 +72,9 @@ func resolveEffectiveTarget(ctx context.Context, target string, config discover.
 		RequestMethod:              common.RequestMethodStandard,
 	}
 
+	// Add proxy settings from context
+	requesthelpers.ApplyProxySettings(ctx, &sendConfig)
+
 	response, err := request.SendRequest(ctx, sendConfig)
 	if err != nil || response == nil || response.Response == nil {
 		return target
@@ -182,7 +185,7 @@ func buildAllParameterURLs(route *discover.RouteDetails) []string {
 	return allURLs
 }
 
-func createSendHTTPRequestConfigWithQuery(baseURL, path string, queryParams map[string]string, config discover.DiscoverRouteConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) common.SendHttpRequestConfig {
+func createSendHTTPRequestConfigWithQuery(ctx context.Context, baseURL, path string, queryParams map[string]string, config discover.DiscoverRouteConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) common.SendHttpRequestConfig {
 	request := common.HttpRequest{
 		BaseUrl: baseURL,
 		Path:    path,
@@ -195,7 +198,7 @@ func createSendHTTPRequestConfigWithQuery(baseURL, path string, queryParams map[
 	// Capture console logs and page cookies on headless captures to match the
 	// page-capture output contract; the standard transport ignores both flags.
 	captureBrowserArtifacts := config.RequestMethod == common.RequestMethodHeadless
-	return common.SendHttpRequestConfig{
+	sendConfig := common.SendHttpRequestConfig{
 		Request:                    &request,
 		MaxRedirects:               config.MaxRedirects,
 		VerifyTls:                  config.VerifyTls,
@@ -212,6 +215,11 @@ func createSendHTTPRequestConfigWithQuery(baseURL, path string, queryParams map[
 		CaptureConsoleLogs:         &captureBrowserArtifacts,
 		CaptureCookies:             &captureBrowserArtifacts,
 	}
+
+	// Add proxy settings from context
+	requesthelpers.ApplyProxySettings(ctx, &sendConfig)
+
+	return sendConfig
 }
 
 func extractRoutes(ctx context.Context, httpRequestResponse *common.HttpRequestResponse, requestConfig common.SendHttpRequestConfig, routeCaptureConfig discover.DiscoverRouteConfig) ([]*discover.RouteDetails, []string, []string) {
@@ -304,6 +312,7 @@ func extractRoutes(ctx context.Context, httpRequestResponse *common.HttpRequestR
 			PathToBrowser:              requestConfig.HeadlessConfig.PathToBrowserShell,
 			MinDOMStabalizeTimeSeconds: requestConfig.HeadlessConfig.MinDomStabalizeTime,
 		}
+		browser.SetProxyConfigFromRequest(requestConfig)
 		err := browser.InitializeBrowser(networkRouteCtx)
 		if err != nil {
 			log.Error("Failed to initialize browser", svc1log.SafeParam("error", err))
@@ -443,7 +452,7 @@ func PerformRouteCapture(ctx context.Context, config discover.DiscoverRouteConfi
 				}
 
 				// Send the request
-				requestConfig := createSendHTTPRequestConfigWithQuery(currentBaseURL, currentPath, queryParams, config, browserbaseSecrets)
+				requestConfig := createSendHTTPRequestConfigWithQuery(ctx, currentBaseURL, currentPath, queryParams, config, browserbaseSecrets)
 				request, err := request.SendRequest(ctx, requestConfig)
 				if err != nil {
 					errChan <- fmt.Sprintf("error performing request to %s: %s", targetURL, err)

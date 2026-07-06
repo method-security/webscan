@@ -2,10 +2,10 @@
 // primitive. The tests in this file exist to pin the AITF-138 Part 3 bug
 // class: the user's invocation
 //
-//   webscan discover request --target ... --verify-tls TRUE --user-agent CHROME \
-//     --header "Accept: application/json" \
-//     --header "Accept: text/html;q=0.9" \
-//     --header "Accept: */*;q=0.8"
+//	webscan discover request --target ... --verify-tls TRUE --user-agent CHROME \
+//	  --header "Accept: application/json" \
+//	  --header "Accept: text/html;q=0.9" \
+//	  --header "Accept: */*;q=0.8"
 //
 // was supposed to send three Accept values comma-joined per RFC 7230, but
 // silently dropped headers that did not contain a colon and overwrote

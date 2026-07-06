@@ -71,7 +71,9 @@ func (a *WebScan) InitRootCommand() {
 				outputFilePointer = nil
 			}
 			a.OutputConfig = writer.NewOutputConfig(outputFilePointer, format)
-			cmd.SetContext(svc1log.WithLogger(cmd.Context(), config.InitializeLogging(cmd, &a.RootFlags)))
+			ctx := svc1log.WithLogger(cmd.Context(), config.InitializeLogging(cmd, &a.RootFlags))
+			ctx = config.SetProxyConfig(ctx, a.RootFlags.HttpProxy, a.RootFlags.SocksProxy)
+			cmd.SetContext(ctx)
 			return nil
 		},
 		PersistentPostRunE: func(cmd *cobra.Command, _ []string) error {
@@ -93,6 +95,8 @@ func (a *WebScan) InitRootCommand() {
 	a.RootCmd.PersistentFlags().BoolVarP(&a.RootFlags.Verbose, "verbose", "v", false, "Verbose output")
 	a.RootCmd.PersistentFlags().StringVarP(&outputFile, "output-file", "f", "", "Path to output file. If blank, will output to STDOUT")
 	a.RootCmd.PersistentFlags().StringVarP(&outputFormat, "output", "o", "signal", "Output format (signal, json, yaml). Default value is signal")
+	a.RootCmd.PersistentFlags().StringVar(&a.RootFlags.HttpProxy, "http-proxy", "", "HTTP/HTTPS proxy URL (e.g., http://proxy.example.com:8080)")
+	a.RootCmd.PersistentFlags().StringVar(&a.RootFlags.SocksProxy, "socks-proxy", "", "SOCKS proxy URL (e.g., socks5://proxy.example.com:1080)")
 
 	a.VersionCmd = &cobra.Command{
 		Use:   "version",

@@ -16,6 +16,8 @@ type Requester struct {
 	PathToBrowser              *string
 	TimeoutSeconds             int
 	MinDOMStabalizeTimeSeconds int
+	HttpProxy                  string
+	SocksProxy                 string
 	ownsBrowser                bool
 }
 
@@ -56,4 +58,31 @@ func NewRequesterWithClient(client *cdp.Client, timeout int, minDOMStabalizeTime
 		TimeoutSeconds:             timeout,
 		MinDOMStabalizeTimeSeconds: minDOMStabalizeTime,
 	}, nil
+}
+
+// SetProxyConfig stores launch-scoped proxy configuration for browser instances
+// created by this requester. HTTP takes precedence when both proxies are set.
+func (b *Requester) SetProxyConfig(httpProxy, socksProxy string) {
+	b.HttpProxy = httpProxy
+	b.SocksProxy = socksProxy
+}
+
+// SetProxyConfigFromRequest stores proxy configuration from a request config.
+func (b *Requester) SetProxyConfigFromRequest(config common.SendHttpRequestConfig) {
+	var httpProxy string
+	if config.HttpProxy != nil {
+		httpProxy = *config.HttpProxy
+	}
+	var socksProxy string
+	if config.SocksProxy != nil {
+		socksProxy = *config.SocksProxy
+	}
+	b.SetProxyConfig(httpProxy, socksProxy)
+}
+
+func (b *Requester) proxyServer() string {
+	if b.HttpProxy != "" {
+		return b.HttpProxy
+	}
+	return b.SocksProxy
 }

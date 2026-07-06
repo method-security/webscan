@@ -4,12 +4,13 @@ import (
 	// Standard
 	"bytes"
 	"context"
-	"crypto/tls"
 	"fmt"
 	"io"
 	"net/http"
 	"time"
 
+	// Method
+	"github.com/Method-Security/pkg/httpclient"
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
 	// Utils
@@ -25,16 +26,7 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 	log := svc1log.FromContext(ctx)
 	log.Debug("Sending request", svc1log.SafeParam("url", url), svc1log.SafeParam("maxRedirects", config.MaxRedirects))
 
-	// Configure HTTP Client
-	client := &http.Client{
-		Timeout: time.Duration(config.Timeout) * time.Second,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: !config.VerifyTls},
-		},
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-	}
+	client := newHTTPClient(config)
 
 	// Initialize Redirect Chain
 	redirectChain := []string{url}
@@ -79,26 +71,10 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 			reqBody = bytes.NewReader(bodyBuffer.Bytes())
 		}
 
-		// Create Request (Set Method, URL, Body). Bind the caller's context so a
-		// cancelled/expired request actually aborts the in-flight dial.
-		req, err := http.NewRequestWithContext(ctx, string(config.Request.Method), currentURL, reqBody)
-		if err != nil {
-			log.Error("Failed to create request", svc1log.SafeParam("url", currentURL), svc1log.SafeParam("error", err.Error()))
-			return nil, redirectChain, fmt.Errorf("failed to create request for %s: %v", currentURL, err)
-		}
-
-		// Set Headers
-		for k, v := range headers {
-			req.Header.Set(k, v)
-		}
-
-		// Set a realistic User-Agent if the caller didn't provide one
-		if req.Header.Get("User-Agent") == "" {
-			req.Header.Set("User-Agent", resolvedUserAgent)
-		}
+		requestHeaders := headersWithUserAgent(headers, resolvedUserAgent)
 
 		// Send Request
-		resp, err := client.Do(req)
+		clientResp, err := client.Request(ctx, string(config.Request.Method), currentURL, reqBody, requestHeaders)
 		if err != nil {
 			detail := requesthelpers.ClassifyTransportError(err)
 			log.Error("Failed to send request",
@@ -107,6 +83,7 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 				svc1log.SafeParam("error", detail.Cause))
 			return nil, redirectChain, fmt.Errorf("request to %s failed [%s]: %s", currentURL, detail.Category, detail.Cause)
 		}
+		resp := httpResponseFromClientResponse(clientResp)
 
 		// Check if Response is not a redirect, return
 		if resp.StatusCode < 300 || resp.StatusCode >= 400 {
@@ -133,7 +110,12 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 
 		// Parse Redirect Location first — we need the resolved URL to decide
 		// whether this is a trailing-slash hop before applying the budget check.
-		nextURL, err := resp.Request.URL.Parse(location)
+		parsedCurrentURL, err := neturl.Parse(currentURL)
+		if err != nil {
+			log.Error("Failed to parse current URL", svc1log.SafeParam("url", currentURL), svc1log.SafeParam("error", err.Error()))
+			return nil, redirectChain, fmt.Errorf("failed to parse current URL: %v", err)
+		}
+		nextURL, err := parsedCurrentURL.Parse(location)
 		if err != nil {
 			log.Error("Failed to parse redirect location", svc1log.SafeParam("error", err.Error()))
 			return nil, redirectChain, fmt.Errorf("failed to parse redirect location: %v", err)
@@ -190,4 +172,43 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 	}
 
 	return nil, redirectChain, fmt.Errorf("maximum redirects (%d) exceeded for %s", config.MaxRedirects, url)
+}
+
+func newHTTPClient(config common.SendHttpRequestConfig) *httpclient.Client {
+	options := []httpclient.Option{
+		httpclient.WithTimeout(time.Duration(config.Timeout) * time.Second),
+		httpclient.WithTLSVerify(config.VerifyTls),
+		httpclient.WithMaxRedirects(0),
+	}
+	if config.HttpProxy != nil && *config.HttpProxy != "" {
+		options = append(options, httpclient.WithHTTPProxy(*config.HttpProxy))
+	} else if config.SocksProxy != nil && *config.SocksProxy != "" {
+		options = append(options, httpclient.WithSOCKSProxy(*config.SocksProxy))
+	}
+	return httpclient.New(options...)
+}
+
+func httpResponseFromClientResponse(resp *httpclient.Response) *http.Response {
+	return &http.Response{
+		StatusCode:    resp.StatusCode,
+		Status:        fmt.Sprintf("%d %s", resp.StatusCode, http.StatusText(resp.StatusCode)),
+		Header:        resp.Headers,
+		Body:          io.NopCloser(bytes.NewReader(resp.Body)),
+		ContentLength: int64(len(resp.Body)),
+	}
+}
+
+func headersWithUserAgent(headers map[string]string, userAgent string) map[string]string {
+	result := make(map[string]string, len(headers)+1)
+	hasUserAgent := false
+	for key, value := range headers {
+		result[key] = value
+		if http.CanonicalHeaderKey(key) == "User-Agent" {
+			hasUserAgent = true
+		}
+	}
+	if !hasUserAgent {
+		result["User-Agent"] = userAgent
+	}
+	return result
 }

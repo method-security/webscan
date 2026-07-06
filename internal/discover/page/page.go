@@ -78,6 +78,7 @@ func PerformPageCapture(
 
 	// Get request config
 	requestConfig := getHTTPRequestConfig(baseURL, path, queryParams, config, browserbaseSecrets)
+	requesthelpers.ApplyProxySettings(ctx, &requestConfig)
 
 	// Perform HTML capture
 	log.Info("Performing HTML capture", svc1log.SafeParam("target", config.Target))
@@ -88,6 +89,7 @@ func PerformPageCapture(
 		defer requestCancel()
 
 		requester := headless.NewRequester(config.Timeout, config.HeadlessConfig)
+		requester.SetProxyConfigFromRequest(requestConfig)
 		response, img, metadata, err := requester.SendRequestWithScreenshot(requestCtx, requestConfig)
 		httpRequestResponse = &response
 		if len(img) > 0 {

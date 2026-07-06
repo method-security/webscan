@@ -14,6 +14,7 @@ import (
 	discover "github.com/Method-Security/webscan/generated/go/discover"
 
 	// Internal
+	appconfig "github.com/Method-Security/webscan/internal/config"
 	discoverpagehelpers "github.com/Method-Security/webscan/internal/discover/page/helpers"
 	discoversaashelpers "github.com/Method-Security/webscan/internal/discover/saas/active/helpers"
 
@@ -55,6 +56,8 @@ func createSharedBrowser(ctx context.Context, config discover.DiscoverSaasConfig
 
 	// Create a headless requester to use its initialization logic
 	requester := headless.NewRequester(config.Timeout, config.HeadlessConfig)
+	proxyConfig := appconfig.GetProxyConfig(ctx)
+	requester.SetProxyConfig(proxyConfig.HttpProxy, proxyConfig.SocksProxy)
 	err := requester.InitializeBrowser(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize browser: %v", err)
@@ -161,6 +164,7 @@ func LaunchDiscoverSaas(ctx context.Context, config discover.DiscoverSaasConfig,
 
 						// Send the request using the shared browser
 						httpConfig := createSendHTTPRequestConfig(baseURL, path, config, browserbaseSecrets)
+						requesthelpers.ApplyProxySettings(ctx, &httpConfig)
 						httpRequestResponse, err := request.SendRequest(ctx, httpConfig)
 						if err != nil {
 							errorsMutex.Lock()

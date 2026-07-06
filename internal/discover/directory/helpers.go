@@ -46,9 +46,10 @@ func createDirectorySendHTTPRequestConfig(baseURL, path string, method common.Ht
 }
 
 // groupRequestFailures collapses a target's per-request failures into grouped summary
-// messages (one per send-failure batch and one per rejected status code) so large wordlists
-// don't produce one error per path. Status codes are sorted for deterministic output.
-func groupRequestFailures(baseURL string, disallowedStatusCounts map[int]int, sendFailureCount int, sendFailureSample string) []string {
+// messages (one per send-failure batch, one per rejected status code, and one for bodies
+// omitted as standard responses) so large wordlists don't produce one error per path.
+// Status codes are sorted for deterministic output.
+func groupRequestFailures(baseURL string, disallowedStatusCounts map[int]int, sendFailureCount int, sendFailureSample string, standardResponseCount int) []string {
 	var grouped []string
 	if sendFailureCount > 0 {
 		grouped = append(grouped, fmt.Sprintf("%s: %d request(s) failed to send (e.g. %s)", baseURL, sendFailureCount, sendFailureSample))
@@ -61,18 +62,26 @@ func groupRequestFailures(baseURL string, disallowedStatusCounts map[int]int, se
 	for _, code := range codes {
 		grouped = append(grouped, fmt.Sprintf("%s: %d path(s) returned status code %d which is not in the allowed response codes", baseURL, disallowedStatusCounts[code], code))
 	}
+	if standardResponseCount > 0 {
+		grouped = append(grouped, fmt.Sprintf("%s: %d path(s) returned an allowed status code but a standard-response body (e.g. soft 404, WAF block, or server error) and were omitted; re-run with --omit-standard-responses=false if you suspect false negatives", baseURL, standardResponseCount))
+	}
 	return grouped
 }
 
 // AnalyzeResponse checks if the response signifies that a directory/file was found based on
-// the response code and the baseline size and word count. When the response is rejected
-// solely because its status code is not in the allowed set, that status code is returned as
-// the second value so the caller can group these occurrences rather than reporting every
-// path individually; in all other cases the second value is 0.
-func AnalyzeResponse(ctx context.Context, request common.HttpRequestResponse, validCodes map[int]bool, checkBaseContentMatch bool, omitStandardResponses bool, baselineSize, baselineWords int, baselineSizeRandomPath *int, baselineWordsRandomPath *int, threshold float64) (bool, int) {
+// the response code and the baseline size and word count. It returns:
+//   - valid: true when the response is a genuine directory/file finding.
+//   - disallowedStatus: the response status code when the response was rejected solely
+//     because its status code is not in the allowed set (0 otherwise).
+//   - standardResponse: true when the response was rejected because its body matched a
+//     standard-response fingerprint (soft 404, WAF block, generic server error, etc.).
+//
+// The disallowedStatus and standardResponse signals let the caller group these rejections
+// in the report instead of reporting (or silently dropping) every path individually.
+func AnalyzeResponse(ctx context.Context, request common.HttpRequestResponse, validCodes map[int]bool, checkBaseContentMatch bool, omitStandardResponses bool, baselineSize, baselineWords int, baselineSizeRandomPath *int, baselineWordsRandomPath *int, threshold float64) (valid bool, disallowedStatus int, standardResponse bool) {
 	log := svc1log.FromContext(ctx)
 	if request.Response == nil || request.Response.StatusCode == nil {
-		return false, 0
+		return false, 0, false
 	}
 	statusCode := *request.Response.StatusCode
 	if !validCodes[statusCode] {
@@ -80,16 +89,16 @@ func AnalyzeResponse(ctx context.Context, request common.HttpRequestResponse, va
 			svc1log.SafeParam("url", request.Request.BaseUrl),
 			svc1log.SafeParam("path", request.Request.Path),
 			svc1log.SafeParam("status_code", statusCode))
-		return false, statusCode
+		return false, statusCode, false
 	}
 
 	bodyStr := requesthelpers.GetResponseBodyStringFromBodyStruct(request.Response.ResponseBody)
 	if bodyStr == nil {
-		return false, 0
+		return false, 0, false
 	}
 	bodySize := len(*bodyStr)
 	if bodySize == 0 {
-		return false, 0
+		return false, 0, false
 	}
 
 	// Some servers return a 200 (or another allowed status code) while the body is actually a
@@ -99,7 +108,7 @@ func AnalyzeResponse(ctx context.Context, request common.HttpRequestResponse, va
 		log.Info("Allowed status code but body matched a standard response, treating as not found",
 			svc1log.SafeParam("url", request.Request.BaseUrl),
 			svc1log.SafeParam("path", request.Request.Path))
-		return false, 0
+		return false, 0, true
 	}
 
 	wordCount := len(strings.Fields(*bodyStr))
@@ -108,11 +117,11 @@ func AnalyzeResponse(ctx context.Context, request common.HttpRequestResponse, va
 	if checkBaseContentMatch {
 		if (areSimilar(bodySize, baselineSize, threshold) && areSimilar(wordCount, baselineWords, threshold)) ||
 			(baselineSizeRandomPath != nil && baselineWordsRandomPath != nil && areSimilar(bodySize, *baselineSizeRandomPath, threshold) && areSimilar(wordCount, *baselineWordsRandomPath, threshold)) {
-			return false, 0
+			return false, 0, false
 		}
 	}
 	log.Info("Valid directory/file found", svc1log.SafeParam("url", request.Request.BaseUrl), svc1log.SafeParam("path", request.Request.Path), svc1log.SafeParam("size", bodySize), svc1log.SafeParam("words", wordCount))
-	return true, 0
+	return true, 0, false
 }
 
 // standardResponseFingerprints are substrings that commonly appear in the body of standard

@@ -139,6 +139,7 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 		disallowedStatusCounts := map[int]int{}
 		var sendFailureCount int
 		var sendFailureSample string
+		var standardResponseCount int
 
 		threads := config.Threads
 		if threads == 0 {
@@ -160,7 +161,7 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 					if ctx.Err() != nil {
 						// Wait for any running goroutines to complete before returning partial results
 						wg.Wait()
-						errors = append(errors, groupRequestFailures(baseURL, disallowedStatusCounts, sendFailureCount, sendFailureSample)...)
+						errors = append(errors, groupRequestFailures(baseURL, disallowedStatusCounts, sendFailureCount, sendFailureSample, standardResponseCount)...)
 						if len(attempts) > 0 {
 							targetInfo.Attempts = attempts
 							targets = append(targets, &targetInfo)
@@ -211,7 +212,7 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 						}
 
 						// Analyze response
-						isValid, disallowedStatus := AnalyzeResponse(ctx, *httpRequest, validCodes, config.IgnoreBaseContentMatch, config.OmitStandardResponses, baselineSizeInt, baselineWordsInt, baselineSizeRandomPath, baselineWordsRandomPath, config.Threshold)
+						isValid, disallowedStatus, standardResponse := AnalyzeResponse(ctx, *httpRequest, validCodes, config.IgnoreBaseContentMatch, config.OmitStandardResponses, baselineSizeInt, baselineWordsInt, baselineSizeRandomPath, baselineWordsRandomPath, config.Threshold)
 
 						if isValid {
 							attemptsMutex.Lock()
@@ -220,6 +221,10 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 						} else if disallowedStatus != 0 {
 							attemptsMutex.Lock()
 							disallowedStatusCounts[disallowedStatus]++
+							attemptsMutex.Unlock()
+						} else if standardResponse {
+							attemptsMutex.Lock()
+							standardResponseCount++
 							attemptsMutex.Unlock()
 						}
 
@@ -240,7 +245,7 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 		wg.Wait()
 
 		// Collapse this target's request failures into grouped summaries
-		errors = append(errors, groupRequestFailures(baseURL, disallowedStatusCounts, sendFailureCount, sendFailureSample)...)
+		errors = append(errors, groupRequestFailures(baseURL, disallowedStatusCounts, sendFailureCount, sendFailureSample, standardResponseCount)...)
 
 		// Always add results if we have any, even if context expired
 		if len(attempts) > 0 {

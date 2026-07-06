@@ -312,7 +312,7 @@ func extractRoutes(ctx context.Context, httpRequestResponse *common.HttpRequestR
 		}
 
 		fullRedirectedURL := redirectedURL
-		networkRoutes, networkUrls, networkErrors := capturerouteextractors.ExtractNetworkRoutes(networkRouteCtx, browser, fullRedirectedURL, routeCaptureConfig.Target, routeCaptureConfig.IgnoreCrossDomainRoutes, routeCaptureConfig.CollectStaticAssets, routeCaptureConfig.VerifyTls)
+		networkRoutes, networkUrls, networkErrors := capturerouteextractors.ExtractNetworkRoutes(networkRouteCtx, browser, fullRedirectedURL, routeCaptureConfig.Target, routeCaptureConfig.IgnoreCrossDomainRoutes, routeCaptureConfig.IgnoreCrossDomainStaticAssets, routeCaptureConfig.CollectStaticAssets, routeCaptureConfig.VerifyTls)
 		routes = append(routes, networkRoutes...)
 		urls = discoverroutehelpers.AddListToSetString(urls, networkUrls)
 		errors = append(errors, networkErrors...)

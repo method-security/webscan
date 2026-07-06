@@ -25,8 +25,10 @@ import (
 // ExtractNetworkRoutes uses a headless browser to capture network requests and extract route details from them.
 // target is the page to navigate to (the per-page post-redirect URL); scopeURL is the
 // scope anchor (config.Target) used to keep discovery tight to the original target.
-// Returns a slice of RouteDetails, a slice of URLs, and a slice of errors.
-func ExtractNetworkRoutes(ctx context.Context, browser *headless.Requester, target string, scopeURL string, ignoreCrossDomainRoutes bool, captureStaticAssets bool, verifyTLS bool) ([]*discover.RouteDetails, []string, []string) {
+// ignoreCrossDomainRoutes gates the scope of discovered routes; ignoreCrossDomainStaticAssets
+// gates the scope of captured static assets — matching the HTML/JS extractors.
+// Returns a slice of RouteDetails, a slice of URLs (static assets), and a slice of errors.
+func ExtractNetworkRoutes(ctx context.Context, browser *headless.Requester, target string, scopeURL string, ignoreCrossDomainRoutes bool, ignoreCrossDomainStaticAssets bool, captureStaticAssets bool, verifyTLS bool) ([]*discover.RouteDetails, []string, []string) {
 	log := svc1log.FromContext(ctx)
 	const maxNetworkCaptureAttempts = 3
 
@@ -44,7 +46,7 @@ func ExtractNetworkRoutes(ctx context.Context, browser *headless.Requester, targ
 				svc1log.SafeParam("target", target))
 		}
 
-		routes, urls, errors := extractNetworkRoutesOnce(ctx, browser, target, scopeURL, ignoreCrossDomainRoutes, captureStaticAssets, verifyTLS)
+		routes, urls, errors := extractNetworkRoutesOnce(ctx, browser, target, scopeURL, ignoreCrossDomainRoutes, ignoreCrossDomainStaticAssets, captureStaticAssets, verifyTLS)
 		lastRoutes = routes
 		lastUrls = urls
 		lastErrors = errors
@@ -59,7 +61,7 @@ func ExtractNetworkRoutes(ctx context.Context, browser *headless.Requester, targ
 	return lastRoutes, lastUrls, lastErrors
 }
 
-func extractNetworkRoutesOnce(ctx context.Context, browser *headless.Requester, target string, scopeURL string, ignoreCrossDomainRoutes bool, captureStaticAssets bool, verifyTLS bool) ([]*discover.RouteDetails, []string, []string) {
+func extractNetworkRoutesOnce(ctx context.Context, browser *headless.Requester, target string, scopeURL string, ignoreCrossDomainRoutes bool, ignoreCrossDomainStaticAssets bool, captureStaticAssets bool, verifyTLS bool) ([]*discover.RouteDetails, []string, []string) {
 	// Get the logger from the context
 	log := svc1log.FromContext(ctx)
 
@@ -170,6 +172,13 @@ func extractNetworkRoutesOnce(ctx context.Context, browser *headless.Requester, 
 			continue
 		}
 
+		// Static assets are diverted to the StaticAssets output (scoped by the static
+		// asset flag) rather than recorded as routes, matching the HTML/JS extractors.
+		if discoverroutehelpers.CaptureStaticAssetReference(urls, scopeURL, reqURL.String(), ignoreCrossDomainStaticAssets, captureStaticAssets) {
+			continue
+		}
+
+		// Route scope check uses the routes flag.
 		if !discoverroutehelpers.IsURLAllowed(scopeURL, reqURL.String(), ignoreCrossDomainRoutes, captureStaticAssets) {
 			log.Debug("Skipping URL", svc1log.SafeParam("url", reqURL.String()), svc1log.SafeParam("scope", scopeURL))
 			continue

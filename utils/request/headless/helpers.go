@@ -847,6 +847,10 @@ func getStatusCodeFromPage(page *rod.Page) int {
 // isCrossDomainRedirect checks if a redirect URL points to a different domain than the original URL.
 // Relative redirect URLs (e.g. "/login") are resolved against the original URL first so that
 // same-domain relative redirects are not incorrectly flagged as cross-domain.
+// isCrossDomainRedirect reports whether redirectURL leaves the scope of originalURL.
+// "Cross-domain" is standardized across the repo as any host that is not the original
+// host or a subdomain of it (utils.IsHostInScope), so canonical redirects such as
+// example.com -> www.example.com are not treated as cross-domain.
 func isCrossDomainRedirect(originalURL, redirectURL string) bool {
 	parsedOriginal, err := url.Parse(originalURL)
 	if err != nil {
@@ -856,7 +860,7 @@ func isCrossDomainRedirect(originalURL, redirectURL string) bool {
 	if err != nil {
 		return false
 	}
-	return parsedOriginal.Hostname() != resolved.Hostname()
+	return !utils.IsHostInScope(originalURL, resolved.String())
 }
 
 // cleanErrMsg extracts meaningful error message from navigation errors

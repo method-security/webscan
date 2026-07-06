@@ -4,7 +4,6 @@ import (
 	// Standard
 	"context"
 	"fmt"
-	"net"
 	"net/url"
 	"regexp"
 	"runtime"
@@ -25,7 +24,6 @@ import (
 	// External
 	goquery "github.com/PuerkitoBio/goquery"
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
-	"golang.org/x/net/publicsuffix"
 )
 
 // commentRegex matches HTML comments <!-- ... -->
@@ -34,47 +32,6 @@ var commentRegex = regexp.MustCompile(`<!--(.*?)-->`)
 // buildWordRegex builds a regex that matches words of at least minLen letters.
 func buildWordRegex(minLen int) *regexp.Regexp {
 	return regexp.MustCompile(fmt.Sprintf(`\b[A-Za-z]{%d,}\b`, minLen))
-}
-
-// registrableDomain extracts the registrable domain (eTLD+1) from a hostname using
-// the ICANN Public Suffix List via golang.org/x/net/publicsuffix. This correctly
-// handles multi-part TLDs such as .co.uk or .com.br, where a naive last-two-labels
-// heuristic would treat unrelated sites (e.g. foo.co.uk and bar.co.uk) as the same
-// registrable domain.
-// For example: "www.example.com" → "example.com", "api.example.co.uk" → "example.co.uk".
-func registrableDomain(host string) string {
-	if etld1, err := publicsuffix.EffectiveTLDPlusOne(host); err == nil {
-		return etld1
-	}
-	// Fallback for private domains or unexpected parse errors.
-	parts := strings.Split(host, ".")
-	if len(parts) >= 2 {
-		return strings.Join(parts[len(parts)-2:], ".")
-	}
-	return host
-}
-
-// isSameDomain returns true when targetURL belongs to the same registrable domain
-// as baseURL. Same-site subdomains (e.g. www vs api) are allowed; cross-site URLs
-// are rejected. IP addresses require an exact match since they have no subdomain hierarchy.
-func isSameDomain(baseURL, targetURL string) bool {
-	base, err := url.Parse(baseURL)
-	if err != nil {
-		return false
-	}
-	target, err := url.Parse(targetURL)
-	if err != nil {
-		return false
-	}
-	baseHost := strings.ToLower(base.Hostname())
-	targetHost := strings.ToLower(target.Hostname())
-
-	// IP addresses have no subdomain hierarchy — require an exact match.
-	if net.ParseIP(baseHost) != nil || net.ParseIP(targetHost) != nil {
-		return baseHost == targetHost
-	}
-
-	return registrableDomain(baseHost) == registrableDomain(targetHost)
 }
 
 // createRequestConfig builds a SendHttpRequestConfig for a standard GET request.
@@ -96,12 +53,10 @@ func createRequestConfig(rawURL string, config discover.DiscoverWordlistConfig) 
 		},
 	}
 	// IgnoreCrossDomainRedirects is always false: the HTTP layer uses exact
-	// hostname matching for redirects, which is stricter than the
-	// registrable-domain matching that extractLinks / isSameDomain applies.
-	// Blocking canonical redirects (e.g. example.com → www.example.com) here
-	// would drop in-scope pages even when IgnoreCrossDomain is enabled.
-	// Cross-domain filtering is handled after redirect resolution, at the
-	// link-enqueueing stage.
+	// hostname matching for redirects, which would block canonical redirects
+	// (e.g. example.com → www.example.com) and drop in-scope pages even when
+	// IgnoreCrossDomain is enabled. Cross-domain filtering is handled after
+	// redirect resolution, at the link-enqueueing stage via utils.IsHostInScope.
 	return common.SendHttpRequestConfig{
 		Request:                    httpReq,
 		MaxRedirects:               10,
@@ -209,15 +164,15 @@ func extractLinks(htmlContent, pageURL string, config discover.DiscoverWordlistC
 		// as the same URL and not fetched twice (consistent with route discovery).
 		resolved = strings.TrimRight(resolved, "/")
 
-		// Cross-domain check: only enqueue links that are same-domain with the
-		// crawl seed (config.Target). isSameDomain uses registrable-domain
-		// comparison, so same-site subdomains (e.g. www.example.com vs
-		// api.example.com) are accepted. pageURL must NOT be used as a
-		// secondary scope anchor here — when a redirect lands on another
-		// registrable domain, pageURL is that off-scope domain, and allowing
-		// links same-domain with pageURL would cause the entire off-scope site
-		// to be crawled despite IgnoreCrossDomain being set.
-		if config.IgnoreCrossDomain && !isSameDomain(config.Target, resolved) {
+		// Cross-domain check: only enqueue links whose host is the crawl seed's
+		// host (config.Target) or a subdomain of it. utils.IsHostInScope anchors on the
+		// full target host, so the target host and its children are accepted while
+		// the apex and sibling subdomains are excluded. pageURL must NOT be used as
+		// a secondary scope anchor here — when a redirect lands on another host,
+		// pageURL is that off-scope host, and allowing links in scope with pageURL
+		// would cause the entire off-scope site to be crawled despite
+		// IgnoreCrossDomain being set.
+		if config.IgnoreCrossDomain && !utils.IsHostInScope(config.Target, resolved) {
 			return
 		}
 
@@ -355,10 +310,11 @@ func PerformWordlistCapture(ctx context.Context, config discover.DiscoverWordlis
 
 				// isInScope is true when the final page is within the crawl scope:
 				// either IgnoreCrossDomain is off (crawl anything) or the final
-				// URL lands on the same registrable domain as config.Target.
-				// isSameDomain uses the ICANN PSL so same-site subdomains
-				// (e.g. www vs api) are always accepted.
-				isInScope := !config.IgnoreCrossDomain || isSameDomain(config.Target, finalURL)
+				// URL is on the same host as config.Target or a subdomain of it.
+				// utils.IsHostInScope anchors on the full target host, so the target host
+				// and its children are accepted while the apex and sibling
+				// subdomains are excluded.
+				isInScope := !config.IgnoreCrossDomain || utils.IsHostInScope(config.Target, finalURL)
 
 				if isInScope {
 					words := extractWords(bodyStr, config)

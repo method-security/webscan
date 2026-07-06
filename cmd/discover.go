@@ -222,6 +222,11 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			omitStandardResponses, err := cmd.Flags().GetBool("omit-standard-responses")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
 			verifyTLS, err := cmd.Flags().GetBool("verify-tls")
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -289,7 +294,7 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Set config
-			config := getDiscoverDirectoryConfig(targets, paths, wordlistType, wordlistSize, httpMethods, responseCodes, ignoreBaseContentMatch, verifyTLS, threshold, timeout, ignoreCrossDomainRedirects, maxRedirectsBaselineRequest, threads, maxRuntime, retries, sleep, jitter, userAgentPreset)
+			config := getDiscoverDirectoryConfig(targets, paths, wordlistType, wordlistSize, httpMethods, responseCodes, ignoreBaseContentMatch, omitStandardResponses, verifyTLS, threshold, timeout, ignoreCrossDomainRedirects, maxRedirectsBaselineRequest, threads, maxRuntime, retries, sleep, jitter, userAgentPreset)
 
 			// Generate a report
 			rep, err := discoverdirectory.RunDirectoryDiscovery(cmd.Context(), config)
@@ -310,6 +315,7 @@ func (a *WebScan) InitDiscoverCommand() {
 	// Config Flags
 	discoverDirectoryCmd.Flags().String("response-codes", "200-299", "Response codes to consider as valid responses")
 	discoverDirectoryCmd.Flags().Bool("ignore-base-content-match", true, "Ignores valid responses with identical size and word length to the base path, typically signifying a web backend redirect")
+	discoverDirectoryCmd.Flags().Bool("omit-standard-responses", true, "Omits responses whose body matches a standard web page error (e.g. soft 404s, WAF blocks, generic server errors), even if the status code is allowed")
 	discoverDirectoryCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
 	discoverDirectoryCmd.Flags().Float64("threshold", 0.25, "Threshold for successful results")
 	discoverDirectoryCmd.Flags().Int("timeout", 20, "Timeout per request in seconds")
@@ -889,7 +895,12 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Get Config flags
-			ignoreCrossDomain, err := cmd.Flags().GetBool("ignore-cross-domain")
+			ignoreCrossDomainRoutes, err := cmd.Flags().GetBool("ignore-cross-domain-routes")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			ignoreCrossDomainStaticAssets, err := cmd.Flags().GetBool("ignore-cross-domain-static-assets")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -1003,7 +1014,7 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Set Config
-			config := getDiscoverRouteConfig(target, ignoreCrossDomain, collectStaticAssets, spiderDepth, maxRedirects, verifyTLS, timeout, sleep, jitter, threads, userAgentPreset, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig, bundleURLs, fetchSourceMaps, maxBundles)
+			config := getDiscoverRouteConfig(target, ignoreCrossDomainRoutes, ignoreCrossDomainStaticAssets, collectStaticAssets, spiderDepth, maxRedirects, verifyTLS, timeout, sleep, jitter, threads, userAgentPreset, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig, bundleURLs, fetchSourceMaps, maxBundles)
 			config.Headers, err = requesthelpers.ParseHeaderPairs(headerPairs)
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -1033,7 +1044,8 @@ func (a *WebScan) InitDiscoverCommand() {
 	// Target Flags
 	discoverRouteCmd.Flags().String("target", "", "URL target to discover routes from")
 	// Config Flags
-	discoverRouteCmd.Flags().Bool("ignore-cross-domain", true, "Ignore routes that do not share the target's base URL")
+	discoverRouteCmd.Flags().Bool("ignore-cross-domain-routes", true, "Ignore discovered routes whose host is not the target host or a subdomain of it")
+	discoverRouteCmd.Flags().Bool("ignore-cross-domain-static-assets", true, "Ignore discovered static assets whose host is not the target host or a subdomain of it")
 	discoverRouteCmd.Flags().Bool("collect-static-assets", false, "Collect static assets from route discovery")
 	discoverRouteCmd.Flags().Int("spider-depth", 1, "Maximum depth for route spidering")
 	discoverRouteCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
@@ -1723,24 +1735,25 @@ func getDiscoverProbeConfig(targets []string, protocol string, maxRedirects int,
 }
 
 // getDiscoverRouteConfig builds the config for route discovery.
-func getDiscoverRouteConfig(target string, ignoreCrossDomain bool, collectStaticAssets bool, spiderDepth int, maxRedirects int, verifyTLS bool, timeout int, sleep int, jitter int, threads int, userAgent common.UserAgentPreset, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig, bundleURLs []string, fetchSourceMaps bool, maxBundles int) discover.DiscoverRouteConfig {
+func getDiscoverRouteConfig(target string, ignoreCrossDomainRoutes bool, ignoreCrossDomainStaticAssets bool, collectStaticAssets bool, spiderDepth int, maxRedirects int, verifyTLS bool, timeout int, sleep int, jitter int, threads int, userAgent common.UserAgentPreset, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig, bundleURLs []string, fetchSourceMaps bool, maxBundles int) discover.DiscoverRouteConfig {
 	config := discover.DiscoverRouteConfig{
-		Target:              target,
-		CollectStaticAssets: collectStaticAssets,
-		IgnoreCrossDomain:   ignoreCrossDomain,
-		SpiderDepth:         spiderDepth,
-		MaxRedirects:        maxRedirects,
-		VerifyTls:           verifyTLS,
-		Timeout:             max(timeout, 0),
-		Sleep:               max(sleep, 0),
-		Jitter:              max(jitter, 0),
-		Threads:             max(threads, 0),
-		UserAgent:           userAgent,
-		RequestMethod:       requestMethod,
-		HeadlessConfig:      headlessConfig,
-		BrowserbaseConfig:   browserbaseConfig,
-		FetchSourceMaps:     fetchSourceMaps,
-		MaxBundles:          maxBundles,
+		Target:                        target,
+		CollectStaticAssets:           collectStaticAssets,
+		IgnoreCrossDomainRoutes:       ignoreCrossDomainRoutes,
+		IgnoreCrossDomainStaticAssets: ignoreCrossDomainStaticAssets,
+		SpiderDepth:                   spiderDepth,
+		MaxRedirects:                  maxRedirects,
+		VerifyTls:                     verifyTLS,
+		Timeout:                       max(timeout, 0),
+		Sleep:                         max(sleep, 0),
+		Jitter:                        max(jitter, 0),
+		Threads:                       max(threads, 0),
+		UserAgent:                     userAgent,
+		RequestMethod:                 requestMethod,
+		HeadlessConfig:                headlessConfig,
+		BrowserbaseConfig:             browserbaseConfig,
+		FetchSourceMaps:               fetchSourceMaps,
+		MaxBundles:                    maxBundles,
 	}
 
 	if len(bundleURLs) > 0 {
@@ -1771,13 +1784,14 @@ func getDiscoverSaasConfig(orgs []string, saasCompanies []string, ssoCompanies [
 }
 
 // getDiscoverDirectoryConfig builds the config for directory discovery.
-func getDiscoverDirectoryConfig(targets []string, paths []string, wordlistType string, wordlistSize string, httpMethods []common.HttpMethod, responseCodes string, ignoreBaseContentMatch bool, verifyTLS bool, threshold float64, timeout int, ignoreCrossDomainRedirects bool, maxRedirectsBaselineRequest int, threads int, maxRuntime int, retries int, sleep int, jitter int, userAgent common.UserAgentPreset) discover.DiscoverDirectoryConfig {
+func getDiscoverDirectoryConfig(targets []string, paths []string, wordlistType string, wordlistSize string, httpMethods []common.HttpMethod, responseCodes string, ignoreBaseContentMatch bool, omitStandardResponses bool, verifyTLS bool, threshold float64, timeout int, ignoreCrossDomainRedirects bool, maxRedirectsBaselineRequest int, threads int, maxRuntime int, retries int, sleep int, jitter int, userAgent common.UserAgentPreset) discover.DiscoverDirectoryConfig {
 	config := discover.DiscoverDirectoryConfig{
 		Targets:                     targets,
 		Paths:                       paths,
 		HttpMethods:                 httpMethods,
 		ResponseCodes:               responseCodes,
 		IgnoreBaseContentMatch:      ignoreBaseContentMatch,
+		OmitStandardResponses:       omitStandardResponses,
 		VerifyTls:                   verifyTLS,
 		Threshold:                   threshold,
 		Timeout:                     timeout,

@@ -3,6 +3,7 @@ package utils
 import (
 	"bufio"
 	"errors"
+	"net"
 	"net/url"
 	"os"
 	"path"
@@ -92,6 +93,38 @@ func IsStaticAsset(url string) bool {
 		}
 	}
 	return false
+}
+
+// IsHostInScope reports whether targetURL is the same host as baseURL or a
+// subdomain (child) of it. The comparison is case-insensitive and ignores the
+// port. Scope is anchored on the FULL base host, so children are allowed while
+// the apex domain and sibling subdomains are excluded. For a base of
+// www.example.com this admits www.example.com and app.www.example.com, but not
+// example.com (parent) or careers.example.com (sibling). IP addresses have no
+// subdomain hierarchy, so they require an exact match. This is the shared
+// scoping check used by the ignore-cross-domain flag across discovery commands.
+func IsHostInScope(baseURL string, targetURL string) bool {
+	base, err := url.Parse(baseURL)
+	if err != nil {
+		return false
+	}
+	target, err := url.Parse(targetURL)
+	if err != nil {
+		return false
+	}
+
+	baseHost := strings.ToLower(base.Hostname())
+	targetHost := strings.ToLower(target.Hostname())
+	if baseHost == "" || targetHost == "" {
+		return false
+	}
+
+	// IP addresses have no subdomain hierarchy — require an exact match.
+	if net.ParseIP(baseHost) != nil || net.ParseIP(targetHost) != nil {
+		return baseHost == targetHost
+	}
+
+	return targetHost == baseHost || strings.HasSuffix(targetHost, "."+baseHost)
 }
 
 // IsTrailingSlashRedirect checks if the redirect is just adding a trailing slash

@@ -74,8 +74,8 @@ github.com/Knetic/govaluate v3.0.1-0.20171022003610-9aa49832a739+incompatible h1
 github.com/Knetic/govaluate v3.0.1-0.20171022003610-9aa49832a739+incompatible/go.mod h1:r7JcOSlj0wfOMncg0iLm8Leh48TZaKVeNIfJntJ2wa0=
 github.com/Masterminds/semver/v3 v3.4.0 h1:Zog+i5UMtVoCU8oKka5P7i9q9HgrJeGzI9SA1Xbatp0=
 github.com/Masterminds/semver/v3 v3.4.0/go.mod h1:4V+yj/TJE1HU9XfppCwVMZq3I84lprf4nC11bSS5beM=
-github.com/Method-Security/pkg v0.1.0 h1:v7GzPNFJZQr2HB+P0ox7SrhYMF0giNu0uzT4EYJzNDg=
-github.com/Method-Security/pkg v0.1.0/go.mod h1:suN5TaS8DJ4VR3uhwpzTZKfNuWylz08Z+a4JUSbv0LY=
+github.com/Method-Security/pkg v0.1.1 h1:Y8Ca5DlihOVBYuysW6Yr+EeNntDTp9n4sHBhN63Xhe8=
+github.com/Method-Security/pkg v0.1.1/go.mod h1:suN5TaS8DJ4VR3uhwpzTZKfNuWylz08Z+a4JUSbv0LY=
 github.com/Microsoft/go-winio v0.5.2/go.mod h1:WpS1mjBmmwHBEWmogvA2mj8546UReBk4v8QkMxJ6pZY=
 github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERoyfY=
 github.com/Microsoft/go-winio v0.6.2/go.mod h1:yd8OoFMLzJbo9gZq8j5qaps8bJ9aShtEA8Ipt1oGCvU=

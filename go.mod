@@ -3,7 +3,7 @@ module github.com/Method-Security/webscan
 go 1.26.0
 
 require (
-	github.com/Method-Security/pkg v0.1.0
+	github.com/Method-Security/pkg v0.1.1
 	github.com/PuerkitoBio/goquery v1.10.3
 	github.com/corona10/goimagehash v1.1.0
 	github.com/go-rod/rod v0.116.2

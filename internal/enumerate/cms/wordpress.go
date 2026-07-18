@@ -164,6 +164,14 @@ func scanTarget(ctx context.Context, url string, config *enumeratecmswordpressfe
 		errors = append(errors, fmt.Sprintf("no response body found for url: %s", url))
 	}
 
+	// Core version detection
+	version, versionSource, errs := detectWordPressVersion(ctx, url, config, responseBody)
+	if len(errs) > 0 {
+		errors = append(errors, errs...)
+	}
+	result.Version = version
+	result.VersionSource = versionSource
+
 	// Combine results with proper deduplication
 	pluginsMap := make(map[string]*enumeratecmswordpressfern.WordpressPluginDetails)
 
@@ -531,4 +539,100 @@ func checkCSSReferences(baseResponseBody *string) []*enumeratecmswordpressfern.W
 	}
 
 	return plugins
+}
+
+// detectWordPressVersion attempts to identify the WordPress core version running on the target.
+// It tries detection methods in order of reliability: readme.html, the HTML meta generator tag,
+// and the ?ver= query string on core wp-includes/wp-admin asset URLs.
+func detectWordPressVersion(ctx context.Context, url string, config *enumeratecmswordpressfern.EnumerateWordpressPluginsConfig, responseBody *string) (*string, *enumeratecmswordpressfern.DetectionSource, []string) {
+	version, errors := checkReadmeHTMLVersion(ctx, url, config)
+	if version != nil {
+		source := enumeratecmswordpressfern.DetectionSourceReadmeHtml
+		return version, &source, errors
+	}
+
+	if responseBody != nil {
+		if version := checkMetaGeneratorVersion(*responseBody); version != nil {
+			source := enumeratecmswordpressfern.DetectionSourceMetaGenerator
+			return version, &source, errors
+		}
+
+		if version := checkCoreAssetVersion(*responseBody); version != nil {
+			source := enumeratecmswordpressfern.DetectionSourceHtml
+			return version, &source, errors
+		}
+	}
+
+	return nil, nil, errors
+}
+
+// checkReadmeHTMLVersion fetches /readme.html and extracts the WordPress core version, if present.
+func checkReadmeHTMLVersion(ctx context.Context, url string, config *enumeratecmswordpressfern.EnumerateWordpressPluginsConfig) (*string, []string) {
+	errors := []string{}
+
+	baseURL, path, _, err := requesthelpers.SplitTargetURL(url)
+	if err != nil {
+		errors = append(errors, err.Error())
+		return nil, errors
+	}
+
+	readmePath := fmt.Sprintf("%s/readme.html", path)
+	requestConfig := createSendHTTPRequestConfig(baseURL, readmePath, config)
+	readmeRequest, err := request.SendRequest(ctx, requestConfig)
+	if err != nil {
+		errors = append(errors, err.Error())
+		return nil, errors
+	}
+
+	if readmeRequest.Response == nil || readmeRequest.Response.StatusCode == nil || *readmeRequest.Response.StatusCode != 200 {
+		return nil, errors
+	}
+
+	readmeBody := requesthelpers.GetResponseBodyStringFromBodyStruct(readmeRequest.Response.ResponseBody)
+	if readmeBody == nil {
+		return nil, errors
+	}
+
+	versionRegex := regexp.MustCompile(`(?i)version\s+([0-9]+(?:\.[0-9]+)+)`)
+	versionMatch := versionRegex.FindStringSubmatch(*readmeBody)
+
+	// Regex Info:
+	// versionMatch[0] = full match
+	// versionMatch[1] = version
+	if len(versionMatch) > 1 {
+		return &versionMatch[1], errors
+	}
+
+	return nil, errors
+}
+
+// checkMetaGeneratorVersion extracts the WordPress core version from the HTML meta generator tag.
+func checkMetaGeneratorVersion(responseBody string) *string {
+	generatorRegex := regexp.MustCompile(`(?i)<meta\s+name=["']generator["']\s+content=["']WordPress\s+([0-9]+(?:\.[0-9]+)+)`)
+	match := generatorRegex.FindStringSubmatch(responseBody)
+
+	// Regex Info:
+	// match[0] = full match
+	// match[1] = version
+	if len(match) > 1 {
+		return &match[1]
+	}
+
+	return nil
+}
+
+// checkCoreAssetVersion extracts the WordPress core version from ?ver= query strings on
+// wp-includes/wp-admin core asset URLs (e.g. wp-emoji-release.min.js?ver=6.4.3).
+func checkCoreAssetVersion(responseBody string) *string {
+	assetRegex := regexp.MustCompile(`/(?:wp-includes|wp-admin)/[^'"]+\?ver=([0-9]+(?:\.[0-9]+)+)`)
+	match := assetRegex.FindStringSubmatch(responseBody)
+
+	// Regex Info:
+	// match[0] = full match
+	// match[1] = version
+	if len(match) > 1 {
+		return &match[1]
+	}
+
+	return nil
 }

@@ -621,17 +621,32 @@ func checkMetaGeneratorVersion(responseBody string) *string {
 	return nil
 }
 
-// checkCoreAssetVersion extracts the WordPress core version from ?ver= query strings on
-// wp-includes/wp-admin core asset URLs (e.g. wp-emoji-release.min.js?ver=6.4.3).
-func checkCoreAssetVersion(responseBody string) *string {
-	assetRegex := regexp.MustCompile(`/(?:wp-includes|wp-admin)/[^'"]+\?ver=([0-9]+(?:\.[0-9]+)+)`)
-	match := assetRegex.FindStringSubmatch(responseBody)
+// coreOnlyAssetFiles are asset paths shipped and versioned by WordPress core itself, as opposed
+// to third-party libraries bundled under wp-includes/wp-admin (e.g. jQuery, Moment, React) that
+// publish their own independent version in the same ?ver= query string convention. Matching only
+// these avoids reporting a bundled library's version as the WordPress core version.
+var coreOnlyAssetFiles = []string{
+	"wp-includes/js/wp-emoji-release.min.js",
+	"wp-includes/js/wp-embed.min.js",
+	"wp-includes/css/dist/block-library/style.min.css",
+	"wp-admin/css/common.min.css",
+	"wp-admin/load-styles.php",
+	"wp-admin/load-scripts.php",
+}
 
-	// Regex Info:
-	// match[0] = full match
-	// match[1] = version
-	if len(match) > 1 {
-		return &match[1]
+// checkCoreAssetVersion extracts the WordPress core version from the ?ver= query string on a
+// known core-authored asset URL (e.g. wp-emoji-release.min.js?ver=6.4.3).
+func checkCoreAssetVersion(responseBody string) *string {
+	for _, asset := range coreOnlyAssetFiles {
+		assetRegex := regexp.MustCompile(regexp.QuoteMeta(asset) + `\?ver=([0-9]+(?:\.[0-9]+)+)`)
+		match := assetRegex.FindStringSubmatch(responseBody)
+
+		// Regex Info:
+		// match[0] = full match
+		// match[1] = version
+		if len(match) > 1 {
+			return &match[1]
+		}
 	}
 
 	return nil

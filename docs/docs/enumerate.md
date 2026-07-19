@@ -100,7 +100,7 @@ Enumerate content management systems.
 
 #### WordPress Plugins
 
-In addition to enumerating installed plugins, this command detects the WordPress core version running on the target, trying (in order of reliability) `/readme.html`, the HTML `<meta name="generator">` tag, and `?ver=` query strings on core `wp-includes`/`wp-admin` asset URLs. The detected version and the method that found it are reported as `version` and `versionSource` on each target.
+In addition to enumerating installed plugins, this command detects the WordPress core version running on the target, trying (in order of reliability) the HTML `<meta name="generator">` tag and `?ver=` query strings on known core-authored `wp-includes`/`wp-admin` asset URLs. The detected version and the method that found it are reported as `version` and `versionSource` on each target.
 
 ```bash
 webscan enumerate cms wordpress plugins --targets https://example.com

@@ -165,12 +165,11 @@ func scanTarget(ctx context.Context, url string, config *enumeratecmswordpressfe
 	}
 
 	// Core version detection
-	version, versionSource, errs := detectWordPressVersion(ctx, url, config, responseBody)
-	if len(errs) > 0 {
-		errors = append(errors, errs...)
+	if responseBody != nil {
+		version, versionSource := detectWordPressVersion(*responseBody)
+		result.Version = version
+		result.VersionSource = versionSource
 	}
-	result.Version = version
-	result.VersionSource = versionSource
 
 	// Combine results with proper deduplication
 	pluginsMap := make(map[string]*enumeratecmswordpressfern.WordpressPluginDetails)
@@ -541,69 +540,24 @@ func checkCSSReferences(baseResponseBody *string) []*enumeratecmswordpressfern.W
 	return plugins
 }
 
-// detectWordPressVersion attempts to identify the WordPress core version running on the target.
-// It tries detection methods in order of reliability: readme.html, the HTML meta generator tag,
-// and the ?ver= query string on core wp-includes/wp-admin asset URLs.
-func detectWordPressVersion(ctx context.Context, url string, config *enumeratecmswordpressfern.EnumerateWordpressPluginsConfig, responseBody *string) (*string, *enumeratecmswordpressfern.DetectionSource, []string) {
-	version, errors := checkReadmeHTMLVersion(ctx, url, config)
-	if version != nil {
-		source := enumeratecmswordpressfern.DetectionSourceReadmeHtml
-		return version, &source, errors
+// detectWordPressVersion attempts to identify the WordPress core version running on the target
+// from its homepage response body. It tries detection methods in order of reliability: the HTML
+// meta generator tag, then the ?ver= query string on core wp-includes/wp-admin asset URLs.
+// readme.html is deliberately not used as a source: WordPress core does not publish its own
+// release version there, only PHP/MySQL/GPL version numbers that are unrelated to the running
+// core version and would otherwise be misreported as such.
+func detectWordPressVersion(responseBody string) (*string, *enumeratecmswordpressfern.DetectionSource) {
+	if version := checkMetaGeneratorVersion(responseBody); version != nil {
+		source := enumeratecmswordpressfern.DetectionSourceMetaGenerator
+		return version, &source
 	}
 
-	if responseBody != nil {
-		if version := checkMetaGeneratorVersion(*responseBody); version != nil {
-			source := enumeratecmswordpressfern.DetectionSourceMetaGenerator
-			return version, &source, errors
-		}
-
-		if version := checkCoreAssetVersion(*responseBody); version != nil {
-			source := enumeratecmswordpressfern.DetectionSourceHtml
-			return version, &source, errors
-		}
+	if version := checkCoreAssetVersion(responseBody); version != nil {
+		source := enumeratecmswordpressfern.DetectionSourceHtml
+		return version, &source
 	}
 
-	return nil, nil, errors
-}
-
-// checkReadmeHTMLVersion fetches /readme.html and extracts the WordPress core version, if present.
-func checkReadmeHTMLVersion(ctx context.Context, url string, config *enumeratecmswordpressfern.EnumerateWordpressPluginsConfig) (*string, []string) {
-	errors := []string{}
-
-	baseURL, path, _, err := requesthelpers.SplitTargetURL(url)
-	if err != nil {
-		errors = append(errors, err.Error())
-		return nil, errors
-	}
-
-	readmePath := fmt.Sprintf("%s/readme.html", path)
-	requestConfig := createSendHTTPRequestConfig(baseURL, readmePath, config)
-	readmeRequest, err := request.SendRequest(ctx, requestConfig)
-	if err != nil {
-		errors = append(errors, err.Error())
-		return nil, errors
-	}
-
-	if readmeRequest.Response == nil || readmeRequest.Response.StatusCode == nil || *readmeRequest.Response.StatusCode != 200 {
-		return nil, errors
-	}
-
-	readmeBody := requesthelpers.GetResponseBodyStringFromBodyStruct(readmeRequest.Response.ResponseBody)
-	if readmeBody == nil {
-		return nil, errors
-	}
-
-	versionRegex := regexp.MustCompile(`(?i)version\s+([0-9]+(?:\.[0-9]+)+)`)
-	versionMatch := versionRegex.FindStringSubmatch(*readmeBody)
-
-	// Regex Info:
-	// versionMatch[0] = full match
-	// versionMatch[1] = version
-	if len(versionMatch) > 1 {
-		return &versionMatch[1], errors
-	}
-
-	return nil, errors
+	return nil, nil
 }
 
 // checkMetaGeneratorVersion extracts the WordPress core version from the HTML meta generator tag.
@@ -634,11 +588,13 @@ var coreOnlyAssetFiles = []string{
 	"wp-admin/load-scripts.php",
 }
 
-// checkCoreAssetVersion extracts the WordPress core version from the ?ver= query string on a
-// known core-authored asset URL (e.g. wp-emoji-release.min.js?ver=6.4.3).
+// checkCoreAssetVersion extracts the WordPress core version from the ver query param on a known
+// core-authored asset URL (e.g. wp-emoji-release.min.js?ver=6.4.3). The ver param isn't always
+// the first query param (e.g. wp-admin/load-scripts.php?c=1&load%5B%5D=jquery&ver=6.4.3), and
+// HTML-escaped markup renders the separator as &amp; rather than &, so both are accepted.
 func checkCoreAssetVersion(responseBody string) *string {
 	for _, asset := range coreOnlyAssetFiles {
-		assetRegex := regexp.MustCompile(regexp.QuoteMeta(asset) + `\?ver=([0-9]+(?:\.[0-9]+)+)`)
+		assetRegex := regexp.MustCompile(regexp.QuoteMeta(asset) + `[^'"]*?[?&](?:amp;)?ver=([0-9]+(?:\.[0-9]+)+)`)
 		match := assetRegex.FindStringSubmatch(responseBody)
 
 		// Regex Info:

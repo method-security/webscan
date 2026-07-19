@@ -99,6 +99,9 @@ Global Flags:
 Enumerate content management systems.
 
 #### WordPress Plugins
+
+In addition to enumerating installed plugins, this command detects the WordPress core version running on the target, trying (in order of reliability) the HTML `<meta name="generator">` tag and `?ver=` query strings on known core-authored `wp-includes`/`wp-admin` asset URLs. The detected version and the method that found it are reported as `version` and `versionSource` on each target.
+
 ```bash
 webscan enumerate cms wordpress plugins --targets https://example.com
 ```
@@ -111,19 +114,24 @@ Usage:
   webscan enumerate cms wordpress plugins [flags]
 
 Flags:
-  -h, --help                        help for plugins
-      --plugins strings             Specific WordPress plugins to check for
-      --plugins-file-paths strings  Paths to files containing WordPress plugin lists
-      --plugins-file-size string    Size of the WordPress plugin list to use (default "SMALL")
-      --targets strings             URL targets to perform WordPress plugin enumeration against
-      --threads int                 Number of concurrent threads for scanning (default 50)
-      --timeout int                 Timeout per request in seconds (default 30)
-      --verify-tls                  Verify TLS certificates when making HTTPS requests
+  -h, --help                         help for plugins
+      --jitter int                   Jitter percentage (0-100) to apply random variance to sleep delay
+      --plugins strings              Specific WordPress plugins to check for
+      --plugins-file-paths strings   Paths to files containing WordPress plugin lists
+      --plugins-file-size string     Size of the WordPress plugin list to use (default "SMALL")
+      --sleep int                    Number of seconds to sleep between requests
+      --targets strings              URL targets to perform WordPress plugin enumeration against
+      --threads int                  Number of concurrent threads for scanning (default 50)
+      --timeout int                  Timeout per request in seconds (default 30)
+      --user-agent string            User-Agent preset (RANDOM, CHROME, FIREFOX, SAFARI, EDGE) (default "RANDOM")
+      --verify-tls                   Verify TLS certificates when making HTTPS requests
 
 Global Flags:
+      --http-proxy string    HTTP/HTTPS proxy URL (e.g., http://proxy.example.com:8080)
   -o, --output string        Output format (signal, json, yaml). Default value is signal (default "signal")
   -f, --output-file string   Path to output file. If blank, will output to STDOUT
   -q, --quiet                Suppress output
+      --socks-proxy string   SOCKS proxy URL (e.g., socks5://proxy.example.com:1080)
   -v, --verbose              Verbose output
 ```
 

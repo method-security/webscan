@@ -164,6 +164,13 @@ func scanTarget(ctx context.Context, url string, config *enumeratecmswordpressfe
 		errors = append(errors, fmt.Sprintf("no response body found for url: %s", url))
 	}
 
+	// Core version detection
+	if responseBody != nil {
+		version, versionSource := detectWordPressVersion(*responseBody)
+		result.Version = version
+		result.VersionSource = versionSource
+	}
+
 	// Combine results with proper deduplication
 	pluginsMap := make(map[string]*enumeratecmswordpressfern.WordpressPluginDetails)
 
@@ -531,4 +538,74 @@ func checkCSSReferences(baseResponseBody *string) []*enumeratecmswordpressfern.W
 	}
 
 	return plugins
+}
+
+// detectWordPressVersion attempts to identify the WordPress core version running on the target
+// from its homepage response body. It tries detection methods in order of reliability: the HTML
+// meta generator tag, then the ?ver= query string on core wp-includes/wp-admin asset URLs.
+// readme.html is deliberately not used as a source: WordPress core does not publish its own
+// release version there, only PHP/MySQL/GPL version numbers that are unrelated to the running
+// core version and would otherwise be misreported as such.
+func detectWordPressVersion(responseBody string) (*string, *enumeratecmswordpressfern.DetectionSource) {
+	if version := checkMetaGeneratorVersion(responseBody); version != nil {
+		source := enumeratecmswordpressfern.DetectionSourceMetaGenerator
+		return version, &source
+	}
+
+	if version := checkCoreAssetVersion(responseBody); version != nil {
+		source := enumeratecmswordpressfern.DetectionSourceHtml
+		return version, &source
+	}
+
+	return nil, nil
+}
+
+// checkMetaGeneratorVersion extracts the WordPress core version from the HTML meta generator tag.
+func checkMetaGeneratorVersion(responseBody string) *string {
+	generatorRegex := regexp.MustCompile(`(?i)<meta\s+name=["']generator["']\s+content=["']WordPress\s+([0-9]+(?:\.[0-9]+)+)`)
+	match := generatorRegex.FindStringSubmatch(responseBody)
+
+	// Regex Info:
+	// match[0] = full match
+	// match[1] = version
+	if len(match) > 1 {
+		return &match[1]
+	}
+
+	return nil
+}
+
+// coreOnlyAssetFiles are asset paths shipped and versioned by WordPress core itself, as opposed
+// to third-party libraries bundled under wp-includes/wp-admin (e.g. jQuery, Moment, React) that
+// publish their own independent version in the same ?ver= query string convention. Matching only
+// these avoids reporting a bundled library's version as the WordPress core version.
+var coreOnlyAssetFiles = []string{
+	"wp-includes/js/wp-emoji-release.min.js",
+	"wp-includes/js/wp-embed.min.js",
+	"wp-includes/css/dist/block-library/style.min.css",
+	"wp-admin/css/common.min.css",
+	"wp-admin/load-styles.php",
+	"wp-admin/load-scripts.php",
+}
+
+// checkCoreAssetVersion extracts the WordPress core version from the ver query param on a known
+// core-authored asset URL (e.g. wp-emoji-release.min.js?ver=6.4.3). Real WordPress markup escapes
+// these URLs in ways this must tolerate: forward slashes are JSON-escaped as \/ inside inline
+// scripts like _wpemojiSettings, esc_url() renders the query separator as &#038; (or &amp;)
+// rather than a literal &, and the ver param isn't always the first query param.
+func checkCoreAssetVersion(responseBody string) *string {
+	for _, asset := range coreOnlyAssetFiles {
+		pathPattern := strings.ReplaceAll(regexp.QuoteMeta(asset), "/", `\\?/`)
+		assetRegex := regexp.MustCompile(pathPattern + `[^'"]*?(?:\?|&(?:amp;|#0*38;)?)ver=([0-9]+(?:\.[0-9]+)+)`)
+		match := assetRegex.FindStringSubmatch(responseBody)
+
+		// Regex Info:
+		// match[0] = full match
+		// match[1] = version
+		if len(match) > 1 {
+			return &match[1]
+		}
+	}
+
+	return nil
 }

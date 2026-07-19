@@ -22,6 +22,7 @@ types:
         enum:
             - CSS_REFERENCE
             - HTML
+            - META_GENERATOR
             - README_TXT
             - REGISTERED_SCRIPT
             - REST_API_DIRECT
@@ -41,6 +42,8 @@ types:
     WordpressPluginsTarget:
         properties:
             target: string
+            version: optional<string>
+            versionSource: optional<DetectionSource>
             plugins: optional<list<WordpressPluginDetails>>
     EnumerateWordpressPluginsResult:
         properties:

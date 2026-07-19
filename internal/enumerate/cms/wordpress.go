@@ -589,12 +589,14 @@ var coreOnlyAssetFiles = []string{
 }
 
 // checkCoreAssetVersion extracts the WordPress core version from the ver query param on a known
-// core-authored asset URL (e.g. wp-emoji-release.min.js?ver=6.4.3). The ver param isn't always
-// the first query param (e.g. wp-admin/load-scripts.php?c=1&load%5B%5D=jquery&ver=6.4.3), and
-// HTML-escaped markup renders the separator as &amp; rather than &, so both are accepted.
+// core-authored asset URL (e.g. wp-emoji-release.min.js?ver=6.4.3). Real WordPress markup escapes
+// these URLs in ways this must tolerate: forward slashes are JSON-escaped as \/ inside inline
+// scripts like _wpemojiSettings, esc_url() renders the query separator as &#038; (or &amp;)
+// rather than a literal &, and the ver param isn't always the first query param.
 func checkCoreAssetVersion(responseBody string) *string {
 	for _, asset := range coreOnlyAssetFiles {
-		assetRegex := regexp.MustCompile(regexp.QuoteMeta(asset) + `[^'"]*?[?&](?:amp;)?ver=([0-9]+(?:\.[0-9]+)+)`)
+		pathPattern := strings.ReplaceAll(regexp.QuoteMeta(asset), "/", `\\?/`)
+		assetRegex := regexp.MustCompile(pathPattern + `[^'"]*?(?:\?|&(?:amp;|#0*38;)?)ver=([0-9]+(?:\.[0-9]+)+)`)
 		match := assetRegex.FindStringSubmatch(responseBody)
 
 		// Regex Info:

@@ -20,6 +20,7 @@ import (
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
 
 	// External
+	uuid "github.com/google/uuid"
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
@@ -50,25 +51,52 @@ func createDirectorySendHTTPRequestConfig(ctx context.Context, baseURL, path str
 	return sendConfig
 }
 
-// groupRequestFailures collapses a target's per-request failures into grouped summary
-// messages (one per send-failure batch, one per rejected status code, and one for bodies
-// omitted as standard responses) so large wordlists don't produce one error per path.
-// Status codes are sorted for deterministic output.
-func groupRequestFailures(baseURL string, disallowedStatusCounts map[int]int, sendFailureCount int, sendFailureSample string, standardResponseCount int) []string {
-	var grouped []string
-	if sendFailureCount > 0 {
-		grouped = append(grouped, fmt.Sprintf("%s: %d request(s) failed to send (e.g. %s)", baseURL, sendFailureCount, sendFailureSample))
+type directoryScanMetrics struct {
+	disallowedStatusCounts   map[int]int
+	sendFailureCount         int
+	sendFailureSample        string
+	calibrationFailureCount  int
+	calibrationFailureSample string
+	baselineMatchCount       int
+	standardResponseCount    int
+	commonResponseCount      int
+	commonProfileCount       int
+}
+
+func countDisallowedResponses(statusCounts map[int]int) int {
+	var total int
+	for _, count := range statusCounts {
+		total += count
 	}
-	codes := make([]int, 0, len(disallowedStatusCounts))
-	for code := range disallowedStatusCounts {
+	return total
+}
+
+// groupRequestFailures collapses per-request scan metrics into grouped summary
+// messages so large wordlists do not produce one signal error per path.
+func groupRequestFailures(target string, metrics directoryScanMetrics) []string {
+	var grouped []string
+	if metrics.sendFailureCount > 0 {
+		grouped = append(grouped, fmt.Sprintf("target %s: %d request(s) failed to send; sample error: %s", target, metrics.sendFailureCount, metrics.sendFailureSample))
+	}
+	if metrics.calibrationFailureCount > 0 {
+		grouped = append(grouped, fmt.Sprintf("target %s: %d common-response calibration request(s) failed; sample error: %s", target, metrics.calibrationFailureCount, metrics.calibrationFailureSample))
+	}
+	codes := make([]int, 0, len(metrics.disallowedStatusCounts))
+	for code := range metrics.disallowedStatusCounts {
 		codes = append(codes, code)
 	}
 	sort.Ints(codes)
 	for _, code := range codes {
-		grouped = append(grouped, fmt.Sprintf("%s: %d path(s) returned status code %d which is not in the allowed response codes", baseURL, disallowedStatusCounts[code], code))
+		grouped = append(grouped, fmt.Sprintf("target %s: %d response(s) returned status code %d outside the allowed response codes and were omitted", target, metrics.disallowedStatusCounts[code], code))
 	}
-	if standardResponseCount > 0 {
-		grouped = append(grouped, fmt.Sprintf("%s: %d path(s) returned an allowed status code but a standard-response body (e.g. soft 404, WAF block, or server error) and were omitted; re-run with --omit-standard-responses=false if you suspect false negatives", baseURL, standardResponseCount))
+	if metrics.baselineMatchCount > 0 {
+		grouped = append(grouped, fmt.Sprintf("target %s: %d response(s) matched the base response size/word profile and were omitted", target, metrics.baselineMatchCount))
+	}
+	if metrics.standardResponseCount > 0 {
+		grouped = append(grouped, fmt.Sprintf("target %s: %d response(s) matched a high-confidence standard response text fingerprint and were omitted", target, metrics.standardResponseCount))
+	}
+	if metrics.commonResponseCount > 0 {
+		grouped = append(grouped, fmt.Sprintf("target %s: %d response(s) matched %d common response body profile(s) learned from calibration or repeated scan responses and were omitted", target, metrics.commonResponseCount, metrics.commonProfileCount))
 	}
 	return grouped
 }
@@ -78,15 +106,16 @@ func groupRequestFailures(baseURL string, disallowedStatusCounts map[int]int, se
 //   - valid: true when the response is a genuine directory/file finding.
 //   - disallowedStatus: the response status code when the response was rejected solely
 //     because its status code is not in the allowed set (0 otherwise).
-//   - standardResponse: true when the response was rejected because its body matched a
-//     standard-response fingerprint (soft 404, WAF block, generic server error, etc.).
+//   - baselineMatch: true when the response matched the base response size/word profile.
+//   - standardResponseMatch: true when the response body matched a high-confidence
+//     soft-404 text fingerprint.
 //
-// The disallowedStatus and standardResponse signals let the caller group these rejections
-// in the report instead of reporting (or silently dropping) every path individually.
-func AnalyzeResponse(ctx context.Context, request common.HttpRequestResponse, validCodes map[int]bool, checkBaseContentMatch bool, omitStandardResponses bool, baselineSize, baselineWords int, baselineSizeRandomPath *int, baselineWordsRandomPath *int, threshold float64) (valid bool, disallowedStatus int, standardResponse bool) {
+// The rejection signals let the caller group these outcomes in the report instead
+// of reporting (or silently dropping) every path individually.
+func AnalyzeResponse(ctx context.Context, request common.HttpRequestResponse, validCodes map[int]bool, enableCommonResponseFilters bool, baselineSize, baselineWords int, threshold float64) (valid bool, disallowedStatus int, baselineMatch bool, standardResponseMatch bool) {
 	log := svc1log.FromContext(ctx)
 	if request.Response == nil || request.Response.StatusCode == nil {
-		return false, 0, false
+		return false, 0, false, false
 	}
 	statusCode := *request.Response.StatusCode
 	if !validCodes[statusCode] {
@@ -94,105 +123,80 @@ func AnalyzeResponse(ctx context.Context, request common.HttpRequestResponse, va
 			svc1log.SafeParam("url", request.Request.BaseUrl),
 			svc1log.SafeParam("path", request.Request.Path),
 			svc1log.SafeParam("status_code", statusCode))
-		return false, statusCode, false
+		return false, statusCode, false, false
 	}
 
 	bodyStr := requesthelpers.GetResponseBodyStringFromBodyStruct(request.Response.ResponseBody)
 	if bodyStr == nil {
-		return false, 0, false
+		return false, 0, false, false
 	}
-	bodySize := len(*bodyStr)
+	body := *bodyStr
+	bodySize := len(body)
 	if bodySize == 0 {
-		return false, 0, false
+		return false, 0, false, false
 	}
 
-	// Some servers return a 200 (or another allowed status code) while the body is actually a
-	// standard response (e.g. a soft 404 or a WAF rejection). Treat those as not found to
-	// reduce false positives.
-	if omitStandardResponses && isStandardResponseBody(*bodyStr) {
-		log.Info("Allowed status code but body matched a standard response, treating as not found",
+	wordCount := len(strings.Fields(body))
+	if enableCommonResponseFilters && isHighConfidenceStandardResponseBody(body) {
+		log.Debug("Response matched high-confidence standard response fingerprint",
 			svc1log.SafeParam("url", request.Request.BaseUrl),
 			svc1log.SafeParam("path", request.Request.Path))
-		return false, 0, true
+		return false, 0, false, true
 	}
 
-	wordCount := len(strings.Fields(*bodyStr))
-	// If the response is similar to the baseline or the baseline random path, then it is not a valid finding
-	// This is to prevent false positives from remote configurations that dont redirect but give blanket responses on all paths
-	if checkBaseContentMatch {
-		if (areSimilar(bodySize, baselineSize, threshold) && areSimilar(wordCount, baselineWords, threshold)) ||
-			(baselineSizeRandomPath != nil && baselineWordsRandomPath != nil && areSimilar(bodySize, *baselineSizeRandomPath, threshold) && areSimilar(wordCount, *baselineWordsRandomPath, threshold)) {
-			return false, 0, false
+	// If the response is similar to the base path, then it is not a valid finding.
+	// Common responses from random paths and repeated scan responses are handled by
+	// commonResponseDetector after this eligibility check.
+	if enableCommonResponseFilters {
+		if areSimilar(bodySize, baselineSize, threshold) && areSimilar(wordCount, baselineWords, threshold) {
+			return false, 0, true, false
 		}
 	}
-	log.Info("Valid directory/file found", svc1log.SafeParam("url", request.Request.BaseUrl), svc1log.SafeParam("path", request.Request.Path), svc1log.SafeParam("size", bodySize), svc1log.SafeParam("words", wordCount))
-	return true, 0, false
+	log.Debug("Response eligible for directory finding analysis", svc1log.SafeParam("url", request.Request.BaseUrl), svc1log.SafeParam("path", request.Request.Path), svc1log.SafeParam("size", bodySize), svc1log.SafeParam("words", wordCount))
+	return true, 0, false, false
 }
 
-// standardResponseFingerprints are substrings that commonly appear in the body of standard
-// responses (soft 404s, WAF blocks, generic server errors, etc). When any of these are
-// present in a response body we should not treat the path as a valid finding, even if the
-// status code is in the allowed set.
-//
-// Matching is done via strings.Contains, so each entry must be the shortest distinctive
-// phrase for the response it represents. Do not add longer phrases that already contain one
-// of these substrings (e.g. "404 not found" is redundant with "not found").
-var standardResponseFingerprints = []string{
-	// Missing / not found resource
-	"not found",
-	"404 error",
-	"error 404",
-	"404 status code",
-	"could not be found",
-	"can't be found",
-	"couldn't find",
-	"does not exist",
-	"doesn't exist",
-	"no longer exists",
-	"no longer available",
-	"no such file or directory",
-	"nothing found",
-	"no results found",
-	"nothing matched your search",
-	"the page you are looking for",
-	"the resource you are looking for",
-	"the file you are looking for",
-	"this page can't be displayed",
-	// Access denied / WAF rejection
-	"access denied",
-	"403 forbidden",
-	"access forbidden",
-	"401 unauthorized",
-	"permission to access",
-	"request blocked",
-	"you have been blocked",
-	"requested url was rejected",
-	"unauthorized activity",
-	"unauthorized access",
-	"unauthorized request",
-	"incident id",
-	// Generic server / gateway errors
-	"internal server error",
-	"bad gateway",
-	"service unavailable",
-	"gateway timeout",
-	"unexpected error",
-	"error occurred while processing your request",
-	"something went wrong",
-	"temporarily unavailable",
-	"under maintenance",
+// highConfidenceStandardResponseFingerprints are deliberately narrow soft-404
+// phrases. Keep these specific enough that they are unlikely to appear in real
+// content pages; broad terms like "not found" or "access denied" are too noisy.
+var highConfidenceStandardResponseFingerprints = []string{
+	"the requested url was not found on this server",
+	"the requested resource was not found on this server",
+	"the page you are looking for could not be found",
+	"the page you requested could not be found",
+	"the page you are looking for does not exist",
+	"the requested page does not exist",
+	"404 page not found",
+	"404 - page not found",
+	"404: page not found",
 }
 
-// isStandardResponseBody reports whether the provided response body matches the fingerprint
-// of a standard response (e.g. soft 404, WAF rejection, or generic server error).
-func isStandardResponseBody(responseBody string) bool {
+func isHighConfidenceStandardResponseBody(responseBody string) bool {
 	responseBodyLower := strings.ToLower(responseBody)
-	for _, fingerprint := range standardResponseFingerprints {
+	for _, fingerprint := range highConfidenceStandardResponseFingerprints {
 		if strings.Contains(responseBodyLower, fingerprint) {
 			return true
 		}
 	}
 	return false
+}
+
+func logDirectoryFindings(ctx context.Context, attempts []*common.HttpRequestResponse) {
+	log := svc1log.FromContext(ctx)
+	for _, attempt := range attempts {
+		if attempt == nil || attempt.Request == nil || attempt.Response == nil {
+			continue
+		}
+		bodyStr := requesthelpers.GetResponseBodyStringFromBodyStruct(attempt.Response.ResponseBody)
+		if bodyStr == nil {
+			continue
+		}
+		log.Info("Valid directory/file found",
+			svc1log.SafeParam("url", attempt.Request.BaseUrl),
+			svc1log.SafeParam("path", attempt.Request.Path),
+			svc1log.SafeParam("size", len(*bodyStr)),
+			svc1log.SafeParam("words", len(strings.Fields(*bodyStr))))
+	}
 }
 
 // baseLine gets the baseline size and word count of the target to be used for validation of the response
@@ -220,6 +224,49 @@ func baseLine(ctx context.Context, baseURL string, path string, validCodes map[i
 	wordCount := len(strings.Fields(*baseBodyStr))
 
 	return request, &bodySize, &wordCount, nil
+}
+
+// calibrateCommonResponses sends intentionally invalid paths and seeds the common-response
+// detector with the resulting body profiles.
+func calibrateCommonResponses(ctx context.Context, baseURL, parsedTargetPath string, config *discover.DiscoverDirectoryConfig, detector *commonResponseDetector) ([]*common.HttpRequestResponse, int, string) {
+	var attempts []*common.HttpRequestResponse
+	var failureCount int
+	var failureSample string
+
+	for _, method := range config.HttpMethods {
+		for _, probePath := range commonResponseCalibrationPaths(parsedTargetPath) {
+			requestConfig := createDirectorySendHTTPRequestConfig(ctx, baseURL, probePath, method, common.HttpRequestParams{}, 0, config)
+			httpRequest, err := request.SendRequest(ctx, requestConfig)
+			if err != nil {
+				failureCount++
+				if failureSample == "" {
+					failureSample = err.Error()
+				}
+				continue
+			}
+			attempts = append(attempts, httpRequest)
+			detector.Seed(httpRequest)
+		}
+	}
+
+	return attempts, failureCount, failureSample
+}
+
+func commonResponseCalibrationPaths(parsedTargetPath string) []string {
+	return []string{
+		appendDirectoryPath(parsedTargetPath, fmt.Sprintf("webscan-calibration-%s", uuid.NewString())),
+		appendDirectoryPath(parsedTargetPath, fmt.Sprintf("webscan-calibration-%s/", uuid.NewString())),
+		appendDirectoryPath(parsedTargetPath, fmt.Sprintf("webscan-calibration-%s.txt", uuid.NewString())),
+	}
+}
+
+func appendDirectoryPath(basePath, childPath string) string {
+	basePath = strings.TrimRight(basePath, "/")
+	childPath = strings.TrimLeft(childPath, "/")
+	if basePath == "" {
+		return "/" + childPath
+	}
+	return basePath + "/" + childPath
 }
 
 // gatherPaths gathers all paths from the config

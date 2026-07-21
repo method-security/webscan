@@ -131,8 +131,6 @@ Flags:
       --request-method string                      Request method to use (standard, headless, browserbase) (default "HEADLESS")
       --response-codes string                      Response codes to consider as valid responses (default "200-299")
       --screenshot                                 Capture a screenshot of the page
-      --sensitive-content-detection                Enable sensitive content detection (default true)
-      --sensitive-content-fingerprints-path string Path to a custom sensitive content fingerprints file
       --target string                              URL target to capture and analyze
       --timeout int                                Timeout per request in seconds (default 180)
       --verify-tls                                 Verify TLS certificates when making HTTPS requests

@@ -2,36 +2,10 @@ imports:
   http: ../common/http.yml
   method: ../common/method.yml
 types:
-  # Enums
-  SensitiveContentType:
-    enum:
-      - CREDENTIAL
-      - PII_DATA
-  SensitiveContentConfidenceLevel:
-    enum:
-      - HIGH
-      - MEDIUM
-      - LOW
-  # Sensitive Content Structs
-  SensitiveContentFingerprint:
-    properties:
-      name: string
-      type: SensitiveContentType
-      pattern: string
-      confidence: SensitiveContentConfidenceLevel
-  SensitiveContentFingerprints:
-    properties:
-      fingerprints: list<SensitiveContentFingerprint>
-  SensitiveContent:
-    properties:
-      value: string
-      fingerprint: SensitiveContentFingerprint
   # Function Config Struct
   DiscoverPageConfig:
     properties:
       target: string
-      sensitiveContentDetection: boolean
-      sensitiveContentFingerprintsPath: optional<string>
       responseCodes: string
       screenshot: boolean
       maxRedirects: integer
@@ -54,7 +28,6 @@ types:
       favicon: optional<base64>
       faviconHash: optional<string>
       htmlTitle: optional<string>
-      sensitiveContents: optional<list<SensitiveContent>>
   # Report Struct
   DiscoverPageReport:
     properties:

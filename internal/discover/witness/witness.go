@@ -16,7 +16,6 @@ import (
 
 	// Internal
 	discoverpage "github.com/Method-Security/webscan/internal/discover/page"
-	discoverpagehelpers "github.com/Method-Security/webscan/internal/discover/page/helpers"
 	discoverrequest "github.com/Method-Security/webscan/internal/discover/request"
 	witnesshelpers "github.com/Method-Security/webscan/internal/discover/witness/helpers"
 
@@ -59,23 +58,21 @@ func loadTargets(target *string, targetsFile *string) ([]string, error) {
 // pageConfigFromWitnessConfig converts a DiscoverWitnessConfig to a DiscoverPageConfig for a specific target.
 func pageConfigFromWitnessConfig(target string, config discover.DiscoverWitnessConfig) discover.DiscoverPageConfig {
 	return discover.DiscoverPageConfig{
-		Target:                           target,
-		SensitiveContentDetection:        config.SensitiveContentDetection,
-		SensitiveContentFingerprintsPath: config.SensitiveContentFingerprintsPath,
-		ResponseCodes:                    config.ResponseCodes,
-		Screenshot:                       config.Screenshot,
-		MaxRedirects:                     config.MaxRedirects,
-		VerifyTls:                        config.VerifyTls,
-		Timeout:                          config.Timeout,
-		IgnoreCrossDomainRedirects:       config.IgnoreCrossDomainRedirects,
-		UserAgent:                        config.UserAgent,
-		RequestMethod:                    config.RequestMethod,
-		HeadlessConfig:                   config.HeadlessConfig,
-		BrowserbaseConfig:                config.BrowserbaseConfig,
-		Headers:                          config.Headers,
-		Cookies:                          config.Cookies,
-		LocalStorage:                     config.LocalStorage,
-		SessionStorage:                   config.SessionStorage,
+		Target:                     target,
+		ResponseCodes:              config.ResponseCodes,
+		Screenshot:                 config.Screenshot,
+		MaxRedirects:               config.MaxRedirects,
+		VerifyTls:                  config.VerifyTls,
+		Timeout:                    config.Timeout,
+		IgnoreCrossDomainRedirects: config.IgnoreCrossDomainRedirects,
+		UserAgent:                  config.UserAgent,
+		RequestMethod:              config.RequestMethod,
+		HeadlessConfig:             config.HeadlessConfig,
+		BrowserbaseConfig:          config.BrowserbaseConfig,
+		Headers:                    config.Headers,
+		Cookies:                    config.Cookies,
+		LocalStorage:               config.LocalStorage,
+		SessionStorage:             config.SessionStorage,
 	}
 }
 
@@ -228,7 +225,6 @@ func processTarget(
 	ctx context.Context,
 	target string,
 	config discover.DiscoverWitnessConfig,
-	sensitiveContentFingerprints *discover.SensitiveContentFingerprints,
 	nucleiResults map[string][]*discover.ApplicationFingerprintAttempt,
 	browserbaseSecrets *common.BrowserbaseRequestSecrets,
 ) *discover.DiscoverWitnessTargetResult {
@@ -241,7 +237,7 @@ func processTarget(
 
 	// Run page capture via the existing DiscoverPage substrate
 	pageConfig := pageConfigFromWitnessConfig(target, config)
-	pageReport := discoverpage.PerformPageCapture(ctx, pageConfig, sensitiveContentFingerprints, browserbaseSecrets)
+	pageReport := discoverpage.PerformPageCapture(ctx, pageConfig, browserbaseSecrets)
 
 	// Copy page errors
 	targetErrors = append(targetErrors, pageReport.Errors...)
@@ -254,7 +250,6 @@ func processTarget(
 		result.Favicon = pr.Favicon
 		result.FaviconHash = pr.FaviconHash
 		result.HtmlTitle = pr.HtmlTitle
-		result.SensitiveContents = pr.SensitiveContents
 
 		// Run Wappalyzer fingerprinting over the captured response
 		if pr.Request != nil && pr.Request.Response != nil {
@@ -334,17 +329,6 @@ func RunWitness(ctx context.Context, config discover.DiscoverWitnessConfig, brow
 
 	log.Info("Starting witness scan", svc1log.SafeParam("targetCount", len(targets)))
 
-	// Load sensitive content fingerprints (if needed)
-	var sensitiveContentFingerprints *discover.SensitiveContentFingerprints
-	if config.SensitiveContentDetection {
-		sensitiveContentFingerprints, err = discoverpagehelpers.LoadSensitiveConentFingerprints(ctx, config.SensitiveContentFingerprintsPath)
-		if err != nil {
-			reportErrors = append(reportErrors, fmt.Sprintf("failed to load sensitive content fingerprints: %s", err.Error()))
-			report.Errors = reportErrors
-			return report, err
-		}
-	}
-
 	// Run Nuclei across all targets (if template paths are set)
 	nucleiResults, nucleiErr := runNucleiForTargets(ctx, targets, config)
 	if nucleiErr != nil {
@@ -356,7 +340,7 @@ func RunWitness(ctx context.Context, config discover.DiscoverWitnessConfig, brow
 	results := make([]*discover.DiscoverWitnessTargetResult, 0, len(targets))
 	for _, target := range targets {
 		log.Info("Processing target", svc1log.SafeParam("target", target))
-		targetResult := processTarget(ctx, target, config, sensitiveContentFingerprints, nucleiResults, browserbaseSecrets)
+		targetResult := processTarget(ctx, target, config, nucleiResults, browserbaseSecrets)
 		results = append(results, targetResult)
 	}
 

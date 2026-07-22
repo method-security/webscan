@@ -3,7 +3,6 @@ imports:
   method: ../common/method.yml
   request: ./request.yml
   application: ./application.yml
-  page: ./page.yml
 
 types:
   DetectedTechnology:
@@ -19,8 +18,6 @@ types:
     properties:
       target: optional<string>
       targetsFile: optional<string>
-      sensitiveContentDetection: boolean
-      sensitiveContentFingerprintsPath: optional<string>
       responseCodes: string
       screenshot: boolean
       maxRedirects: integer
@@ -50,7 +47,6 @@ types:
       technologies: list<DetectedTechnology>
       nucleiFingerprints: optional<list<application.ApplicationFingerprintAttempt>>
       tlsCertificates: optional<list<request.TlsCertificate>>
-      sensitiveContents: optional<list<page.SensitiveContent>>
       errors: optional<list<string>>
 
   DiscoverWitnessReport:

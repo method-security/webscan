@@ -16,7 +16,6 @@ import (
 	discoverapplication "github.com/Method-Security/webscan/internal/discover/application"
 	discoverdirectory "github.com/Method-Security/webscan/internal/discover/directory"
 	discoverpage "github.com/Method-Security/webscan/internal/discover/page"
-	discoverpagehelpers "github.com/Method-Security/webscan/internal/discover/page/helpers"
 	discoverrequest "github.com/Method-Security/webscan/internal/discover/request"
 	discoverroute "github.com/Method-Security/webscan/internal/discover/route"
 	discoversaas "github.com/Method-Security/webscan/internal/discover/saas/active"
@@ -217,12 +216,7 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			ignoreBaseContentMatch, err := cmd.Flags().GetBool("ignore-base-content-match")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			omitStandardResponses, err := cmd.Flags().GetBool("omit-standard-responses")
+			enableCommonResponseFilters, err := cmd.Flags().GetBool("enable-common-response-filters")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -294,7 +288,7 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Set config
-			config := getDiscoverDirectoryConfig(targets, paths, wordlistType, wordlistSize, httpMethods, responseCodes, ignoreBaseContentMatch, omitStandardResponses, verifyTLS, threshold, timeout, ignoreCrossDomainRedirects, maxRedirectsBaselineRequest, threads, maxRuntime, retries, sleep, jitter, userAgentPreset)
+			config := getDiscoverDirectoryConfig(targets, paths, wordlistType, wordlistSize, httpMethods, responseCodes, enableCommonResponseFilters, verifyTLS, threshold, timeout, ignoreCrossDomainRedirects, maxRedirectsBaselineRequest, threads, maxRuntime, retries, sleep, jitter, userAgentPreset)
 
 			// Generate a report
 			rep, err := discoverdirectory.RunDirectoryDiscovery(cmd.Context(), config)
@@ -314,8 +308,7 @@ func (a *WebScan) InitDiscoverCommand() {
 	discoverDirectoryCmd.Flags().StringSlice("http-methods", []string{"GET"}, "HTTP methods to use (e.g. GET,POST,PUT)")
 	// Config Flags
 	discoverDirectoryCmd.Flags().String("response-codes", "200-299", "Response codes to consider as valid responses")
-	discoverDirectoryCmd.Flags().Bool("ignore-base-content-match", true, "Ignores valid responses with identical size and word length to the base path, typically signifying a web backend redirect")
-	discoverDirectoryCmd.Flags().Bool("omit-standard-responses", true, "Omits responses whose body matches a standard web page error (e.g. soft 404s, WAF blocks, generic server errors), even if the status code is allowed")
+	discoverDirectoryCmd.Flags().Bool("enable-common-response-filters", true, "Filters valid responses matching the base response or learned common response body profiles")
 	discoverDirectoryCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
 	discoverDirectoryCmd.Flags().Float64("threshold", 0.25, "Threshold for successful results")
 	discoverDirectoryCmd.Flags().Int("timeout", 20, "Timeout per request in seconds")
@@ -353,19 +346,6 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Config flags
-			var sensitiveContentFingerprintsPath string
-			sensitiveContentDetection, err := cmd.Flags().GetBool("sensitive-content-detection")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			if sensitiveContentDetection {
-				sensitiveContentFingerprintsPath, err = cmd.Flags().GetString("sensitive-content-fingerprints-path")
-				if err != nil {
-					a.OutputSignal.AddError(err)
-					return
-				}
-			}
 			responseCodes, err := cmd.Flags().GetString("response-codes")
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -448,7 +428,7 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Set Config
-			config := getDiscoverPageConfig(target, sensitiveContentDetection, sensitiveContentFingerprintsPath, responseCodes, maxRedirects, verifyTLS, timeout, ignoreCrossDomainRedirects, takeScreenshot, userAgentPreset, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
+			config := getDiscoverPageConfig(target, responseCodes, maxRedirects, verifyTLS, timeout, ignoreCrossDomainRedirects, takeScreenshot, userAgentPreset, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
 			config.Headers, err = requesthelpers.ParseHeaderPairs(headerPairs)
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -470,33 +450,14 @@ func (a *WebScan) InitDiscoverCommand() {
 				return
 			}
 
-			// Load sensitive content fingerprints if sensitive content detection is enabled and no fingerprints are found, return an error
-			var sensitiveContentFingerprints *discover.SensitiveContentFingerprints
-			if config.SensitiveContentDetection {
-				// Load sensitive content fingerprints
-				sensitiveContentFingerprints, err = discoverpagehelpers.LoadSensitiveConentFingerprints(ctx, config.SensitiveContentFingerprintsPath)
-				if err != nil {
-					a.OutputSignal.AddError(err)
-					return
-				}
-
-				// If no fingerprints are found, return an error
-				if sensitiveContentFingerprints == nil || len(sensitiveContentFingerprints.Fingerprints) == 0 {
-					a.OutputSignal.AddError(errors.New("no sensitive content fingerprints found"))
-					return
-				}
-			}
-
 			// Generate a report
-			report := discoverpage.PerformPageCapture(ctx, config, sensitiveContentFingerprints, requestMethodConfig.BrowserbaseSecrets)
+			report := discoverpage.PerformPageCapture(ctx, config, requestMethodConfig.BrowserbaseSecrets)
 			a.OutputSignal.Content = report
 		},
 	}
 	// Target Flags
 	discoverPageCmd.Flags().String("target", "", "URL target to capture and analyze")
 	// Config Flags
-	discoverPageCmd.Flags().Bool("sensitive-content-detection", true, "Enable sensitive content detection")
-	discoverPageCmd.Flags().String("sensitive-content-fingerprints-path", "", "Path to a custom sensitive content fingerprints file")
 	discoverPageCmd.Flags().String("response-codes", "200-299", "Response codes to consider as valid responses")
 	discoverPageCmd.Flags().Bool("screenshot", false, "Capture a screenshot of the page")
 	discoverPageCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
@@ -1395,19 +1356,6 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Config flags
-			var sensitiveContentFingerprintsPath string
-			sensitiveContentDetection, err := cmd.Flags().GetBool("sensitive-content-detection")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			if sensitiveContentDetection {
-				sensitiveContentFingerprintsPath, err = cmd.Flags().GetString("sensitive-content-fingerprints-path")
-				if err != nil {
-					a.OutputSignal.AddError(err)
-					return
-				}
-			}
 			responseCodes, err := cmd.Flags().GetString("response-codes")
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -1517,7 +1465,6 @@ func (a *WebScan) InitDiscoverCommand() {
 
 			// Build config
 			config := discover.DiscoverWitnessConfig{
-				SensitiveContentDetection:  sensitiveContentDetection,
 				ResponseCodes:              responseCodes,
 				Screenshot:                 takeScreenshot,
 				MaxRedirects:               max(maxRedirects, 0),
@@ -1541,22 +1488,6 @@ func (a *WebScan) InitDiscoverCommand() {
 			if targetsFile != "" {
 				config.TargetsFile = &targetsFile
 			}
-			if sensitiveContentFingerprintsPath != "" {
-				config.SensitiveContentFingerprintsPath = &sensitiveContentFingerprintsPath
-			}
-
-			// Load sensitive content fingerprints if needed
-			if config.SensitiveContentDetection {
-				scFingerprints, scErr := discoverpagehelpers.LoadSensitiveConentFingerprints(ctx, config.SensitiveContentFingerprintsPath)
-				if scErr != nil {
-					a.OutputSignal.AddError(scErr)
-					return
-				}
-				if scFingerprints == nil || len(scFingerprints.Fingerprints) == 0 {
-					a.OutputSignal.AddError(errors.New("no sensitive content fingerprints found"))
-					return
-				}
-			}
 
 			// Generate report
 			report, err := discoverwitness.RunWitness(ctx, config, requestMethodConfig.BrowserbaseSecrets)
@@ -1573,8 +1504,6 @@ func (a *WebScan) InitDiscoverCommand() {
 	discoverWitnessCmd.MarkFlagsMutuallyExclusive("target", "targets-file")
 	discoverWitnessCmd.MarkFlagsOneRequired("target", "targets-file")
 	// Config Flags
-	discoverWitnessCmd.Flags().Bool("sensitive-content-detection", true, "Enable sensitive content detection")
-	discoverWitnessCmd.Flags().String("sensitive-content-fingerprints-path", "", "Path to a custom sensitive content fingerprints file")
 	discoverWitnessCmd.Flags().String("response-codes", "200-299", "Response codes to consider as valid responses")
 	discoverWitnessCmd.Flags().Bool("screenshot", false, "Capture a screenshot of each page (headless only)")
 	discoverWitnessCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
@@ -1662,11 +1591,10 @@ func getDiscoverApplicationConfig(targets []string, resource string, templatePat
 }
 
 // getDiscoverPageConfig builds the config for page capture and analysis.
-func getDiscoverPageConfig(target string, sensitiveContentDetection bool, sensitiveContentFingerprintsPath string, responseCodes string, maxRedirects int, verifyTLS bool, timeout int, ignoreCrossDomainRedirects bool, takeScreenshot bool, userAgent common.UserAgentPreset, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) discover.DiscoverPageConfig {
+func getDiscoverPageConfig(target string, responseCodes string, maxRedirects int, verifyTLS bool, timeout int, ignoreCrossDomainRedirects bool, takeScreenshot bool, userAgent common.UserAgentPreset, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) discover.DiscoverPageConfig {
 	config := discover.DiscoverPageConfig{
 		Target:                     target,
 		ResponseCodes:              responseCodes,
-		SensitiveContentDetection:  sensitiveContentDetection,
 		MaxRedirects:               maxRedirects,
 		VerifyTls:                  verifyTLS,
 		Timeout:                    max(timeout, 0),
@@ -1676,9 +1604,6 @@ func getDiscoverPageConfig(target string, sensitiveContentDetection bool, sensit
 		RequestMethod:              requestMethod,
 		HeadlessConfig:             headlessConfig,
 		BrowserbaseConfig:          browserbaseConfig,
-	}
-	if sensitiveContentFingerprintsPath != "" {
-		config.SensitiveContentFingerprintsPath = &sensitiveContentFingerprintsPath
 	}
 	return config
 }
@@ -1784,14 +1709,13 @@ func getDiscoverSaasConfig(orgs []string, saasCompanies []string, ssoCompanies [
 }
 
 // getDiscoverDirectoryConfig builds the config for directory discovery.
-func getDiscoverDirectoryConfig(targets []string, paths []string, wordlistType string, wordlistSize string, httpMethods []common.HttpMethod, responseCodes string, ignoreBaseContentMatch bool, omitStandardResponses bool, verifyTLS bool, threshold float64, timeout int, ignoreCrossDomainRedirects bool, maxRedirectsBaselineRequest int, threads int, maxRuntime int, retries int, sleep int, jitter int, userAgent common.UserAgentPreset) discover.DiscoverDirectoryConfig {
+func getDiscoverDirectoryConfig(targets []string, paths []string, wordlistType string, wordlistSize string, httpMethods []common.HttpMethod, responseCodes string, enableCommonResponseFilters bool, verifyTLS bool, threshold float64, timeout int, ignoreCrossDomainRedirects bool, maxRedirectsBaselineRequest int, threads int, maxRuntime int, retries int, sleep int, jitter int, userAgent common.UserAgentPreset) discover.DiscoverDirectoryConfig {
 	config := discover.DiscoverDirectoryConfig{
 		Targets:                     targets,
 		Paths:                       paths,
 		HttpMethods:                 httpMethods,
 		ResponseCodes:               responseCodes,
-		IgnoreBaseContentMatch:      ignoreBaseContentMatch,
-		OmitStandardResponses:       omitStandardResponses,
+		EnableCommonResponseFilters: enableCommonResponseFilters,
 		VerifyTls:                   verifyTLS,
 		Threshold:                   threshold,
 		Timeout:                     timeout,

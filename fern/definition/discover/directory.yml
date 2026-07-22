@@ -22,8 +22,7 @@ types:
       wordlistSize: optional<WordlistSize>
       httpMethods: list<http.HttpMethod>
       responseCodes: string
-      ignoreBaseContentMatch: boolean
-      omitStandardResponses: boolean
+      enableCommonResponseFilters: boolean
       verifyTls: boolean
       threshold: float
       timeout: integer

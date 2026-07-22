@@ -43,7 +43,7 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 	// Gather all paths
 	allPaths, err := gatherPaths(config.Paths, config.WordlistType, config.WordlistSize)
 	if err != nil {
-		report.Errors = append(report.Errors, err.Error())
+		report.Errors = append(report.Errors, fmt.Sprintf("directory discovery: failed to gather paths: %v", err))
 		return &report, nil
 	}
 	log.Info("Paths gathered", svc1log.SafeParam("count", len(allPaths)))
@@ -52,7 +52,7 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 	validCodes, err := utils.ParseResponseCodes(config.ResponseCodes)
 	if err != nil {
 		report.Result = &result
-		report.Errors = append(report.Errors, err.Error())
+		report.Errors = append(report.Errors, fmt.Sprintf("directory discovery: failed to parse response codes %q: %v", config.ResponseCodes, err))
 		return &report, nil
 	}
 
@@ -82,42 +82,36 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 		// Split target
 		baseURL, parsedTargetPath, _, err := requesthelpers.SplitTargetURL(target)
 		if err != nil {
-			errors = append(errors, fmt.Sprintf("failed to split target url: %v", err))
+			errors = append(errors, fmt.Sprintf("target %s: failed to split target URL: %v", target, err))
 			report.Errors = errors
 			continue
 		}
 
-		// Get baseline size and word count
-		// Follow redirects to get the correct baseline size and word count
-		baselineRequest, baselineSize, baselineWords, err := baseLine(ctx, baseURL, parsedTargetPath, validCodes, config.MaxRedirectsBaselineRequest, &config)
-		if err != nil {
-			errors = append(errors, "failed to get baseline body, stopping enumeration")
-			report.Errors = errors
-			continue
-		}
-		baselineSizeInt := *baselineSize
-		baselineWordsInt := *baselineWords
-		targetInfo.BaselineAttempts = append(targetInfo.BaselineAttempts, baselineRequest)
-		log.Info("Baseline size", svc1log.SafeParam("size", baselineSizeInt), svc1log.SafeParam("words", baselineWordsInt))
+		var baselineSizeInt int
+		var baselineWordsInt int
+		detector := newCommonResponseDetector(config.Threshold)
+		var calibrationFailureCount int
+		var calibrationFailureSample string
+		if config.EnableCommonResponseFilters {
+			// Follow redirects to get the correct baseline size and word count.
+			baselineRequest, baselineSize, baselineWords, err := baseLine(ctx, baseURL, parsedTargetPath, validCodes, config.MaxRedirectsBaselineRequest, &config)
+			if err != nil {
+				errors = append(errors, fmt.Sprintf("target %s: failed to get base response profile, skipping enumeration: %v", target, err))
+				report.Errors = errors
+				continue
+			}
+			baselineSizeInt = *baselineSize
+			baselineWordsInt = *baselineWords
+			targetInfo.BaselineAttempts = append(targetInfo.BaselineAttempts, baselineRequest)
+			log.Info("Baseline size", svc1log.SafeParam("size", baselineSizeInt), svc1log.SafeParam("words", baselineWordsInt))
 
-		// Do not follow redirects to get the correct baseline size and word count
-		// This is to prevent false positives from remote configurations that dont redirect but give blanket responses on all paths
-		// For random baseline, we accept 404s (not found) since the random path should not exist
-		randomBaselineValidCodes := make(map[int]bool)
-		for code := range validCodes {
-			randomBaselineValidCodes[code] = true
-		}
-		randomBaselineValidCodes[404] = true // Accept 404 for random paths (expected behavior)
-
-		baselineRandomRequest, baselineSizeRandomPath, baselineWordsRandomPath, err := baseLine(ctx, baseURL, "xxxx", randomBaselineValidCodes, 0, &config)
-		if err != nil {
-			log.Debug("Failed to get baseline random path", svc1log.SafeParam("error", err.Error()))
-			// This is not a fatal error - we can continue enumeration without the random baseline
-			// The random baseline is just an additional check to reduce false positives
-		}
-		if baselineSizeRandomPath != nil && baselineWordsRandomPath != nil {
-			targetInfo.BaselineAttempts = append(targetInfo.BaselineAttempts, baselineRandomRequest)
-			log.Info("Baseline size random path", svc1log.SafeParam("size", *baselineSizeRandomPath), svc1log.SafeParam("words", *baselineWordsRandomPath))
+			calibrationAttempts, failureCount, failureSample := calibrateCommonResponses(ctx, baseURL, parsedTargetPath, &config, detector)
+			targetInfo.BaselineAttempts = append(targetInfo.BaselineAttempts, calibrationAttempts...)
+			calibrationFailureCount = failureCount
+			calibrationFailureSample = failureSample
+			log.Info("Common response calibration complete",
+				svc1log.SafeParam("attempts", len(calibrationAttempts)),
+				svc1log.SafeParam("failures", failureCount))
 		}
 
 		// Check if context expired during baseline setup
@@ -134,18 +128,25 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 		var attemptsMutex sync.Mutex
 		var wg sync.WaitGroup
 
-		// Aggregate per-target request failures so we emit one grouped summary per
-		// category instead of one error per path (which is noise for large wordlists).
-		disallowedStatusCounts := map[int]int{}
-		var sendFailureCount int
-		var sendFailureSample string
-		var standardResponseCount int
+		// Aggregate per-target scan metrics so we emit one grouped summary per category
+		// instead of one error per path.
+		metrics := directoryScanMetrics{
+			disallowedStatusCounts:   map[int]int{},
+			calibrationFailureCount:  calibrationFailureCount,
+			calibrationFailureSample: calibrationFailureSample,
+		}
 
 		threads := config.Threads
 		if threads == 0 {
 			threads = runtime.NumCPU()
 		}
 		semaphore := make(chan struct{}, threads) // Limit concurrent requests
+		totalRequests := len(allPaths) * len(config.HttpMethods) * (config.Retries + 1)
+		var completedRequests int
+		log.Info("Starting target directory requests",
+			svc1log.SafeParam("target", target),
+			svc1log.SafeParam("requestCount", totalRequests),
+			svc1log.SafeParam("threads", threads))
 
 		for _, path := range allPaths {
 			// Clean path (ie. /foo/bar/ -> /foo/bar or foo/bar -> /foo/bar)
@@ -161,7 +162,12 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 					if ctx.Err() != nil {
 						// Wait for any running goroutines to complete before returning partial results
 						wg.Wait()
-						errors = append(errors, groupRequestFailures(baseURL, disallowedStatusCounts, sendFailureCount, sendFailureSample, standardResponseCount)...)
+						if config.EnableCommonResponseFilters {
+							attempts = detector.Results()
+							metrics.commonResponseCount, metrics.commonProfileCount = detector.Metrics()
+						}
+						logDirectoryFindings(ctx, attempts)
+						errors = append(errors, groupRequestFailures(target, metrics)...)
 						if len(attempts) > 0 {
 							targetInfo.Attempts = attempts
 							targets = append(targets, &targetInfo)
@@ -176,6 +182,32 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 					wg.Add(1)
 					go func(fullPath string, method common.HttpMethod) {
 						defer wg.Done()
+						defer func() {
+							attemptsMutex.Lock()
+							completedRequests++
+							completed := completedRequests
+							sendFailures := metrics.sendFailureCount
+							baselineMatches := metrics.baselineMatchCount
+							standardResponses := metrics.standardResponseCount
+							disallowedResponses := countDisallowedResponses(metrics.disallowedStatusCounts)
+							positiveFindings := len(attempts)
+							attemptsMutex.Unlock()
+
+							if completed%250 == 0 || completed == totalRequests {
+								filteredCommonResponses := 0
+								if config.EnableCommonResponseFilters {
+									filteredCommonResponses, _, positiveFindings = detector.ProgressMetrics()
+								}
+								log.Info("Directory discovery progress",
+									svc1log.SafeParam("completedRequests", completed),
+									svc1log.SafeParam("positiveFindings", positiveFindings),
+									svc1log.SafeParam("sendFailures", sendFailures),
+									svc1log.SafeParam("baselineMatches", baselineMatches),
+									svc1log.SafeParam("standardResponses", standardResponses),
+									svc1log.SafeParam("disallowedStatusCodes", disallowedResponses),
+									svc1log.SafeParam("filteredCommonResponses", filteredCommonResponses))
+							}
+						}()
 
 						// Check if context has expired before starting
 						if ctx.Err() != nil {
@@ -197,9 +229,9 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 							// Don't add errors if context was cancelled
 							if ctx.Err() == nil {
 								attemptsMutex.Lock()
-								sendFailureCount++
-								if sendFailureSample == "" {
-									sendFailureSample = err.Error()
+								metrics.sendFailureCount++
+								if metrics.sendFailureSample == "" {
+									metrics.sendFailureSample = err.Error()
 								}
 								attemptsMutex.Unlock()
 							}
@@ -212,19 +244,27 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 						}
 
 						// Analyze response
-						isValid, disallowedStatus, standardResponse := AnalyzeResponse(ctx, *httpRequest, validCodes, config.IgnoreBaseContentMatch, config.OmitStandardResponses, baselineSizeInt, baselineWordsInt, baselineSizeRandomPath, baselineWordsRandomPath, config.Threshold)
+						isValid, disallowedStatus, baselineMatch, standardResponseMatch := AnalyzeResponse(ctx, *httpRequest, validCodes, config.EnableCommonResponseFilters, baselineSizeInt, baselineWordsInt, config.Threshold)
 
 						if isValid {
-							attemptsMutex.Lock()
-							attempts = append(attempts, httpRequest)
-							attemptsMutex.Unlock()
+							if config.EnableCommonResponseFilters {
+								detector.Observe(httpRequest)
+							} else {
+								attemptsMutex.Lock()
+								attempts = append(attempts, httpRequest)
+								attemptsMutex.Unlock()
+							}
 						} else if disallowedStatus != 0 {
 							attemptsMutex.Lock()
-							disallowedStatusCounts[disallowedStatus]++
+							metrics.disallowedStatusCounts[disallowedStatus]++
 							attemptsMutex.Unlock()
-						} else if standardResponse {
+						} else if baselineMatch {
 							attemptsMutex.Lock()
-							standardResponseCount++
+							metrics.baselineMatchCount++
+							attemptsMutex.Unlock()
+						} else if standardResponseMatch {
+							attemptsMutex.Lock()
+							metrics.standardResponseCount++
 							attemptsMutex.Unlock()
 						}
 
@@ -244,8 +284,23 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 		// Wait for all goroutines to complete
 		wg.Wait()
 
-		// Collapse this target's request failures into grouped summaries
-		errors = append(errors, groupRequestFailures(baseURL, disallowedStatusCounts, sendFailureCount, sendFailureSample, standardResponseCount)...)
+		if config.EnableCommonResponseFilters {
+			attempts = detector.Results()
+			metrics.commonResponseCount, metrics.commonProfileCount = detector.Metrics()
+		}
+		logDirectoryFindings(ctx, attempts)
+		log.Info("Directory discovery target complete",
+			svc1log.SafeParam("target", target),
+			svc1log.SafeParam("completedRequests", completedRequests),
+			svc1log.SafeParam("findings", len(attempts)),
+			svc1log.SafeParam("filteredCommonResponses", metrics.commonResponseCount),
+			svc1log.SafeParam("baselineMatches", metrics.baselineMatchCount),
+			svc1log.SafeParam("standardResponses", metrics.standardResponseCount),
+			svc1log.SafeParam("disallowedStatusCodes", countDisallowedResponses(metrics.disallowedStatusCounts)),
+			svc1log.SafeParam("sendFailures", metrics.sendFailureCount))
+
+		// Collapse this target's scan metrics into grouped summaries
+		errors = append(errors, groupRequestFailures(target, metrics)...)
 
 		// Always add results if we have any, even if context expired
 		if len(attempts) > 0 {

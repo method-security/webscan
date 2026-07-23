@@ -15,8 +15,8 @@ import (
 	discoverpagehelpers "github.com/Method-Security/webscan/internal/discover/page/helpers"
 	//Utils
 	headless "github.com/Method-Security/webscan/utils/request/headless"
+	browserbase "github.com/Method-Security/webscan/utils/request/headless/browserbase"
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
-	"github.com/Method-Security/webscan/utils/useragent"
 
 	// External
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
@@ -32,9 +32,9 @@ func getHTTPRequestConfig(baseURL string, path string, queryParams map[string]st
 			Headers: requesthelpers.BuildAuthHeaders(config.Headers, config.Cookies),
 		},
 	}
-	// Capture console logs and page cookies on headless captures to mirror the
-	// rendered-page output contract; the standard transport ignores both flags.
-	captureBrowserArtifacts := config.RequestMethod == common.RequestMethodHeadless
+	// Capture console logs and page cookies on browser-backed captures to mirror
+	// the rendered-page output contract; the standard transport ignores both flags.
+	captureBrowserArtifacts := config.RequestMethod == common.RequestMethodHeadless || config.RequestMethod == common.RequestMethodBrowserbase
 	return common.SendHttpRequestConfig{
 		Request:                    &request,
 		MaxRedirects:               config.MaxRedirects,
@@ -82,14 +82,26 @@ func PerformPageCapture(
 	// Perform HTML capture
 	log.Info("Performing HTML capture", svc1log.SafeParam("target", config.Target))
 	var httpRequestResponse *common.HttpRequestResponse
-	if config.Screenshot && config.RequestMethod == common.RequestMethodHeadless {
-		log.Info("Performing combined HEADLESS screenshot and HTML capture", svc1log.SafeParam("target", config.Target))
+	if config.RequestMethod == common.RequestMethodHeadless {
+		if config.Screenshot {
+			log.Info("Performing combined HEADLESS screenshot and HTML capture", svc1log.SafeParam("target", config.Target))
+		} else {
+			log.Info("Performing HEADLESS HTML capture with metadata", svc1log.SafeParam("target", config.Target))
+		}
 		requestCtx, requestCancel := context.WithTimeout(ctx, time.Duration(requestConfig.Timeout)*time.Second)
 		defer requestCancel()
 
 		requester := headless.NewRequester(config.Timeout, config.HeadlessConfig)
 		requester.SetProxyConfigFromRequest(requestConfig)
-		response, img, metadata, err := requester.SendRequestWithScreenshot(requestCtx, requestConfig)
+		var response common.HttpRequestResponse
+		var img []byte
+		var metadata headless.PageMetadata
+		var err error
+		if config.Screenshot {
+			response, img, metadata, err = requester.SendRequestWithScreenshot(requestCtx, requestConfig)
+		} else {
+			response, metadata, err = requester.SendRequestWithMetadata(requestCtx, requestConfig)
+		}
 		httpRequestResponse = &response
 		if len(img) > 0 {
 			result.Screenshot = &img
@@ -111,34 +123,30 @@ func PerformPageCapture(
 				return &report
 			}
 		}
+	} else if config.RequestMethod == common.RequestMethodBrowserbase {
+		log.Info("Performing BROWSERBASE HTML capture with metadata", svc1log.SafeParam("target", config.Target))
+		requestCtx, requestCancel := context.WithTimeout(ctx, time.Duration(requestConfig.Timeout)*time.Second)
+		defer requestCancel()
 
-		// Favicon (gowitness parity, AITF-139) — best-effort, never fatal.
-		// Use the final navigated URL plus rendered HTML to resolve a favicon URL.
-		if response.Response != nil {
-			var finalURLStr string
-			if len(response.Response.RedirectChain) > 0 {
-				finalURLStr = response.Response.RedirectChain[len(response.Response.RedirectChain)-1]
-			} else {
-				finalURLStr = config.Target
-			}
-			var htmlContent string
-			if response.Response.ResponseBody != nil {
-				if bodyStr := requesthelpers.GetResponseBodyStringFromBodyStruct(response.Response.ResponseBody); bodyStr != nil {
-					htmlContent = *bodyStr
-				}
-			}
-			faviconURL := discoverpagehelpers.ExtractFaviconURL(htmlContent, finalURLStr)
-			if faviconURL != "" {
-				// Use the resolved discover-page User-Agent so the favicon fetch
-				// matches what the headless browser advertised. Pass the outer
-				// `ctx`, not `requestCtx` — the favicon helper derives a fresh
-				// timeout (the combined headless capture has already consumed
-				// most of `requestCtx`'s budget).
-				resolvedUA := useragent.Resolve(config.UserAgent)
-				if faviconBytes, faviconHash, faviconErr := discoverpagehelpers.FetchFavicon(ctx, faviconURL, config.Timeout, config.VerifyTls, resolvedUA); faviconErr == nil && len(faviconBytes) > 0 {
-					result.Favicon = &faviconBytes
-					result.FaviconHash = &faviconHash
-				}
+		client := browserbase.NewBrowserbaseClient(config.BrowserbaseConfig, browserbaseSecrets)
+		requester := browserbase.NewBrowserbaseRequester(requestCtx, *client, config.Timeout, config.HeadlessConfig.MinDomStabalizeTime)
+		if requester == nil {
+			errors = append(errors, "failed to create browserbase capturer")
+			report.Errors = errors
+			return &report
+		}
+
+		response, metadata, err := requester.SendRequestWithMetadata(requestCtx, requestConfig)
+		httpRequestResponse = &response
+		if metadata.HtmlTitle != "" {
+			title := metadata.HtmlTitle
+			result.HtmlTitle = &title
+		}
+		if err != nil {
+			errors = append(errors, err.Error())
+			if response.Response == nil {
+				report.Errors = errors
+				return &report
 			}
 		}
 	} else {
@@ -148,6 +156,14 @@ func PerformPageCapture(
 			errors = append(errors, err.Error())
 			report.Errors = errors
 			return &report
+		}
+	}
+
+	if result.HtmlTitle == nil && httpRequestResponse != nil && httpRequestResponse.Response != nil && httpRequestResponse.Response.ResponseBody != nil {
+		if bodyStr := requesthelpers.GetResponseBodyStringFromBodyStruct(httpRequestResponse.Response.ResponseBody); bodyStr != nil {
+			if htmlTitle := discoverpagehelpers.ExtractHTMLTitle(*bodyStr); htmlTitle != "" {
+				result.HtmlTitle = &htmlTitle
+			}
 		}
 	}
 

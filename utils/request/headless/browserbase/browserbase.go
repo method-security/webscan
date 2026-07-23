@@ -57,6 +57,12 @@ func (b *Requester) SendRequest(ctx context.Context, options common.SendHttpRequ
 	return b.Requester.SendRequest(ctx, options)
 }
 
+// SendRequestWithMetadata performs a Browserbase-backed headless capture and
+// preserves live DOM metadata collected by the underlying requester.
+func (b *Requester) SendRequestWithMetadata(ctx context.Context, options common.SendHttpRequestConfig) (common.HttpRequestResponse, headless.PageMetadata, error) {
+	return b.Requester.SendRequestWithMetadata(ctx, options)
+}
+
 func (b *Requester) Close(ctx context.Context) error {
 	var err error = nil
 	sessionErr := b.Client.CloseAllSessions(ctx)

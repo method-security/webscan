@@ -161,6 +161,27 @@ var uuidSegmentPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9
 // longHexSegmentPattern matches long hex strings (16+ hex chars) that are not UUIDs.
 var longHexSegmentPattern = regexp.MustCompile(`^[0-9a-fA-F]{16,}$`)
 
+// unresolvedJSTemplateExpressionPattern matches JavaScript template placeholders
+// that were captured as literal text instead of being resolved by the parser.
+var unresolvedJSTemplateExpressionPattern = regexp.MustCompile(`\$\{[^}]*\}`)
+
+func hasUnresolvedJSTemplateExpression(value string) bool {
+	return unresolvedJSTemplateExpressionPattern.MatchString(value)
+}
+
+func parseRouteMethod(method string) (common.HttpMethod, bool) {
+	if method == "" {
+		method = string(common.HttpMethodGet)
+	}
+
+	parsedMethod, err := common.NewHttpMethodFromString(strings.ToUpper(method))
+	if err != nil {
+		return "", false
+	}
+
+	return parsedMethod, true
+}
+
 // normalizePathTemplate replaces dynamic path segments with placeholder tokens.
 // - Numeric segments become <id>
 // - UUID segments become <uuid>
@@ -263,6 +284,18 @@ func extractRoutesFromPatterns(content string, baseURL string, routeCaptureConfi
 				continue
 			}
 
+			// Regex fallback can match JavaScript examples such as
+			// xhr.open('${method}', '${url}') from docs or generated bundles.
+			// Those are unresolved placeholders, not concrete routes.
+			if hasUnresolvedJSTemplateExpression(urlStr) || hasUnresolvedJSTemplateExpression(method) {
+				continue
+			}
+
+			routeMethod, ok := parseRouteMethod(method)
+			if !ok {
+				continue
+			}
+
 			// Resolve relative URLs
 			fullURL := discoverroutehelpers.ResolveURL(baseURL, urlStr)
 
@@ -291,15 +324,10 @@ func extractRoutesFromPatterns(content string, baseURL string, routeCaptureConfi
 				continue
 			}
 
-			// If no method was found in the pattern, default to GET
-			if method == "" {
-				method = "GET"
-			}
-
 			route := &discover.RouteDetails{
 				BaseUrl: routeBaseURL,
 				Path:    routePath,
-				Method:  common.HttpMethod(method),
+				Method:  routeMethod,
 			}
 
 			// Apply path templating if the path has dynamic segments

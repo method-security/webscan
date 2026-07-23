@@ -1,4 +1,4 @@
-package discoverpage
+package witnesshelpers
 
 import (
 	// Standard
@@ -59,7 +59,7 @@ func ExtractFaviconURL(html, finalURL string) string {
 // FetchFavicon downloads the favicon at faviconURL using a fresh HTTP client
 // that respects verifyTLS and timeout. The caller supplies userAgent (typically
 // the resolved discover-page UA) so favicon traffic matches what the headless
-// browser advertised — servers that vary their favicon on UA work correctly.
+// browser advertised - servers that vary their favicon on UA work correctly.
 //
 // IMPORTANT: a fresh context is derived from `ctx` instead of using `ctx` as a
 // deadline-bearing parent. The combined headless capture exhausts most of its
@@ -70,7 +70,7 @@ func ExtractFaviconURL(html, finalURL string) string {
 //
 // Returns the raw bytes and a Shodan-compatible mmh3-32 hash (signed int32,
 // decimal string). On non-2xx, network error, or empty body, it returns
-// (nil, "", nil) — caller treats this as not found.
+// (nil, "", nil) - caller treats this as not found.
 func FetchFavicon(ctx context.Context, faviconURL string, timeout int, verifyTLS bool, userAgent string) ([]byte, string, error) {
 	if faviconURL == "" {
 		return nil, "", nil

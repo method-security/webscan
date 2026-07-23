@@ -73,7 +73,7 @@ func setupHeaderInterception(page *rod.Page, log svc1log.Logger) *NetworkHeaderC
 	go page.EachEvent(
 		func(e *proto.NetworkResponseReceived) {
 			// Only capture headers for main document responses
-			if e.Type == proto.NetworkResourceTypeDocument && e.Response != nil && !isInternalBrowserURL(e.Response.URL) {
+			if isMainFrameDocumentEvent(page, e.Type, e.FrameID) && e.Response != nil && !isInternalBrowserURL(e.Response.URL) {
 				headers := make(map[string][]string)
 				for key, value := range e.Response.Headers {
 					// Convert gson.JSON to string
@@ -177,7 +177,7 @@ func handleNavigation(ctx context.Context, page *rod.Page, redirectChain *[]stri
 	// Set up event listeners for navigation events and network redirects
 	go page.EachEvent(
 		func(e *proto.NetworkRequestWillBeSent) {
-			if e.Type != proto.NetworkResourceTypeDocument || e.RedirectResponse == nil {
+			if !isMainFrameDocumentEvent(page, e.Type, e.FrameID) || e.RedirectResponse == nil {
 				return
 			}
 			if e.RedirectResponse.Status < 300 || e.RedirectResponse.Status >= 400 {
@@ -206,7 +206,7 @@ func handleNavigation(ctx context.Context, page *rod.Page, redirectChain *[]stri
 		// Capture HTTP redirect responses at the network level
 		func(e *proto.NetworkResponseReceived) {
 			// Only capture redirect responses for the main document
-			if e.Type == proto.NetworkResourceTypeDocument && e.Response.Status >= 300 && e.Response.Status < 400 {
+			if isMainFrameDocumentEvent(page, e.Type, e.FrameID) && e.Response != nil && e.Response.Status >= 300 && e.Response.Status < 400 {
 				// Extract the Location header from the redirect response
 				if location := headerValue(e.Response.Headers, "location"); location != "" {
 					locationURL := resolveRedirectLocation(e.Response.URL, location)
@@ -309,6 +309,13 @@ func handleNavigation(ctx context.Context, page *rod.Page, redirectChain *[]stri
 			}
 		},
 	)()
+}
+
+func isMainFrameDocumentEvent(page *rod.Page, resourceType proto.NetworkResourceType, frameID proto.PageFrameID) bool {
+	return page != nil &&
+		resourceType == proto.NetworkResourceTypeDocument &&
+		frameID != "" &&
+		frameID == page.FrameID
 }
 
 func signalRedirectError(err error, redirectError chan error, requestComplete chan struct{}, once *sync.Once, completed *int32) {

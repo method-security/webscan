@@ -15,7 +15,6 @@ import (
 	standardhelpers "github.com/Method-Security/webscan/utils/request/standard/helpers"
 
 	// Utils
-	utils "github.com/Method-Security/webscan/utils"
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
 	useragent "github.com/Method-Security/webscan/utils/useragent"
 
@@ -416,8 +415,15 @@ func (b *Requester) sendRequestWithArtifactsOnce(ctx context.Context, config com
 			}
 		}
 
-		// Redirect Chain
-		if finalURL != "" && !utils.IsStaticAsset(finalURL) {
+		// Redirect Chain: fold the post-render location (window.location.href)
+		// into the chain as the terminal entry. handleNavigation only records
+		// HTTP 3xx redirects, so this is what captures client-side/JS/meta-refresh
+		// redirects — i.e. where the browser actually ended up, including when it
+		// lands on a static asset (e.g. a redirect to a PDF) or bounces back to an
+		// earlier URL (A->B->A). Guard against internal browser URLs (about:blank,
+		// chrome-error://, ...) so they never become the terminal entry consumers
+		// read as the final URL.
+		if finalURL != "" && !isInternalBrowserURL(finalURL) {
 			redirectChainMu.Lock()
 			added, redirectErr := appendRedirectURLLocked(&redirectChain, finalURL, config.MaxRedirects)
 			if redirectErr != nil {
@@ -442,7 +448,6 @@ func (b *Requester) sendRequestWithArtifactsOnce(ctx context.Context, config com
 		log.Info("Final URL", svc1log.SafeParam("url", finalURL))
 
 		// Capture htmlTitle for outer scope (returned to caller via PageMetadata).
-		// finalURL is plumbed onto response.FinalUrl below; no outer-scope copy needed.
 		capturedHtmlTitle = htmlTitle
 
 		// Check if Chrome error page using batch result
@@ -517,13 +522,6 @@ func (b *Requester) sendRequestWithArtifactsOnce(ctx context.Context, config com
 			responseHeaders,
 			responseBody,
 		)
-
-		// Surface the final navigated URL on HttpResponse so downstream consumers
-		// don't have to reconstruct it from redirectChain[-1]. gowitness parity.
-		if finalURL != "" {
-			finalURLCopy := finalURL
-			response.FinalUrl = &finalURLCopy
-		}
 
 		// Attach captured console logs and page cookies when requested.
 		if console != nil {

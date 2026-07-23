@@ -284,9 +284,9 @@ func processTarget(
 		tlsTarget := target
 		if pageReport.Result != nil && pageReport.Result.Request != nil &&
 			pageReport.Result.Request.Response != nil &&
-			pageReport.Result.Request.Response.FinalUrl != nil &&
-			*pageReport.Result.Request.Response.FinalUrl != "" {
-			tlsTarget = *pageReport.Result.Request.Response.FinalUrl
+			len(pageReport.Result.Request.Response.RedirectChain) > 0 {
+			redirectChain := pageReport.Result.Request.Response.RedirectChain
+			tlsTarget = redirectChain[len(redirectChain)-1]
 		}
 		tlsCerts := extractTLSFromTarget(ctx, tlsTarget, config)
 		if len(tlsCerts) > 0 {

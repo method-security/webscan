@@ -116,8 +116,8 @@ func PerformPageCapture(
 		// Use the final navigated URL plus rendered HTML to resolve a favicon URL.
 		if response.Response != nil {
 			var finalURLStr string
-			if response.Response.FinalUrl != nil && *response.Response.FinalUrl != "" {
-				finalURLStr = *response.Response.FinalUrl
+			if len(response.Response.RedirectChain) > 0 {
+				finalURLStr = response.Response.RedirectChain[len(response.Response.RedirectChain)-1]
 			} else {
 				finalURLStr = config.Target
 			}

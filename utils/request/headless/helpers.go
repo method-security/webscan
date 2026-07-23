@@ -322,13 +322,18 @@ func signalRedirectError(err error, redirectError chan error, requestComplete ch
 	})
 }
 
+// appendRedirectURLLocked records redirectURL as the new terminal entry of the
+// chain. It intentionally does NOT dedup against the whole chain: a bounce flow
+// (A->B->A) must end at A even though A already appears earlier, otherwise
+// redirectChain[-1] would report B while the browser is at A and downstream
+// consumers (favicon, TLS extraction, cross-domain checks) would use the wrong
+// host.
 func appendRedirectURLLocked(redirectChain *[]string, redirectURL string, maxRedirects int) (bool, error) {
-	if chainContainsURL(*redirectChain, redirectURL) {
-		return false, nil
-	}
-
 	if len(*redirectChain) > 0 {
 		lastURL := (*redirectChain)[len(*redirectChain)-1]
+		if lastURL == redirectURL {
+			return false, nil
+		}
 		if utils.IsTrailingSlashRedirect(lastURL, redirectURL) {
 			(*redirectChain)[len(*redirectChain)-1] = redirectURL
 			return false, nil
@@ -372,35 +377,6 @@ func firstRedirectURL(redirectChain *[]string, redirectChainMu *sync.Mutex) stri
 		return ""
 	}
 	return (*redirectChain)[0]
-}
-
-func chainContainsURL(chain []string, candidate string) bool {
-	normalizedCandidate := normalizeDefaultPort(candidate)
-	for _, existing := range chain {
-		if normalizeDefaultPort(existing) == normalizedCandidate {
-			return true
-		}
-	}
-	return false
-}
-
-func normalizeDefaultPort(raw string) string {
-	parsed, err := url.Parse(raw)
-	if err != nil {
-		return raw
-	}
-	if port := parsed.Port(); port != "" && isDefaultPort(strings.ToLower(parsed.Scheme), port) {
-		hostname := parsed.Hostname()
-		if strings.Contains(hostname, ":") {
-			hostname = "[" + hostname + "]"
-		}
-		parsed.Host = hostname
-	}
-	return parsed.String()
-}
-
-func isDefaultPort(scheme, port string) bool {
-	return (scheme == "http" && port == "80") || (scheme == "https" && port == "443")
 }
 
 func headlessCaptureAttempts(method common.HttpMethod) int {

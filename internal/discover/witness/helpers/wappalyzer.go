@@ -286,7 +286,7 @@ func Fingerprint(headers map[string][]string, body []byte) (*discover.DiscoverWi
 		sort.Strings(categories)
 		tech.SetCategories(categories)
 		bucket, technologyType := classifyTechnology(rawName, categories)
-		tech.TechnologyType = technologyType
+		tech.SetTechnologyType(technologyType)
 
 		// Populate optional fields
 		if info.CPE != "" {
@@ -315,9 +315,9 @@ func Fingerprint(headers map[string][]string, body []byte) (*discover.DiscoverWi
 	return technologies, nil
 }
 
-func classifyTechnology(name string, categories []string) (technologyBucket, *discover.DetectedTechnologyType) {
+func classifyTechnology(name string, categories []string) (technologyBucket, discover.DetectedTechnologyType) {
 	if technologyType, ok := explicitTechnologyTypes[strings.ToLower(strings.TrimSpace(name))]; ok {
-		return bucketForTechnologyType(technologyType), &technologyType
+		return bucketForTechnologyType(technologyType), technologyType
 	}
 
 	categorySet := make(map[string]struct{}, len(categories))
@@ -331,11 +331,11 @@ func classifyTechnology(name string, categories []string) (technologyBucket, *di
 		}
 		technologyType := wappalyzerCategoryTypes[category]
 		if technologyType != nil {
-			return bucketForTechnologyType(*technologyType), technologyType
+			return bucketForTechnologyType(*technologyType), *technologyType
 		}
 	}
 
-	return technologyBucketOther, technologyTypePtr(discover.DetectedTechnologyTypeUncategorized)
+	return technologyBucketOther, discover.DetectedTechnologyTypeUncategorized
 }
 
 func bucketForTechnologyType(technologyType discover.DetectedTechnologyType) technologyBucket {

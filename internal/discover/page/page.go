@@ -125,16 +125,26 @@ func PerformPageCapture(
 		}
 	} else if config.RequestMethod == common.RequestMethodBrowserbase {
 		log.Info("Performing BROWSERBASE HTML capture with metadata", svc1log.SafeParam("target", config.Target))
+		if requesthelpers.HasProxyConfig(requestConfig) {
+			errors = append(errors, "browserbase capture does not support --http-proxy or --socks-proxy; use Browserbase proxy options instead")
+			report.Errors = errors
+			return &report
+		}
 		requestCtx, requestCancel := context.WithTimeout(ctx, time.Duration(requestConfig.Timeout)*time.Second)
 		defer requestCancel()
 
 		client := browserbase.NewBrowserbaseClient(config.BrowserbaseConfig, browserbaseSecrets)
-		requester := browserbase.NewBrowserbaseRequester(requestCtx, *client, config.Timeout, config.HeadlessConfig.MinDomStabalizeTime)
+		requester := browserbase.NewBrowserbaseRequester(ctx, *client, config.Timeout, config.HeadlessConfig.MinDomStabalizeTime)
 		if requester == nil {
 			errors = append(errors, "failed to create browserbase capturer")
 			report.Errors = errors
 			return &report
 		}
+		defer func() {
+			if closeErr := requester.Close(ctx); closeErr != nil {
+				log.Warn("Failed to close browserbase session", svc1log.SafeParam("error", closeErr.Error()))
+			}
+		}()
 
 		response, metadata, err := requester.SendRequestWithMetadata(requestCtx, requestConfig)
 		httpRequestResponse = &response

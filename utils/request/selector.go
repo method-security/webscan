@@ -11,6 +11,7 @@ import (
 	// Utils
 	headless "github.com/Method-Security/webscan/utils/request/headless"
 	browserbase "github.com/Method-Security/webscan/utils/request/headless/browserbase"
+	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
 	standard "github.com/Method-Security/webscan/utils/request/standard"
 
 	// External
@@ -60,7 +61,7 @@ func SendRequest(ctx context.Context, config common.SendHttpRequestConfig) (*com
 	// Browserbase capture
 	case common.RequestMethodBrowserbase:
 		log.Debug("Sending browserbase request")
-		if hasProxyConfig(config) {
+		if requesthelpers.HasProxyConfig(config) {
 			return nil, fmt.Errorf("browserbase capture does not support --http-proxy or --socks-proxy; use Browserbase proxy options instead")
 		}
 		client := browserbase.NewBrowserbaseClient(config.BrowserbaseConfig, config.BrowserbaseSecrets)
@@ -68,6 +69,11 @@ func SendRequest(ctx context.Context, config common.SendHttpRequestConfig) (*com
 		if browserbase == nil {
 			return nil, fmt.Errorf("failed to create browserbase capturer")
 		}
+		defer func() {
+			if closeErr := browserbase.Close(ctx); closeErr != nil {
+				log.Warn("Failed to close browserbase session", svc1log.SafeParam("error", closeErr.Error()))
+			}
+		}()
 		httpRequestResponse, err := browserbase.SendRequest(requestCtx, config)
 		if err != nil {
 			return nil, fmt.Errorf("browserbase capture failed: %w", err)
@@ -78,8 +84,4 @@ func SendRequest(ctx context.Context, config common.SendHttpRequestConfig) (*com
 	default:
 		return nil, fmt.Errorf("invalid request method: %s", config.RequestMethod)
 	}
-}
-
-func hasProxyConfig(config common.SendHttpRequestConfig) bool {
-	return (config.HttpProxy != nil && *config.HttpProxy != "") || (config.SocksProxy != nil && *config.SocksProxy != "")
 }

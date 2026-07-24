@@ -21,7 +21,7 @@ types:
       name: string
       version: optional<string>
       categories: list<string>
-      technologyType: optional<DetectedTechnologyType>
+      technologyType: DetectedTechnologyType
       cpe: optional<string>
       description: optional<string>
       website: optional<string>

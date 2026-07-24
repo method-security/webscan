@@ -1462,7 +1462,7 @@ func (a *WebScan) InitDiscoverCommand() {
 	discoverWitnessCmd.Flags().String("target", "", "Single URL target for witness scan")
 	_ = discoverWitnessCmd.MarkFlagRequired("target")
 	// Config Flags
-	discoverWitnessCmd.Flags().String("response-codes", "200-600", "Response codes to consider as valid responses")
+	discoverWitnessCmd.Flags().String("response-codes", "200-599", "Response codes to consider as valid responses")
 	discoverWitnessCmd.Flags().Bool("screenshot", false, "Capture a screenshot of the page (headless only)")
 	discoverWitnessCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
 	discoverWitnessCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")

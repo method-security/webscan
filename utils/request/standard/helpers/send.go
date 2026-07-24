@@ -4,13 +4,14 @@ import (
 	// Standard
 	"bytes"
 	"context"
-	"crypto/tls"
 	"fmt"
 	"io"
 	"net/http"
 	neturl "net/url"
 	"time"
 
+	// Method
+	"github.com/Method-Security/pkg/httpclient"
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
 	// Utils
@@ -20,17 +21,13 @@ import (
 
 	// External
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
-	"golang.org/x/net/proxy"
 )
 
 func SendHTTPRequest(ctx context.Context, url string, headers map[string]string, bodyReader io.Reader, config common.SendHttpRequestConfig) (*http.Response, []string, error) {
 	log := svc1log.FromContext(ctx)
 	log.Debug("Sending request", svc1log.SafeParam("url", url), svc1log.SafeParam("maxRedirects", config.MaxRedirects))
 
-	client, err := newHTTPClient(config)
-	if err != nil {
-		return nil, []string{url}, err
-	}
+	client := newHTTPClient(config)
 
 	// Initialize Redirect Chain
 	redirectChain := []string{url}
@@ -87,15 +84,7 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 		requestHeaders := headersWithUserAgent(headers, resolvedUserAgent)
 
 		// Send Request
-		req, err := http.NewRequestWithContext(ctx, string(config.Request.Method), currentURL, reqBody)
-		if err != nil {
-			return nil, redirectChain, fmt.Errorf("failed to create request to %s: %w", currentURL, err)
-		}
-		for key, value := range requestHeaders {
-			req.Header.Set(key, value)
-		}
-
-		resp, err := client.Do(req)
+		clientResp, err := client.Request(ctx, string(config.Request.Method), currentURL, reqBody, requestHeaders)
 		if err != nil {
 			detail := requesthelpers.ClassifyTransportError(err)
 			log.Error("Failed to send request",
@@ -104,6 +93,7 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 				svc1log.SafeParam("error", detail.Cause))
 			return nil, redirectChain, fmt.Errorf("request to %s failed [%s]: %s", currentURL, detail.Category, detail.Cause)
 		}
+		resp := httpResponseFromClientResponse(clientResp)
 
 		// Check if Response is not a redirect, return
 		if resp.StatusCode < 300 || resp.StatusCode >= 400 {
@@ -196,47 +186,29 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 	return nil, redirectChain, fmt.Errorf("maximum redirects (%d) exceeded for %s", config.MaxRedirects, url)
 }
 
-func newHTTPClient(config common.SendHttpRequestConfig) (*http.Client, error) {
-	transport := &http.Transport{
-		ForceAttemptHTTP2: true,
-		TLSClientConfig: &tls.Config{
-			MinVersion:         tls.VersionTLS12,
-			InsecureSkipVerify: !config.VerifyTls, //nolint:gosec // configurable by caller
-		},
+func newHTTPClient(config common.SendHttpRequestConfig) *httpclient.Client {
+	options := []httpclient.Option{
+		httpclient.WithTimeout(time.Duration(config.Timeout) * time.Second),
+		httpclient.WithTLSVerify(config.VerifyTls),
+		httpclient.WithMaxRedirects(0),
 	}
 
 	if config.HttpProxy != nil && *config.HttpProxy != "" {
-		proxyURL, err := neturl.Parse(*config.HttpProxy)
-		if err != nil {
-			return nil, fmt.Errorf("invalid HTTP proxy URL: %w", err)
-		}
-		transport.Proxy = http.ProxyURL(proxyURL)
+		options = append(options, httpclient.WithHTTPProxy(*config.HttpProxy))
 	} else if config.SocksProxy != nil && *config.SocksProxy != "" {
-		proxyURL, err := neturl.Parse(*config.SocksProxy)
-		if err != nil {
-			return nil, fmt.Errorf("invalid SOCKS5 proxy URL: %w", err)
-		}
-		dialer, err := proxy.FromURL(proxyURL, proxy.Direct)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create SOCKS5 dialer: %w", err)
-		}
-		contextDialer, ok := dialer.(proxy.ContextDialer)
-		if !ok {
-			return nil, fmt.Errorf("SOCKS5 dialer does not support context-aware dialing")
-		}
-		transport.Proxy = func(*http.Request) (*neturl.URL, error) {
-			return nil, nil
-		}
-		transport.DialContext = contextDialer.DialContext
+		options = append(options, httpclient.WithSOCKSProxy(*config.SocksProxy))
 	}
+	return httpclient.New(options...)
+}
 
-	return &http.Client{
-		Timeout:   time.Duration(config.Timeout) * time.Second,
-		Transport: transport,
-		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-	}, nil
+func httpResponseFromClientResponse(resp *httpclient.Response) *http.Response {
+	return &http.Response{
+		StatusCode:    resp.StatusCode,
+		Status:        fmt.Sprintf("%d %s", resp.StatusCode, http.StatusText(resp.StatusCode)),
+		Header:        resp.Headers,
+		Body:          io.NopCloser(bytes.NewReader(resp.Body)),
+		ContentLength: int64(len(resp.Body)),
+	}
 }
 
 func headersWithUserAgent(headers map[string]string, userAgent string) map[string]string {

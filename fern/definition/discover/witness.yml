@@ -1,23 +1,44 @@
 imports:
   http: ../common/http.yml
   method: ../common/method.yml
-  request: ./request.yml
-  application: ./application.yml
-
 types:
+  DetectedTechnologyType:
+    enum:
+      - UI_FRAMEWORK
+      - JAVASCRIPT_LIBRARY
+      - CSS_FRAMEWORK
+      - CLIENT_ANALYTICS
+      - CLIENT_WIDGET
+      - PROGRAMMING_LANGUAGE
+      - WEB_FRAMEWORK
+      - RUNTIME
+      - TEMPLATE_ENGINE
+      - AUTHENTICATION_LIBRARY
+      - UNCATEGORIZED
+  # Wappalyzer Technology Struct
   DetectedTechnology:
     properties:
       name: string
       version: optional<string>
       categories: list<string>
+      technologyType: DetectedTechnologyType
       cpe: optional<string>
       description: optional<string>
       website: optional<string>
-
+  DiscoverWitnessTechnologies:
+    properties:
+      clientSide: optional<list<DetectedTechnology>>
+      serverSide: optional<list<DetectedTechnology>>
+      other: optional<list<DetectedTechnology>>
+  DiscoverWitnessFavicon:
+    properties:
+      url: string
+      binary: base64
+      hash: string
+  # Function Config Struct
   DiscoverWitnessConfig:
     properties:
-      target: optional<string>
-      targetsFile: optional<string>
+      target: string
       responseCodes: string
       screenshot: boolean
       maxRedirects: integer
@@ -32,25 +53,18 @@ types:
       cookies: optional<map<string, string>>
       localStorage: optional<map<string, string>>
       sessionStorage: optional<map<string, string>>
-      nucleiTemplatePaths: optional<list<string>>
-      nucleiThreads: integer
-
-  DiscoverWitnessTargetResult:
+  # Result Struct
+  DiscoverWitnessResult:
     properties:
       target: string
-      request: optional<http.HttpRequestResponse>
+      request: http.HttpRequestResponse
       screenshot: optional<base64>
       screenshotPerceptualHash: optional<string>
-      favicon: optional<base64>
-      faviconHash: optional<string>
-      htmlTitle: optional<string>
-      technologies: list<DetectedTechnology>
-      nucleiFingerprints: optional<list<application.ApplicationFingerprintAttempt>>
-      tlsCertificates: optional<list<request.TlsCertificate>>
-      errors: optional<list<string>>
-
+      favicon: optional<DiscoverWitnessFavicon>
+      technologies: optional<DiscoverWitnessTechnologies>
+  # Report Struct
   DiscoverWitnessReport:
     properties:
       config: DiscoverWitnessConfig
-      results: list<DiscoverWitnessTargetResult>
+      result: DiscoverWitnessResult
       errors: optional<list<string>>

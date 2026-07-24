@@ -66,6 +66,15 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 		return resp, redirectChain, nil
 	}
 
+	closeResponseBody := func(resp *http.Response) {
+		if resp == nil || resp.Body == nil {
+			return
+		}
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			log.Error("Failed to close response body", svc1log.SafeParam("error", closeErr.Error()))
+		}
+	}
+
 	for redirects := 0; redirects <= config.MaxRedirects; redirects++ {
 		var reqBody io.Reader
 		if bodyBuffer != nil {
@@ -114,11 +123,13 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 		parsedCurrentURL, err := neturl.Parse(currentURL)
 		if err != nil {
 			log.Error("Failed to parse current URL", svc1log.SafeParam("url", currentURL), svc1log.SafeParam("error", err.Error()))
+			closeResponseBody(resp)
 			return nil, redirectChain, fmt.Errorf("failed to parse current URL: %v", err)
 		}
 		nextURL, err := parsedCurrentURL.Parse(location)
 		if err != nil {
 			log.Error("Failed to parse redirect location", svc1log.SafeParam("error", err.Error()))
+			closeResponseBody(resp)
 			return nil, redirectChain, fmt.Errorf("failed to parse redirect location: %v", err)
 		}
 
@@ -181,6 +192,7 @@ func newHTTPClient(config common.SendHttpRequestConfig) *httpclient.Client {
 		httpclient.WithTLSVerify(config.VerifyTls),
 		httpclient.WithMaxRedirects(0),
 	}
+
 	if config.HttpProxy != nil && *config.HttpProxy != "" {
 		options = append(options, httpclient.WithHTTPProxy(*config.HttpProxy))
 	} else if config.SocksProxy != nil && *config.SocksProxy != "" {

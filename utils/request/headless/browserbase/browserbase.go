@@ -29,21 +29,29 @@ func NewBrowserbaseRequester(
 	timeout int,
 	minDOMStabalizeTime int,
 ) *Requester {
+	log := svc1log.FromContext(ctx)
 	session, err := browserbaseClient.CreateSession(ctx)
 	if err != nil {
-		svc1log.FromContext(ctx).Error("Failed to create session. Aborting.")
+		log.Error("Failed to create session. Aborting.")
 		return nil
+	}
+	closeSessionOnError := func() {
+		if closeErr := browserbaseClient.CloseSession(ctx, session.ID); closeErr != nil {
+			log.Error("Failed to close browserbase session after initialization error", svc1log.SafeParam("error", closeErr.Error()))
+		}
 	}
 
 	websocket, err := NewWebSocket(ctx, browserbaseClient.ConnectionString(*session))
 	if err != nil {
-		svc1log.FromContext(ctx).Error("Failed to create websocket connection", svc1log.SafeParam("error", err.Error()))
+		log.Error("Failed to create websocket connection", svc1log.SafeParam("error", err.Error()))
+		closeSessionOnError()
 		return nil
 	}
 	client := cdp.New().Start(websocket)
 	headlessRequester, err := headless.NewRequesterWithClient(client, timeout, minDOMStabalizeTime)
 	if err != nil {
-		svc1log.FromContext(ctx).Error("Failed to connect to browserbase CDP session", svc1log.SafeParam("error", err.Error()))
+		log.Error("Failed to connect to browserbase CDP session", svc1log.SafeParam("error", err.Error()))
+		closeSessionOnError()
 		return nil
 	}
 
@@ -55,6 +63,12 @@ func NewBrowserbaseRequester(
 
 func (b *Requester) SendRequest(ctx context.Context, options common.SendHttpRequestConfig) (common.HttpRequestResponse, error) {
 	return b.Requester.SendRequest(ctx, options)
+}
+
+// SendRequestWithMetadata performs a Browserbase-backed headless capture and
+// preserves live DOM metadata collected by the underlying requester.
+func (b *Requester) SendRequestWithMetadata(ctx context.Context, options common.SendHttpRequestConfig) (common.HttpRequestResponse, headless.PageMetadata, error) {
+	return b.Requester.SendRequestWithMetadata(ctx, options)
 }
 
 func (b *Requester) Close(ctx context.Context) error {

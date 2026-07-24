@@ -18,3 +18,8 @@ func ApplyProxySettings(ctx context.Context, config *common.SendHttpRequestConfi
 		config.HttpProxy = nil
 	}
 }
+
+// HasProxyConfig reports whether a request is configured to use a local proxy.
+func HasProxyConfig(config common.SendHttpRequestConfig) bool {
+	return (config.HttpProxy != nil && *config.HttpProxy != "") || (config.SocksProxy != nil && *config.SocksProxy != "")
+}

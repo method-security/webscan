@@ -132,6 +132,17 @@ func (b *Requester) SendRequest(ctx context.Context, config common.SendHttpReque
 // The returned PageMetadata carries fields harvested from the live DOM
 // (e.g. <title>) that are not part of the HttpResponse contract.
 func (b *Requester) SendRequestWithScreenshot(ctx context.Context, config common.SendHttpRequestConfig) (common.HttpRequestResponse, []byte, PageMetadata, error) {
+	return b.sendRequestWithArtifacts(ctx, config, true)
+}
+
+// SendRequestWithMetadata performs one headless navigation and returns page
+// metadata without paying the screenshot capture cost.
+func (b *Requester) SendRequestWithMetadata(ctx context.Context, config common.SendHttpRequestConfig) (common.HttpRequestResponse, PageMetadata, error) {
+	report, _, metadata, err := b.sendRequestWithArtifacts(ctx, config, false)
+	return report, metadata, err
+}
+
+func (b *Requester) sendRequestWithArtifacts(ctx context.Context, config common.SendHttpRequestConfig, captureScreenshot bool) (common.HttpRequestResponse, []byte, PageMetadata, error) {
 	log := svc1log.FromContext(ctx)
 	attempts := headlessCaptureAttempts(config.Request.Method)
 	var lastReport common.HttpRequestResponse
@@ -146,7 +157,7 @@ func (b *Requester) SendRequestWithScreenshot(ctx context.Context, config common
 			}
 		}
 
-		report, screenshot, metadata, err := b.sendRequestWithArtifactsOnce(ctx, config, true)
+		report, screenshot, metadata, err := b.sendRequestWithArtifactsOnce(ctx, config, captureScreenshot)
 		if err == nil {
 			return report, screenshot, metadata, nil
 		}

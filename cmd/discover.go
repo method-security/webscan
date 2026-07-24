@@ -34,7 +34,7 @@ import (
 // InitDiscoverCommand initializes the 'discover' command and its subcommands for the CLI.
 func (a *WebScan) InitDiscoverCommand() {
 	// Discover Command
-	// Subcommands: application, directory, page, probe, route, saas
+	// Subcommands: application, directory, page, request, probe, route, saas, wordlist, witness
 	discoverCmd := &cobra.Command{
 		Use:   "discover",
 		Short: "Perform various discovery scans",
@@ -1336,20 +1336,15 @@ func (a *WebScan) InitDiscoverCommand() {
 	// Witness Command
 	discoverWitnessCmd := &cobra.Command{
 		Use:   "witness",
-		Short: "Single-pass web witness: screenshot, HTTP capture, favicon, tech fingerprinting, and TLS extraction",
-		Long:  `Perform a single-pass web witness scan: navigate to each target URL, capture a screenshot, extract HTTP metadata, fetch favicons, run Wappalyzer technology fingerprinting, optionally run Nuclei templates, and extract TLS certificates.`,
+		Short: "Single-pass web witness: screenshot, HTTP capture, favicon, and tech fingerprinting",
+		Long:  `Perform a single-pass web witness scan: navigate to a target URL, capture a screenshot, extract HTTP metadata, fetch a favicon, and run Wappalyzer technology fingerprinting.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			defer a.OutputSignal.PanicHandler(cmd.Context())
 
 			ctx := cmd.Context()
 
-			// Target flags (mutually exclusive, one required)
+			// Target flag
 			target, err := cmd.Flags().GetString("target")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			targetsFile, err := cmd.Flags().GetString("targets-file")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -1430,67 +1425,32 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			headers, err := requesthelpers.ParseHeaderPairs(headerPairs)
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			cookies, err := requesthelpers.ParseCookiePairs(cookiePairs)
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			localStorageMap, err := requesthelpers.ParseFormDataPairs(localStoragePairs)
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			sessionStorageMap, err := requesthelpers.ParseFormDataPairs(sessionStoragePairs)
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
 
-			// Nuclei flags
-			nucleiTemplatePaths, err := cmd.Flags().GetStringSlice("nuclei-template-paths")
+			// Set Config
+			config := getDiscoverWitnessConfig(target, responseCodes, takeScreenshot, maxRedirects, verifyTLS, timeout, ignoreCrossDomainRedirects, userAgentPreset, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
+			config.Headers, err = requesthelpers.ParseHeaderPairs(headerPairs)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			nucleiThreads, err := cmd.Flags().GetInt("nuclei-threads")
+			config.Cookies, err = requesthelpers.ParseCookiePairs(cookiePairs)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
-
-			// Build config
-			config := discover.DiscoverWitnessConfig{
-				ResponseCodes:              responseCodes,
-				Screenshot:                 takeScreenshot,
-				MaxRedirects:               max(maxRedirects, 0),
-				VerifyTls:                  verifyTLS,
-				Timeout:                    max(timeout, 0),
-				IgnoreCrossDomainRedirects: ignoreCrossDomainRedirects,
-				UserAgent:                  userAgentPreset,
-				RequestMethod:              requestMethodConfig.RequestMethodEnum,
-				HeadlessConfig:             requestMethodConfig.HeadlessConfig,
-				BrowserbaseConfig:          requestMethodConfig.BrowserbaseConfig,
-				Headers:                    headers,
-				Cookies:                    cookies,
-				LocalStorage:               localStorageMap,
-				SessionStorage:             sessionStorageMap,
-				NucleiTemplatePaths:        nucleiTemplatePaths,
-				NucleiThreads:              nucleiThreads,
+			config.LocalStorage, err = requesthelpers.ParseFormDataPairs(localStoragePairs)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
 			}
-			if target != "" {
-				config.Target = &target
-			}
-			if targetsFile != "" {
-				config.TargetsFile = &targetsFile
+			config.SessionStorage, err = requesthelpers.ParseFormDataPairs(sessionStoragePairs)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
 			}
 
 			// Generate report
-			report, err := discoverwitness.RunWitness(ctx, config, requestMethodConfig.BrowserbaseSecrets)
+			report, err := discoverwitness.PerformWitnessCapture(ctx, config, requestMethodConfig.BrowserbaseSecrets)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -1498,14 +1458,12 @@ func (a *WebScan) InitDiscoverCommand() {
 			a.OutputSignal.Content = report
 		},
 	}
-	// Target Flags (mutually exclusive, one required)
+	// Target Flag
 	discoverWitnessCmd.Flags().String("target", "", "Single URL target for witness scan")
-	discoverWitnessCmd.Flags().String("targets-file", "", "File containing one URL per line for witness scan")
-	discoverWitnessCmd.MarkFlagsMutuallyExclusive("target", "targets-file")
-	discoverWitnessCmd.MarkFlagsOneRequired("target", "targets-file")
+	_ = discoverWitnessCmd.MarkFlagRequired("target")
 	// Config Flags
-	discoverWitnessCmd.Flags().String("response-codes", "200-299", "Response codes to consider as valid responses")
-	discoverWitnessCmd.Flags().Bool("screenshot", false, "Capture a screenshot of each page (headless only)")
+	discoverWitnessCmd.Flags().String("response-codes", "200-599", "Response codes to consider as valid responses")
+	discoverWitnessCmd.Flags().Bool("screenshot", false, "Capture a screenshot of the page (headless only)")
 	discoverWitnessCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
 	discoverWitnessCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
 	discoverWitnessCmd.Flags().Int("timeout", 180, "Timeout per request in seconds")
@@ -1524,10 +1482,6 @@ func (a *WebScan) InitDiscoverCommand() {
 	discoverWitnessCmd.Flags().StringArray("cookie", []string{}, "Cookie for authenticated capture as 'name=value' (repeatable)")
 	discoverWitnessCmd.Flags().StringArray("local-storage", []string{}, "localStorage entry as 'key=value' injected before page load (repeatable, headless only)")
 	discoverWitnessCmd.Flags().StringArray("session-storage", []string{}, "sessionStorage entry as 'key=value' injected before page load (repeatable, headless only)")
-	// Nuclei Flags
-	discoverWitnessCmd.Flags().StringSlice("nuclei-template-paths", []string{}, "Nuclei template paths to run against targets (leave empty to skip Nuclei)")
-	discoverWitnessCmd.Flags().Int("nuclei-threads", 25, "Number of concurrent Nuclei threads")
-
 	// Add Command to 'Discover' Command
 	discoverCmd.AddCommand(discoverWitnessCmd)
 
@@ -1605,6 +1559,25 @@ func getDiscoverPageConfig(target string, responseCodes string, maxRedirects int
 		HeadlessConfig:             headlessConfig,
 		BrowserbaseConfig:          browserbaseConfig,
 	}
+	return config
+}
+
+// getDiscoverWitnessConfig builds the config for witness capture and enrichment.
+func getDiscoverWitnessConfig(target string, responseCodes string, takeScreenshot bool, maxRedirects int, verifyTLS bool, timeout int, ignoreCrossDomainRedirects bool, userAgent common.UserAgentPreset, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) discover.DiscoverWitnessConfig {
+	config := discover.DiscoverWitnessConfig{
+		Target:                     target,
+		ResponseCodes:              responseCodes,
+		Screenshot:                 takeScreenshot,
+		MaxRedirects:               maxRedirects,
+		VerifyTls:                  verifyTLS,
+		Timeout:                    max(timeout, 0),
+		IgnoreCrossDomainRedirects: ignoreCrossDomainRedirects,
+		UserAgent:                  userAgent,
+		RequestMethod:              requestMethod,
+		HeadlessConfig:             headlessConfig,
+		BrowserbaseConfig:          browserbaseConfig,
+	}
+
 	return config
 }
 

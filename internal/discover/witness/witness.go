@@ -48,8 +48,9 @@ func processTarget(
 	target string,
 	config discover.DiscoverWitnessConfig,
 	browserbaseSecrets *common.BrowserbaseRequestSecrets,
-) (*discover.DiscoverWitnessResult, []string, error) {
+) (*discover.DiscoverWitnessResult, []string) {
 	log := svc1log.FromContext(ctx)
+	result := &discover.DiscoverWitnessResult{}
 	var targetErrors []string
 
 	// Run page capture via the existing DiscoverPage substrate
@@ -59,89 +60,75 @@ func processTarget(
 	// Copy page errors
 	targetErrors = append(targetErrors, pageReport.Errors...)
 
-	if pageReport.Result == nil || pageReport.Result.Request == nil {
-		if len(targetErrors) > 0 {
-			return nil, targetErrors, fmt.Errorf("witness capture did not produce an HTTP request: %s", targetErrors[0])
-		}
-		return nil, nil, fmt.Errorf("witness capture did not produce an HTTP request")
+	if pageReport.Result == nil || pageReport.Result.Request == nil || pageReport.Result.Request.Response == nil {
+		return result, targetErrors
 	}
 
-	pr := pageReport.Result
-	result := &discover.DiscoverWitnessResult{
-		Target:                   target,
-		Request:                  pr.Request,
-		Screenshot:               pr.Screenshot,
-		ScreenshotPerceptualHash: pr.ScreenshotPerceptualHash,
-	}
+	result.Request = pageReport.Result.Request
+	result.Screenshot = pageReport.Result.Screenshot
+	result.ScreenshotPerceptualHash = pageReport.Result.ScreenshotPerceptualHash
+	result.Target = &target
 
 	// Run Wappalyzer fingerprinting over the captured response
-	if pr.Request.Response != nil {
-		resp := pr.Request.Response
-		headers := resp.ResponseHeaders
-		if headers == nil {
-			headers = make(map[string][]string)
-		}
+	resp := result.Request.Response
+	headers := resp.ResponseHeaders
+	if headers == nil {
+		headers = make(map[string][]string)
+	}
 
-		// Extract body bytes for Wappalyzer
-		var bodyBytes []byte
-		if resp.ResponseBody != nil {
-			if bodyStr := requesthelpers.GetResponseBodyStringFromBodyStruct(resp.ResponseBody); bodyStr != nil {
-				bodyBytes = []byte(*bodyStr)
-			}
-		}
-
-		finalURL := target
-		if len(resp.RedirectChain) > 0 {
-			finalURL = resp.RedirectChain[len(resp.RedirectChain)-1]
-		}
-		faviconURL := witnesshelpers.ExtractFaviconURL(string(bodyBytes), finalURL)
-		if faviconURL != "" {
-			resolvedUA := useragent.Resolve(config.UserAgent)
-			if faviconBytes, faviconHash, faviconErr := witnesshelpers.FetchFavicon(ctx, faviconURL, config.Timeout, config.VerifyTls, resolvedUA); faviconErr == nil && len(faviconBytes) > 0 {
-				result.Favicon = &discover.DiscoverWitnessFavicon{
-					Url:    faviconURL,
-					Binary: faviconBytes,
-					Hash:   faviconHash,
-				}
-			}
-		}
-
-		log.Info("Running Wappalyzer fingerprinting", svc1log.SafeParam("target", target))
-		techs, wapErr := witnesshelpers.Fingerprint(headers, bodyBytes)
-		if wapErr != nil {
-			log.Warn("Wappalyzer fingerprinting failed", svc1log.SafeParam("target", target), svc1log.SafeParam("error", wapErr.Error()))
-			targetErrors = append(targetErrors, fmt.Sprintf("wappalyzer: %s", wapErr.Error()))
-		} else if techs != nil && (len(techs.ClientSide) > 0 || len(techs.ServerSide) > 0 || len(techs.Other) > 0) {
-			result.Technologies = techs
+	// Extract body bytes for Wappalyzer
+	var bodyBytes []byte
+	if resp.ResponseBody != nil {
+		if bodyStr := requesthelpers.GetResponseBodyStringFromBodyStruct(resp.ResponseBody); bodyStr != nil {
+			bodyBytes = []byte(*bodyStr)
 		}
 	}
 
-	return result, targetErrors, nil
+	finalURL := target
+	if len(resp.RedirectChain) > 0 {
+		finalURL = resp.RedirectChain[len(resp.RedirectChain)-1]
+	}
+	faviconURL := witnesshelpers.ExtractFaviconURL(string(bodyBytes), finalURL)
+	if faviconURL != "" {
+		resolvedUA := useragent.Resolve(config.UserAgent)
+		if faviconBytes, faviconHash, faviconErr := witnesshelpers.FetchFavicon(ctx, faviconURL, config.Timeout, config.VerifyTls, resolvedUA); faviconErr == nil && len(faviconBytes) > 0 {
+			result.Favicon = &discover.DiscoverWitnessFavicon{
+				Url:    faviconURL,
+				Binary: faviconBytes,
+				Hash:   faviconHash,
+			}
+		}
+	}
+
+	log.Info("Running Wappalyzer fingerprinting", svc1log.SafeParam("target", target))
+	techs, wapErr := witnesshelpers.Fingerprint(headers, bodyBytes)
+	if wapErr != nil {
+		log.Warn("Wappalyzer fingerprinting failed", svc1log.SafeParam("target", target), svc1log.SafeParam("error", wapErr.Error()))
+		targetErrors = append(targetErrors, fmt.Sprintf("wappalyzer: %s", wapErr.Error()))
+	} else if techs != nil && (len(techs.ClientSide) > 0 || len(techs.ServerSide) > 0 || len(techs.Other) > 0) {
+		result.Technologies = techs
+	}
+
+	return result, targetErrors
 }
 
 // PerformWitnessCapture performs a single-pass witness scan for one target.
-func PerformWitnessCapture(ctx context.Context, config discover.DiscoverWitnessConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) (*discover.DiscoverWitnessReport, error) {
+func PerformWitnessCapture(ctx context.Context, config discover.DiscoverWitnessConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) *discover.DiscoverWitnessReport {
 	log := svc1log.FromContext(ctx)
 
 	report := &discover.DiscoverWitnessReport{
 		Config: &config,
+		Result: &discover.DiscoverWitnessResult{},
 	}
-	errors := []string{}
 
 	if config.Target == "" {
-		return nil, fmt.Errorf("witness: no target provided")
+		report.Errors = []string{"witness: no target provided"}
+		return report
 	}
 
 	log.Info("Starting witness scan", svc1log.SafeParam("target", config.Target))
-	capturedResult, targetErrors, err := processTarget(ctx, config.Target, config, browserbaseSecrets)
-	if err != nil {
-		return nil, err
-	}
+	capturedResult, targetErrors := processTarget(ctx, config.Target, config, browserbaseSecrets)
 	report.Result = capturedResult
-
-	if len(targetErrors) > 0 {
-		errors = append(errors, targetErrors...)
-	}
-	report.Errors = errors
-	return report, nil
+	report.Errors = targetErrors
+	return report
 }

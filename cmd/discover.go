@@ -1450,11 +1450,7 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Generate report
-			report, err := discoverwitness.PerformWitnessCapture(ctx, config, requestMethodConfig.BrowserbaseSecrets)
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
+			report := discoverwitness.PerformWitnessCapture(ctx, config, requestMethodConfig.BrowserbaseSecrets)
 			a.OutputSignal.Content = report
 		},
 	}

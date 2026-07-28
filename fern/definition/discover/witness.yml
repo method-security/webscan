@@ -56,8 +56,8 @@ types:
   # Result Struct
   DiscoverWitnessResult:
     properties:
-      target: string
-      request: http.HttpRequestResponse
+      target: optional<string>
+      request: optional<http.HttpRequestResponse>
       screenshot: optional<base64>
       screenshotPerceptualHash: optional<string>
       favicon: optional<DiscoverWitnessFavicon>

@@ -109,10 +109,15 @@ func sendRequests(ctx context.Context, target string, config *discover.DiscoverP
 	}
 
 	var protocolMismatchErr error
-	if detectMissMatchedProtocols(ctx, httpResponse, httpsResponse) {
+	if detectMissMatchedProtocols(ctx, httpResponse) {
 		protocolMismatchErr = fmt.Errorf("failed to probe http://%s - response indicates plain HTTP was sent to an HTTPS port", requesthelpers.RemoveScheme(target))
 		httpErr = protocolMismatchErr
 		httpResponse = nil
+	}
+	if detectMissMatchedProtocols(ctx, httpsResponse) {
+		protocolMismatchErr = fmt.Errorf("failed to probe https://%s - response indicates HTTPS was sent to an HTTP port", requesthelpers.RemoveScheme(target))
+		httpsErr = protocolMismatchErr
+		httpsResponse = nil
 	}
 
 	if httpResponse != nil {
@@ -184,17 +189,12 @@ var mismatchedProtocolResponsePatterns = []string{
 	"incorrect protocol on port",
 }
 
-func detectMissMatchedProtocols(_ context.Context, httpResponse *common.HttpRequestResponse, _ *common.HttpRequestResponse) bool {
-	if httpResponse == nil || httpResponse.Response == nil || httpResponse.Response.StatusCode == nil {
+func detectMissMatchedProtocols(_ context.Context, response *common.HttpRequestResponse) bool {
+	if response == nil || response.Response == nil || response.Response.StatusCode == nil || response.Response.ResponseBody == nil {
 		return false
 	}
 
-	statusCode := *httpResponse.Response.StatusCode
-	if statusCode < 400 || statusCode >= 500 {
-		return false
-	}
-
-	body := requesthelpers.GetResponseBodyStringFromBodyStruct(httpResponse.Response.ResponseBody)
+	body := requesthelpers.GetResponseBodyStringFromBodyStruct(response.Response.ResponseBody)
 	if body == nil {
 		return false
 	}

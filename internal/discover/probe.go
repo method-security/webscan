@@ -4,6 +4,7 @@ import (
 	// Standard
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	// Generated
@@ -69,6 +70,7 @@ func sendRequestWithProtocol(ctx context.Context, target string, protocol string
 // Otherwise, attempts both HTTPS and HTTP protocols for backward compatibility
 func sendRequests(ctx context.Context, target string, config *discover.DiscoverProbeConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) ([]*common.HttpRequestResponse, []string) {
 	httpRequestResponses := []*common.HttpRequestResponse{}
+	var httpResponse, httpsResponse *common.HttpRequestResponse
 	var httpErr, httpsErr error
 
 	// Check if a specific protocol is configured
@@ -76,34 +78,48 @@ func sendRequests(ctx context.Context, target string, config *discover.DiscoverP
 		switch *config.Protocol {
 		case common.WebProtocolHttp:
 			// Only try HTTP
-			if httpResponse, err := sendRequestWithProtocol(ctx, target, "http", config, browserbaseSecrets); err != nil {
+			if response, err := sendRequestWithProtocol(ctx, target, "http", config, browserbaseSecrets); err != nil {
 				httpErr = err
 			} else {
-				httpRequestResponses = append(httpRequestResponses, httpResponse)
+				httpResponse = response
 			}
 		case common.WebProtocolHttps:
 			// Only try HTTPS
-			if httpsResponse, err := sendRequestWithProtocol(ctx, target, "https", config, browserbaseSecrets); err != nil {
+			if response, err := sendRequestWithProtocol(ctx, target, "https", config, browserbaseSecrets); err != nil {
 				httpsErr = err
 			} else {
-				httpRequestResponses = append(httpRequestResponses, httpsResponse)
+				httpsResponse = response
 			}
 		}
 	} else {
 		// No specific protocol set - maintain existing behavior (try both)
 		// Try HTTP request
-		if httpResponse, err := sendRequestWithProtocol(ctx, target, "http", config, browserbaseSecrets); err != nil {
+		if response, err := sendRequestWithProtocol(ctx, target, "http", config, browserbaseSecrets); err != nil {
 			httpErr = err
 		} else {
-			httpRequestResponses = append(httpRequestResponses, httpResponse)
+			httpResponse = response
 		}
 
 		// Try HTTPS request
-		if httpsResponse, err := sendRequestWithProtocol(ctx, target, "https", config, browserbaseSecrets); err != nil {
+		if response, err := sendRequestWithProtocol(ctx, target, "https", config, browserbaseSecrets); err != nil {
 			httpsErr = err
 		} else {
-			httpRequestResponses = append(httpRequestResponses, httpsResponse)
+			httpsResponse = response
 		}
+	}
+
+	var protocolMismatchErr error
+	if detectMissMatchedProtocols(ctx, httpResponse, httpsResponse) {
+		protocolMismatchErr = fmt.Errorf("failed to probe http://%s - response indicates plain HTTP was sent to an HTTPS port", requesthelpers.RemoveScheme(target))
+		httpErr = protocolMismatchErr
+		httpResponse = nil
+	}
+
+	if httpResponse != nil {
+		httpRequestResponses = append(httpRequestResponses, httpResponse)
+	}
+	if httpsResponse != nil {
+		httpRequestResponses = append(httpRequestResponses, httpsResponse)
 	}
 
 	// Return errors based on what was attempted
@@ -119,6 +135,8 @@ func sendRequests(ctx context.Context, target string, config *discover.DiscoverP
 		// If no specific protocol was set, only return errors if both requests failed
 		if httpErr != nil && httpsErr != nil {
 			errors = append(errors, httpErr.Error(), httpsErr.Error())
+		} else if protocolMismatchErr != nil {
+			errors = append(errors, protocolMismatchErr.Error())
 		}
 	}
 
@@ -156,4 +174,37 @@ func PerformWebProbe(ctx context.Context, config *discover.DiscoverProbeConfig, 
 	result.Targets = allResponses
 	report.Errors = errors
 	return report, nil
+}
+
+var mismatchedProtocolResponsePatterns = []string{
+	"the plain http request was sent to https port",
+	"plain http request was sent to https port",
+	"client sent an http request to an https server",
+	"speaking plain http to an ssl-enabled server port",
+	"incorrect protocol on port",
+}
+
+func detectMissMatchedProtocols(_ context.Context, httpResponse *common.HttpRequestResponse, _ *common.HttpRequestResponse) bool {
+	if httpResponse == nil || httpResponse.Response == nil || httpResponse.Response.StatusCode == nil {
+		return false
+	}
+
+	statusCode := *httpResponse.Response.StatusCode
+	if statusCode < 400 || statusCode >= 500 {
+		return false
+	}
+
+	body := requesthelpers.GetResponseBodyStringFromBodyStruct(httpResponse.Response.ResponseBody)
+	if body == nil {
+		return false
+	}
+
+	lowerBody := strings.ToLower(*body)
+	for _, pattern := range mismatchedProtocolResponsePatterns {
+		if strings.Contains(lowerBody, pattern) {
+			return true
+		}
+	}
+
+	return false
 }

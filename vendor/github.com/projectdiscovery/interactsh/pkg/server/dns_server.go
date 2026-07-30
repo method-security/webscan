@@ -1,7 +1,6 @@
 package server
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"net"
@@ -24,7 +23,7 @@ type DNSServer struct {
 	options       *Options
 	mxDomains     map[string]string
 	nsDomains     map[string][]string
-	ipAddress     net.IP
+	ipAddresses   []net.IP
 	timeToLive    uint32
 	server        *dns.Server
 	customRecords *customDNSRecords
@@ -49,14 +48,14 @@ func NewDNSServer(network string, options *Options) *DNSServer {
 
 	server := &DNSServer{
 		options:       options,
-		ipAddress:     net.ParseIP(options.IPAddress),
+		ipAddresses:   options.IPAddresses,
 		mxDomains:     mxDomains,
 		nsDomains:     nsDomains,
 		timeToLive:    3600,
-		customRecords: newCustomDNSRecordsServer(options.CustomRecords),
+		customRecords: newCustomDNSRecordsServer(options.CustomRecords, options.Domains),
 	}
 	server.server = &dns.Server{
-		Addr:    options.ListenIP + fmt.Sprintf(":%d", options.DnsPort),
+		Addr:    formatAddress(options.ListenIP, options.DnsPort),
 		Net:     network,
 		Handler: server,
 	}
@@ -145,8 +144,9 @@ func (h *DNSServer) handleACMETXTChallenge(zone string, m *dns.Msg) error {
 
 	rrs := []dns.RR{}
 	for _, record := range records {
-		txtHdr := dns.RR_Header{Name: zone, Rrtype: dns.TypeTXT, Class: dns.ClassINET, Ttl: uint32(record.TTL)}
-		rrs = append(rrs, &dns.TXT{Hdr: txtHdr, Txt: []string{record.Value}})
+		rr := record.RR()
+		txtHdr := dns.RR_Header{Name: zone, Rrtype: dns.TypeTXT, Class: dns.ClassINET, Ttl: uint32(rr.TTL.Seconds())}
+		rrs = append(rrs, &dns.TXT{Hdr: txtHdr, Txt: []string{rr.Data}})
 	}
 	m.Answer = append(m.Answer, rrs...)
 	return nil
@@ -154,26 +154,46 @@ func (h *DNSServer) handleACMETXTChallenge(zone string, m *dns.Msg) error {
 
 // handleACNAMEANY handles A, CNAME or ANY queries for DNS server
 func (h *DNSServer) handleACNAMEANY(zone string, m *dns.Msg) {
-	nsHeader := dns.RR_Header{Name: zone, Rrtype: dns.TypeNS, Class: dns.ClassINET, Ttl: h.timeToLive}
-
-	// If we have a custom record serve it, or default IP
-	record := h.customRecords.checkCustomResponse(zone)
-	switch {
-	case record != "":
-		h.resultFunction(nsHeader, zone, net.ParseIP(record), m)
-	default:
-		h.resultFunction(nsHeader, zone, h.ipAddress, m)
+	// Determine the query type from the question
+	var qtype = dns.TypeA
+	if len(m.Question) > 0 {
+		qtype = m.Question[0].Qtype
 	}
+
+	// Check for custom records
+	customRecords := h.customRecords.checkCustomResponse(zone, qtype)
+	if len(customRecords) > 0 {
+		for _, record := range customRecords {
+			if err := h.addCustomRecordToMessage(record, zone, m); err != nil {
+				gologger.Warning().Msgf("Could not add custom %s record for %s: %s", record.Type, zone, err)
+			}
+		}
+		return
+	}
+
+	// No custom records, use default IP
+	nsHeader := dns.RR_Header{Name: zone, Rrtype: dns.TypeNS, Class: dns.ClassINET, Ttl: h.timeToLive}
+	h.resultFunction(nsHeader, zone, h.ipAddresses, m)
 }
 
-func (h *DNSServer) resultFunction(nsHeader dns.RR_Header, zone string, ipAddress net.IP, m *dns.Msg) {
-	m.Answer = append(m.Answer, &dns.A{Hdr: dns.RR_Header{Name: zone, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: h.timeToLive}, A: ipAddress})
+func (h *DNSServer) resultFunction(nsHeader dns.RR_Header, zone string, ipAddresses []net.IP, m *dns.Msg) {
+	unique := uniqueIPs(ipAddresses)
+	var answered bool
+	for _, ipAddress := range unique {
+		if h.appendAnswerRecord(zone, ipAddress, m) {
+			answered = true
+		}
+	}
+	if !answered {
+		return
+	}
+
 	dotDomains := []string{zone, dns.Fqdn(h.options.Domains[0])}
 	for _, dotDomain := range dotDomains {
 		if nsDomains, ok := h.nsDomains[dotDomain]; ok {
 			for _, nsDomain := range nsDomains {
 				m.Ns = append(m.Ns, &dns.NS{Hdr: nsHeader, Ns: nsDomain})
-				m.Extra = append(m.Extra, &dns.A{Hdr: dns.RR_Header{Name: nsDomain, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: h.timeToLive}, A: h.ipAddress})
+				h.appendGlueRecords(nsDomain, m)
 			}
 			return
 		}
@@ -181,8 +201,19 @@ func (h *DNSServer) resultFunction(nsHeader dns.RR_Header, zone string, ipAddres
 }
 
 func (h *DNSServer) handleMX(zone string, m *dns.Msg) {
-	nsHdr := dns.RR_Header{Name: zone, Rrtype: dns.TypeMX, Class: dns.ClassINET, Ttl: h.timeToLive}
+	// Check for custom MX records first
+	customRecords := h.customRecords.checkCustomResponse(zone, dns.TypeMX)
+	if len(customRecords) > 0 {
+		for _, record := range customRecords {
+			if err := h.addCustomRecordToMessage(record, zone, m); err != nil {
+				gologger.Warning().Msgf("Could not add custom %s record for %s: %s", record.Type, zone, err)
+			}
+		}
+		return
+	}
 
+	// Fall back to default MX records
+	nsHdr := dns.RR_Header{Name: zone, Rrtype: dns.TypeMX, Class: dns.ClassINET, Ttl: h.timeToLive}
 	dotDomains := []string{zone, dns.Fqdn(h.options.Domains[0])}
 	for _, dotDomain := range dotDomains {
 		if mxdomain, ok := h.mxDomains[dotDomain]; ok {
@@ -193,8 +224,19 @@ func (h *DNSServer) handleMX(zone string, m *dns.Msg) {
 }
 
 func (h *DNSServer) handleNS(zone string, m *dns.Msg) {
-	nsHeader := dns.RR_Header{Name: zone, Rrtype: dns.TypeNS, Class: dns.ClassINET, Ttl: h.timeToLive}
+	// Check for custom NS records first
+	customRecords := h.customRecords.checkCustomResponse(zone, dns.TypeNS)
+	if len(customRecords) > 0 {
+		for _, record := range customRecords {
+			if err := h.addCustomRecordToMessage(record, zone, m); err != nil {
+				gologger.Warning().Msgf("Could not add custom %s record for %s: %s", record.Type, zone, err)
+			}
+		}
+		return
+	}
 
+	// Fall back to default NS records
+	nsHeader := dns.RR_Header{Name: zone, Rrtype: dns.TypeNS, Class: dns.ClassINET, Ttl: h.timeToLive}
 	dotDomains := []string{zone, dns.Fqdn(h.options.Domains[0])}
 	for _, dotDomain := range dotDomains {
 		if nsDomains, ok := h.nsDomains[dotDomain]; ok {
@@ -220,6 +262,18 @@ func (h *DNSServer) handleSOA(zone string, m *dns.Msg) {
 }
 
 func (h *DNSServer) handleTXT(zone string, m *dns.Msg) {
+	// Check for custom TXT records first
+	customRecords := h.customRecords.checkCustomResponse(zone, dns.TypeTXT)
+	if len(customRecords) > 0 {
+		for _, record := range customRecords {
+			if err := h.addCustomRecordToMessage(record, zone, m); err != nil {
+				gologger.Warning().Msgf("Could not add custom %s record for %s: %s", record.Type, zone, err)
+			}
+		}
+		return
+	}
+
+	// Fall back to default TXT record
 	m.Answer = append(m.Answer, &dns.TXT{Hdr: dns.RR_Header{Name: zone, Rrtype: dns.TypeTXT, Class: dns.ClassINET, Ttl: 0}, Txt: []string{h.TxtRecord}})
 }
 
@@ -282,12 +336,12 @@ func (h *DNSServer) handleInteraction(domain string, w dns.ResponseWriter, r *dn
 			h.options.OnResult(interaction)
 		}
 
-		buffer := &bytes.Buffer{}
-		if err := jsoniter.NewEncoder(buffer).Encode(interaction); err != nil {
+		data, err := jsoniter.Marshal(interaction)
+		if err != nil {
 			gologger.Warning().Msgf("Could not encode root tld dns interaction: %s\n", err)
 		} else {
-			gologger.Debug().Msgf("Root TLD DNS Interaction: \n%s\n", buffer.String())
-			if err := h.options.Storage.AddInteractionWithId(correlationID, buffer.Bytes()); err != nil {
+			gologger.Debug().Msgf("Root TLD DNS Interaction: \n%s\n", string(data))
+			if err := h.options.Storage.AddInteractionWithId(correlationID, data); err != nil {
 				gologger.Warning().Msgf("Could not store dns interaction: %s\n", err)
 			}
 		}
@@ -335,21 +389,94 @@ func (h *DNSServer) handleInteraction(domain string, w dns.ResponseWriter, r *dn
 			RemoteAddress: host,
 			Timestamp:     time.Now(),
 		}
-		buffer := &bytes.Buffer{}
-		if err := jsoniter.NewEncoder(buffer).Encode(interaction); err != nil {
+		data, err := jsoniter.Marshal(interaction)
+		if err != nil {
 			gologger.Warning().Msgf("Could not encode dns interaction: %s\n", err)
 		} else {
-			gologger.Debug().Msgf("DNS Interaction: \n%s\n", buffer.String())
-			if err := h.options.Storage.AddInteraction(correlationID, buffer.Bytes()); err != nil {
+			gologger.Debug().Msgf("DNS Interaction: \n%s\n", string(data))
+			if err := h.options.Storage.AddInteraction(correlationID, data); err != nil {
 				gologger.Warning().Msgf("Could not store dns interaction: %s\n", err)
 			}
 		}
 	}
 }
 
+// CustomRecordConfig represents a custom DNS record configuration
+type CustomRecordConfig struct {
+	Type     string `yaml:"type"`
+	Value    string `yaml:"value"`
+	TTL      uint32 `yaml:"ttl,omitempty"`
+	Priority uint16 `yaml:"priority,omitempty"` // for MX records
+}
+
+// DNSRecordsConfig represents the structured DNS records configuration (YAML format)
+type DNSRecordsConfig map[string][]CustomRecordConfig
+
+// appendAnswerRecord appends an A/AAAA record to the DNS message based on the
+// provided IP address.
+func (h *DNSServer) appendAnswerRecord(zone string, ip net.IP, m *dns.Msg) bool {
+	if ip == nil {
+		return false
+	}
+
+	if ipv4 := ip.To4(); ipv4 != nil {
+		m.Answer = append(m.Answer, &dns.A{Hdr: dns.RR_Header{Name: zone, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: h.timeToLive}, A: ipv4})
+		return true
+	}
+
+	if ipv6 := ip.To16(); ipv6 != nil {
+		m.Answer = append(m.Answer, &dns.AAAA{Hdr: dns.RR_Header{Name: zone, Rrtype: dns.TypeAAAA, Class: dns.ClassINET, Ttl: h.timeToLive}, AAAA: ipv6})
+		return true
+	}
+
+	return false
+}
+
+// appendGlueRecords appends A/AAAA glue records for the given nameserver domain.
+func (h *DNSServer) appendGlueRecords(nsDomain string, m *dns.Msg) {
+	for _, ip := range uniqueIPs(h.ipAddresses) {
+		if ipv4 := ip.To4(); ipv4 != nil {
+			m.Extra = append(m.Extra, &dns.A{Hdr: dns.RR_Header{Name: nsDomain, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: h.timeToLive}, A: ipv4})
+			continue
+		}
+
+		if ipv6 := ip.To16(); ipv6 != nil {
+			m.Extra = append(m.Extra, &dns.AAAA{Hdr: dns.RR_Header{Name: nsDomain, Rrtype: dns.TypeAAAA, Class: dns.ClassINET, Ttl: h.timeToLive}, AAAA: ipv6})
+		}
+	}
+}
+
+// uniqueIPs deduplicates a slice of [net.IP] objects and returns a new slice
+// containing only unique IP addresses.
+func uniqueIPs(ips []net.IP) []net.IP {
+	if len(ips) == 0 {
+		return nil
+	}
+
+	seen := make(map[string]struct{}, len(ips))
+
+	var result []net.IP
+	for _, ip := range ips {
+		if ip == nil {
+			continue
+		}
+
+		key := ip.String()
+		if _, ok := seen[key]; ok {
+			continue
+		}
+
+		seen[key] = struct{}{}
+		result = append(result, ip)
+	}
+
+	return result
+}
+
 // customDNSRecords is a server for custom dns records
 type customDNSRecords struct {
-	records map[string]string
+	records map[string][]CustomRecordConfig
+	domains []string
 }
 
 // defaultCustomRecords is the list of default custom DNS records
@@ -360,10 +487,16 @@ var defaultCustomRecords = map[string]string{
 	"oracle":    "192.0.0.192",
 }
 
-func newCustomDNSRecordsServer(input string) *customDNSRecords {
-	server := &customDNSRecords{records: make(map[string]string)}
+func newCustomDNSRecordsServer(input string, domains []string) *customDNSRecords {
+	server := &customDNSRecords{
+		records: make(map[string][]CustomRecordConfig),
+		domains: domains,
+	}
+	// Add default records as A records
 	for k, v := range defaultCustomRecords {
-		server.records[k] = v
+		server.records[k] = []CustomRecordConfig{
+			{Type: "A", Value: v},
+		}
 	}
 	if input != "" {
 		if err := server.readRecordsFromFile(input); err != nil {
@@ -374,29 +507,175 @@ func newCustomDNSRecordsServer(input string) *customDNSRecords {
 }
 
 func (c *customDNSRecords) readRecordsFromFile(input string) error {
-	file, err := os.Open(input)
+	// Read the entire file once
+	data, err := os.ReadFile(input)
 	if err != nil {
-		return errors.Wrap(err, "could not open file")
+		return errors.Wrap(err, "could not read file")
 	}
-	defer file.Close()
 
-	var data map[string]string
-	if err := yaml.NewDecoder(file).Decode(&data); err != nil {
-		return errors.Wrap(err, "could not decode file")
+	// Try to parse as structured format first
+	var structuredData DNSRecordsConfig
+	if err := yaml.Unmarshal(data, &structuredData); err == nil && len(structuredData) > 0 {
+		// Successfully parsed as structured format
+		for subdomain, entries := range structuredData {
+			subdomainLower := strings.ToLower(subdomain)
+			for _, entry := range entries {
+				if entry.Type == "" {
+					return errors.New("record type is required")
+				}
+				if entry.Value == "" {
+					return errors.New("record value is required")
+				}
+
+				// Normalize type to uppercase
+				entry.Type = strings.ToUpper(entry.Type)
+				c.records[subdomainLower] = append(c.records[subdomainLower], entry)
+			}
+		}
+		return nil
 	}
-	for k, v := range data {
-		c.records[strings.ToLower(k)] = v
+
+	// If structured format failed, try legacy format (backwards compatibility)
+	var legacyData map[string]string
+	if err := yaml.Unmarshal(data, &legacyData); err != nil {
+		return errors.Wrap(err, "could not decode file as structured or legacy format")
+	}
+
+	// Convert legacy format to CustomRecordConfig (assume A records)
+	for k, v := range legacyData {
+		c.records[strings.ToLower(k)] = []CustomRecordConfig{
+			{Type: "A", Value: v},
+		}
 	}
 	return nil
 }
 
-func (c *customDNSRecords) checkCustomResponse(zone string) string {
-	parts := strings.SplitN(zone, ".", 2)
-	if len(parts) != 2 {
-		return ""
+// checkCustomResponse returns custom DNS records for the given zone and record type
+func (c *customDNSRecords) checkCustomResponse(zone string, recordType uint16) []CustomRecordConfig {
+	// Normalize zone (remove trailing dot if present)
+	zone = strings.TrimSuffix(zone, ".")
+	zoneLower := strings.ToLower(zone)
+
+	// Try to find which base domain this zone belongs to and extract the subdomain
+	var subdomain string
+	for _, domain := range c.domains {
+		domainLower := strings.ToLower(domain)
+		// Check if zone ends with .domain or is exactly domain
+		if zoneLower == domainLower {
+			// It's the base domain itself, no custom subdomain
+			continue
+		}
+		suffix := "." + domainLower
+		if strings.HasSuffix(zoneLower, suffix) {
+			// Extract the subdomain part (everything before .domain)
+			subdomain = zoneLower[:len(zoneLower)-len(suffix)]
+			break
+		}
 	}
-	if value, ok := c.records[strings.ToLower(parts[0])]; ok {
-		return value
+
+	if subdomain == "" {
+		return nil
 	}
-	return ""
+
+	configs, ok := c.records[subdomain]
+	if !ok {
+		return nil
+	}
+
+	// Filter by record type
+	var filtered []CustomRecordConfig
+	for _, config := range configs {
+		// Match the requested type
+		switch recordType {
+		case dns.TypeA:
+			if config.Type == "A" {
+				filtered = append(filtered, config)
+			}
+		case dns.TypeAAAA:
+			if config.Type == "AAAA" {
+				filtered = append(filtered, config)
+			}
+		case dns.TypeCNAME:
+			if config.Type == "CNAME" {
+				filtered = append(filtered, config)
+			}
+		case dns.TypeMX:
+			if config.Type == "MX" {
+				filtered = append(filtered, config)
+			}
+		case dns.TypeTXT:
+			if config.Type == "TXT" {
+				filtered = append(filtered, config)
+			}
+		case dns.TypeNS:
+			if config.Type == "NS" {
+				filtered = append(filtered, config)
+			}
+		case dns.TypeANY:
+			// Return all records for ANY query
+			filtered = append(filtered, config)
+		}
+	}
+
+	return filtered
+}
+
+// addCustomRecordToMessage adds a custom DNS record to the DNS message
+func (h *DNSServer) addCustomRecordToMessage(record CustomRecordConfig, zone string, m *dns.Msg) error {
+	// Determine TTL (use custom if set, otherwise use server default)
+	ttl := h.timeToLive
+	if record.TTL > 0 {
+		ttl = record.TTL
+	}
+
+	// Create the appropriate DNS record based on type
+	switch record.Type {
+	case "A":
+		ip := net.ParseIP(record.Value)
+		if ip == nil {
+			return fmt.Errorf("invalid IPv4 address for A record: %s", record.Value)
+		}
+		m.Answer = append(m.Answer, &dns.A{
+			Hdr: dns.RR_Header{Name: zone, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: ttl},
+			A:   ip.To4(),
+		})
+	case "AAAA":
+		ip := net.ParseIP(record.Value)
+		if ip == nil {
+			return fmt.Errorf("invalid IPv6 address for AAAA record: %s", record.Value)
+		}
+		m.Answer = append(m.Answer, &dns.AAAA{
+			Hdr:  dns.RR_Header{Name: zone, Rrtype: dns.TypeAAAA, Class: dns.ClassINET, Ttl: ttl},
+			AAAA: ip.To16(),
+		})
+	case "CNAME":
+		m.Answer = append(m.Answer, &dns.CNAME{
+			Hdr:    dns.RR_Header{Name: zone, Rrtype: dns.TypeCNAME, Class: dns.ClassINET, Ttl: ttl},
+			Target: dns.Fqdn(record.Value),
+		})
+	case "MX":
+		priority := record.Priority
+		if priority == 0 {
+			priority = 10 // default priority if not specified
+		}
+		m.Answer = append(m.Answer, &dns.MX{
+			Hdr:        dns.RR_Header{Name: zone, Rrtype: dns.TypeMX, Class: dns.ClassINET, Ttl: ttl},
+			Mx:         dns.Fqdn(record.Value),
+			Preference: priority,
+		})
+	case "TXT":
+		m.Answer = append(m.Answer, &dns.TXT{
+			Hdr: dns.RR_Header{Name: zone, Rrtype: dns.TypeTXT, Class: dns.ClassINET, Ttl: ttl},
+			Txt: []string{record.Value},
+		})
+	case "NS":
+		m.Answer = append(m.Answer, &dns.NS{
+			Hdr: dns.RR_Header{Name: zone, Rrtype: dns.TypeNS, Class: dns.ClassINET, Ttl: ttl},
+			Ns:  dns.Fqdn(record.Value),
+		})
+	default:
+		return fmt.Errorf("unsupported record type: %s", record.Type)
+	}
+
+	return nil
 }

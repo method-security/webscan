@@ -28,7 +28,7 @@
 // you use this lower-level API, you'll have to be sure to solve the HTTP
 // and TLS-ALPN challenges yourself (unless you disabled them or use the
 // DNS challenge) by using the provided Config.GetCertificate function
-// in your tls.Config and/or Config.HTTPChallangeHandler in your HTTP
+// in your tls.Config and/or Config.HTTPChallengeHandler in your HTTP
 // handler.
 //
 // See the package's README for more instruction.
@@ -39,6 +39,7 @@ import (
 	"crypto"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net"
@@ -260,15 +261,16 @@ func ManageAsync(ctx context.Context, domainNames []string) error {
 // containing the names passed into those functions if
 // no DecisionFunc is set. This ensures some degree of
 // control by default to avoid certificate operations for
-// aribtrary domain names. To override this whitelist,
+// arbitrary domain names. To override this whitelist,
 // manually specify a DecisionFunc. To impose rate limits,
 // specify your own DecisionFunc.
 type OnDemandConfig struct {
 	// If set, this function will be called to determine
 	// whether a certificate can be obtained or renewed
 	// for the given name. If an error is returned, the
-	// request will be denied.
-	DecisionFunc func(name string) error
+	// request will be denied. IDNs will be given as
+	// punycode.
+	DecisionFunc func(ctx context.Context, name string) error
 
 	// Sources for getting new, unmanaged certificates.
 	// They will be invoked only during TLS handshakes
@@ -300,52 +302,6 @@ type OnDemandConfig struct {
 	// 110K names where 29s was spent checking for
 	// duplicates. Order is not important here.)
 	hostAllowlist map[string]struct{}
-}
-
-// isLoopback returns true if the hostname of addr looks
-// explicitly like a common local hostname. addr must only
-// be a host or a host:port combination.
-func isLoopback(addr string) bool {
-	host := hostOnly(addr)
-	return host == "localhost" ||
-		strings.Trim(host, "[]") == "::1" ||
-		strings.HasPrefix(host, "127.")
-}
-
-// isInternal returns true if the IP of addr
-// belongs to a private network IP range. addr
-// must only be an IP or an IP:port combination.
-// Loopback addresses are considered false.
-func isInternal(addr string) bool {
-	privateNetworks := []string{
-		"10.0.0.0/8",
-		"172.16.0.0/12",
-		"192.168.0.0/16",
-		"fc00::/7",
-	}
-	host := hostOnly(addr)
-	ip := net.ParseIP(host)
-	if ip == nil {
-		return false
-	}
-	for _, privateNetwork := range privateNetworks {
-		_, ipnet, _ := net.ParseCIDR(privateNetwork)
-		if ipnet.Contains(ip) {
-			return true
-		}
-	}
-	return false
-}
-
-// hostOnly returns only the host portion of hostport.
-// If there is no port or if there is an error splitting
-// the port off, the whole input string is returned.
-func hostOnly(hostport string) string {
-	host, _, err := net.SplitHostPort(hostport)
-	if err != nil {
-		return hostport // OK; probably had no port to begin with
-	}
-	return host
 }
 
 // PreChecker is an interface that can be optionally implemented by
@@ -394,7 +350,12 @@ type Revoker interface {
 type Manager interface {
 	// GetCertificate returns the certificate to use to complete the handshake.
 	// Since this is called during every TLS handshake, it must be very fast and not block.
-	// Returning (nil, nil) is valid and is simply treated as a no-op.
+	// Returning any non-nil value indicates that this Manager manages a certificate
+	// for the described handshake. Returning (nil, nil) is valid and is simply treated as
+	// a no-op Return (nil, nil) when the Manager has no certificate for this handshake.
+	// Return an error or a certificate only if the Manager is supposed to get a certificate
+	// for this handshake. Returning (nil, nil) other Managers or Issuers to try to get
+	// a certificate for the handshake.
 	GetCertificate(context.Context, *tls.ClientHelloInfo) (*tls.Certificate, error)
 }
 
@@ -429,7 +390,8 @@ type IssuedCertificate struct {
 	Certificate []byte
 
 	// Any extra information to serialize alongside the
-	// certificate in storage.
+	// certificate in storage. It MUST be serializable
+	// as JSON in order to be preserved.
 	Metadata any
 }
 
@@ -450,7 +412,7 @@ type CertificateResource struct {
 
 	// Any extra information associated with the certificate,
 	// usually provided by the issuer implementation.
-	IssuerData any `json:"issuer_data,omitempty"`
+	IssuerData json.RawMessage `json:"issuer_data,omitempty"`
 
 	// The unique string identifying the issuer of the
 	// certificate; internally useful for storage access.

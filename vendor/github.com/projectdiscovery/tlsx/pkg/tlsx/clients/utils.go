@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	errorutil "github.com/projectdiscovery/utils/errors"
+	"github.com/projectdiscovery/utils/errkit"
 	iputil "github.com/projectdiscovery/utils/ip"
 	mapsutil "github.com/projectdiscovery/utils/maps"
 )
@@ -24,7 +24,7 @@ func Convertx509toResponse(options *Options, hostname string, cert *x509.Certifi
 		NotBefore:    cert.NotBefore,
 		NotAfter:     cert.NotAfter,
 		Expired:      IsExpired(cert.NotAfter),
-		SelfSigned:   IsSelfSigned(cert.AuthorityKeyId, cert.SubjectKeyId),
+		SelfSigned:   IsSelfSigned(cert.AuthorityKeyId, cert.SubjectKeyId, cert.DNSNames),
 		MisMatched:   IsMisMatchedCert(hostname, domainNames),
 		Revoked:      IsTLSRevoked(options, cert),
 		WildCardCert: IsWildCardCert(domainNames),
@@ -102,14 +102,14 @@ func GetConn(ctx context.Context, hostname, ip, port string, inputOpts *Options)
 	}
 	//validation
 	if (hostname == "" && ip == "") || port == "" {
-		return nil, errorutil.New("client requires valid address got port=%v,hostname=%v,ip=%v", port, hostname, ip)
+		return nil, errkit.Newf("client requires valid address got port=%v,hostname=%v,ip=%v", port, hostname, ip)
 	}
 	rawConn, err := inputOpts.Fastdialer.Dial(ctx, "tcp", address)
 	if err != nil {
-		return nil, errorutil.New("could not dial address").Wrap(err)
+		return nil, errkit.Wrap(err, "could not dial address")
 	}
 	if rawConn == nil {
-		return nil, errorutil.New("could not connect to %s", address)
+		return nil, errkit.Newf("could not connect to %s", address)
 	}
 	if inputOpts.Timeout == 0 {
 		inputOpts.Timeout = 5

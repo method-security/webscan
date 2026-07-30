@@ -7,7 +7,7 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/dop251/goja"
+	"github.com/projectdiscovery/goja"
 	"github.com/projectdiscovery/nuclei/v3/pkg/js/compiler"
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols"
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/generators"
@@ -16,7 +16,7 @@ import (
 
 	"github.com/kitabisa/go-ci"
 	"github.com/projectdiscovery/nuclei/v3/pkg/types"
-	errorutil "github.com/projectdiscovery/utils/errors"
+	"github.com/projectdiscovery/utils/errkit"
 	fileutil "github.com/projectdiscovery/utils/file"
 	mapsutil "github.com/projectdiscovery/utils/maps"
 	"go.uber.org/multierr"
@@ -24,7 +24,7 @@ import (
 
 var (
 	// ErrInvalidRequestID is a request id error
-	ErrInvalidRequestID = errorutil.NewWithFmt("[%s] invalid request id '%s' provided")
+	ErrInvalidRequestID = errkit.New("invalid request id provided")
 )
 
 // ProtoOptions are options that can be passed to flow protocol callback
@@ -111,13 +111,21 @@ func (f *FlowExecutor) Compile() error {
 	if f.results == nil {
 		f.results = new(atomic.Bool)
 	}
+
 	// load all variables and evaluate with existing data
-	variableMap := f.options.Variables.Evaluate(f.options.GetTemplateCtx(f.ctx.Input.MetaInput).GetAll())
 	// cli options
 	optionVars := generators.BuildPayloadFromOptions(f.options.Options)
 	// constants
 	constants := f.options.Constants
+	scope := f.options.NewVariablesScope()
+
+	f.options.AddTemplateCtxToVariablesScope(f.ctx.Input.MetaInput, scope)
+	scope.AddData(constants, optionVars)
+
+	evaluation := f.options.Variables.EvaluateScope(scope)
+	variableMap := evaluation.Values
 	allVars := generators.MergeMaps(variableMap, constants, optionVars)
+
 	// we support loading variables from files in variables , cli options and constants
 	// try to load if files exist
 	for k, v := range allVars {
@@ -129,7 +137,24 @@ func (f *FlowExecutor) Compile() error {
 			}
 		}
 	}
+
+	templateVariables := make(map[string]interface{}, len(evaluation.TemplateValues))
+	for key := range evaluation.TemplateValues {
+		if _, ok := constants[key]; ok {
+			continue
+		}
+
+		if _, ok := optionVars[key]; ok {
+			continue
+		}
+
+		if value, ok := allVars[key]; ok {
+			templateVariables[key] = value
+		}
+	}
+
 	f.options.GetTemplateCtx(f.ctx.Input.MetaInput).Merge(allVars) // merge all variables into template context
+	f.options.GetTemplateCtx(f.ctx.Input.MetaInput).MergeTemplateVariables(templateVariables)
 
 	// ---- define callback functions/objects----
 	f.protoFunctions = map[string]func(call goja.FunctionCall, runtime *goja.Runtime) goja.Value{}
@@ -139,6 +164,7 @@ func (f *FlowExecutor) Compile() error {
 		reqMap := mapsutil.Map[string, protocols.Request]{}
 		counter := 0
 		proto := strings.ToLower(p) // donot use loop variables in callback functions directly
+
 		for index := range requests {
 			counter++ // start index from 1
 			request := f.allProtocols[proto][index]
@@ -146,22 +172,26 @@ func (f *FlowExecutor) Compile() error {
 				// if id is present use it
 				reqMap[request.GetID()] = request
 			}
+
 			// fallback to using index as id
 			// always allow index as id as a fallback
 			reqMap[strconv.Itoa(counter)] = request
 		}
+
 		// ---define hook that allows protocol/request execution from js-----
 		// --- this is the actual callback that is executed when function is invoked in js----
 		f.protoFunctions[proto] = func(call goja.FunctionCall, runtime *goja.Runtime) goja.Value {
 			opts := &ProtoOptions{
 				protoName: proto,
 			}
+
 			for _, v := range call.Arguments {
 				switch value := v.Export().(type) {
 				default:
 					opts.reqIDS = append(opts.reqIDS, types.ToString(value))
 				}
 			}
+
 			// before executing any protocol function flatten tracked values
 			if len(f.flattenKeys) > 0 {
 				ctx := f.options.GetTemplateCtx(f.ctx.Input.MetaInput)
@@ -171,9 +201,11 @@ func (f *FlowExecutor) Compile() error {
 					}
 				}
 			}
+
 			return runtime.ToValue(f.requestExecutor(runtime, reqMap, opts))
 		}
 	}
+
 	return nil
 }
 
@@ -208,7 +240,7 @@ func (f *FlowExecutor) ExecuteWithResults(ctx *scan.ScanContext) error {
 		for proto := range f.protoFunctions {
 			_ = runtime.GlobalObject().Delete(proto)
 		}
-
+		runtime.RemoveContextValue("executionId")
 	}()
 
 	// TODO(dwisiswant0): remove this once we get the RCA.
@@ -249,17 +281,19 @@ func (f *FlowExecutor) ExecuteWithResults(ctx *scan.ScanContext) error {
 		return err
 	}
 
+	runtime.SetContextValue("executionId", f.options.Options.ExecutionId)
+
 	// pass flow and execute the js vm and handle errors
 	_, err := runtime.RunProgram(f.program)
 	f.reconcileProgress()
 	if err != nil {
 		ctx.LogError(err)
-		return errorutil.NewWithErr(err).Msgf("failed to execute flow\n%v\n", f.options.Flow)
+		return errkit.Wrapf(err, "failed to execute flow\n%v\n", f.options.Flow)
 	}
 	runtimeErr := f.GetRuntimeErrors()
 	if runtimeErr != nil {
 		ctx.LogError(runtimeErr)
-		return errorutil.NewWithErr(runtimeErr).Msgf("got following errors while executing flow")
+		return errkit.Wrap(runtimeErr, "got following errors while executing flow")
 	}
 
 	return nil
@@ -281,7 +315,7 @@ func (f *FlowExecutor) reconcileProgress() {
 func (f *FlowExecutor) GetRuntimeErrors() error {
 	errs := []error{}
 	for proto, err := range f.allErrs.GetAll() {
-		errs = append(errs, errorutil.NewWithErr(err).Msgf("failed to execute %v protocol", proto))
+		errs = append(errs, errkit.Wrapf(err, "failed to execute %v protocol", proto))
 	}
 	return multierr.Combine(errs...)
 }
@@ -295,8 +329,8 @@ func (f *FlowExecutor) ReadDataFromFile(payload string) ([]string, error) {
 		return values, err
 	}
 	defer func() {
-         _ = reader.Close()
-       }()
+		_ = reader.Close()
+	}()
 	bin, err := io.ReadAll(reader)
 	if err != nil {
 		return values, err

@@ -60,13 +60,16 @@ CertMagic - Automatic HTTPS using Let's Encrypt
 		- [Advanced use](#advanced-use)
 	- [Wildcard Certificates](#wildcard-certificates)
 	- [Behind a load balancer (or in a cluster)](#behind-a-load-balancer-or-in-a-cluster)
-	- [The ACME Challenges](#the-acme-challenges)
-		- [HTTP Challenge](#http-challenge)
-		- [TLS-ALPN Challenge](#tls-alpn-challenge)
-		- [DNS Challenge](#dns-challenge)
-	- [On-Demand TLS](#on-demand-tls)
-	- [Storage](#storage)
-	- [Cache](#cache)
+- [The ACME Challenges](#the-acme-challenges)
+	- [HTTP Challenge](#http-challenge)
+	- [TLS-ALPN Challenge](#tls-alpn-challenge)
+	- [DNS Challenge](#dns-challenge)
+- [On-Demand TLS](#on-demand-tls)
+- [Storage](#storage)
+- [Cache](#cache)
+- [Events](#events)
+- [ZeroSSL](#zerossl)
+- [FAQ](#faq)
 - [Contributing](#contributing)
 - [Project History](#project-history)
 - [Credits and License](#credits-and-license)
@@ -87,7 +90,7 @@ CertMagic - Automatic HTTPS using Let's Encrypt
 	- Exponential backoff with carefully-tuned intervals
 	- Retries with optional test/staging CA endpoint instead of production, to avoid rate limits
 - Written in Go, a language with memory-safety guarantees
-- Powered by [ACMEz](https://github.com/mholt/acmez), _the_ premier ACME client library for Go
+- Powered by [ACMEz](https://github.com/mholt/acmez/v3), _the_ premier ACME client library for Go
 - All [libdns](https://github.com/libdns) DNS providers work out-of-the-box
 - Pluggable storage backends (default: file system)
 - Pluggable key sources
@@ -110,6 +113,7 @@ CertMagic - Automatic HTTPS using Let's Encrypt
 - Cross-platform support! Mac, Windows, Linux, BSD, Android...
 - Scales to hundreds of thousands of names/certificates per instance
 - Use in conjunction with your own certificates
+- Full support for [RFC 9773](https://datatracker.ietf.org/doc/html/rfc9773) (ACME Renewal Information; ARI) extension
 
 
 ## Requirements
@@ -125,6 +129,7 @@ CertMagic - Automatic HTTPS using Let's Encrypt
 4. Persistent storage
 	- Typically the local file system (default)
 	- Other integrations available/possible
+5. Go 1.21 or newer
 
 **_Before using this library, your domain names MUST be pointed (A/AAAA records) at your server (unless you use the DNS challenge)!_**
 
@@ -202,7 +207,7 @@ certmagic.DefaultACME.Email = "you@yours.com"
 certmagic.DefaultACME.CA = certmagic.LetsEncryptStagingCA
 ```
 
-For fully-functional program examples, check out [this Twitter thread](https://twitter.com/mholt6/status/1073103805112147968) (or read it [unrolled into a single post](https://threadreaderapp.com/thread/1073103805112147968.html)). (Note that the package API has changed slightly since these posts.)
+For fully-functional program examples, check out [this X thread](https://x.com/mholt6/status/1073103805112147968) (or read it [unrolled into a single post](https://threadreaderapp.com/thread/1073103805112147968.html)). (Note that the package API has changed slightly since these posts.)
 
 
 #### Serving HTTP handlers with HTTPS
@@ -233,6 +238,9 @@ tlsConfig, err := certmagic.TLS([]string{"example.com"})
 if err != nil {
 	return err
 }
+// be sure to customize NextProtos if serving a specific
+// application protocol after the TLS handshake, for example:
+tlsConfig.NextProtos = append([]string{"h2", "http/1.1"}, tlsConfig.NextProtos...)
 ```
 
 
@@ -289,7 +297,7 @@ tlsConfig.NextProtos = append([]string{"h2", "http/1.1"}, tlsConfig.NextProtos..
 // we can simply set its GetCertificate field and append the
 // TLS-ALPN challenge protocol to the NextProtos
 myTLSConfig.GetCertificate = magic.GetCertificate
-myTLSConfig.NextProtos = append(myTLSConfig.NextProtos, tlsalpn01.ACMETLS1Protocol)
+myTLSConfig.NextProtos = append(myTLSConfig.NextProtos, acmez.ACMETLS1Protocol)
 
 // the HTTP challenge has to be handled by your HTTP server;
 // if you don't have one, you should have disabled it earlier
@@ -318,7 +326,7 @@ See [Storage](#storage) and the associated [pkg.go.dev](https://pkg.go.dev/githu
 
 ## The ACME Challenges
 
-This section describes how to solve the ACME challenges. Challenges are how you demonstrate to the certificate authority some control over your domain name, thus authorizing them to grant you a certificate for that name. [The great innovation of ACME](https://www.dotconferences.com/2016/10/matthew-holt-go-with-acme) is that verification by CAs can now be automated, rather than having to click links in emails (who ever thought that was a good idea??).
+This section describes how to solve the ACME challenges. Challenges are how you demonstrate to the certificate authority some control over your domain name, thus authorizing them to grant you a certificate for that name. [The great innovation of ACME](https://www.youtube.com/watch?v=KdX51QJWQTA) is that verification by CAs can now be automated, rather than having to click links in emails (who ever thought that was a good idea??).
 
 If you're using the high-level convenience functions like `HTTPS()`, `Listen()`, or `TLS()`, the HTTP and/or TLS-ALPN challenges are solved for you because they also start listeners. However, if you're making a `Config` and you start your own server manually, you'll need to be sure the ACME challenges can be solved so certificates can be renewed.
 
@@ -376,7 +384,7 @@ Or make two simple changes to an existing `tls.Config`:
 
 ```go
 myTLSConfig.GetCertificate = magic.GetCertificate
-myTLSConfig.NextProtos = append(myTLSConfig.NextProtos, tlsalpn01.ACMETLS1Protocol}
+myTLSConfig.NextProtos = append(myTLSConfig.NextProtos, acmez.ACMETLS1Protocol}
 ```
 
 Then just make sure your TLS listener is listening on port 443:
@@ -398,8 +406,10 @@ To enable it, just set the `DNS01Solver` field on a `certmagic.ACMEIssuer` struc
 import "github.com/libdns/cloudflare"
 
 certmagic.DefaultACME.DNS01Solver = &certmagic.DNS01Solver{
-	DNSProvider: &cloudflare.Provider{
-		APIToken: "topsecret",
+	DNSManager: certmagic.DNSManager{
+		DNSProvider: &cloudflare.Provider{
+			APIToken: "topsecret",
+		},
 	},
 }
 ```
@@ -501,6 +511,26 @@ CertMagic emits events when possible things of interest happen. Set the [`OnEven
 
 `OnEvent` can return an error. Some events may be aborted by returning an error. For example, returning an error from `cert_obtained` can cancel obtaining the certificate. Only return an error from `OnEvent` if you want to abort program flow.
 
+## ZeroSSL
+
+ZeroSSL has both ACME and HTTP API services for getting certificates. CertMagic works with both of them.
+
+To use ZeroSSL's ACME server, configure CertMagic with an [`ACMEIssuer`](https://pkg.go.dev/github.com/caddyserver/certmagic#ACMEIssuer) like you would with any other ACME CA (just adjust the directory URL). External Account Binding (EAB) is required for ZeroSSL. You can use the [ZeroSSL API](https://pkg.go.dev/github.com/caddyserver/zerossl) to generate one, or your account dashboard.
+
+To use ZeroSSL's API instead, use the [`ZeroSSLIssuer`](https://pkg.go.dev/github.com/caddyserver/certmagic#ZeroSSLIssuer). Here is a simple example:
+
+```go
+magic := certmagic.NewDefault()
+
+magic.Issuers = []certmagic.Issuer{
+	certmagic.ZeroSSLIssuer{
+		APIKey: "<your ZeroSSL API key>",
+	}),
+}
+
+err := magic.ManageSync(ctx, []string{"example.com"})
+```
+
 ## FAQ
 
 ### Can I use some of my own certificates while using CertMagic?
@@ -537,7 +567,7 @@ We welcome your contributions! Please see our **[contributing guidelines](https:
 
 ## Project History
 
-CertMagic is the core of Caddy's advanced TLS automation code, extracted into a library. The underlying ACME client implementation is [ACMEz](https://github.com/mholt/acmez). CertMagic's code was originally a central part of Caddy even before Let's Encrypt entered public beta in 2015.
+CertMagic is the core of Caddy's advanced TLS automation code, extracted into a library. The underlying ACME client implementation is [ACMEz](https://github.com/mholt/acmez/v3). CertMagic's code was originally a central part of Caddy even before Let's Encrypt entered public beta in 2015.
 
 In the years since then, Caddy's TLS automation techniques have been widely adopted, tried and tested in production, and served millions of sites and secured trillions of connections.
 
@@ -549,15 +579,15 @@ Caddy was also the first to sport "on-demand" issuance technology, which obtains
 
 Consequently, CertMagic brings all these (and more) features and capabilities right into your own Go programs.
 
-You can [watch a 2016 dotGo talk](https://www.dotconferences.com/2016/10/matthew-holt-go-with-acme) by the author of this library about using ACME to automate certificate management in Go programs:
+You can [watch a 2016 dotGo talk](https://youtu.be/KdX51QJWQTA) by the author of this library about using ACME to automate certificate management in Go programs:
 
-[![Matthew Holt speaking at dotGo 2016 about ACME in Go](https://user-images.githubusercontent.com/1128849/49921557-2d506780-fe6b-11e8-97bf-6053b6b4eb48.png)](https://www.dotconferences.com/2016/10/matthew-holt-go-with-acme)
+[![Matthew Holt speaking at dotGo 2016 about ACME in Go](https://user-images.githubusercontent.com/1128849/49921557-2d506780-fe6b-11e8-97bf-6053b6b4eb48.png)](https://youtu.be/KdX51QJWQTA)
 
 
 
 ## Credits and License
 
-CertMagic is a project by [Matthew Holt](https://twitter.com/mholt6), who is the author; and various contributors, who are credited in the commit history of either CertMagic or Caddy.
+CertMagic is a project by [Matthew Holt](https://x.com/mholt6), who is the author; and various contributors, who are credited in the commit history of either CertMagic or Caddy.
 
 CertMagic is licensed under Apache 2.0, an open source license. For convenience, its main points are summarized as follows (but this is no replacement for the actual license text):
 

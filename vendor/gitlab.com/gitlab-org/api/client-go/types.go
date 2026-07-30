@@ -103,7 +103,7 @@ type ApproverIDsValue struct {
 // ApproverIDs is a helper routine that creates a new ApproverIDsValue.
 func ApproverIDs(v any) *ApproverIDsValue {
 	switch v.(type) {
-	case UserIDValue, []int:
+	case UserIDValue, []int64:
 		return &ApproverIDsValue{value: v}
 	default:
 		panic("Unsupported value passed as approver ID")
@@ -115,11 +115,11 @@ func (a *ApproverIDsValue) EncodeValues(key string, v *url.Values) error {
 	switch value := a.value.(type) {
 	case UserIDValue:
 		v.Set(key, string(value))
-	case []int:
+	case []int64:
 		v.Del(key)
 		v.Del(key + "[]")
 		for _, id := range value {
-			v.Add(key+"[]", strconv.Itoa(id))
+			v.Add(key+"[]", strconv.FormatInt(id, 10))
 		}
 	}
 	return nil
@@ -143,7 +143,7 @@ type AssigneeIDValue struct {
 // AssigneeID is a helper routine that creates a new AssigneeIDValue.
 func AssigneeID(v any) *AssigneeIDValue {
 	switch v.(type) {
-	case UserIDValue, int:
+	case UserIDValue, int, int64:
 		return &AssigneeIDValue{value: v}
 	default:
 		panic("Unsupported value passed as assignee ID")
@@ -157,6 +157,8 @@ func (a *AssigneeIDValue) EncodeValues(key string, v *url.Values) error {
 		v.Set(key, string(value))
 	case int:
 		v.Set(key, strconv.Itoa(value))
+	case int64:
+		v.Set(key, strconv.FormatInt(value, 10))
 	}
 	return nil
 }
@@ -179,7 +181,7 @@ type ReviewerIDValue struct {
 // ReviewerID is a helper routine that creates a new ReviewerIDValue.
 func ReviewerID(v any) *ReviewerIDValue {
 	switch v.(type) {
-	case UserIDValue, int:
+	case UserIDValue, int, int64:
 		return &ReviewerIDValue{value: v}
 	default:
 		panic("Unsupported value passed as reviewer ID")
@@ -193,6 +195,8 @@ func (a *ReviewerIDValue) EncodeValues(key string, v *url.Values) error {
 		v.Set(key, string(value))
 	case int:
 		v.Set(key, strconv.Itoa(value))
+	case int64:
+		v.Set(key, strconv.FormatInt(value, 10))
 	}
 	return nil
 }
@@ -212,7 +216,7 @@ type AvailabilityValue string
 
 // List of available availability values.
 //
-// Undocummented, see code at:
+// Undocumented, see code at:
 // https://gitlab.com/gitlab-org/gitlab-foss/-/blob/master/app/models/user_status.rb#L22
 const (
 	NotSet AvailabilityValue = "not_set"
@@ -299,7 +303,7 @@ const (
 	ProtectionRuleAccessLevelAdmin      ProtectionRuleAccessLevel = "admin"
 )
 
-// DeploymentApprovalStatus represents a Gitlab deployment approval status.
+// DeploymentApprovalStatus represents a GitLab deployment approval status.
 type DeploymentApprovalStatus string
 
 // These constants represent all valid deployment approval statuses.
@@ -308,7 +312,7 @@ const (
 	DeploymentApprovalStatusRejected DeploymentApprovalStatus = "rejected"
 )
 
-// DeploymentStatusValue represents a Gitlab deployment status.
+// DeploymentStatusValue represents a GitLab deployment status.
 type DeploymentStatusValue string
 
 // These constants represent all valid deployment statuses.
@@ -458,7 +462,7 @@ func (t ISOTime) MarshalJSON() ([]byte, error) {
 	}
 
 	if y := time.Time(t).Year(); y < 0 || y >= 10000 {
-		// ISO 8901 uses 4 digits for the years.
+		// ISO 8601 uses 4 digits for the years.
 		return nil, errors.New("json: ISOTime year outside of range [0,9999]")
 	}
 
@@ -477,10 +481,18 @@ func (t *ISOTime) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 
-	isotime, err := time.Parse(`"`+iso8601+`"`, string(data))
-	*t = ISOTime(isotime)
+	// Try parsing as datetime first (ISO 8601 with time)
+	isotime, err := time.Parse(`"`+time.RFC3339+`"`, string(data))
+	if err != nil {
+		// If that fails, try parsing as date-only
+		isotime, err = time.Parse(`"`+iso8601+`"`, string(data))
+		if err != nil {
+			return err
+		}
+	}
 
-	return err
+	*t = ISOTime(isotime)
+	return nil
 }
 
 // EncodeValues implements the query.Encoder interface.
@@ -718,9 +730,10 @@ type ResourceGroupProcessMode string
 // GitLab API docs:
 // https://docs.gitlab.com/ci/resource_groups/#process-modes
 const (
-	Unordered   ResourceGroupProcessMode = "unordered"
-	OldestFirst ResourceGroupProcessMode = "oldest_first"
-	NewestFirst ResourceGroupProcessMode = "newest_first"
+	Unordered        ResourceGroupProcessMode = "unordered"
+	OldestFirst      ResourceGroupProcessMode = "oldest_first"
+	NewestFirst      ResourceGroupProcessMode = "newest_first"
+	NewestReadyFirst ResourceGroupProcessMode = "newest_ready_first"
 )
 
 // SharedRunnersSettingValue determines whether shared runners are enabled for a
@@ -774,8 +787,8 @@ const (
 
 // TasksCompletionStatus represents tasks of the issue/merge request.
 type TasksCompletionStatus struct {
-	Count          int `json:"count"`
-	CompletedCount int `json:"completed_count"`
+	Count          int64 `json:"count"`
+	CompletedCount int64 `json:"completed_count"`
 }
 
 // TodoAction represents the available actions that can be performed on a todo.

@@ -32,16 +32,42 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/mholt/acmez/acme"
+	"github.com/mholt/acmez/v3/acme"
+	"go.uber.org/zap"
 )
 
-// getAccount either loads or creates a new account, depending on if
+// getAccountToUse will either load or create an account based on the configuration of the issuer.
+// It will try to get one from storage if one exists, and if not, it will create one, all the while
+// honoring the configured account key PEM (if any) to restrict which account is used.
+func (iss *ACMEIssuer) getAccountToUse(ctx context.Context, directory string) (acme.Account, error) {
+	var account acme.Account
+	var err error
+	if iss.AccountKeyPEM != "" {
+		iss.Logger.Info("using configured ACME account")
+		account, err = iss.GetAccount(ctx, []byte(iss.AccountKeyPEM))
+	} else {
+		account, err = iss.loadOrCreateAccount(ctx, directory, iss.getEmail())
+	}
+	if err != nil {
+		return acme.Account{}, fmt.Errorf("getting ACME account: %v", err)
+	}
+	return account, nil
+}
+
+// loadOrCreateAccount either loads or creates a new account, depending on if
 // an account can be found in storage for the given CA + email combo.
-func (am *ACMEIssuer) getAccount(ctx context.Context, ca, email string) (acme.Account, error) {
+func (am *ACMEIssuer) loadOrCreateAccount(ctx context.Context, ca, email string) (acme.Account, error) {
 	acct, err := am.loadAccount(ctx, ca, email)
 	if errors.Is(err, fs.ErrNotExist) {
+		am.Logger.Info("creating new account because no account for configured email is known to us",
+			zap.String("email", email),
+			zap.String("ca", ca),
+			zap.Error(err))
 		return am.newAccount(email)
 	}
+	am.Logger.Debug("using existing ACME account because key found in storage associated with email",
+		zap.String("email", email),
+		zap.String("ca", ca))
 	return acct, err
 }
 
@@ -88,11 +114,18 @@ func (*ACMEIssuer) newAccount(email string) (acme.Account, error) {
 // If it does not exist in storage, it will be retrieved from the ACME server and added to storage.
 // The account must already exist; it does not create a new account.
 func (am *ACMEIssuer) GetAccount(ctx context.Context, privateKeyPEM []byte) (acme.Account, error) {
-	account, err := am.loadAccountByKey(ctx, privateKeyPEM)
-	if errors.Is(err, fs.ErrNotExist) {
-		account, err = am.lookUpAccount(ctx, privateKeyPEM)
+	email := am.getEmail()
+	if email == "" {
+		if account, err := am.loadAccountByKey(ctx, privateKeyPEM); err == nil {
+			return account, nil
+		}
+	} else {
+		keyBytes, err := am.config.Storage.Load(ctx, am.storageKeyUserPrivateKey(am.CA, email))
+		if err == nil && bytes.Equal(bytes.TrimSpace(keyBytes), bytes.TrimSpace(privateKeyPEM)) {
+			return am.loadAccount(ctx, am.CA, email)
+		}
 	}
-	return account, err
+	return am.lookUpAccount(ctx, privateKeyPEM)
 }
 
 // loadAccountByKey loads the account with the given private key from storage, if it exists.
@@ -107,9 +140,14 @@ func (am *ACMEIssuer) loadAccountByKey(ctx context.Context, privateKeyPEM []byte
 		email := path.Base(accountFolderKey)
 		keyBytes, err := am.config.Storage.Load(ctx, am.storageKeyUserPrivateKey(am.CA, email))
 		if err != nil {
-			return acme.Account{}, err
+			// Try the next account: This one is missing its private key, if it turns out to be the one we're looking
+			// for we will try to save it again after confirming with the ACME server.
+			continue
 		}
 		if bytes.Equal(bytes.TrimSpace(keyBytes), bytes.TrimSpace(privateKeyPEM)) {
+			// Found the account with the correct private key, try loading it. If this fails we we will follow
+			// the same procedure as if the private key was not found and confirm with the ACME server before saving
+			// it again.
 			return am.loadAccount(ctx, am.CA, email)
 		}
 	}
@@ -169,6 +207,16 @@ func (am *ACMEIssuer) saveAccount(ctx context.Context, ca string, account acme.A
 		},
 	}
 	return storeTx(ctx, am.config.Storage, all)
+}
+
+// deleteAccountLocally deletes the registration info and private key of the account
+// for the given CA from storage.
+func (am *ACMEIssuer) deleteAccountLocally(ctx context.Context, ca string, account acme.Account) error {
+	primaryContact := getPrimaryContact(account)
+	if err := am.config.Storage.Delete(ctx, am.storageKeyUserReg(ca, primaryContact)); err != nil {
+		return err
+	}
+	return am.config.Storage.Delete(ctx, am.storageKeyUserPrivateKey(ca, primaryContact))
 }
 
 // setEmail does everything it can to obtain an email address
@@ -377,12 +425,21 @@ func (am *ACMEIssuer) mostRecentAccountEmail(ctx context.Context, caURL string) 
 		return "", false
 	}
 
-	account, err := am.getAccount(ctx, caURL, path.Base(accountList[0]))
+	account, err := am.loadOrCreateAccount(ctx, caURL, path.Base(accountList[0]))
 	if err != nil {
 		return "", false
 	}
 
 	return getPrimaryContact(account), true
+}
+
+func accountRegLockKey(acc acme.Account) string {
+	key := "register_acme_account"
+	if len(acc.Contact) == 0 {
+		return key
+	}
+	key += "_" + getPrimaryContact(acc)
+	return key
 }
 
 // getPrimaryContact returns the first contact on the account (if any)

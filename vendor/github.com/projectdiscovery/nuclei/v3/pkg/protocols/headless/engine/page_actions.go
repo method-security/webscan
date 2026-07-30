@@ -21,9 +21,10 @@ import (
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/contextargs"
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/expressions"
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/protocolstate"
+	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/render"
+	filepathutil "github.com/projectdiscovery/nuclei/v3/pkg/utils/filepath"
 	contextutil "github.com/projectdiscovery/utils/context"
 	"github.com/projectdiscovery/utils/errkit"
-	errorutil "github.com/projectdiscovery/utils/errors"
 	fileutil "github.com/projectdiscovery/utils/file"
 	folderutil "github.com/projectdiscovery/utils/folder"
 	stringsutil "github.com/projectdiscovery/utils/strings"
@@ -32,10 +33,10 @@ import (
 )
 
 var (
-	errinvalidArguments = errorutil.New("invalid arguments provided")
-	ErrLFAccessDenied   = errorutil.New("Use -allow-local-file-access flag to enable local file access")
-	// ErrActionExecDealine is the error returned when alloted time for action execution exceeds
-	ErrActionExecDealine = errkit.New("headless action execution deadline exceeded").SetKind(errkit.ErrKindDeadline).Build()
+	errinvalidArguments = errkit.New("invalid arguments provided")
+	ErrLFAccessDenied   = errkit.New("Use -allow-local-file-access flag to enable local file access")
+	// ErrActionExecDeadline is the error returned when allotted time for action execution exceeds
+	ErrActionExecDeadline = errkit.New("headless action execution deadline exceeded").SetKind(errkit.ErrKindDeadline).Build()
 )
 
 const (
@@ -60,7 +61,7 @@ func (p *Page) ExecuteActions(input *contextargs.Context, actions []*Action) (ou
 		}
 
 		if r := recover(); r != nil {
-			err = errorutil.New("panic on headless action: %v", r)
+			err = errkit.Newf("panic on headless action: %v", r)
 		}
 	}()
 
@@ -73,7 +74,7 @@ func (p *Page) ExecuteActions(input *contextargs.Context, actions []*Action) (ou
 				for _, waitFunc := range waitFuncs {
 					if waitFunc != nil {
 						if err := waitFunc(); err != nil {
-							return nil, errorutil.NewWithErr(err).Msgf("error occurred while executing waitFunc")
+							return nil, errkit.Wrap(err, "error occurred while executing waitFunc")
 						}
 					}
 				}
@@ -129,7 +130,12 @@ func (p *Page) ExecuteActions(input *contextargs.Context, actions []*Action) (ou
 		case ActionWaitDialog:
 			err = p.HandleDialog(act, outData)
 		case ActionFilesInput:
-			if p.options.Options.AllowLocalFileAccess {
+			// Use the same canonical predicate used by the screenshot action
+			// rather than reading Options.AllowLocalFileAccess directly so the
+			// two file-touching actions cannot disagree about whether LFA is
+			// enabled (e.g. when callers use protocolstate.SetLfaAllowed
+			// without also flipping the field on Options).
+			if protocolstate.IsLfaAllowed(p.options.Options) {
 				err = p.FilesInput(act, outData)
 			} else {
 				err = ErrLFAccessDenied
@@ -281,7 +287,7 @@ func (p *Page) ActionAddHeader(act *Action, out ActionData) error {
 		return err
 	}
 
-	p.rules = append(p.rules, rule{
+	p.appendRule(rule{
 		Action: ActionAddHeader,
 		Part:   part,
 		Args:   args,
@@ -309,7 +315,7 @@ func (p *Page) ActionSetHeader(act *Action, out ActionData) error {
 		return err
 	}
 
-	p.rules = append(p.rules, rule{
+	p.appendRule(rule{
 		Action: ActionSetHeader,
 		Part:   part,
 		Args:   args,
@@ -332,7 +338,7 @@ func (p *Page) ActionDeleteHeader(act *Action, out ActionData) error {
 		return err
 	}
 
-	p.rules = append(p.rules, rule{
+	p.appendRule(rule{
 		Action: ActionDeleteHeader,
 		Part:   part,
 		Args:   args,
@@ -355,7 +361,7 @@ func (p *Page) ActionSetBody(act *Action, out ActionData) error {
 		return err
 	}
 
-	p.rules = append(p.rules, rule{
+	p.appendRule(rule{
 		Action: ActionSetBody,
 		Part:   part,
 		Args:   args,
@@ -378,7 +384,7 @@ func (p *Page) ActionSetMethod(act *Action, out ActionData) error {
 		return err
 	}
 
-	p.rules = append(p.rules, rule{
+	p.appendRule(rule{
 		Action: ActionSetMethod,
 		Part:   part,
 		Args:   args,
@@ -401,7 +407,7 @@ func (p *Page) NavigateURL(action *Action, out ActionData) error {
 
 	parsedURL, err := urlutil.ParseURL(url, true)
 	if err != nil {
-		return errorutil.NewWithTag("headless", "failed to parse url %v while creating http request", url)
+		return errkit.Newf("failed to parse url %v while creating http request", url)
 	}
 
 	// ===== parameter automerge =====
@@ -411,7 +417,7 @@ func (p *Page) NavigateURL(action *Action, out ActionData) error {
 	parsedURL.Params = finalparams
 
 	if err := p.page.Navigate(parsedURL.String()); err != nil {
-		return errorutil.NewWithErr(err).Msgf("could not navigate to url %s", parsedURL.String())
+		return errkit.Wrapf(err, "could not navigate to url %s", parsedURL.String())
 	}
 
 	p.updateLastNavigatedURL()
@@ -525,20 +531,20 @@ func (p *Page) Screenshot(act *Action, out ActionData) error {
 
 	to, err = fileutil.CleanPath(to)
 	if err != nil {
-		return errorutil.New("could not clean output screenshot path %s", to)
+		return errkit.Newf("could not clean output screenshot path %s", to)
 	}
 
-	// allow if targetPath is child of current working directory
-	if !protocolstate.IsLFAAllowed() {
-		cwd, err := os.Getwd()
-		if err != nil {
-			return errorutil.NewWithErr(err).Msgf("could not get current working directory")
-		}
+	// Build the final write path (with .png) BEFORE running any containment
+	// gate. Otherwise inputs like "." or a bare directory name pass the gate
+	// against `to` and then the .png suffix moves the actual write outside
+	// cwd (e.g. <cwd>.png is a sibling of cwd and not contained by it).
+	filePath := to
+	if !strings.HasSuffix(filePath, ".png") {
+		filePath += ".png"
+	}
 
-		if !strings.HasPrefix(to, cwd) {
-			// writing outside of cwd requires -lfa flag
-			return ErrLFAccessDenied
-		}
+	if err := p.isScreenshotPathAllowed(filePath); err != nil {
+		return err
 	}
 
 	mkdir, err := p.getActionArg(act, "mkdir")
@@ -547,23 +553,17 @@ func (p *Page) Screenshot(act *Action, out ActionData) error {
 	}
 
 	// edgecase create directory if mkdir=true and path contains directory
-	if mkdir == "true" && stringsutil.ContainsAny(to, folderutil.UnixPathSeparator, folderutil.WindowsPathSeparator) {
-		// creates new directory if needed based on path `to`
+	if mkdir == "true" && stringsutil.ContainsAny(filePath, folderutil.UnixPathSeparator, folderutil.WindowsPathSeparator) {
+		// creates new directory if needed based on the final filePath
 		// TODO: replace all permission bits with fileutil constants (https://github.com/projectdiscovery/utils/issues/113)
-		if err := os.MkdirAll(filepath.Dir(to), 0700); err != nil {
-			return errorutil.NewWithErr(err).Msgf("failed to create directory while writing screenshot")
+		if err := os.MkdirAll(filepath.Dir(filePath), 0700); err != nil {
+			return errkit.Wrap(err, "failed to create directory while writing screenshot")
 		}
-	}
-
-	// actual file path to write
-	filePath := to
-	if !strings.HasSuffix(filePath, ".png") {
-		filePath += ".png"
 	}
 
 	if fileutil.FileExists(filePath) {
 		// return custom error as overwriting files is not supported
-		return errorutil.NewWithTag("screenshot", "failed to write screenshot, file %v already exists", filePath)
+		return errkit.Newf("failed to write screenshot, file %v already exists", filePath)
 	}
 	err = os.WriteFile(filePath, data, 0540)
 	if err != nil {
@@ -571,6 +571,45 @@ func (p *Page) Screenshot(act *Action, out ActionData) error {
 	}
 	gologger.Info().Msgf("Screenshot successfully saved at %v\n", filePath)
 	return nil
+}
+
+func (p *Page) isScreenshotPathAllowed(to string) error {
+	if protocolstate.IsLfaAllowed(p.options.Options) {
+		return nil
+	}
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		return errkit.Wrap(err, "could not get current working directory")
+	}
+
+	if !isScreenshotPathWithinDirectory(to, cwd) {
+		// writing outside of cwd requires -lfa flag
+		return ErrLFAccessDenied
+	}
+
+	return nil
+}
+
+func isScreenshotPathWithinDirectory(to, cwd string) bool {
+	if !filepathutil.IsPathWithinDirectory(to, cwd) {
+		return false
+	}
+
+	existingParent := filepath.Dir(to)
+	for {
+		if _, err := os.Stat(existingParent); err == nil {
+			return filepathutil.IsPathWithinDirectory(existingParent, cwd)
+		} else if !os.IsNotExist(err) {
+			return false
+		}
+
+		parent := filepath.Dir(existingParent)
+		if parent == existingParent {
+			return false
+		}
+		existingParent = parent
+	}
 }
 
 // InputElement executes input element actions for an element.
@@ -678,7 +717,7 @@ func (p *Page) WaitPageLifecycleEvent(act *Action, out ActionData, event proto.P
 
 // WaitStable waits until the page is stable
 func (p *Page) WaitStable(act *Action, out ActionData) error {
-	var dur = time.Second // default stable page duration: 1s
+	dur := time.Second // default stable page duration: 1s
 
 	timeout, err := getTimeout(p, act)
 	if err != nil {
@@ -806,12 +845,12 @@ func (p *Page) WaitEvent(act *Action, out ActionData) (func() error, error) {
 
 	gotType := proto.GetType(event)
 	if gotType == nil {
-		return nil, errorutil.New("event %q does not exist", event)
+		return nil, errkit.Newf("event %q does not exist", event)
 	}
 
 	tmp, ok := reflect.New(gotType).Interface().(proto.Event)
 	if !ok {
-		return nil, errorutil.New("event %q is not a page event", event)
+		return nil, errkit.Newf("event %q is not a page event", event)
 	}
 
 	waitEvent = tmp
@@ -825,7 +864,7 @@ func (p *Page) WaitEvent(act *Action, out ActionData) (func() error, error) {
 	// Just wait the event to happen
 	waitFunc := func() (err error) {
 		// execute actual wait event
-		ctx, cancel := context.WithTimeoutCause(context.Background(), maxDuration, ErrActionExecDealine)
+		ctx, cancel := context.WithTimeoutCause(context.Background(), maxDuration, ErrActionExecDeadline)
 		defer cancel()
 
 		err = contextutil.ExecFunc(ctx, p.page.WaitEvent(waitEvent))
@@ -938,23 +977,28 @@ func (p *Page) getActionArg(action *Action, arg string) (string, error) {
 
 	argValue := action.GetArg(arg)
 
-	if p.instance.interactsh != nil {
-		var interactshURLs []string
-		argValue, interactshURLs = p.instance.interactsh.Replace(argValue, p.InteractshURLs)
-		p.addInteractshURL(interactshURLs...)
+	prepared, err := render.ReplaceInteractshMarkers(argValue, p.instance.interactsh, nil)
+	if err != nil {
+		return "", fmt.Errorf("could not replace interactsh marker for argument %q: %w", arg, err)
 	}
+	argValue = prepared.Text
 
 	exprs := getExpressions(argValue, p.variables)
 
 	err = expressions.ContainsUnresolvedVariables(exprs...)
 	if err != nil {
-		return "", errorutil.NewWithErr(err).Msgf("argument %q, value: %q", arg, argValue)
+		return "", errkit.Wrapf(err, "argument %q, value: %q", arg, argValue)
 	}
 
-	argValue, err = expressions.Evaluate(argValue, p.variables)
+	result, err := render.Render(render.Input{
+		Text:         argValue,
+		Values:       p.variables,
+		InteractURLs: prepared.InteractURLs,
+	})
 	if err != nil {
 		return "", fmt.Errorf("could not get value for argument %q: %s", arg, err)
 	}
+	p.addInteractshURL(result.InteractURLs...)
 
-	return argValue, nil
+	return result.Text, nil
 }

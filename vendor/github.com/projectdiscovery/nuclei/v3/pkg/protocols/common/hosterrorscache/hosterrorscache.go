@@ -27,6 +27,7 @@ type CacheInterface interface {
 	Remove(ctx *contextargs.Context)                                          // remove a host from the cache
 	MarkFailed(protoType string, ctx *contextargs.Context, err error)         // record a failure (and cause) for the host
 	MarkFailedOrRemove(protoType string, ctx *contextargs.Context, err error) // record a failure (and cause) for the host or remove it
+	IsPermanentErr(ctx *contextargs.Context, err error) bool                  // return true if the error is permanent for the host
 }
 
 var (
@@ -137,8 +138,9 @@ func (c *Cache) Check(protoType string, ctx *contextargs.Context) bool {
 	defer cache.mu.Unlock()
 
 	if cache.isPermanentErr {
-		// skipping permanent errors is expected so verbose instead of info
-		gologger.Verbose().Msgf("Skipped %s from target list as found unresponsive permanently: %s", finalValue, cache.cause)
+		cache.Do(func() {
+			gologger.Info().Msgf("Skipped %s from target list as found unresponsive permanently: %s", finalValue, cache.cause)
+		})
 		return true
 	}
 
@@ -171,6 +173,14 @@ func (c *Cache) MarkFailed(protoType string, ctx *contextargs.Context, err error
 
 // MarkFailedOrRemove marks a host as failed previously or removes it
 func (c *Cache) MarkFailedOrRemove(protoType string, ctx *contextargs.Context, err error) {
+	// A failure that occurs because the caller's context was cancelled or hit its
+	// deadline is not the host's fault (e.g. the parent scan was cancelled). Such
+	// errors classify as temporary/deadline and would otherwise be counted, so
+	// ignore them. A nil error (success) still resets the host below.
+	if err != nil && ctx != nil && ctx.Context() != nil && ctx.Context().Err() != nil {
+		return
+	}
+
 	if err != nil && !c.checkError(protoType, err) {
 		return
 	}
@@ -232,6 +242,28 @@ func (c *Cache) MarkFailedOrRemove(protoType string, ctx *contextargs.Context, e
 	_ = c.failedTargets.Set(cacheKey, cache)
 }
 
+// IsPermanentErr returns true if the error is permanent for the host.
+func (c *Cache) IsPermanentErr(ctx *contextargs.Context, err error) bool {
+	if err == nil {
+		return false
+	}
+
+	if errkit.IsKind(err, errkit.ErrKindNetworkPermanent) {
+		return true
+	}
+
+	cacheKey := c.GetKeyFromContext(ctx, err)
+	cache, cacheErr := c.failedTargets.GetIFPresent(cacheKey)
+	if cacheErr != nil {
+		return false
+	}
+
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	return cache.isPermanentErr
+}
+
 // GetKeyFromContext returns the key for the cache from the context
 func (c *Cache) GetKeyFromContext(ctx *contextargs.Context, err error) string {
 	// Note:
@@ -256,7 +288,7 @@ func (c *Cache) GetKeyFromContext(ctx *contextargs.Context, err error) string {
 	return finalValue
 }
 
-var reCheckError = regexp.MustCompile(`(no address found for host|could not resolve host|connection refused|connection reset by peer|could not connect to any address found for host|timeout awaiting response headers)`)
+var reCheckError = regexp.MustCompile(`(no address found for host|could not resolve host|connection refused|connection reset by peer|could not connect to any address found for host|timeout awaiting response headers|i/o timeout)`)
 
 // checkError checks if an error represents a type that should be
 // added to the host skipping table.
@@ -276,8 +308,11 @@ func (c *Cache) checkError(protoType string, err error) bool {
 		// and are due to template logic
 		return false
 	case errkit.ErrKindNetworkTemporary:
-		// these should not be counted as host errors
-		return false
+		// a single temporary error (timeout, i/o reset) is transient, but a host
+		// that produces them on every request with no success in between is
+		// unresponsive. Count it; MarkFailedOrRemove resets the host on the next
+		// successful response, so only consecutive failures reach MaxHostError.
+		return true
 	case errkit.ErrKindNetworkPermanent:
 		// these should be counted as host errors
 		return true

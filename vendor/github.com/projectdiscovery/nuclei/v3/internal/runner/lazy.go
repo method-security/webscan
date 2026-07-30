@@ -7,6 +7,7 @@ import (
 
 	"github.com/projectdiscovery/nuclei/v3/pkg/authprovider/authx"
 	"github.com/projectdiscovery/nuclei/v3/pkg/catalog"
+	"github.com/projectdiscovery/nuclei/v3/pkg/catalog/disk"
 	"github.com/projectdiscovery/nuclei/v3/pkg/catalog/loader"
 	"github.com/projectdiscovery/nuclei/v3/pkg/output"
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols"
@@ -17,22 +18,22 @@ import (
 	"github.com/projectdiscovery/nuclei/v3/pkg/scan"
 	"github.com/projectdiscovery/nuclei/v3/pkg/types"
 	"github.com/projectdiscovery/utils/env"
-	errorutil "github.com/projectdiscovery/utils/errors"
+	"github.com/projectdiscovery/utils/errkit"
 )
 
 type AuthLazyFetchOptions struct {
 	TemplateStore *loader.Store
-	ExecOpts      protocols.ExecutorOptions
+	ExecOpts      *protocols.ExecutorOptions
 	OnError       func(error)
 }
 
 // GetAuthTmplStore create new loader for loading auth templates
-func GetAuthTmplStore(opts types.Options, catalog catalog.Catalog, execOpts protocols.ExecutorOptions) (*loader.Store, error) {
+func GetAuthTmplStore(opts *types.Options, catalog catalog.Catalog, execOpts *protocols.ExecutorOptions) (*loader.Store, error) {
 	tmpls := []string{}
 	for _, file := range opts.SecretsFile {
 		data, err := authx.GetTemplatePathsFromSecretFile(file)
 		if err != nil {
-			return nil, errorutil.NewWithErr(err).Msgf("failed to get template paths from secrets file")
+			return nil, errkit.Wrap(err, "failed to get template paths from secrets file")
 		}
 		tmpls = append(tmpls, data...)
 	}
@@ -54,11 +55,11 @@ func GetAuthTmplStore(opts types.Options, catalog catalog.Catalog, execOpts prot
 	opts.Protocols = nil
 	opts.ExcludeProtocols = nil
 	opts.IncludeConditions = nil
-	cfg := loader.NewConfig(&opts, catalog, execOpts)
+	cfg := loader.NewConfig(opts, catalog, execOpts)
 	cfg.StoreId = loader.AuthStoreId
 	store, err := loader.New(cfg)
 	if err != nil {
-		return nil, errorutil.NewWithErr(err).Msgf("failed to initialize dynamic auth templates store")
+		return nil, errkit.Wrap(err, "failed to initialize dynamic auth templates store")
 	}
 	return store, nil
 }
@@ -66,9 +67,12 @@ func GetAuthTmplStore(opts types.Options, catalog catalog.Catalog, execOpts prot
 // GetLazyAuthFetchCallback returns a lazy fetch callback for auth secrets
 func GetLazyAuthFetchCallback(opts *AuthLazyFetchOptions) authx.LazyFetchSecret {
 	return func(d *authx.Dynamic) error {
-		tmpls := opts.TemplateStore.LoadTemplates([]string{d.TemplatePath})
+		tmpls, err := opts.TemplateStore.LoadTemplates([]string{d.TemplatePath})
+		if err != nil {
+			return fmt.Errorf("failed to load templates: %w", err)
+		}
 		if len(tmpls) == 0 {
-			return fmt.Errorf("no templates found for path: %s", d.TemplatePath)
+			return fmt.Errorf("%w for path: %s", disk.ErrNoTemplatesFound, d.TemplatePath)
 		}
 		if len(tmpls) > 1 {
 			return fmt.Errorf("multiple templates found for path: %s", d.TemplatePath)
@@ -105,11 +109,9 @@ func GetLazyAuthFetchCallback(opts *AuthLazyFetchOptions) authx.LazyFetchSecret 
 		var finalErr error
 		ctx.OnResult = func(e *output.InternalWrappedEvent) {
 			if e == nil {
-				finalErr = fmt.Errorf("no result found for template: %s", d.TemplatePath)
 				return
 			}
 			if !e.HasOperatorResult() {
-				finalErr = fmt.Errorf("no result found for template: %s", d.TemplatePath)
 				return
 			}
 			// dynamic values
@@ -129,19 +131,15 @@ func GetLazyAuthFetchCallback(opts *AuthLazyFetchOptions) authx.LazyFetchSecret 
 					data[k] = v[0]
 				}
 			}
-			if len(data) == 0 {
-				if e.OperatorsResult.Matched {
-					finalErr = fmt.Errorf("match found but no (dynamic/extracted) values found for template: %s", d.TemplatePath)
-				} else {
-					finalErr = fmt.Errorf("no match or (dynamic/extracted) values found for template: %s", d.TemplatePath)
-				}
-			}
 			// log result of template in result file/screen
 			_ = writer.WriteResult(e, opts.ExecOpts.Output, opts.ExecOpts.Progress, opts.ExecOpts.IssuesClient)
 		}
-		_, err := tmpl.Executer.ExecuteWithResults(ctx)
-		if err != nil {
-			finalErr = err
+		_, execErr := tmpl.Executer.ExecuteWithResults(ctx)
+		if execErr != nil {
+			finalErr = execErr
+		}
+		if finalErr == nil && len(data) == 0 {
+			finalErr = fmt.Errorf("no extracted values found for template: %s", d.TemplatePath)
 		}
 		// store extracted result in auth context
 		d.Extracted = data

@@ -6,10 +6,12 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"strings"
 	"sync/atomic"
 	"time"
 
+	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/nuclei/v3/internal/pdcp"
 	"github.com/projectdiscovery/nuclei/v3/internal/server"
 	"github.com/projectdiscovery/nuclei/v3/pkg/authprovider"
@@ -28,11 +30,10 @@ import (
 	pprofutil "github.com/projectdiscovery/utils/pprof"
 	updateutils "github.com/projectdiscovery/utils/update"
 
-	"github.com/logrusorgru/aurora"
+	"github.com/logrusorgru/aurora/v4"
 	"github.com/pkg/errors"
 	"github.com/projectdiscovery/ratelimit"
 
-	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/nuclei/v3/internal/colorizer"
 	"github.com/projectdiscovery/nuclei/v3/internal/httpapi"
 	"github.com/projectdiscovery/nuclei/v3/pkg/catalog"
@@ -51,9 +52,11 @@ import (
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/automaticscan"
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/contextargs"
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/globalmatchers"
+	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/honeypotdetector"
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/hosterrorscache"
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/interactsh"
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/protocolinit"
+	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/protocolstate"
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/uncover"
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/utils/excludematchers"
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/headless/engine"
@@ -84,7 +87,7 @@ type Runner struct {
 	projectFile        *projectfile.ProjectFile
 	catalog            catalog.Catalog
 	progress           progress.Progress
-	colorizer          aurora.Aurora
+	colorizer          *aurora.Aurora
 	issuesClient       reporting.Client
 	browser            *engine.Browser
 	rateLimiter        *ratelimit.Limiter
@@ -95,6 +98,9 @@ type Runner struct {
 	inputProvider      provider.InputProvider
 	fuzzFrequencyCache *frequency.Tracker
 	httpStats          *outputstats.Tracker
+	Logger             *gologger.Logger
+
+	honeypotDetector *honeypotdetector.Detector
 
 	//general purpose temporary directory
 	tmpDir          string
@@ -108,10 +114,11 @@ type Runner struct {
 func New(options *types.Options) (*Runner, error) {
 	runner := &Runner{
 		options: options,
+		Logger:  options.Logger,
 	}
 
 	if options.HealthCheck {
-		gologger.Print().Msgf("%s\n", DoHealthCheck(options))
+		runner.Logger.Print().Msgf("%s\n", DoHealthCheck(options))
 		os.Exit(0)
 	}
 
@@ -119,14 +126,14 @@ func New(options *types.Options) (*Runner, error) {
 	if config.DefaultConfig.CanCheckForUpdates() {
 		if err := installer.NucleiVersionCheck(); err != nil {
 			if options.Verbose || options.Debug {
-				gologger.Error().Msgf("nuclei version check failed got: %s\n", err)
+				runner.Logger.Error().Msgf("nuclei version check failed got: %s\n", err)
 			}
 		}
 
 		// check for custom template updates and update if available
 		ctm, err := customtemplates.NewCustomTemplatesManager(options)
 		if err != nil {
-			gologger.Error().Label("custom-templates").Msgf("Failed to create custom templates manager: %s\n", err)
+			runner.Logger.Error().Label("custom-templates").Msgf("Failed to create custom templates manager: %s\n", err)
 		}
 
 		// Check for template updates and update if available.
@@ -136,15 +143,15 @@ func New(options *types.Options) (*Runner, error) {
 			DisablePublicTemplates: options.PublicTemplateDisableDownload,
 		}
 		if err := tm.FreshInstallIfNotExists(); err != nil {
-			gologger.Warning().Msgf("failed to install nuclei templates: %s\n", err)
+			runner.Logger.Warning().Msgf("failed to install nuclei templates: %s\n", err)
 		}
 		if err := tm.UpdateIfOutdated(); err != nil {
-			gologger.Warning().Msgf("failed to update nuclei templates: %s\n", err)
+			runner.Logger.Warning().Msgf("failed to update nuclei templates: %s\n", err)
 		}
 
 		if config.DefaultConfig.NeedsIgnoreFileUpdate() {
 			if err := installer.UpdateIgnoreFile(); err != nil {
-				gologger.Warning().Msgf("failed to update nuclei ignore file: %s\n", err)
+				runner.Logger.Warning().Msgf("failed to update nuclei ignore file: %s\n", err)
 			}
 		}
 
@@ -152,7 +159,7 @@ func New(options *types.Options) (*Runner, error) {
 			// we automatically check for updates unless explicitly disabled
 			// this print statement is only to inform the user that there are no updates
 			if !config.DefaultConfig.NeedsTemplateUpdate() {
-				gologger.Info().Msgf("No new updates found for nuclei templates")
+				runner.Logger.Info().Msgf("No new updates found for nuclei templates")
 			}
 			// manually trigger update of custom templates
 			if ctm != nil {
@@ -161,20 +168,26 @@ func New(options *types.Options) (*Runner, error) {
 		}
 	}
 
-	parser := templates.NewParser()
-
-	if options.Validate {
-		parser.ShouldValidate = true
+	if op, ok := options.Parser.(*templates.Parser); ok {
+		// Enable passing in an existing parser instance
+		// This uses a type assertion to avoid an import loop
+		runner.parser = op
+	} else {
+		parser := templates.NewParser()
+		if options.Validate {
+			parser.ShouldValidate = true
+		}
+		// TODO: refactor to pass options reference globally without cycles
+		parser.NoStrictSyntax = options.NoStrictSyntax
+		runner.parser = parser
 	}
-	// TODO: refactor to pass options reference globally without cycles
-	parser.NoStrictSyntax = options.NoStrictSyntax
-	runner.parser = parser
 
 	yaml.StrictSyntax = !options.NoStrictSyntax
+	yaml.AllowLocalFileAccess = options.AllowLocalFileAccess
 
 	if options.Headless {
 		if engine.MustDisableSandbox() {
-			gologger.Warning().Msgf("The current platform and privileged user will run the browser without sandbox\n")
+			runner.Logger.Warning().Msgf("The current platform and privileged user will run the browser without sandbox\n")
 		}
 		browser, err := engine.New(options)
 		if err != nil {
@@ -188,7 +201,7 @@ func New(options *types.Options) (*Runner, error) {
 	var httpclient *retryablehttp.Client
 	if options.ProxyInternal && options.AliveHttpProxy != "" || options.AliveSocksProxy != "" {
 		var err error
-		httpclient, err = httpclientpool.Get(options, &httpclientpool.Configuration{})
+		httpclient, err = httpclientpool.Get(options, &httpclientpool.Configuration{}, "")
 		if err != nil {
 			return nil, err
 		}
@@ -215,7 +228,7 @@ func New(options *types.Options) (*Runner, error) {
 
 	// output coloring
 	useColor := !options.NoColor
-	runner.colorizer = aurora.NewAurora(useColor)
+	runner.colorizer = aurora.New(aurora.WithColors(useColor))
 	templates.Colorizer = runner.colorizer
 	templates.SeverityColorizer = colorizer.New(runner.colorizer)
 
@@ -226,11 +239,11 @@ func New(options *types.Options) (*Runner, error) {
 
 	if options.HttpApiEndpoint != "" {
 		apiServer := httpapi.New(options.HttpApiEndpoint, options)
-		gologger.Info().Msgf("Listening api endpoint on: %s", options.HttpApiEndpoint)
+		runner.Logger.Info().Msgf("Listening api endpoint on: %s", options.HttpApiEndpoint)
 		runner.httpApiEndpoint = apiServer
 		go func() {
 			if err := apiServer.Start(); err != nil {
-				gologger.Error().Msgf("Failed to start API server: %s", err)
+				runner.Logger.Error().Msgf("Failed to start API server: %s", err)
 			}
 		}()
 	}
@@ -239,8 +252,29 @@ func New(options *types.Options) (*Runner, error) {
 		os.Exit(0)
 	}
 
+	tmpDir, err := os.MkdirTemp("", "nuclei-tmp-*")
+	if err != nil {
+		return nil, errors.Wrap(err, "could not create temporary directory")
+	}
+	runner.tmpDir = tmpDir
+
+	// Cleanup tmpDir only if initialization fails
+	// On successful initialization, Close() method will handle cleanup
+	cleanupOnError := true
+	defer func() {
+		if cleanupOnError && runner.tmpDir != "" {
+			_ = os.RemoveAll(runner.tmpDir)
+		}
+	}()
+
+	// Initialize honeypot detector (opt-in) so results can be suppressed.
+	var hpDetector *honeypotdetector.Detector
+	if options.HoneypotDetection {
+		hpDetector = honeypotdetector.New(options.HoneypotThreshold)
+	}
+
 	// create the input provider and load the inputs
-	inputProvider, err := provider.NewInputProvider(provider.InputOptions{Options: options})
+	inputProvider, err := provider.NewInputProvider(provider.InputOptions{Options: options, TempDir: runner.tmpDir})
 	if err != nil {
 		return nil, errors.Wrap(err, "could not create input provider")
 	}
@@ -250,6 +284,10 @@ func New(options *types.Options) (*Runner, error) {
 	outputWriter, err := output.NewStandardWriter(options)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not create output file")
+	}
+	if hpDetector != nil {
+		outputWriter.SetHoneypotDetector(hpDetector)
+		runner.honeypotDetector = hpDetector
 	}
 	// setup a proxy writer to automatically upload results to PDCP
 	runner.output = runner.setupPDCPUpload(outputWriter)
@@ -284,7 +322,7 @@ func New(options *types.Options) (*Runner, error) {
 	// create the resume configuration structure
 	resumeCfg := types.NewResumeCfg()
 	if runner.options.ShouldLoadResume() {
-		gologger.Info().Msg("Resuming from save checkpoint")
+		runner.Logger.Info().Msg("Resuming from save checkpoint")
 		file, err := os.ReadFile(runner.options.Resume)
 		if err != nil {
 			return nil, err
@@ -326,6 +364,7 @@ func New(options *types.Options) (*Runner, error) {
 	}
 
 	opts := interactsh.DefaultOptions(runner.output, runner.issuesClient, runner.progress)
+	opts.Logger = runner.Logger
 	opts.Debug = runner.options.Debug
 	opts.NoColor = runner.options.NoColor
 	if options.InteractshURL != "" {
@@ -355,34 +394,33 @@ func New(options *types.Options) (*Runner, error) {
 	}
 	interactshClient, err := interactsh.New(opts)
 	if err != nil {
-		gologger.Error().Msgf("Could not create interactsh client: %s", err)
+		runner.Logger.Error().Msgf("Could not create interactsh client: %s", err)
 	} else {
 		runner.interactsh = interactshClient
 	}
 
 	if options.RateLimitMinute > 0 {
-		gologger.Print().Msgf("[%v] %v", aurora.BrightYellow("WRN"), "rate limit per minute is deprecated - use rate-limit-duration")
+		runner.Logger.Warning().Msg("rate limit per minute is deprecated - use rate-limit-duration")
 		options.RateLimit = options.RateLimitMinute
 		options.RateLimitDuration = time.Minute
 	}
 	if options.RateLimit > 0 && options.RateLimitDuration == 0 {
 		options.RateLimitDuration = time.Second
 	}
-	if options.RateLimit == 0 && options.RateLimitDuration == 0 {
-		runner.rateLimiter = ratelimit.NewUnlimited(context.Background())
+	// If per-host rate limiting is enabled, make global rate limiter unlimited
+	if options.PerHostRateLimit {
+		runner.rateLimiter = utils.GetRateLimiter(context.Background(), 0, 0)
 	} else {
-		runner.rateLimiter = ratelimit.New(context.Background(), uint(options.RateLimit), options.RateLimitDuration)
+		runner.rateLimiter = utils.GetRateLimiter(context.Background(), options.RateLimit, options.RateLimitDuration)
 	}
 
-	if tmpDir, err := os.MkdirTemp("", "nuclei-tmp-*"); err == nil {
-		runner.tmpDir = tmpDir
-	}
-
+	// Initialization successful, disable cleanup on error
+	cleanupOnError = false
 	return runner, nil
 }
 
 // runStandardEnumeration runs standard enumeration
-func (r *Runner) runStandardEnumeration(executerOpts protocols.ExecutorOptions, store *loader.Store, engine *core.Engine) (*atomic.Bool, error) {
+func (r *Runner) runStandardEnumeration(executerOpts *protocols.ExecutorOptions, store *loader.Store, engine *core.Engine) (*atomic.Bool, error) {
 	if r.options.AutomaticScan {
 		return r.executeSmartWorkflowInput(executerOpts, store, engine)
 	}
@@ -397,12 +435,39 @@ func (r *Runner) Close() {
 	if r.httpStats != nil {
 		r.httpStats.DisplayTopStats(r.options.NoColor)
 	}
+	if newConns, reusedConns := httpclientpool.GetConnectionStats(); newConns+reusedConns > 0 {
+		total := newConns + reusedConns
+		ratio := float64(reusedConns) / float64(total) * 100
+		gologger.Info().Msgf("HTTP connections: %d total, %d new, %d reused (%.1f%%)", total, newConns, reusedConns, ratio)
+
+		// Per-host breakdown is opt-in (verbose) since large scans touch many hosts.
+		if r.options.Verbose {
+			perHost := httpclientpool.GetPerHostConnectionStats()
+			sort.Slice(perHost, func(i, j int) bool {
+				return (perHost[i].New + perHost[i].Reused) > (perHost[j].New + perHost[j].Reused)
+			})
+			const maxPerHostLines = 20
+			for i, s := range perHost {
+				if i >= maxPerHostLines {
+					gologger.Info().Msgf("HTTP connections: ... and %d more host(s)", len(perHost)-maxPerHostLines)
+					break
+				}
+				hostTotal := s.New + s.Reused
+				hostRatio := float64(s.Reused) / float64(hostTotal) * 100
+				gologger.Info().Msgf("HTTP connections [%s]: %d total, %d new, %d reused (%.1f%%)", s.Host, hostTotal, s.New, s.Reused, hostRatio)
+			}
+		}
+	}
 	// dump hosterrors cache
 	if r.hostErrors != nil {
 		r.hostErrors.Close()
 	}
 	if r.output != nil {
 		r.output.Close()
+	}
+
+	if r.honeypotDetector != nil {
+		r.Logger.Print().Msgf("%s\n", r.honeypotDetector.Summary())
 	}
 	if r.issuesClient != nil {
 		r.issuesClient.Close()
@@ -413,7 +478,7 @@ func (r *Runner) Close() {
 	if r.inputProvider != nil {
 		r.inputProvider.Close()
 	}
-	protocolinit.Close()
+	protocolinit.Close(r.options.ExecutionId)
 	if r.pprofServer != nil {
 		r.pprofServer.Stop()
 	}
@@ -440,22 +505,21 @@ func (r *Runner) setupPDCPUpload(writer output.Writer) output.Writer {
 		r.options.EnableCloudUpload = true
 	}
 	if !r.options.EnableCloudUpload && !EnableCloudUpload {
-		r.pdcpUploadErrMsg = fmt.Sprintf("[%v] Scan results upload to cloud is disabled.", r.colorizer.BrightYellow("WRN"))
+		r.pdcpUploadErrMsg = "Scan results upload to cloud is disabled."
 		return writer
 	}
-	color := aurora.NewAurora(!r.options.NoColor)
 	h := &pdcpauth.PDCPCredHandler{}
 	creds, err := h.GetCreds()
 	if err != nil {
 		if err != pdcpauth.ErrNoCreds && !HideAutoSaveMsg {
-			gologger.Verbose().Msgf("Could not get credentials for cloud upload: %s\n", err)
+			r.Logger.Verbose().Msgf("Could not get credentials for cloud upload: %s\n", err)
 		}
-		r.pdcpUploadErrMsg = fmt.Sprintf("[%v] To view results on Cloud Dashboard, Configure API key from %v", color.BrightYellow("WRN"), pdcpauth.DashBoardURL)
+		r.pdcpUploadErrMsg = fmt.Sprintf("To view results on Cloud Dashboard, configure API key from %v", pdcpauth.DashBoardURL)
 		return writer
 	}
-	uploadWriter, err := pdcp.NewUploadWriter(context.Background(), creds)
+	uploadWriter, err := pdcp.NewUploadWriter(context.Background(), r.Logger, creds)
 	if err != nil {
-		r.pdcpUploadErrMsg = fmt.Sprintf("[%v] PDCP (%v) Auto-Save Failed: %s\n", color.BrightYellow("WRN"), pdcpauth.DashBoardURL, err)
+		r.pdcpUploadErrMsg = fmt.Sprintf("PDCP (%v) Auto-Save Failed: %s\n", pdcpauth.DashBoardURL, err)
 		return writer
 	}
 	if r.options.ScanID != "" {
@@ -474,6 +538,11 @@ func (r *Runner) setupPDCPUpload(writer output.Writer) output.Writer {
 // RunEnumeration sets up the input layer for giving input nuclei.
 // binary and runs the actual enumeration
 func (r *Runner) RunEnumeration() error {
+	// Reset connection-reuse counters so the summary logged on Close()
+	// reflects only this run, not totals accumulated across multiple
+	// in-process executions (e.g. SDK / embedded usage).
+	httpclientpool.ResetConnectionStats()
+
 	// If the user has asked for DAST server mode, run the live
 	// DAST fuzzing server.
 	if r.options.DASTServer {
@@ -491,6 +560,7 @@ func (r *Runner) RunEnumeration() error {
 			Parser:             r.parser,
 			TemporaryDirectory: r.tmpDir,
 			FuzzStatsDB:        r.fuzzStats,
+			Logger:             r.Logger,
 		}
 		dastServer, err := server.New(&server.Options{
 			Address:               r.options.DASTServerAddress,
@@ -532,7 +602,7 @@ func (r *Runner) RunEnumeration() error {
 
 	// Create the executor options which will be used throughout the execution
 	// stage by the nuclei engine modules.
-	executorOpts := protocols.ExecutorOptions{
+	executorOpts := &protocols.ExecutorOptions{
 		Output:              r.output,
 		Options:             r.options,
 		Progress:            r.progress,
@@ -550,6 +620,8 @@ func (r *Runner) RunEnumeration() error {
 		Parser:              r.parser,
 		FuzzParamsFrequency: fuzzFreqCache,
 		GlobalMatchers:      globalmatchers.New(),
+		DoNotCache:          r.options.DoNotCacheTemplates,
+		Logger:              r.Logger,
 	}
 
 	if config.DefaultConfig.IsDebugArgEnabled(config.DebugExportURLPattern) {
@@ -558,7 +630,9 @@ func (r *Runner) RunEnumeration() error {
 	}
 
 	if len(r.options.SecretsFile) > 0 && !r.options.Validate {
-		authTmplStore, err := GetAuthTmplStore(*r.options, r.catalog, executorOpts)
+		// Clone options so GetAuthTmplStore can modify them without affecting the original
+		authOptions := r.options.Copy()
+		authTmplStore, err := GetAuthTmplStore(authOptions, r.catalog, executorOpts)
 		if err != nil {
 			return errors.Wrap(err, "failed to load dynamic auth templates")
 		}
@@ -578,8 +652,8 @@ func (r *Runner) RunEnumeration() error {
 	if r.options.ShouldUseHostError() {
 		maxHostError := r.options.MaxHostError
 		if r.options.TemplateThreads > maxHostError {
-			gologger.Print().Msgf("[%v] The concurrency value is higher than max-host-error", r.colorizer.BrightYellow("WRN"))
-			gologger.Info().Msgf("Adjusting max-host-error to the concurrency value: %d", r.options.TemplateThreads)
+			r.Logger.Warning().Msg("The concurrency value is higher than max-host-error")
+			r.Logger.Info().Msgf("Adjusting max-host-error to the concurrency value: %d", r.options.TemplateThreads)
 
 			maxHostError = r.options.TemplateThreads
 		}
@@ -594,7 +668,7 @@ func (r *Runner) RunEnumeration() error {
 	executorEngine := core.New(r.options)
 	executorEngine.SetExecuterOptions(executorOpts)
 
-	workflowLoader, err := parsers.NewLoader(&executorOpts)
+	workflowLoader, err := parsers.NewLoader(executorOpts)
 	if err != nil {
 		return errors.Wrap(err, "Could not create loader.")
 	}
@@ -615,16 +689,20 @@ func (r *Runner) RunEnumeration() error {
 	// This uses a separate parser to reduce time taken as
 	// normally nuclei does a lot of compilation and stuff
 	// for templates, which we don't want for these simp
-	if r.options.TemplateList || r.options.TemplateDisplay || r.options.TagList {
+	if r.options.TagList {
+		tagsMap, err := store.LoadTemplateTags()
+		if err != nil {
+			return err
+		}
+		r.listAvailableTags(tagsMap)
+		os.Exit(0)
+	}
+
+	if r.options.TemplateList || r.options.TemplateDisplay {
 		if err := store.LoadTemplatesOnlyMetadata(); err != nil {
 			return err
 		}
-
-		if r.options.TagList {
-			r.listAvailableStoreTags(store)
-		} else {
-			r.listAvailableStoreTemplates(store)
-		}
+		r.listAvailableStoreTemplates(store)
 		os.Exit(0)
 	}
 
@@ -632,16 +710,17 @@ func (r *Runner) RunEnumeration() error {
 		if err := store.ValidateTemplates(); err != nil {
 			return err
 		}
-		if stats.GetValue(templates.SyntaxErrorStats) == 0 && stats.GetValue(templates.SyntaxWarningStats) == 0 && stats.GetValue(templates.RuntimeWarningsStats) == 0 {
-			gologger.Info().Msgf("All templates validated successfully\n")
+		if stats.GetValue(templates.TemplateSyntaxErrorStats) == 0 && stats.GetValue(templates.TemplateSyntaxWarningStats) == 0 && stats.GetValue(templates.TemplateRuntimeWarningStats) == 0 {
+			r.Logger.Info().Msgf("All templates validated successfully")
 		} else {
 			return errors.New("encountered errors while performing template validation")
 		}
 		return nil // exit
 	}
-	store.Load()
+	if err := store.Load(); err != nil {
+		return err
+	}
 	// TODO: remove below functions after v3 or update warning messages
-	disk.PrintDeprecatedPathsMsgIfApplicable(r.options.Silent)
 	templates.PrintDeprecatedProtocolNameMsgIfApplicable(r.options.Silent, r.options.Verbose)
 
 	// add the hosts from the metadata queries of loaded templates into input provider
@@ -655,15 +734,24 @@ func (r *Runner) RunEnumeration() error {
 		}
 		ret := uncover.GetUncoverTargetsFromMetadata(context.TODO(), store.Templates(), r.options.UncoverField, uncoverOpts)
 		for host := range ret {
-			_ = r.inputProvider.SetWithExclusions(host)
+			_ = r.inputProvider.SetWithExclusions(r.options.ExecutionId, host)
+		}
+	}
+
+	// Preflight: resolve hosts + portscan for ports required by loaded templates, then filter inputs.
+	// This reduces time spent on non-resolvable targets or targets with no relevant open ports.
+	// Preflight is a best-effort optimization: on failure we log and continue with the full input set.
+	if r.options.PreflightPortScan {
+		if err := r.preflightResolveAndPortScan(store); err != nil {
+			gologger.Warning().Msgf("preflight resolve/portscan failed, continuing without input filtering: %s", err)
 		}
 	}
 	// display execution info like version , templates used etc
 	r.displayExecutionInfo(store)
 
-	// prefetch secrets if enabled
-	if executorOpts.AuthProvider != nil && r.options.PreFetchSecrets {
-		gologger.Info().Msgf("Pre-fetching secrets from authprovider[s]")
+	// prefetch secrets to ensure authentication completes before scanning starts
+	if executorOpts.AuthProvider != nil {
+		r.Logger.Info().Msgf("Pre-fetching secrets from authprovider[s]")
 		if err := executorOpts.AuthProvider.PreFetchSecrets(); err != nil {
 			return errors.Wrap(err, "could not pre-fetch secrets")
 		}
@@ -680,13 +768,15 @@ func (r *Runner) RunEnumeration() error {
 		executorOpts.InputHelper.InputsHTTP = inputHelpers
 	}
 
+	inputCount := int(r.inputProvider.Count())
+
 	// initialize stats worker ( this is no-op unless nuclei is built with stats build tag)
 	// during execution a directory with 2 files will be created in the current directory
 	// config.json - containing below info
 	// events.jsonl - containing all start and end times of all templates
 	events.InitWithConfig(&events.ScanConfig{
 		Name:                "nuclei-stats", // make this configurable
-		TargetCount:         int(r.inputProvider.Count()),
+		TargetCount:         inputCount,
 		TemplatesCount:      len(store.Templates()) + len(store.Workflows()),
 		TemplateConcurrency: r.options.TemplateThreads,
 		PayloadConcurrency:  r.options.PayloadConcurrency,
@@ -697,7 +787,7 @@ func (r *Runner) RunEnumeration() error {
 	if r.dastServer != nil {
 		go func() {
 			if err := r.dastServer.Start(); err != nil {
-				gologger.Error().Msgf("could not start dast server: %v", err)
+				r.Logger.Error().Msgf("could not start dast server: %v", err)
 			}
 		}()
 	}
@@ -728,13 +818,32 @@ func (r *Runner) RunEnumeration() error {
 
 	r.progress.Stop()
 	timeTaken := time.Since(now)
+
+	// Print pool/tracker stats if available (single dialers lookup, reads under lock)
+	if dialers := protocolstate.GetDialersWithId(r.options.ExecutionId); dialers != nil {
+		dialers.Lock()
+		perHostRateLimitPool := dialers.PerHostRateLimitPool
+		httpToHTTPSPortTracker := dialers.HTTPToHTTPSPortTracker
+		dialers.Unlock()
+
+		if pool, ok := perHostRateLimitPool.(interface{ PrintStats() }); ok {
+			pool.PrintStats()
+		}
+		if pool, ok := perHostRateLimitPool.(interface{ PrintPerHostPPSStats() }); ok {
+			pool.PrintPerHostPPSStats()
+		}
+		if tracker, ok := httpToHTTPSPortTracker.(interface{ PrintStats() }); ok {
+			tracker.PrintStats()
+		}
+	}
+
 	// todo: error propagation without canonical straight error check is required by cloud?
 	// use safe dereferencing to avoid potential panics in case of previous unchecked errors
 	if v := ptrutil.Safe(results); !v.Load() {
-		gologger.Info().Msgf("Scan completed in %s. No results found.", shortDur(timeTaken))
+		r.Logger.Info().Msgf("Scan completed in %s. No results found.", shortDur(timeTaken))
 	} else {
 		matchCount := r.output.ResultCount()
-		gologger.Info().Msgf("Scan completed in %s. %d matches found.", shortDur(timeTaken), matchCount)
+		r.Logger.Info().Msgf("Scan completed in %s. %d matches found.", shortDur(timeTaken), matchCount)
 	}
 
 	// check if a passive scan was requested but no target was provided
@@ -775,7 +884,7 @@ func (r *Runner) isInputNonHTTP() bool {
 	return nonURLInput
 }
 
-func (r *Runner) executeSmartWorkflowInput(executorOpts protocols.ExecutorOptions, store *loader.Store, engine *core.Engine) (*atomic.Bool, error) {
+func (r *Runner) executeSmartWorkflowInput(executorOpts *protocols.ExecutorOptions, store *loader.Store, engine *core.Engine) (*atomic.Bool, error) {
 	r.progress.Init(r.inputProvider.Count(), 0, 0)
 
 	service, err := automaticscan.New(automaticscan.Options{
@@ -822,36 +931,38 @@ func (r *Runner) executeTemplatesInput(store *loader.Store, engine *core.Engine)
 	return results, nil
 }
 
-// displayExecutionInfo displays misc info about the nuclei engine execution
+// displayExecutionInfo prints parser stats, version info, and scan counts.
 func (r *Runner) displayExecutionInfo(store *loader.Store) {
-	// Display stats for any loaded templates' syntax warnings or errors
-	stats.Display(templates.SyntaxWarningStats)
-	stats.Display(templates.SyntaxErrorStats)
-	stats.Display(templates.RuntimeWarningsStats)
+	// Display parser stats for templates loaded into the store.
+	stats.Display(templates.TemplateSyntaxWarningStats)
+	stats.Display(templates.TemplateSyntaxErrorStats)
+	stats.Display(templates.TemplateRuntimeWarningStats)
+
 	tmplCount := len(store.Templates())
 	workflowCount := len(store.Workflows())
 	if r.options.Verbose || (tmplCount == 0 && workflowCount == 0) {
-		// only print these stats in verbose mode
-		stats.ForceDisplayWarning(templates.ExcludedHeadlessTmplStats)
-		stats.ForceDisplayWarning(templates.ExcludedCodeTmplStats)
-		stats.ForceDisplayWarning(templates.ExludedDastTmplStats)
-		stats.ForceDisplayWarning(templates.TemplatesExcludedStats)
-		stats.ForceDisplayWarning(templates.ExcludedFileStats)
-		stats.ForceDisplayWarning(templates.ExcludedSelfContainedStats)
+		// Excluded-template stats are noisy during normal scans, but useful in verbose mode
+		// and when no runnable templates remain.
+		for _, capability := range templates.AllCapabilities() {
+			stats.ForceDisplayWarning(capability.Stat())
+		}
+		stats.ForceDisplayWarning(templates.ExcludedWeakMatcherTemplateStats)
 	}
 
 	if tmplCount == 0 && workflowCount == 0 {
-		// if dast flag is used print explicit warning
 		if r.options.DAST {
-			gologger.DefaultLogger.Print().Msgf("[%v] No DAST templates found", aurora.BrightYellow("WRN"))
+			r.Logger.Warning().Msg("No DAST templates found")
 		}
-		stats.ForceDisplayWarning(templates.SkippedCodeTmplTamperedStats)
+		stats.ForceDisplayWarning(templates.SkippedUnverifiedCodeTemplateStats)
+		stats.ForceDisplayWarning(templates.SkippedUnverifiedJavascriptTemplateStats)
 	} else {
-		stats.DisplayAsWarning(templates.SkippedCodeTmplTamperedStats)
+		stats.DisplayAsWarning(templates.SkippedUnverifiedCodeTemplateStats)
+		stats.DisplayAsWarning(templates.SkippedUnverifiedJavascriptTemplateStats)
 	}
+
 	stats.DisplayAsWarning(httpProtocol.SetThreadToCountZero)
-	stats.ForceDisplayWarning(templates.SkippedUnsignedStats)
-	stats.ForceDisplayWarning(templates.SkippedRequestSignatureStats)
+	stats.ForceDisplayWarning(templates.SkippedUnverifiedTemplateStats)
+	stats.ForceDisplayWarning(templates.SkippedRequestSignatureTemplateStats)
 
 	cfg := config.DefaultConfig
 
@@ -867,34 +978,34 @@ func (r *Runner) displayExecutionInfo(store *loader.Store) {
 	gologger.Info().Msg(versionInfo(cfg.TemplateVersion, cfg.LatestNucleiTemplatesVersion, "nuclei-templates"))
 	if !HideAutoSaveMsg {
 		if r.pdcpUploadErrMsg != "" {
-			gologger.Print().Msgf("%s", r.pdcpUploadErrMsg)
+			r.Logger.Warning().Msgf("%s", r.pdcpUploadErrMsg)
 		} else {
-			gologger.Info().Msgf("To view results on cloud dashboard, visit %v/scans upon scan completion.", pdcpauth.DashBoardURL)
+			r.Logger.Info().Msgf("To view results on cloud dashboard, visit %v/scans upon scan completion.", pdcpauth.DashBoardURL)
 		}
 	}
 
 	if tmplCount > 0 || workflowCount > 0 {
 		if len(store.Templates()) > 0 {
-			gologger.Info().Msgf("New templates added in latest release: %d", len(config.DefaultConfig.GetNewAdditions()))
-			gologger.Info().Msgf("Templates loaded for current scan: %d", len(store.Templates()))
+			r.Logger.Info().Msgf("New templates added in latest release: %d", len(config.DefaultConfig.GetNewAdditions()))
+			r.Logger.Info().Msgf("Templates loaded for current scan: %d", len(store.Templates()))
 		}
 		if len(store.Workflows()) > 0 {
-			gologger.Info().Msgf("Workflows loaded for current scan: %d", len(store.Workflows()))
+			r.Logger.Info().Msgf("Workflows loaded for current scan: %d", len(store.Workflows()))
 		}
 		for k, v := range templates.SignatureStats {
 			value := v.Load()
 			if value > 0 {
 				if k == templates.Unsigned && !r.options.Silent && !config.DefaultConfig.HideTemplateSigWarning {
-					gologger.Print().Msgf("[%v] Loading %d unsigned templates for scan. Use with caution.", r.colorizer.BrightYellow("WRN"), value)
+					r.Logger.Warning().Msgf("Loading %d unsigned templates for scan. Use with caution.", value)
 				} else {
-					gologger.Info().Msgf("Executing %d signed templates from %s", value, k)
+					r.Logger.Info().Msgf("Executing %d signed templates from %s", value, k)
 				}
 			}
 		}
 	}
 
 	if r.inputProvider.Count() > 0 {
-		gologger.Info().Msgf("Targets loaded for current scan: %d", r.inputProvider.Count())
+		r.Logger.Info().Msgf("Targets loaded for current scan: %d", r.inputProvider.Count())
 	}
 }
 
@@ -921,7 +1032,7 @@ func UploadResultsToCloud(options *types.Options) error {
 		return errors.Wrap(err, "could not get credentials for cloud upload")
 	}
 	ctx := context.TODO()
-	uploadWriter, err := pdcp.NewUploadWriter(ctx, creds)
+	uploadWriter, err := pdcp.NewUploadWriter(ctx, options.Logger, creds)
 	if err != nil {
 		return errors.Wrap(err, "could not create upload writer")
 	}
@@ -941,20 +1052,20 @@ func UploadResultsToCloud(options *types.Options) error {
 		return errors.Wrap(err, "could not open scan upload file")
 	}
 	defer func() {
-         _ = file.Close()
-       }()
+		_ = file.Close()
+	}()
 
-	gologger.Info().Msgf("Uploading scan results to cloud dashboard from %s", options.ScanUploadFile)
+	options.Logger.Info().Msgf("Uploading scan results to cloud dashboard from %s", options.ScanUploadFile)
 	dec := json.NewDecoder(file)
 	for dec.More() {
 		var r output.ResultEvent
 		err := dec.Decode(&r)
 		if err != nil {
-			gologger.Warning().Msgf("Could not decode jsonl: %s\n", err)
+			options.Logger.Warning().Msgf("Could not decode jsonl: %s\n", err)
 			continue
 		}
 		if err = uploadWriter.Write(&r); err != nil {
-			gologger.Warning().Msgf("[%s] failed to upload: %s\n", r.TemplateID, err)
+			options.Logger.Warning().Msgf("[%s] failed to upload: %s\n", r.TemplateID, err)
 		}
 	}
 	uploadWriter.Close()
@@ -969,7 +1080,7 @@ type WalkFunc func(reflect.Value, reflect.StructField)
 // reflect.Value and reflect.Type properties of the value in the struct.
 func Walk(s interface{}, callback WalkFunc) {
 	structValue := reflect.ValueOf(s)
-	if structValue.Kind() == reflect.Ptr {
+	if structValue.Kind() == reflect.Pointer {
 		structValue = structValue.Elem()
 	}
 	if structValue.Kind() != reflect.Struct {
@@ -983,7 +1094,7 @@ func Walk(s interface{}, callback WalkFunc) {
 		}
 		if field.Kind() == reflect.Struct {
 			Walk(field.Addr().Interface(), callback)
-		} else if field.Kind() == reflect.Ptr && field.Elem().Kind() == reflect.Struct {
+		} else if field.Kind() == reflect.Pointer && field.Elem().Kind() == reflect.Struct {
 			Walk(field.Interface(), callback)
 		} else {
 			callback(field, fieldType)

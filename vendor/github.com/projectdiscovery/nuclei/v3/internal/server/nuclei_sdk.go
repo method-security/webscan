@@ -6,7 +6,7 @@ import (
 	_ "net/http/pprof"
 	"strings"
 
-	"github.com/logrusorgru/aurora"
+	"github.com/logrusorgru/aurora/v4"
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/nuclei/v3/pkg/fuzz/frequency"
 	"github.com/projectdiscovery/nuclei/v3/pkg/fuzz/stats"
@@ -41,7 +41,7 @@ type nucleiExecutor struct {
 	engine       *core.Engine
 	store        *loader.Store
 	options      *NucleiExecutorOptions
-	executorOpts protocols.ExecutorOptions
+	executorOpts *protocols.ExecutorOptions
 }
 
 type NucleiExecutorOptions struct {
@@ -55,9 +55,10 @@ type NucleiExecutorOptions struct {
 	ProjectFile        *projectfile.ProjectFile
 	Browser            *browserEngine.Browser
 	FuzzStatsDB        *stats.Tracker
-	Colorizer          aurora.Aurora
+	Colorizer          *aurora.Aurora
 	Parser             parser.Parser
 	TemporaryDirectory string
+	Logger             *gologger.Logger
 }
 
 func newNucleiExecutor(opts *NucleiExecutorOptions) (*nucleiExecutor, error) {
@@ -66,7 +67,7 @@ func newNucleiExecutor(opts *NucleiExecutorOptions) (*nucleiExecutor, error) {
 
 	// Create the executor options which will be used throughout the execution
 	// stage by the nuclei engine modules.
-	executorOpts := protocols.ExecutorOptions{
+	executorOpts := &protocols.ExecutorOptions{
 		Output:              opts.Output,
 		Options:             opts.Options,
 		Progress:            opts.Progress,
@@ -85,6 +86,7 @@ func newNucleiExecutor(opts *NucleiExecutorOptions) (*nucleiExecutor, error) {
 		FuzzParamsFrequency: fuzzFreqCache,
 		GlobalMatchers:      globalmatchers.New(),
 		FuzzStatsDB:         opts.FuzzStatsDB,
+		Logger:              opts.Logger,
 	}
 
 	if opts.Options.ShouldUseHostError() {
@@ -93,7 +95,7 @@ func newNucleiExecutor(opts *NucleiExecutorOptions) (*nucleiExecutor, error) {
 			maxHostError = 100 // auto adjust for fuzzings
 		}
 		if opts.Options.TemplateThreads > maxHostError {
-			gologger.Info().Msgf("Adjusting max-host-error to the concurrency value: %d", opts.Options.TemplateThreads)
+			opts.Logger.Info().Msgf("Adjusting max-host-error to the concurrency value: %d", opts.Options.TemplateThreads)
 
 			maxHostError = opts.Options.TemplateThreads
 		}
@@ -107,7 +109,7 @@ func newNucleiExecutor(opts *NucleiExecutorOptions) (*nucleiExecutor, error) {
 	executorEngine := core.New(opts.Options)
 	executorEngine.SetExecuterOptions(executorOpts)
 
-	workflowLoader, err := parsers.NewLoader(&executorOpts)
+	workflowLoader, err := parsers.NewLoader(executorOpts)
 	if err != nil {
 		return nil, errors.Wrap(err, "Could not create loader options.")
 	}
@@ -123,7 +125,9 @@ func newNucleiExecutor(opts *NucleiExecutorOptions) (*nucleiExecutor, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "Could not create loader options.")
 	}
-	store.Load()
+	if err := store.Load(); err != nil {
+		return nil, errors.Wrap(err, "Could not load templates.")
+	}
 
 	return &nucleiExecutor{
 		engine:       executorEngine,
@@ -186,10 +190,13 @@ func (n *nucleiExecutor) ExecuteScan(target PostRequestsHandlerRequest) error {
 }
 
 func (n *nucleiExecutor) Close() {
+	if n == nil || n.executorOpts == nil {
+		return
+	}
 	if n.executorOpts.FuzzStatsDB != nil {
 		n.executorOpts.FuzzStatsDB.Close()
 	}
-	if n.options.Interactsh != nil {
+	if n.options != nil && n.options.Interactsh != nil {
 		_ = n.options.Interactsh.Close()
 	}
 	if n.executorOpts.InputHelper != nil {

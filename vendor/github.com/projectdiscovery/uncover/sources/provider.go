@@ -36,6 +36,9 @@ type Provider struct {
 	BinaryEdge []string `yaml:"binaryedge"`
 	Onyphe     []string `yaml:"onyphe"`
 	Driftnet   []string `yaml:"driftnet"`
+	GreyNoise  []string `yaml:"greynoise"`
+	Daydaymap  []string `yaml:"daydaymap"`
+	NerdyData  []string `yaml:"nerdydata"`
 }
 
 // NewProvider loads provider keys from default location and env variables
@@ -56,7 +59,7 @@ func (provider *Provider) GetKeys() Keys {
 		parts := strings.Split(censysKeys, ":")
 		if len(parts) == 2 {
 			keys.CensysToken = parts[0]
-			keys.CensysSecret = parts[1]
+			keys.CensysOrgId = parts[1]
 		}
 	}
 
@@ -119,6 +122,15 @@ func (provider *Provider) GetKeys() Keys {
 	if len(provider.Driftnet) > 0 {
 		keys.DriftnetToken = provider.Driftnet[rand.Intn(len(provider.Driftnet))]
 	}
+	if len(provider.GreyNoise) > 0 {
+		keys.GreyNoiseKey = provider.GreyNoise[rand.Intn(len(provider.GreyNoise))]
+	}
+	if len(provider.Daydaymap) > 0 {
+		keys.Daydaymap = provider.Daydaymap[rand.Intn(len(provider.Daydaymap))]
+	}
+	if len(provider.NerdyData) > 0 {
+		keys.NerdyDataToken = provider.NerdyData[rand.Intn(len(provider.NerdyData))]
+	}
 
 	return keys
 }
@@ -151,6 +163,7 @@ func (provider *Provider) LoadProviderKeysFromEnv() {
 	provider.HunterHow = appendIfExists(provider.HunterHow, "HUNTERHOW_API_KEY")
 	provider.ZoomEye = appendIfExists(provider.ZoomEye, "ZOOMEYE_API_KEY")
 	provider.Driftnet = appendIfExists(provider.Driftnet, "DRIFTNET_API_KEY")
+	provider.Daydaymap = appendIfExists(provider.Daydaymap, "DAYDAYMAP_API_KEY")
 
 	appendIfAllExists := func(arr []string, env1 string, env2 string) []string {
 		if val1, ok := os.LookupEnv(env1); ok {
@@ -163,11 +176,13 @@ func (provider *Provider) LoadProviderKeysFromEnv() {
 		return arr
 	}
 	provider.Fofa = appendIfAllExists(provider.Fofa, "FOFA_EMAIL", "FOFA_KEY")
-	provider.Censys = appendIfAllExists(provider.Censys, "CENSYS_API_ID", "CENSYS_API_SECRET")
+	provider.Censys = appendIfAllExists(provider.Censys, "CENSYS_API_TOKEN", "CENSYS_ORGANIZATION_ID")
 	provider.Google = appendIfAllExists(provider.Google, "GOOGLE_API_KEY", "GOOGLE_API_CX")
 	provider.Odin = appendIfExists(provider.Odin, "ODIN_API_KEY")
 	provider.BinaryEdge = appendIfExists(provider.BinaryEdge, "BINARYEDGE_API_KEY")
 	provider.Onyphe = appendIfExists(provider.Onyphe, "ONYPHE_API_KEY")
+	provider.GreyNoise = appendIfExists(provider.GreyNoise, "GREYNOISE_API_KEY")
+	provider.NerdyData = appendIfExists(provider.NerdyData, "NERDYDATA_API_KEY")
 }
 
 // HasKeys returns true if at least one agent/source has keys
@@ -188,6 +203,9 @@ func (provider *Provider) HasKeys() bool {
 		len(provider.BinaryEdge) > 0,
 		len(provider.Onyphe) > 0,
 		len(provider.Driftnet) > 0,
+		len(provider.GreyNoise) > 0,
+		len(provider.Daydaymap) > 0,
+		len(provider.NerdyData) > 0,
 	)
 }
 

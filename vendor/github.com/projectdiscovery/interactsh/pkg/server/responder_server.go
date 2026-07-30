@@ -1,8 +1,6 @@
 package server
 
 import (
-	"bytes"
-	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -25,18 +23,13 @@ var responderMonitorList map[string]string = map[string]string{
 type ResponderServer struct {
 	options   *Options
 	LogFile   string
-	ipAddress net.IP
 	cmd       *exec.Cmd
 	tmpFolder string
 }
 
 // NewResponderServer returns a new SMB server.
 func NewResponderServer(options *Options) (*ResponderServer, error) {
-	server := &ResponderServer{
-		options:   options,
-		ipAddress: net.ParseIP(options.IPAddress),
-	}
-	return server, nil
+	return &ResponderServer{options: options}, nil
 }
 
 // ListenAndServe listens on various responder ports
@@ -95,12 +88,12 @@ func (h *ResponderServer) ListenAndServe(responderAlive chan bool) error {
 						RawRequest: responderData,
 						Timestamp:  time.Now(),
 					}
-					buffer := &bytes.Buffer{}
-					if err := jsoniter.NewEncoder(buffer).Encode(interaction); err != nil {
+					data, err := jsoniter.Marshal(interaction)
+					if err != nil {
 						gologger.Warning().Msgf("Could not encode responder interaction: %s\n", err)
 					} else {
-						gologger.Debug().Msgf("Responder Interaction: \n%s\n", buffer.String())
-						if err := h.options.Storage.AddInteractionWithId(h.options.Token, buffer.Bytes()); err != nil {
+						gologger.Debug().Msgf("Responder Interaction: \n%s\n", string(data))
+						if err := h.options.Storage.AddInteractionWithId(h.options.Token, data); err != nil {
 							gologger.Warning().Msgf("Could not store dns interaction: %s\n", err)
 						}
 					}
@@ -115,6 +108,6 @@ func (h *ResponderServer) ListenAndServe(responderAlive chan bool) error {
 func (h *ResponderServer) Close() {
 	_ = h.cmd.Process.Kill()
 	if fileutil.FolderExists(h.tmpFolder) {
-		os.RemoveAll(h.tmpFolder)
+		_ = os.RemoveAll(h.tmpFolder)
 	}
 }

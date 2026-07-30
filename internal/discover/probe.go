@@ -73,51 +73,16 @@ func sendRequests(ctx context.Context, target string, config *discover.DiscoverP
 	var httpResponse, httpsResponse *common.HttpRequestResponse
 	var httpErr, httpsErr error
 
-	// Check if a specific protocol is configured
-	if config.Protocol != nil {
-		switch *config.Protocol {
-		case common.WebProtocolHttp:
-			// Only try HTTP
-			if response, err := sendRequestWithProtocol(ctx, target, "http", config, browserbaseSecrets); err != nil {
-				httpErr = err
-			} else {
-				httpResponse = response
-			}
-		case common.WebProtocolHttps:
-			// Only try HTTPS
-			if response, err := sendRequestWithProtocol(ctx, target, "https", config, browserbaseSecrets); err != nil {
-				httpsErr = err
-			} else {
-				httpsResponse = response
-			}
-		}
-	} else {
-		// No specific protocol set - maintain existing behavior (try both)
-		// Try HTTP request
-		if response, err := sendRequestWithProtocol(ctx, target, "http", config, browserbaseSecrets); err != nil {
-			httpErr = err
-		} else {
-			httpResponse = response
-		}
-
-		// Try HTTPS request
-		if response, err := sendRequestWithProtocol(ctx, target, "https", config, browserbaseSecrets); err != nil {
-			httpsErr = err
-		} else {
-			httpsResponse = response
-		}
+	if config.Protocol == nil || *config.Protocol == common.WebProtocolHttp {
+		httpResponse, httpErr = sendRequestWithProtocol(ctx, target, "http", config, browserbaseSecrets)
+	}
+	if config.Protocol == nil || *config.Protocol == common.WebProtocolHttps {
+		httpsResponse, httpsErr = sendRequestWithProtocol(ctx, target, "https", config, browserbaseSecrets)
 	}
 
-	var protocolMismatchErr error
-	if detectMissMatchedProtocols(ctx, httpResponse) {
-		protocolMismatchErr = fmt.Errorf("failed to probe http://%s - response indicates plain HTTP was sent to an HTTPS port", requesthelpers.RemoveScheme(target))
-		httpErr = protocolMismatchErr
+	if detectMismatchedProtocol(httpResponse) {
+		httpErr = fmt.Errorf("failed to probe http://%s - response indicates plain HTTP was sent to an HTTPS port", requesthelpers.RemoveScheme(target))
 		httpResponse = nil
-	}
-	if detectMissMatchedProtocols(ctx, httpsResponse) {
-		protocolMismatchErr = fmt.Errorf("failed to probe https://%s - response indicates HTTPS was sent to an HTTP port", requesthelpers.RemoveScheme(target))
-		httpsErr = protocolMismatchErr
-		httpsResponse = nil
 	}
 
 	if httpResponse != nil {
@@ -140,8 +105,6 @@ func sendRequests(ctx context.Context, target string, config *discover.DiscoverP
 		// If no specific protocol was set, only return errors if both requests failed
 		if httpErr != nil && httpsErr != nil {
 			errors = append(errors, httpErr.Error(), httpsErr.Error())
-		} else if protocolMismatchErr != nil {
-			errors = append(errors, protocolMismatchErr.Error())
 		}
 	}
 
@@ -182,15 +145,13 @@ func PerformWebProbe(ctx context.Context, config *discover.DiscoverProbeConfig, 
 }
 
 var mismatchedProtocolResponsePatterns = []string{
-	"the plain http request was sent to https port",
 	"plain http request was sent to https port",
 	"client sent an http request to an https server",
-	"speaking plain http to an ssl-enabled server port",
 	"incorrect protocol on port",
 }
 
-func detectMissMatchedProtocols(_ context.Context, response *common.HttpRequestResponse) bool {
-	if response == nil || response.Response == nil || response.Response.StatusCode == nil || response.Response.ResponseBody == nil {
+func detectMismatchedProtocol(response *common.HttpRequestResponse) bool {
+	if response == nil || response.Response == nil || response.Response.ResponseBody == nil {
 		return false
 	}
 

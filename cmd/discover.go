@@ -1555,20 +1555,27 @@ func getDiscoverApplicationConfig(targets []string, resource string, templatePat
 	}
 
 	config := &discover.DiscoverApplicationConfig{
-		Targets:                      targets,
-		ResourceType:                 &resourceEnum,
-		TemplatePaths:                templatePaths,
-		Timeout:                      timeout,
-		Threads:                      threads,
-		Proxy:                        &proxy,
-		VerboseLogs:                  verboseLogs,
-		GlobalRateLimit:              max(0, globalRateLimit),
-		GlobalTimeout:                max(0, globalTimeout),
-		UserAgent:                    userAgent,
-		WebServerIpAddress:           &webServerIPAddress,
-		WebServerPort:                &webServerPort,
-		WebServerApplicationProtocol: &webServerApplicationProtocolEnum,
+		Targets:         targets,
+		ResourceType:    &resourceEnum,
+		TemplatePaths:   templatePaths,
+		Timeout:         timeout,
+		Threads:         threads,
+		Proxy:           &proxy,
+		VerboseLogs:     verboseLogs,
+		GlobalRateLimit: max(0, globalRateLimit),
+		GlobalTimeout:   max(0, globalTimeout),
+		UserAgent:       userAgent,
 	}
+	if webServerIPAddress != "" {
+		config.WebServerIpAddress = &webServerIPAddress
+	}
+	if webServerPort > 0 {
+		config.WebServerPort = &webServerPort
+	}
+	if webServerApplicationProtocol != "" {
+		config.WebServerApplicationProtocol = &webServerApplicationProtocolEnum
+	}
+
 	return config, nil
 }
 
@@ -1637,20 +1644,26 @@ func getDiscoverProbeConfig(targets []string, protocol string, maxRedirects int,
 	}
 
 	config := &discover.DiscoverProbeConfig{
-		Targets:                      targets,
-		MaxRedirects:                 maxRedirects,
-		VerifyTls:                    verifyTLS,
-		Timeout:                      max(timeout, 0),
-		Sleep:                        max(sleep, 0),
-		Jitter:                       max(jitter, 0),
-		IgnoreCrossDomainRedirects:   ignoreCrossDomainRedirects,
-		UserAgent:                    userAgent,
-		RequestMethod:                requestMethod,
-		HeadlessConfig:               headlessConfig,
-		BrowserbaseConfig:            browserbaseConfig,
-		WebServerIpAddress:           &webServerIPAddress,
-		WebServerPort:                &webServerPort,
-		WebServerApplicationProtocol: &webServerApplicationProtocolEnum,
+		Targets:                    targets,
+		MaxRedirects:               maxRedirects,
+		VerifyTls:                  verifyTLS,
+		Timeout:                    max(timeout, 0),
+		Sleep:                      max(sleep, 0),
+		Jitter:                     max(jitter, 0),
+		IgnoreCrossDomainRedirects: ignoreCrossDomainRedirects,
+		UserAgent:                  userAgent,
+		RequestMethod:              requestMethod,
+		HeadlessConfig:             headlessConfig,
+		BrowserbaseConfig:          browserbaseConfig,
+	}
+	if webServerIPAddress != "" {
+		config.WebServerIpAddress = &webServerIPAddress
+	}
+	if webServerPort > 0 {
+		config.WebServerPort = &webServerPort
+	}
+	if webServerApplicationProtocol != "" {
+		config.WebServerApplicationProtocol = &webServerApplicationProtocolEnum
 	}
 
 	return config, nil

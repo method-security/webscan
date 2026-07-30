@@ -110,9 +110,30 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			webServerIpAddress, err := cmd.Flags().GetString("web-server-ip-address")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			webServerPort, err := cmd.Flags().GetInt("web-server-port")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			webServerApplicationProtocol, err := cmd.Flags().GetString("web-server-application-protocol")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			webServerApplicationProtocol = strings.ToUpper(webServerApplicationProtocol)
+			webServerApplicationProtocolEnum, err := common.NewWebProtocolFromString(webServerApplicationProtocol)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
 
 			// Create config
-			config, err := getDiscoverApplicationConfig(targets, resourceType, templatePaths, timeout, threads, proxy, verboseLogs, globalRateLimit, globalTimeout, userAgentPreset)
+			config, err := getDiscoverApplicationConfig(targets, resourceType, templatePaths, timeout, threads, proxy, verboseLogs, globalRateLimit, globalTimeout, userAgentPreset, webServerIpAddress, webServerPort, webServerApplicationProtocolEnum)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -138,6 +159,9 @@ func (a *WebScan) InitDiscoverCommand() {
 	discoverApplicationCmd.Flags().Int("global-rate-limit", 10, "Global rate limit in requests per second")
 	discoverApplicationCmd.Flags().Int("global-timeout", 0, "Maximum total scan time in seconds")
 	discoverApplicationCmd.Flags().String("user-agent", "RANDOM", "User-Agent preset (RANDOM, CHROME, FIREFOX, SAFARI, EDGE)")
+	discoverApplicationCmd.Flags().String("web-server-ip-address", "", "IP address of the WebServer listener this probe is running against")
+	discoverApplicationCmd.Flags().Int("web-server-port", 0, "Port of the WebServer listener this probe is running against")
+	discoverApplicationCmd.Flags().String("web-server-application-protocol", "", "Application protocol of the WebServer listener this probe is running against (HTTP, HTTPS)")
 
 	// Mark Required Flags
 	_ = discoverApplicationCmd.MarkFlagRequired("targets")
@@ -797,9 +821,15 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			webServerApplicationProtocol = strings.ToUpper(webServerApplicationProtocol)
+			webServerApplicationProtocolEnum, err := common.NewWebProtocolFromString(webServerApplicationProtocol)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
 
 			// Set Config
-			config := getDiscoverProbeConfig(targets, protocol, maxRedirects, verifyTLS, timeout, sleep, jitter, ignoreCrossDomainRedirects, userAgentPreset, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig, webServerIPAddress, webServerPort, webServerApplicationProtocol)
+			config := getDiscoverProbeConfig(targets, protocol, maxRedirects, verifyTLS, timeout, sleep, jitter, ignoreCrossDomainRedirects, userAgentPreset, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig, webServerIPAddress, webServerPort, webServerApplicationProtocolEnum)
 
 			// Generate report
 			report, err := discoverprobe.PerformWebProbe(cmd.Context(), config, requestMethodConfig.BrowserbaseSecrets)
@@ -1519,25 +1549,44 @@ func parseDiscoverRequestFiles(pairs []string) ([]*discover.RequestFile, error) 
 }
 
 // getDiscoverApplicationConfig builds the config for application fingerprinting discovery.
-func getDiscoverApplicationConfig(targets []string, resource string, templatePaths []string, timeout int, threads int, proxy string, verboseLogs bool, globalRateLimit int, globalTimeout int, userAgent common.UserAgentPreset) (*discover.DiscoverApplicationConfig, error) {
+func getDiscoverApplicationConfig(targets []string, resource string, templatePaths []string, timeout int, threads int, proxy string, verboseLogs bool, globalRateLimit int, globalTimeout int, userAgent common.UserAgentPreset, webServerIPAddress string, webServerPort int, webServerApplicationProtocol common.WebProtocol) (*discover.DiscoverApplicationConfig, error) {
 	resourceEnum, err := getDiscoverApplicationResourceConfigTypeFromString(resource)
 	if err != nil {
 		return nil, fmt.Errorf("invalid resource type: %s", resource)
 	}
 
 	config := &discover.DiscoverApplicationConfig{
-		Targets:         targets,
-		ResourceType:    &resourceEnum,
-		TemplatePaths:   templatePaths,
-		Timeout:         timeout,
-		Threads:         threads,
-		Proxy:           &proxy,
-		VerboseLogs:     verboseLogs,
-		GlobalRateLimit: max(0, globalRateLimit),
-		GlobalTimeout:   max(0, globalTimeout),
-		UserAgent:       userAgent,
+		Targets:                      targets,
+		ResourceType:                 &resourceEnum,
+		TemplatePaths:                templatePaths,
+		Timeout:                      timeout,
+		Threads:                      threads,
+		Proxy:                        &proxy,
+		VerboseLogs:                  verboseLogs,
+		GlobalRateLimit:              max(0, globalRateLimit),
+		GlobalTimeout:                max(0, globalTimeout),
+		UserAgent:                    userAgent,
+		WebServerIpAddress:           &webServerIPAddress,
+		WebServerPort:                &webServerPort,
+		WebServerApplicationProtocol: &webServerApplicationProtocol,
 	}
 	return config, nil
+}
+
+// getDiscoverApplicationResourceConfigTypeFromString converts a string to an ApplicationResourceConfigType enum.
+func getDiscoverApplicationResourceConfigTypeFromString(resource string) (discover.ApplicationResourceConfigType, error) {
+	if resource == "ALL" {
+		return discover.ApplicationResourceConfigType{
+			ApplicationResourceTypeAll: discover.ApplicationResourceTypeAllAll,
+		}, nil
+	}
+	resourceEnum, err := discover.NewApplicationResourceTypeFromString(resource)
+	if err != nil {
+		return discover.ApplicationResourceConfigType{}, fmt.Errorf("invalid resource type: %s", resource)
+	}
+	return discover.ApplicationResourceConfigType{
+		ApplicationResourceType: resourceEnum,
+	}, nil
 }
 
 // getDiscoverPageConfig builds the config for page capture and analysis.
@@ -1578,51 +1627,22 @@ func getDiscoverWitnessConfig(target string, responseCodes string, takeScreensho
 }
 
 // getDiscoverProbeConfig builds the config for probe discovery.
-func getDiscoverProbeConfig(targets []string, protocol string, maxRedirects int, verifyTLS bool, timeout int, sleep int, jitter int, ignoreCrossDomainRedirects bool, userAgent common.UserAgentPreset, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig, webServerIPAddress string, webServerPort int, webServerApplicationProtocol string) *discover.DiscoverProbeConfig {
+func getDiscoverProbeConfig(targets []string, protocol string, maxRedirects int, verifyTLS bool, timeout int, sleep int, jitter int, ignoreCrossDomainRedirects bool, userAgent common.UserAgentPreset, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig, webServerIPAddress string, webServerPort int, webServerApplicationProtocol common.WebProtocol) *discover.DiscoverProbeConfig {
 	config := &discover.DiscoverProbeConfig{
-		Targets:                    targets,
-		MaxRedirects:               maxRedirects,
-		VerifyTls:                  verifyTLS,
-		Timeout:                    max(timeout, 0),
-		Sleep:                      max(sleep, 0),
-		Jitter:                     max(jitter, 0),
-		IgnoreCrossDomainRedirects: ignoreCrossDomainRedirects,
-		UserAgent:                  userAgent,
-		RequestMethod:              requestMethod,
-		HeadlessConfig:             headlessConfig,
-		BrowserbaseConfig:          browserbaseConfig,
-	}
-
-	// Set protocol if provided, otherwise leave unset for backward compatibility
-	if protocol != "" {
-		switch strings.ToUpper(protocol) {
-		case "HTTP":
-			httpProtocol := common.WebProtocolHttp
-			config.Protocol = &httpProtocol
-		case "HTTPS":
-			httpsProtocol := common.WebProtocolHttps
-			config.Protocol = &httpsProtocol
-		default:
-			// Invalid protocol - will be handled by validation in the probe function
-			// For now, leave it unset to maintain existing behavior
-		}
-	}
-
-	if webServerIPAddress != "" {
-		config.WebServerIpAddress = &webServerIPAddress
-	}
-	if webServerPort > 0 {
-		config.WebServerPort = &webServerPort
-	}
-	if webServerApplicationProtocol != "" {
-		switch strings.ToUpper(webServerApplicationProtocol) {
-		case "HTTP":
-			wsProtocol := common.WebProtocolHttp
-			config.WebServerApplicationProtocol = &wsProtocol
-		case "HTTPS":
-			wsProtocol := common.WebProtocolHttps
-			config.WebServerApplicationProtocol = &wsProtocol
-		}
+		Targets:                      targets,
+		MaxRedirects:                 maxRedirects,
+		VerifyTls:                    verifyTLS,
+		Timeout:                      max(timeout, 0),
+		Sleep:                        max(sleep, 0),
+		Jitter:                       max(jitter, 0),
+		IgnoreCrossDomainRedirects:   ignoreCrossDomainRedirects,
+		UserAgent:                    userAgent,
+		RequestMethod:                requestMethod,
+		HeadlessConfig:               headlessConfig,
+		BrowserbaseConfig:            browserbaseConfig,
+		WebServerIpAddress:           &webServerIPAddress,
+		WebServerPort:                &webServerPort,
+		WebServerApplicationProtocol: &webServerApplicationProtocol,
 	}
 
 	return config
@@ -1719,21 +1739,6 @@ func getDiscoverDirectoryConfig(targets []string, paths []string, wordlistType s
 	}
 
 	return config
-}
-
-func getDiscoverApplicationResourceConfigTypeFromString(resource string) (discover.ApplicationResourceConfigType, error) {
-	if resource == "ALL" {
-		return discover.ApplicationResourceConfigType{
-			ApplicationResourceTypeAll: discover.ApplicationResourceTypeAllAll,
-		}, nil
-	}
-	resourceEnum, err := discover.NewApplicationResourceTypeFromString(resource)
-	if err != nil {
-		return discover.ApplicationResourceConfigType{}, fmt.Errorf("invalid resource type: %s", resource)
-	}
-	return discover.ApplicationResourceConfigType{
-		ApplicationResourceType: resourceEnum,
-	}, nil
 }
 
 // getDiscoverWordlistConfig builds the config for wordlist generation.

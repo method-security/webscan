@@ -125,15 +125,9 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			webServerApplicationProtocol = strings.ToUpper(webServerApplicationProtocol)
-			webServerApplicationProtocolEnum, err := common.NewWebProtocolFromString(webServerApplicationProtocol)
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
 
 			// Create config
-			config, err := getDiscoverApplicationConfig(targets, resourceType, templatePaths, timeout, threads, proxy, verboseLogs, globalRateLimit, globalTimeout, userAgentPreset, webServerIpAddress, webServerPort, webServerApplicationProtocolEnum)
+			config, err := getDiscoverApplicationConfig(targets, resourceType, templatePaths, timeout, threads, proxy, verboseLogs, globalRateLimit, globalTimeout, userAgentPreset, webServerIpAddress, webServerPort, webServerApplicationProtocol)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -821,15 +815,13 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			webServerApplicationProtocol = strings.ToUpper(webServerApplicationProtocol)
-			webServerApplicationProtocolEnum, err := common.NewWebProtocolFromString(webServerApplicationProtocol)
+
+			// Set Config
+			config, err := getDiscoverProbeConfig(targets, protocol, maxRedirects, verifyTLS, timeout, sleep, jitter, ignoreCrossDomainRedirects, userAgentPreset, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig, webServerIPAddress, webServerPort, webServerApplicationProtocol)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
-
-			// Set Config
-			config := getDiscoverProbeConfig(targets, protocol, maxRedirects, verifyTLS, timeout, sleep, jitter, ignoreCrossDomainRedirects, userAgentPreset, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig, webServerIPAddress, webServerPort, webServerApplicationProtocolEnum)
 
 			// Generate report
 			report, err := discoverprobe.PerformWebProbe(cmd.Context(), config, requestMethodConfig.BrowserbaseSecrets)
@@ -1549,10 +1541,17 @@ func parseDiscoverRequestFiles(pairs []string) ([]*discover.RequestFile, error) 
 }
 
 // getDiscoverApplicationConfig builds the config for application fingerprinting discovery.
-func getDiscoverApplicationConfig(targets []string, resource string, templatePaths []string, timeout int, threads int, proxy string, verboseLogs bool, globalRateLimit int, globalTimeout int, userAgent common.UserAgentPreset, webServerIPAddress string, webServerPort int, webServerApplicationProtocol common.WebProtocol) (*discover.DiscoverApplicationConfig, error) {
+func getDiscoverApplicationConfig(targets []string, resource string, templatePaths []string, timeout int, threads int, proxy string, verboseLogs bool, globalRateLimit int, globalTimeout int, userAgent common.UserAgentPreset, webServerIPAddress string, webServerPort int, webServerApplicationProtocol string) (*discover.DiscoverApplicationConfig, error) {
 	resourceEnum, err := getDiscoverApplicationResourceConfigTypeFromString(resource)
 	if err != nil {
 		return nil, fmt.Errorf("invalid resource type: %s", resource)
+	}
+	var webServerApplicationProtocolEnum common.WebProtocol
+	if len(webServerApplicationProtocol) > 0 {
+		webServerApplicationProtocolEnum, err = common.NewWebProtocolFromString(webServerApplicationProtocol)
+		if err != nil {
+			return nil, fmt.Errorf("invalid web server application protocol: %s", webServerApplicationProtocol)
+		}
 	}
 
 	config := &discover.DiscoverApplicationConfig{
@@ -1568,7 +1567,7 @@ func getDiscoverApplicationConfig(targets []string, resource string, templatePat
 		UserAgent:                    userAgent,
 		WebServerIpAddress:           &webServerIPAddress,
 		WebServerPort:                &webServerPort,
-		WebServerApplicationProtocol: &webServerApplicationProtocol,
+		WebServerApplicationProtocol: &webServerApplicationProtocolEnum,
 	}
 	return config, nil
 }
@@ -1627,7 +1626,16 @@ func getDiscoverWitnessConfig(target string, responseCodes string, takeScreensho
 }
 
 // getDiscoverProbeConfig builds the config for probe discovery.
-func getDiscoverProbeConfig(targets []string, protocol string, maxRedirects int, verifyTLS bool, timeout int, sleep int, jitter int, ignoreCrossDomainRedirects bool, userAgent common.UserAgentPreset, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig, webServerIPAddress string, webServerPort int, webServerApplicationProtocol common.WebProtocol) *discover.DiscoverProbeConfig {
+func getDiscoverProbeConfig(targets []string, protocol string, maxRedirects int, verifyTLS bool, timeout int, sleep int, jitter int, ignoreCrossDomainRedirects bool, userAgent common.UserAgentPreset, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig, webServerIPAddress string, webServerPort int, webServerApplicationProtocol string) (*discover.DiscoverProbeConfig, error) {
+	var webServerApplicationProtocolEnum common.WebProtocol
+	if len(webServerApplicationProtocol) > 0 {
+		var err error
+		webServerApplicationProtocolEnum, err = common.NewWebProtocolFromString(webServerApplicationProtocol)
+		if err != nil {
+			return nil, fmt.Errorf("invalid web server application protocol: %s", webServerApplicationProtocol)
+		}
+	}
+
 	config := &discover.DiscoverProbeConfig{
 		Targets:                      targets,
 		MaxRedirects:                 maxRedirects,
@@ -1642,10 +1650,10 @@ func getDiscoverProbeConfig(targets []string, protocol string, maxRedirects int,
 		BrowserbaseConfig:            browserbaseConfig,
 		WebServerIpAddress:           &webServerIPAddress,
 		WebServerPort:                &webServerPort,
-		WebServerApplicationProtocol: &webServerApplicationProtocol,
+		WebServerApplicationProtocol: &webServerApplicationProtocolEnum,
 	}
 
-	return config
+	return config, nil
 }
 
 // getDiscoverRouteConfig builds the config for route discovery.

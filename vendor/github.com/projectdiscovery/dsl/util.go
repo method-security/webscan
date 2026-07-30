@@ -13,7 +13,9 @@ import (
 
 	"github.com/kataras/jwt"
 	"github.com/pkg/errors"
+	"github.com/projectdiscovery/utils/html"
 	randint "github.com/projectdiscovery/utils/rand"
+	"github.com/spf13/cast"
 )
 
 const (
@@ -76,6 +78,103 @@ func toString(data interface{}) string {
 	default:
 		return fmt.Sprintf("%v", data)
 	}
+}
+
+// toBool converts an interface to boolean in a quick way
+func toBool(data interface{}) bool {
+	switch s := data.(type) {
+	case nil:
+		return false
+	case bool:
+		return s
+	case string:
+		s = strings.TrimSpace(s)
+		if s == "true" {
+			return true
+		}
+
+		if s == "" {
+			return false
+		}
+
+		if b, err := strconv.ParseBool(s); err == nil {
+			return b
+		}
+
+		if f, err := strconv.ParseFloat(s, 64); err == nil {
+			return f == 1
+		}
+
+		if i, err := strconv.ParseInt(s, 10, 64); err == nil {
+			return i == 1
+		}
+
+		return false
+	case int:
+		return s == 1
+	case int8:
+		return s == 1
+	case int16:
+		return s == 1
+	case int32:
+		return s == 1
+	case int64:
+		return s == 1
+	case uint:
+		return s == 1
+	case uint8:
+		return s == 1
+	case uint16:
+		return s == 1
+	case uint32:
+		return s == 1
+	case uint64:
+		return s == 1
+	case float32:
+		return s == 1
+	case float64:
+		return s == 1
+	default:
+		return false
+	}
+}
+
+func numericCastInput(data interface{}) (interface{}, error) {
+	switch value := data.(type) {
+	case int, int8, int16, int32, int64:
+		return value, nil
+	case uint, uint8, uint16, uint32, uint64:
+		return value, nil
+	case float32, float64:
+		return value, nil
+	case string:
+		trimmed := strings.TrimSpace(value)
+		if trimmed == "" {
+			return nil, fmt.Errorf("invalid number: %T", data)
+		}
+		if _, err := strconv.ParseFloat(trimmed, 64); err != nil {
+			return nil, err
+		}
+		return trimmed, nil
+	default:
+		return nil, fmt.Errorf("invalid number: %T", data)
+	}
+}
+
+func toInt(data interface{}) (int, error) {
+	value, err := numericCastInput(data)
+	if err != nil {
+		return 0, err
+	}
+	return cast.ToIntE(value)
+}
+
+func toInt64(data interface{}) (int64, error) {
+	value, err := numericCastInput(data)
+	if err != nil {
+		return 0, err
+	}
+	return cast.ToInt64E(value)
 }
 
 func insertInto(s string, interval int, sep rune) string {
@@ -146,10 +245,12 @@ func parseTimeOrNow(arguments []interface{}) (time.Time, error) {
 				return time.Time{}, errors.New("invalid argument type")
 			}
 			currentTime = time.Unix(unixTime, 0)
-		case int64, float64:
-			currentTime = time.Unix(int64(inputUnixTime.(float64)), 0)
 		default:
-			return time.Time{}, errors.New("invalid argument type")
+			unixTime, err := toInt64(inputUnixTime)
+			if err != nil {
+				return time.Time{}, errors.New("invalid argument type")
+			}
+			currentTime = time.Unix(unixTime, 0)
 		}
 	} else {
 		currentTime = time.Now()
@@ -251,4 +352,30 @@ func aggregate(values []string) string {
 		builder.WriteRune('\n')
 	}
 	return builder.String()
+}
+
+// strToNumEntities applies HTML escaping, then converts non-HTML-entity
+// characters to numeric entities.
+func strToNumEntities(s string) string {
+	escaped := html.EscapeString(s)
+
+	var result strings.Builder
+	i := 0
+	for i < len(escaped) {
+		if escaped[i] == '&' {
+			semicolonPos := strings.Index(escaped[i:], ";")
+			if semicolonPos != -1 {
+				entityEnd := i + semicolonPos + 1
+				result.WriteString(escaped[i:entityEnd])
+				i = entityEnd
+				continue
+			}
+		}
+
+		r := rune(escaped[i])
+		fmt.Fprintf(&result, "&#%d;", int(r))
+		i++
+	}
+
+	return result.String()
 }

@@ -16,7 +16,7 @@ import (
 
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/nuclei/v3/pkg/catalog/config"
-	errorutil "github.com/projectdiscovery/utils/errors"
+	"github.com/projectdiscovery/utils/errkit"
 )
 
 var (
@@ -73,6 +73,7 @@ func (t *TemplateSigner) GetUserFragment() string {
 // Sign signs the given template with the template signer and returns the signature
 func (t *TemplateSigner) Sign(data []byte, tmpl SignableTemplate) (string, error) {
 	existingSignature, content := ExtractSignatureAndContent(data)
+	content = normalizeTemplateContentForSignature(content)
 
 	// while re-signing template check if it has a code protocol
 	// if it does then verify that it is signed by current signer
@@ -82,13 +83,13 @@ func (t *TemplateSigner) Sign(data []byte, tmpl SignableTemplate) (string, error
 			arr := strings.SplitN(string(existingSignature), ":", 3)
 			if len(arr) == 2 {
 				// signature has no fragment
-				return "", errorutil.NewWithTag("signer", "re-signing code templates are not allowed for security reasons.")
+				return "", errkit.New("re-signing code templates are not allowed for security reasons.")
 			}
 			if len(arr) == 3 {
 				// signature has fragment verify if it is equal to current fragment
 				fragment := t.GetUserFragment()
 				if fragment != arr[2] {
-					return "", errorutil.NewWithTag("signer", "re-signing code templates are not allowed for security reasons.")
+					return "", errkit.New("re-signing code templates are not allowed for security reasons.")
 				}
 			}
 		}
@@ -146,9 +147,7 @@ func (t *TemplateSigner) Verify(data []byte, tmpl SignableTemplate) (bool, error
 		return false, err
 	}
 
-	// normalize content by removing \r\n everywhere since this only done for verification
-	// it does not affect the actual template
-	content = bytes.ReplaceAll(content, []byte("\r\n"), []byte("\n"))
+	content = normalizeTemplateContentForSignature(content)
 
 	buff := bytes.NewBuffer(content)
 	// if file has any imports process them
@@ -162,6 +161,10 @@ func (t *TemplateSigner) Verify(data []byte, tmpl SignableTemplate) (bool, error
 	}
 
 	return t.verify(buff.Bytes(), digest)
+}
+
+func normalizeTemplateContentForSignature(content []byte) []byte {
+	return bytes.ReplaceAll(content, []byte("\r\n"), []byte("\n"))
 }
 
 // Verify verifies the given data with the template signer

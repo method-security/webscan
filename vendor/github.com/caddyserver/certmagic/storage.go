@@ -133,7 +133,7 @@ type Locker interface {
 	// is released or becomes stale.
 	//
 	// If the named lock represents an idempotent operation, callers
-	// should awlays check to make sure the work still needs to be
+	// should always check to make sure the work still needs to be
 	// completed after acquiring the lock. You never know if another
 	// process already completed the task while you were waiting to
 	// acquire it.
@@ -147,6 +147,16 @@ type Locker interface {
 	// cleans up any resources allocated during Lock. Unlock should
 	// only return an error if the lock was unable to be released.
 	Unlock(ctx context.Context, name string) error
+}
+
+// LockLeaseRenewer is an optional interface that can be implemented by a Storage
+// implementation to support renewing the lease on a lock. This is useful for
+// long-running operations that need to be synchronized across a cluster.
+type LockLeaseRenewer interface {
+	// RenewLockLease renews the lease on the lock for the given lockKey for the
+	// given leaseDuration. This is used to prevent the lock from being acquired
+	// by another process.
+	RenewLockLease(ctx context.Context, lockKey string, leaseDuration time.Duration) error
 }
 
 // KeyInfo holds information about a key in storage.
@@ -289,7 +299,7 @@ func acquireLock(ctx context.Context, storage Storage, lockKey string) error {
 }
 
 func releaseLock(ctx context.Context, storage Storage, lockKey string) error {
-	err := storage.Unlock(context.TODO(), lockKey) // TODO: in Go 1.21, use WithoutCancel (see #247)
+	err := storage.Unlock(context.WithoutCancel(ctx), lockKey)
 	if err == nil {
 		locksMu.Lock()
 		delete(locks, lockKey)

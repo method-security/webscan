@@ -240,6 +240,7 @@ func (cfg *Config) loadCertResourceAnyIssuer(ctx context.Context, certNamesKey s
 func (cfg *Config) loadCertResource(ctx context.Context, issuer Issuer, certNamesKey string) (CertificateResource, error) {
 	certRes := CertificateResource{issuerKey: issuer.IssuerKey()}
 
+	// don't use the Lookup profile because we might be loading a wildcard cert which is rejected by the Lookup profile
 	normalizedName, err := idna.ToASCII(certNamesKey)
 	if err != nil {
 		return CertificateResource{}, fmt.Errorf("converting '%s' to ASCII: %v", certNamesKey, err)
@@ -280,6 +281,11 @@ func hashCertificateChain(certChain [][]byte) string {
 
 func namesFromCSR(csr *x509.CertificateRequest) []string {
 	var nameSet []string
+	// TODO: CommonName should not be used (it has been deprecated for 25+ years,
+	// but ZeroSSL CA still requires it to be filled out and not overlap SANs...)
+	if csr.Subject.CommonName != "" {
+		nameSet = append(nameSet, csr.Subject.CommonName)
+	}
 	nameSet = append(nameSet, csr.DNSNames...)
 	nameSet = append(nameSet, csr.EmailAddresses...)
 	for _, v := range csr.IPAddresses {

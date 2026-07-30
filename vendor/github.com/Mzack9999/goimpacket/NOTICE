@@ -1,0 +1,50 @@
+goimpacket
+Copyright 2026 Google LLC
+Copyright 2026 Mzack9999
+
+This product is licensed under the Apache License, Version 2.0 (the "License");
+you may not use this product except in compliance with the License. You may
+obtain a copy of the License in the LICENSE file distributed with this work, or
+at http://www.apache.org/licenses/LICENSE-2.0.
+
+goimpacket is a fork of mandiant/gopacket
+(https://github.com/mandiant/gopacket) that swaps the upstream
+github.com/google/gopacket dependency for the cgo-free fork at
+github.com/Mzack9999/gopacket, which loads libpcap dynamically at runtime via
+purego (https://github.com/ebitengine/purego) instead of cgo.
+
+------------------------------------------------------------------------------
+Acknowledgments
+------------------------------------------------------------------------------
+
+This project is a Go reimplementation of concepts, protocols, tool designs,
+and command-line interfaces from Impacket (https://github.com/fortra/impacket),
+originally developed by SecureAuth Corporation and currently maintained by
+Fortra. Impacket is distributed under its own permissive license. No Impacket
+source code is included in this project; all code in this repository
+(excluding the third-party components listed below) was written from scratch
+in Go after studying Microsoft protocol specifications and Impacket's behavior.
+
+Output formats and command-line flags of several tools in this project
+intentionally mirror their Impacket counterparts to ease migration for
+existing users. This functional compatibility does not constitute use of
+Impacket's source code.
+
+------------------------------------------------------------------------------
+Third-Party Components
+------------------------------------------------------------------------------
+
+This product includes the following third-party software, each of which is
+distributed under its own license. See the corresponding source files for
+the full license text.
+
+  * pkg/third_party/smb2/
+    A vendored SMB2/SMB3 client library originally authored by Hiroshi Ioka
+    and contributors, distributed under the BSD 3-Clause License.
+    Upstream: https://github.com/hirochachacha/go-smb2
+
+  * github.com/Mzack9999/gopacket (runtime dependency)
+    A cgo-free fork of github.com/google/gopacket that loads libpcap at
+    runtime via purego instead of via cgo. Distributed under the
+    BSD 3-Clause License. Original work by Google LLC and contributors.
+    Upstream: https://github.com/Mzack9999/gopacket

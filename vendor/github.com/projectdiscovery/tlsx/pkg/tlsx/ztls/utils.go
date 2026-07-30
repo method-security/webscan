@@ -2,7 +2,7 @@ package ztls
 
 import (
 	"github.com/projectdiscovery/tlsx/pkg/tlsx/clients"
-	errorutil "github.com/projectdiscovery/utils/errors"
+	errorutil "github.com/projectdiscovery/utils/errors" //nolint
 	"github.com/zmap/zcrypto/tls"
 	"github.com/zmap/zcrypto/x509"
 )
@@ -28,7 +28,7 @@ func toZTLSCiphers(items []string) ([]uint16, error) {
 	for _, item := range items {
 		zcipher, ok := ztlsCiphers[item]
 		if !ok {
-			return nil, errorutil.NewWithTag("ztls", "cipher suite %v not supported", item)
+			return nil, errorutil.NewWithTag("ztls", "cipher suite %v not supported", item) //nolint
 		}
 		convertedCiphers = append(convertedCiphers, zcipher)
 	}
@@ -46,7 +46,7 @@ func ConvertCertificateToResponse(options *clients.Options, hostname string, cer
 		NotBefore:    cert.NotBefore,
 		NotAfter:     cert.NotAfter,
 		Expired:      clients.IsExpired(cert.NotAfter),
-		SelfSigned:   clients.IsSelfSigned(cert.AuthorityKeyId, cert.SubjectKeyId),
+		SelfSigned:   clients.IsSelfSigned(cert.AuthorityKeyId, cert.SubjectKeyId, cert.DNSNames),
 		MisMatched:   clients.IsMisMatchedCert(hostname, append(cert.DNSNames, cert.Subject.CommonName)),
 		Revoked:      clients.IsZTLSRevoked(options, cert),
 		WildCardCert: clients.IsWildCardCert(append(cert.DNSNames, cert.Subject.CommonName)),

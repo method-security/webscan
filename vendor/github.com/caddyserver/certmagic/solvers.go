@@ -30,9 +30,10 @@ import (
 	"time"
 
 	"github.com/libdns/libdns"
-	"github.com/mholt/acmez"
-	"github.com/mholt/acmez/acme"
+	"github.com/mholt/acmez/v3"
+	"github.com/mholt/acmez/v3/acme"
 	"github.com/miekg/dns"
+	"go.uber.org/zap"
 )
 
 // httpSolver solves the HTTP challenge. It must be
@@ -46,9 +47,9 @@ import (
 // can access the keyAuth material is by loading it
 // from storage, which is done by distributedSolver.
 type httpSolver struct {
-	closed     int32 // accessed atomically
-	acmeIssuer *ACMEIssuer
-	address    string
+	closed  int32 // accessed atomically
+	handler http.Handler
+	address string
 }
 
 // Present starts an HTTP server if none is already listening on s.address.
@@ -88,7 +89,7 @@ func (s *httpSolver) serve(ctx context.Context, si *solverInfo) {
 	}()
 	defer close(si.done)
 	httpServer := &http.Server{
-		Handler:     s.acmeIssuer.HTTPChallengeHandler(http.NewServeMux()),
+		Handler:     s.handler,
 		BaseContext: func(listener net.Listener) context.Context { return ctx },
 	}
 	httpServer.SetKeepAlivesEnabled(false)
@@ -250,9 +251,92 @@ func (s *tlsALPNSolver) CleanUp(_ context.Context, chal acme.Challenge) error {
 // DNS provider APIs and implementations of the libdns interfaces must also
 // support multiple same-named TXT records.
 type DNS01Solver struct {
+	DNSManager
+}
+
+// Present creates the DNS TXT record for the given ACME challenge.
+func (s *DNS01Solver) Present(ctx context.Context, challenge acme.Challenge) error {
+	dnsName := challenge.DNS01TXTRecordName()
+	if s.OverrideDomain != "" {
+		dnsName = s.OverrideDomain
+	}
+	keyAuth := challenge.DNS01KeyAuthorization()
+
+	zrec, err := s.DNSManager.createRecord(ctx, dnsName, "TXT", keyAuth)
+	if err != nil {
+		return err
+	}
+
+	// remember the record and zone we got so we can clean up more efficiently
+	s.saveDNSPresentMemory(dnsPresentMemory{
+		dnsName: dnsName,
+		zoneRec: zrec,
+	})
+
+	return nil
+}
+
+// Wait blocks until the TXT record created in Present() appears in
+// authoritative lookups, i.e. until it has propagated, or until
+// timeout, whichever is first.
+func (s *DNS01Solver) Wait(ctx context.Context, challenge acme.Challenge) error {
+	// prepare for the checks by determining what to look for
+	dnsName := challenge.DNS01TXTRecordName()
+	if s.OverrideDomain != "" {
+		dnsName = s.OverrideDomain
+	}
+	keyAuth := challenge.DNS01KeyAuthorization()
+
+	// wait for the record to propagate
+	memory, err := s.getDNSPresentMemory(dnsName, "TXT", keyAuth)
+	if err != nil {
+		return err
+	}
+	return s.DNSManager.wait(ctx, memory.zoneRec)
+}
+
+// CleanUp deletes the DNS TXT record created in Present().
+//
+// We ignore the context because cleanup is often/likely performed after
+// a context cancellation, and properly-implemented DNS providers should
+// honor cancellation, which would result in cleanup being aborted.
+// Cleanup must always occur.
+func (s *DNS01Solver) CleanUp(ctx context.Context, challenge acme.Challenge) error {
+	dnsName := challenge.DNS01TXTRecordName()
+	if s.OverrideDomain != "" {
+		dnsName = s.OverrideDomain
+	}
+	keyAuth := challenge.DNS01KeyAuthorization()
+
+	// always forget about the record so we don't leak memory
+	defer s.deleteDNSPresentMemory(dnsName, keyAuth)
+
+	// recall the record we created and zone we looked up
+	memory, err := s.getDNSPresentMemory(dnsName, "TXT", keyAuth)
+	if err != nil {
+		return err
+	}
+
+	if err := s.DNSManager.cleanUpRecord(ctx, memory.zoneRec); err != nil {
+		return err
+	}
+	return nil
+}
+
+// DNSManager is a type that makes libdns providers usable for performing
+// DNS verification. See https://github.com/libdns/libdns
+//
+// Note that records may be manipulated concurrently by some clients (such as
+// acmez, which CertMagic uses), meaning that multiple records may be created
+// in a DNS zone simultaneously, and in some cases distinct records of the same
+// type may have the same name. For example, solving ACME challenges for both example.com
+// and *.example.com create a TXT record named _acme_challenge.example.com,
+// but with different tokens as their values. This solver distinguishes between
+// different records with the same type and name by looking at their values.
+type DNSManager struct {
 	// The implementation that interacts with the DNS
 	// provider to set or delete records. (REQUIRED)
-	DNSProvider ACMEDNSProvider
+	DNSProvider DNSProvider
 
 	// The TTL for the temporary challenge records.
 	TTL time.Duration
@@ -274,6 +358,9 @@ type DNS01Solver struct {
 	// that the solver doesn't follow CNAME/NS record.
 	OverrideDomain string
 
+	// An optional logger.
+	Logger *zap.Logger
+
 	// Remember DNS records while challenges are active; i.e.
 	// records we have presented and not yet cleaned up.
 	// This lets us clean them up quickly and efficiently.
@@ -285,83 +372,82 @@ type DNS01Solver struct {
 	// the value of their TXT records, which should contain
 	// unique challenge tokens.
 	// See https://github.com/caddyserver/caddy/issues/3474.
-	txtRecords   map[string][]dnsPresentMemory
-	txtRecordsMu sync.Mutex
+	records   map[string][]dnsPresentMemory
+	recordsMu sync.Mutex
 }
 
-// Present creates the DNS TXT record for the given ACME challenge.
-func (s *DNS01Solver) Present(ctx context.Context, challenge acme.Challenge) error {
-	dnsName := challenge.DNS01TXTRecordName()
-	if s.OverrideDomain != "" {
-		dnsName = s.OverrideDomain
-	}
-	keyAuth := challenge.DNS01KeyAuthorization()
+func (m *DNSManager) createRecord(ctx context.Context, dnsName, recordType, recordValue string) (zoneRecord, error) {
+	logger := m.logger()
 
-	zone, err := findZoneByFQDN(dnsName, recursiveNameservers(s.Resolvers))
+	zone, err := FindZoneByFQDN(ctx, logger, dnsName, RecursiveNameservers(m.Resolvers))
 	if err != nil {
-		return fmt.Errorf("could not determine zone for domain %q: %v", dnsName, err)
+		return zoneRecord{}, fmt.Errorf("could not determine zone for domain %q: %v", dnsName, err)
 	}
 
-	rec := libdns.Record{
-		Type:  "TXT",
-		Name:  libdns.RelativeName(dnsName+".", zone),
-		Value: keyAuth,
-		TTL:   s.TTL,
+	rr := libdns.RR{
+		Type: recordType,
+		Name: libdns.RelativeName(dnsName+".", zone),
+		Data: recordValue,
+		TTL:  m.TTL,
 	}
 
-	results, err := s.DNSProvider.AppendRecords(ctx, zone, []libdns.Record{rec})
+	logger.Debug("creating DNS record",
+		zap.String("dns_name", dnsName),
+		zap.String("zone", zone),
+		zap.String("record_name", rr.Name),
+		zap.String("record_type", rr.Type),
+		zap.String("record_data", rr.Data),
+		zap.Duration("record_ttl", rr.TTL))
+
+	results, err := m.DNSProvider.AppendRecords(ctx, zone, []libdns.Record{rr})
 	if err != nil {
-		return fmt.Errorf("adding temporary record for zone %q: %w", zone, err)
+		return zoneRecord{}, fmt.Errorf("adding temporary record for zone %q: %w", zone, err)
 	}
 	if len(results) != 1 {
-		return fmt.Errorf("expected one record, got %d: %v", len(results), results)
+		return zoneRecord{}, fmt.Errorf("expected one record, got %d: %v", len(results), results)
 	}
 
-	// remember the record and zone we got so we can clean up more efficiently
-	s.saveDNSPresentMemory(dnsPresentMemory{
-		dnsZone: zone,
-		dnsName: dnsName,
-		rec:     results[0],
-	})
-
-	return nil
+	return zoneRecord{zone, results[0].RR()}, nil
 }
 
-// Wait blocks until the TXT record created in Present() appears in
+// wait blocks until the TXT record created in Present() appears in
 // authoritative lookups, i.e. until it has propagated, or until
 // timeout, whichever is first.
-func (s *DNS01Solver) Wait(ctx context.Context, challenge acme.Challenge) error {
+func (m *DNSManager) wait(ctx context.Context, zrec zoneRecord) error {
+	logger := m.logger()
+
 	// if configured to, pause before doing propagation checks
 	// (even if they are disabled, the wait might be desirable on its own)
-	if s.PropagationDelay > 0 {
+	if m.PropagationDelay > 0 {
 		select {
-		case <-time.After(s.PropagationDelay):
+		case <-time.After(m.PropagationDelay):
 		case <-ctx.Done():
 			return ctx.Err()
 		}
 	}
 
 	// skip propagation checks if configured to do so
-	if s.PropagationTimeout == -1 {
+	if m.PropagationTimeout == -1 {
 		return nil
 	}
 
-	// prepare for the checks by determining what to look for
-	dnsName := challenge.DNS01TXTRecordName()
-	if s.OverrideDomain != "" {
-		dnsName = s.OverrideDomain
-	}
-	keyAuth := challenge.DNS01KeyAuthorization()
-
 	// timings
-	timeout := s.PropagationTimeout
+	timeout := m.PropagationTimeout
 	if timeout == 0 {
 		timeout = defaultDNSPropagationTimeout
 	}
 	const interval = 2 * time.Second
 
 	// how we'll do the checks
-	resolvers := recursiveNameservers(s.Resolvers)
+	checkAuthoritativeServers := len(m.Resolvers) == 0
+	resolvers := RecursiveNameservers(m.Resolvers)
+
+	recType := dns.TypeTXT
+	if zrec.record.RR().Type == "CNAME" {
+		recType = dns.TypeCNAME
+	}
+
+	absName := libdns.AbsoluteName(zrec.record.Name, zrec.zone)
 
 	var err error
 	start := time.Now()
@@ -371,10 +457,17 @@ func (s *DNS01Solver) Wait(ctx context.Context, challenge acme.Challenge) error 
 		case <-ctx.Done():
 			return ctx.Err()
 		}
+
+		logger.Debug("checking DNS propagation",
+			zap.String("fqdn", absName),
+			zap.String("record_type", zrec.record.Type),
+			zap.String("expected_data", zrec.record.Data),
+			zap.Strings("resolvers", resolvers))
+
 		var ready bool
-		ready, err = checkDNSPropagation(dnsName, keyAuth, resolvers)
+		ready, err = checkDNSPropagation(ctx, logger, absName, recType, zrec.record.Data, checkAuthoritativeServers, resolvers)
 		if err != nil {
-			return fmt.Errorf("checking DNS propagation of %q: %w", dnsName, err)
+			return fmt.Errorf("checking DNS propagation of %q (relative=%s zone=%s resolvers=%v): %w", absName, zrec.record.Name, zrec.zone, resolvers, err)
 		}
 		if ready {
 			return nil
@@ -384,101 +477,110 @@ func (s *DNS01Solver) Wait(ctx context.Context, challenge acme.Challenge) error 
 	return fmt.Errorf("timed out waiting for record to fully propagate; verify DNS provider configuration is correct - last error: %v", err)
 }
 
+type zoneRecord struct {
+	zone   string
+	record libdns.RR
+}
+
 // CleanUp deletes the DNS TXT record created in Present().
 //
 // We ignore the context because cleanup is often/likely performed after
 // a context cancellation, and properly-implemented DNS providers should
 // honor cancellation, which would result in cleanup being aborted.
 // Cleanup must always occur.
-func (s *DNS01Solver) CleanUp(_ context.Context, challenge acme.Challenge) error {
-	dnsName := challenge.DNS01TXTRecordName()
-	if s.OverrideDomain != "" {
-		dnsName = s.OverrideDomain
-	}
-	keyAuth := challenge.DNS01KeyAuthorization()
-
-	// always forget about the record so we don't leak memory
-	defer s.deleteDNSPresentMemory(dnsName, keyAuth)
-
-	// recall the record we created and zone we looked up
-	memory, err := s.getDNSPresentMemory(dnsName, keyAuth)
-	if err != nil {
-		return err
-	}
+func (m *DNSManager) cleanUpRecord(_ context.Context, zrec zoneRecord) error {
+	logger := m.logger()
 
 	// clean up the record - use a different context though, since
 	// one common reason cleanup is performed is because a context
 	// was canceled, and if so, any HTTP requests by this provider
 	// should fail if the provider is properly implemented
 	// (see issue #200)
-	timeout := s.PropagationTimeout
+	timeout := m.PropagationTimeout
 	if timeout <= 0 {
 		timeout = defaultDNSPropagationTimeout
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	_, err = s.DNSProvider.DeleteRecords(ctx, memory.dnsZone, []libdns.Record{memory.rec})
-	if err != nil {
-		return fmt.Errorf("deleting temporary record for name %q in zone %q: %w", memory.dnsName, memory.dnsZone, err)
-	}
 
+	logger.Debug("deleting DNS record",
+		zap.String("zone", zrec.zone),
+		zap.String("record_name", zrec.record.Name),
+		zap.String("record_type", zrec.record.Type),
+		zap.String("record_data", zrec.record.Data))
+
+	_, err := m.DNSProvider.DeleteRecords(ctx, zrec.zone, []libdns.Record{zrec.record})
+	if err != nil {
+		return fmt.Errorf("deleting temporary record for name %q in zone %q: %w", zrec.zone, zrec.record, err)
+	}
 	return nil
+}
+
+func (m *DNSManager) logger() *zap.Logger {
+	logger := m.Logger
+	if logger == nil {
+		logger = zap.NewNop()
+	}
+	return logger.Named("dns_manager")
 }
 
 const defaultDNSPropagationTimeout = 2 * time.Minute
 
+// dnsPresentMemory associates a created DNS record with its zone
+// (since libdns Records are zone-relative and do not include zone).
 type dnsPresentMemory struct {
-	dnsZone string
 	dnsName string
-	rec     libdns.Record
+	zoneRec zoneRecord
 }
 
-func (s *DNS01Solver) saveDNSPresentMemory(mem dnsPresentMemory) {
-	s.txtRecordsMu.Lock()
-	if s.txtRecords == nil {
-		s.txtRecords = make(map[string][]dnsPresentMemory)
+func (s *DNSManager) saveDNSPresentMemory(mem dnsPresentMemory) {
+	s.recordsMu.Lock()
+	if s.records == nil {
+		s.records = make(map[string][]dnsPresentMemory)
 	}
-	s.txtRecords[mem.dnsName] = append(s.txtRecords[mem.dnsName], mem)
-	s.txtRecordsMu.Unlock()
+	s.records[mem.dnsName] = append(s.records[mem.dnsName], mem)
+	s.recordsMu.Unlock()
 }
 
-func (s *DNS01Solver) getDNSPresentMemory(dnsName, keyAuth string) (dnsPresentMemory, error) {
-	s.txtRecordsMu.Lock()
-	defer s.txtRecordsMu.Unlock()
+func (s *DNSManager) getDNSPresentMemory(dnsName, recType, value string) (dnsPresentMemory, error) {
+	s.recordsMu.Lock()
+	defer s.recordsMu.Unlock()
 
 	var memory dnsPresentMemory
-	for _, mem := range s.txtRecords[dnsName] {
-		if mem.rec.Value == keyAuth {
+	var found bool
+	for _, mem := range s.records[dnsName] {
+		if mem.zoneRec.record.Type == recType && mem.zoneRec.record.Data == value {
 			memory = mem
+			found = true
 			break
 		}
 	}
-
-	if memory.rec.Name == "" {
+	if !found {
 		return dnsPresentMemory{}, fmt.Errorf("no memory of presenting a DNS record for %q (usually OK if presenting also failed)", dnsName)
 	}
 
 	return memory, nil
 }
 
-func (s *DNS01Solver) deleteDNSPresentMemory(dnsName, keyAuth string) {
-	s.txtRecordsMu.Lock()
-	defer s.txtRecordsMu.Unlock()
+func (s *DNSManager) deleteDNSPresentMemory(dnsName, keyAuth string) {
+	s.recordsMu.Lock()
+	defer s.recordsMu.Unlock()
 
-	for i, mem := range s.txtRecords[dnsName] {
-		if mem.rec.Value == keyAuth {
-			s.txtRecords[dnsName] = append(s.txtRecords[dnsName][:i], s.txtRecords[dnsName][i+1:]...)
+	for i, mem := range s.records[dnsName] {
+		if mem.zoneRec.record.Data == keyAuth {
+			s.records[dnsName] = append(s.records[dnsName][:i], s.records[dnsName][i+1:]...)
 			return
 		}
 	}
 }
 
-// ACMEDNSProvider defines the set of operations required for
-// ACME challenges. A DNS provider must be able to append and
-// delete records in order to solve ACME challenges. Find one
-// you can use at https://github.com/libdns. If your provider
-// isn't implemented yet, feel free to contribute!
-type ACMEDNSProvider interface {
+// DNSProvider defines the set of operations required for
+// ACME challenges or other sorts of domain verification.
+// A DNS provider must be able to append and delete records
+// in order to solve ACME challenges. Find one you can use
+// at https://github.com/libdns. If your provider isn't
+// implemented yet, feel free to contribute!
+type DNSProvider interface {
 	libdns.RecordAppender
 	libdns.RecordDeleter
 }
@@ -629,21 +731,23 @@ func robustTryListen(addr string) (net.Listener, error) {
 			return nil, nil
 		}
 
-		// hmm, we couldn't connect to the socket, so something else must
-		// be wrong, right? wrong!! we've had reports across multiple OSes
-		// now that sometimes connections fail even though the OS told us
-		// that the address was already in use; either the listener is
-		// fluctuating between open and closed very, very quickly, or the
-		// OS is inconsistent and contradicting itself; I have been unable
-		// to reproduce this, so I'm now resorting to hard-coding substring
-		// matching in error messages as a really hacky and unreliable
-		// safeguard against this, until we can idenify exactly what was
-		// happening; see the following threads for more info:
+		// Hmm, we couldn't connect to the socket, so something else must
+		// be wrong, right? wrong!! Apparently if a port is bound by another
+		// listener with a specific host, i.e. 'x:1234', we cannot bind to
+		// ':1234' -- it is considered a conflict, but 'y:1234' is not.
+		// I guess we need to assume the conflicting listener is properly
+		// configured and continue. But we should tell the user to specify
+		// the correct ListenHost to avoid conflict or at least so we can
+		// know that the user is intentional about that port and hopefully
+		// has an ACME solver on it.
+		//
+		// History:
 		// https://caddy.community/t/caddy-retry-error/7317
 		// https://caddy.community/t/v2-upgrade-to-caddy2-failing-with-errors/7423
+		// https://github.com/caddyserver/certmagic/issues/250
 		if strings.Contains(listenErr.Error(), "address already in use") ||
 			strings.Contains(listenErr.Error(), "one usage of each socket address") {
-			log.Printf("[WARNING] OS reports a contradiction: %v - but we cannot connect to it, with this error: %v; continuing anyway 🤞 (I don't know what causes this... if you do, please help?)", listenErr, connectErr)
+			log.Printf("[WARNING] %v - be sure to set the ACMEIssuer.ListenHost field; assuming conflicting listener is correctly configured and continuing", listenErr)
 			return nil, nil
 		}
 	}

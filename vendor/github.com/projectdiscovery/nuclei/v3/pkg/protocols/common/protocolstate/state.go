@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"net"
 	"net/url"
-	"sync"
+	"slices"
+	"time"
 
 	"github.com/go-sql-driver/mysql"
 	"github.com/pkg/errors"
@@ -16,32 +17,77 @@ import (
 	"github.com/projectdiscovery/networkpolicy"
 	"github.com/projectdiscovery/nuclei/v3/pkg/types"
 	"github.com/projectdiscovery/nuclei/v3/pkg/utils/expand"
+	mapsutil "github.com/projectdiscovery/utils/maps"
 )
 
-// Dialer is a shared fastdialer instance for host DNS resolution
 var (
-	muDialer sync.RWMutex
-	Dialer   *fastdialer.Dialer
+	dialers *mapsutil.SyncLockMap[string, *Dialers]
 )
 
-func GetDialer() *fastdialer.Dialer {
-	muDialer.RLock()
-	defer muDialer.RUnlock()
-
-	return Dialer
+func init() {
+	dialers = mapsutil.NewSyncLockMap[string, *Dialers]()
 }
 
-func ShouldInit() bool {
-	return Dialer == nil
+func GetDialers(ctx context.Context) *Dialers {
+	executionContext := GetExecutionContext(ctx)
+	dialers, ok := dialers.Get(executionContext.ExecutionID)
+	if !ok {
+		return nil
+	}
+	return dialers
 }
 
-// Init creates the Dialer instance based on user configuration
+func GetDialersWithId(id string) *Dialers {
+	dialers, ok := dialers.Get(id)
+	if !ok {
+		return nil
+	}
+	return dialers
+}
+
+func ShouldInit(id string) bool {
+	dialer, ok := dialers.Get(id)
+	if !ok {
+		return true
+	}
+	return dialer == nil
+}
+
+// Init creates the Dialers instance based on user configuration
 func Init(options *types.Options) error {
-	if Dialer != nil {
+	if existingDialers := GetDialersWithId(options.ExecutionId); existingDialers != nil {
+		// the network policy is baked into the fastdialer when it is created,
+		// so rebuild the dialers when any input to that policy changed for this
+		// execution id (the RestrictLocalNetworkAccess flag or the exclude
+		// targets denylist).
+		existingDialers.Lock()
+		policyChanged := existingDialers.RestrictLocalNetworkAccess != options.RestrictLocalNetworkAccess ||
+			!slices.Equal(existingDialers.ExcludeTargets, options.ExcludeTargets)
+		existingDialers.Unlock()
+		if policyChanged {
+			if existingDialers.Fastdialer != nil {
+				existingDialers.Fastdialer.Close()
+			}
+			dialers.Delete(options.ExecutionId)
+			return initDialers(options)
+		}
+
+		// otherwise refresh the LFA / network-policy state derived from options
+		// so a second Init call with different options is reflected.
+		existingDialers.Lock()
+		existingDialers.LocalFileAccessAllowed = options.AllowLocalFileAccess
+		existingDialers.RestrictLocalNetworkAccess = options.RestrictLocalNetworkAccess
+		existingDialers.ExcludeTargets = options.ExcludeTargets
+		existingDialers.Unlock()
+		SetLfaAllowed(options)
 		return nil
 	}
 
-	lfaAllowed = options.AllowLocalFileAccess
+	return initDialers(options)
+}
+
+// initDialers is the internal implementation of Init
+func initDialers(options *types.Options) error {
 	opts := fastdialer.DefaultOptions
 	opts.DialerTimeout = options.GetTimeouts().DialTimeout
 	if options.DialerKeepAlive > 0 {
@@ -66,8 +112,6 @@ func Init(options *types.Options) error {
 		DenyList: expandedDenyList,
 	}
 	opts.WithNetworkPolicyOptions = npOptions
-	NetworkPolicy, _ = networkpolicy.New(*npOptions)
-	InitHeadless(options.AllowLocalFileAccess, NetworkPolicy)
 
 	switch {
 	case options.SourceIP != "" && options.Interface != "":
@@ -152,7 +196,32 @@ func Init(options *types.Options) error {
 	if err != nil {
 		return errors.Wrap(err, "could not create dialer")
 	}
-	Dialer = dialer
+
+	// fail initialization if the network policy cannot be created rather than
+	// continuing with no denylist.
+	networkPolicy, err := networkpolicy.New(*npOptions)
+	if err != nil {
+		// close the already-created dialer to avoid leaking its resources.
+		dialer.Close()
+		return errors.Wrap(err, "could not create network policy")
+	}
+
+	// Per-host HTTP clients and transports are evicted after 90 seconds of
+	// inactivity (checked lazily every 30 seconds). Evicted transports get
+	// their idle connections closed immediately, so connections to
+	// already-scanned hosts are cleaned up promptly.
+	httpClientPool := NewHTTPPool(90*time.Second, 30*time.Second)
+
+	dialersInstance := &Dialers{
+		Fastdialer:                 dialer,
+		NetworkPolicy:              networkPolicy,
+		HTTPClientPool:             httpClientPool,
+		LocalFileAccessAllowed:     options.AllowLocalFileAccess,
+		RestrictLocalNetworkAccess: options.RestrictLocalNetworkAccess,
+		ExcludeTargets:             options.ExcludeTargets,
+	}
+
+	_ = dialers.Set(options.ExecutionId, dialersInstance)
 
 	// Set a custom dialer for the "nucleitcp" protocol.  This is just plain TCP, but it's registered
 	// with a different name so that we do not clobber the "tcp" dialer in the event that nuclei is
@@ -164,10 +233,20 @@ func Init(options *types.Options) error {
 			addr += ":3306"
 		}
 
-		return Dialer.Dial(ctx, "tcp", addr)
+		var executionId string
+		if val := ctx.Value("executionId"); val != nil {
+			executionId = val.(string)
+		}
+		dialer := GetDialersWithId(executionId)
+		if dialer == nil {
+			return nil, fmt.Errorf("dialers not initialized for %s", executionId)
+		}
+		return dialer.Fastdialer.Dial(ctx, "tcp", addr)
 	})
 
 	StartActiveMemGuardian(context.Background())
+
+	SetLfaAllowed(options)
 
 	return nil
 }
@@ -226,13 +305,30 @@ func interfaceAddresses(interfaceName string) ([]net.Addr, error) {
 }
 
 // Close closes the global shared fastdialer
-func Close() {
-	muDialer.Lock()
-	defer muDialer.Unlock()
-
-	if Dialer != nil {
-		Dialer.Close()
-		Dialer = nil
+func Close(executionId string) {
+	dialersInstance, ok := dialers.Get(executionId)
+	if !ok {
+		return
 	}
-	StopActiveMemGuardian()
+
+	if dialersInstance != nil {
+		// Drop all cached HTTP clients/transports and close their idle
+		// keep-alive connections to avoid lingering transport goroutines
+		// after shutdown.
+		dialersInstance.HTTPClientPool.Close()
+		// Stop the per-host rate limit pool so its background limiters (one
+		// goroutine each, up to the pool capacity) are released instead of
+		// leaking on shutdown or engine recreate. Typed as any here to avoid
+		// an import cycle with the httpclientpool package.
+		if pool, ok := dialersInstance.PerHostRateLimitPool.(interface{ Close() }); ok && pool != nil {
+			pool.Close()
+		}
+		dialersInstance.Fastdialer.Close()
+	}
+
+	dialers.Delete(executionId)
+
+	if dialers.IsEmpty() {
+		StopActiveMemGuardian()
+	}
 }

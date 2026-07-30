@@ -20,6 +20,7 @@ import (
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/helpers/eventcreator"
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/helpers/responsehighlighter"
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/interactsh"
+	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/render"
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/headless/engine"
 	protocolutils "github.com/projectdiscovery/nuclei/v3/pkg/protocols/utils"
 	templateTypes "github.com/projectdiscovery/nuclei/v3/pkg/templates/types"
@@ -52,12 +53,19 @@ func (request *Request) ExecuteWithResults(input *contextargs.Context, metadata,
 
 	vars := protocolutils.GenerateVariablesWithContextArgs(input, false)
 	optionVars := generators.BuildPayloadFromOptions(request.options.Options)
+	scope := request.options.NewVariablesScope(vars)
 	// add templatecontext variables to varMap
 	if request.options.HasTemplateCtx(input.MetaInput) {
-		vars = generators.MergeMaps(vars, metadata, optionVars, request.options.GetTemplateCtx(input.MetaInput).GetAll())
+		request.options.AddTemplateCtxToVariablesScope(input.MetaInput, scope)
 	}
-	variablesMap := request.options.Variables.Evaluate(vars)
-	vars = generators.MergeMaps(vars, variablesMap, request.options.Constants)
+
+	scope.AddData(metadata, optionVars, request.options.Constants)
+	evaluation := request.options.Variables.EvaluateWithInteractshScope(scope, request.options.Interactsh)
+	variablesMap, interactshURLs := evaluation.Values, evaluation.InteractURLs
+	if request.options.HasTemplateCtx(input.MetaInput) {
+		vars = generators.MergeMaps(vars, request.options.GetTemplateCtx(input.MetaInput).GetAll())
+	}
+	vars = generators.MergeMaps(vars, metadata, optionVars, variablesMap, request.options.Constants)
 
 	// check for operator matches by wrapping callback
 	gotmatches := false
@@ -78,20 +86,33 @@ func (request *Request) ExecuteWithResults(input *contextargs.Context, metadata,
 			if !ok {
 				break
 			}
+
 			if gotmatches && (request.StopAtFirstMatch || request.options.Options.StopAtFirstMatch || request.options.StopAtFirstMatch) {
 				return nil
 			}
-			value = generators.MergeMaps(value, vars)
-			if err := request.executeRequestWithPayloads(input, value, previous, wrappedCallback); err != nil {
+
+			renderedValue, err := render.RenderMap(render.MapInput{
+				Source:       value,
+				Data:         vars,
+				Values:       generators.MergeMaps(value, vars),
+				Interactsh:   request.options.Interactsh,
+				InteractURLs: interactshURLs,
+			})
+			if err != nil {
+				return errors.Wrap(err, "could not evaluate payload helper expressions")
+			}
+
+			if err := request.executeRequestWithPayloads(input, renderedValue.Values, previous, renderedValue.InteractURLs, wrappedCallback); err != nil {
 				return err
 			}
 		}
 	} else {
 		value := maps.Clone(vars)
-		if err := request.executeRequestWithPayloads(input, value, previous, wrappedCallback); err != nil {
+		if err := request.executeRequestWithPayloads(input, value, previous, interactshURLs, wrappedCallback); err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -110,7 +131,7 @@ func extractBaseURLFromActions(steps []*engine.Action) (string, error) {
 	return "", errors.New("no navigation action found")
 }
 
-func (request *Request) executeRequestWithPayloads(input *contextargs.Context, payloads map[string]interface{}, previous output.InternalEvent, callback protocols.OutputEventCallback) error {
+func (request *Request) executeRequestWithPayloads(input *contextargs.Context, payloads map[string]interface{}, previous output.InternalEvent, interactshURLs []string, callback protocols.OutputEventCallback) error {
 	instance, err := request.options.Browser.NewInstance()
 	if err != nil {
 		request.options.Output.Request(request.options.TemplatePath, input.MetaInput.Input, request.Type().String(), err)
@@ -118,8 +139,8 @@ func (request *Request) executeRequestWithPayloads(input *contextargs.Context, p
 		return errors.Wrap(err, errCouldNotGetHtmlElement)
 	}
 	defer func() {
-         _ = instance.Close()
-       }()
+		_ = instance.Close()
+	}()
 
 	instance.SetInteractsh(request.options.Interactsh)
 
@@ -146,6 +167,8 @@ func (request *Request) executeRequestWithPayloads(input *contextargs.Context, p
 	}
 	defer page.Close()
 
+	page.InteractshURLs = append(interactshURLs, page.InteractshURLs...)
+
 	reqLog := instance.GetRequestLog()
 	navigatedURL := request.getLastNavigationURLWithLog(reqLog) // also known as matchedURL if there is a match
 
@@ -163,11 +186,11 @@ func (request *Request) executeRequestWithPayloads(input *contextargs.Context, p
 				if reqLog[value] != "" {
 					_, _ = fmt.Fprintf(reqBuilder, "\tnavigate => %v\n", reqLog[value])
 				} else {
-					fmt.Fprintf(reqBuilder, "%v not found in %v\n", value, reqLog)
+					_, _ = fmt.Fprintf(reqBuilder, "%v not found in %v\n", value, reqLog)
 				}
 			} else {
 				actStepStr := act.String()
-				reqBuilder.WriteString("\t" + actStepStr + "\n")
+				_, _ = fmt.Fprintf(reqBuilder, "\t%s\n", actStepStr)
 			}
 		}
 		gologger.Debug().Msg(reqBuilder.String())
@@ -244,19 +267,23 @@ func (request *Request) executeFuzzingRule(input *contextargs.Context, payloads 
 		}
 		newInput := input.Clone()
 		newInput.MetaInput.Input = gr.Request.String()
-		if err := request.executeRequestWithPayloads(newInput, gr.DynamicValues, previous, callback); err != nil {
+
+		if err := request.executeRequestWithPayloads(newInput, gr.DynamicValues, previous, gr.InteractURLs, callback); err != nil {
 			return false
 		}
+
 		return true
 	}
 
 	if _, err := urlutil.Parse(input.MetaInput.Input); err != nil {
 		return errors.Wrap(err, "could not parse url")
 	}
+
 	baseRequest, err := retryablehttp.NewRequest("GET", input.MetaInput.Input, nil)
 	if err != nil {
 		return errors.Wrap(err, "could not create base request")
 	}
+
 	for _, rule := range request.Fuzzing {
 		err := rule.Execute(&fuzz.ExecuteRuleInput{
 			Input:       input,
@@ -274,7 +301,7 @@ func (request *Request) executeFuzzingRule(input *contextargs.Context, payloads 
 	return nil
 }
 
-// getLastNavigationURL returns last successfully navigated URL
+// getLastNavigationURLWithLog returns last successfully navigated URL
 func (request *Request) getLastNavigationURLWithLog(reqLog map[string]string) string {
 	for i := len(request.Steps) - 1; i >= 0; i-- {
 		if request.Steps[i].ActionType.ActionType == engine.ActionNavigate {

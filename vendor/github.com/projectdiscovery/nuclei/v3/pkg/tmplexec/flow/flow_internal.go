@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	"github.com/dop251/goja"
+	"github.com/projectdiscovery/goja"
 	"github.com/projectdiscovery/nuclei/v3/pkg/output"
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols"
+	"github.com/projectdiscovery/utils/errkit"
 	mapsutil "github.com/projectdiscovery/utils/maps"
 )
 
@@ -16,11 +17,14 @@ import (
 func (f *FlowExecutor) requestExecutor(runtime *goja.Runtime, reqMap mapsutil.Map[string, protocols.Request], opts *ProtoOptions) bool {
 	defer func() {
 		// evaluate all variables after execution of each protocol
-		variableMap := f.options.Variables.Evaluate(f.options.GetTemplateCtx(f.ctx.Input.MetaInput).GetAll())
-		f.options.GetTemplateCtx(f.ctx.Input.MetaInput).Merge(variableMap) // merge all variables into template context
+		scope := f.options.NewVariablesScope()
+		f.options.AddTemplateCtxToVariablesScope(f.ctx.Input.MetaInput, scope)
+		evaluation := f.options.Variables.EvaluateScope(scope)
+		f.options.GetTemplateCtx(f.ctx.Input.MetaInput).Merge(evaluation.Values) // merge all variables into template context
+		f.options.GetTemplateCtx(f.ctx.Input.MetaInput).MergeTemplateVariables(evaluation.TemplateValues)
 
 		// to avoid polling update template variables everytime we execute a protocol
-		var m = f.options.GetTemplateCtx(f.ctx.Input.MetaInput).GetAll()
+		m := f.options.GetTemplateCtx(f.ctx.Input.MetaInput).GetAll()
 		_ = runtime.Set("template", m)
 	}()
 	matcherStatus := &atomic.Bool{} // due to interactsh matcher polling logic this needs to be atomic bool
@@ -61,7 +65,7 @@ func (f *FlowExecutor) requestExecutor(runtime *goja.Runtime, reqMap mapsutil.Ma
 		if !ok {
 			f.ctx.LogError(fmt.Errorf("[%v] invalid request id '%s' provided", f.options.TemplateID, id))
 			// compile error
-			if err := f.allErrs.Set(opts.protoName+":"+id, ErrInvalidRequestID.Msgf(f.options.TemplateID, id)); err != nil {
+			if err := f.allErrs.Set(opts.protoName+":"+id, errkit.Newf("[%s] invalid request id '%s' provided", f.options.TemplateID, id)); err != nil {
 				f.ctx.LogError(fmt.Errorf("failed to store flow runtime errors got %v", err))
 			}
 			return matcherStatus.Load()

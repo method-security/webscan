@@ -164,6 +164,27 @@ type Options struct {
 	Fastdialer *fastdialer.Dialer
 	// Serail displays certiface serial number
 	Serial bool
+	// Proxy is the proxy to use for tlsx
+	Proxy string
+	// CTLogs enables certificate transparency logs streaming mode
+	CTLogs bool
+	// CTLBeginning when true starts CT logs streaming from index 0
+	CTLBeginning bool
+	// CTLIndex allows specifying custom start index per log in the form <logURL>=<index>
+	CTLIndex goflags.StringSlice
+	// PDCP related options
+	// Dashboard enables PDCP dashboard upload
+	Dashboard bool
+	// DashboardUpload specifies a file to upload to PDCP dashboard
+	DashboardUpload string
+	// PDCPAPIKey is the API key for PDCP authentication
+	PDCPAPIKey string
+	// PDCPTeamID is the team ID for PDCP uploads
+	PDCPTeamID string
+	// PDCPAssetID is the asset ID for PDCP uploads
+	PDCPAssetID string
+	// PDCPAssetName is the asset name for PDCP uploads
+	PDCPAssetName string
 }
 
 // Response is the response returned for a TLS grab event
@@ -194,13 +215,21 @@ type Response struct {
 	Chain              []*CertificateResponse `json:"chain,omitempty"`
 	JarmHash           string                 `json:"jarm_hash,omitempty"`
 	Ja3Hash            string                 `json:"ja3_hash,omitempty"`
-	Ja3sHash    string                 `json:"ja3s_hash,omitempty"`
+	Ja3sHash           string                 `json:"ja3s_hash,omitempty"`
 	ServerName         string                 `json:"sni,omitempty"`
 	VersionEnum        []string               `json:"version_enum,omitempty"`
 	TlsCiphers         []TlsCiphers           `json:"cipher_enum,omitempty"`
 	ClientHello        *ztls.ClientHello      `json:"client_hello,omitempty"`
 	ServerHello        *ztls.ServerHello      `json:"servers_hello,omitempty"`
 	ClientCertRequired *bool                  `json:"client_cert_required,omitempty"`
+	// CTLogSource is the Certificate Transparency log source for CT logs mode
+	CTLogSource string `json:"ctl_source,omitempty"`
+	// CTLogIndex is the index/offset of this entry in the CT log
+	CTLogIndex uint64 `json:"ctl_index,omitempty"`
+	// CTLogTreeSize is the total number of entries in the CT log (head)
+	CTLogTreeSize uint64 `json:"ctl_tree_size,omitempty"`
+	// CTLogLag is the number of pending entries (TreeSize - Index)
+	CTLogLag uint64 `json:"ctl_lag,omitempty"`
 }
 
 type TlsCiphers struct {
@@ -344,10 +373,19 @@ func IsExpired(notAfter time.Time) bool {
 // IsSelfSigned returns true if the certificate is self-signed
 //
 // follows: https://security.stackexchange.com/a/162263/250973
-func IsSelfSigned(authorityKeyID, subjectKeyID []byte) bool {
+func IsSelfSigned(authorityKeyID, subjectKeyID []byte, SANs []string) bool {
+	// Traditional self-signed check: no authority key ID or authority equals subject
 	if len(authorityKeyID) == 0 || bytes.Equal(authorityKeyID, subjectKeyID) {
 		return true
 	}
+
+	// Additional check for poorly generated self-signed certificates:
+	// Only flag as self-signed if BOTH no SANs AND no authority key ID
+	// This avoids false positives with legitimate intermediate CAs
+	if len(SANs) == 0 && len(authorityKeyID) == 0 {
+		return true
+	}
+
 	return false
 }
 
@@ -416,7 +454,7 @@ func IsZTLSRevoked(options *Options, cert *zx509.Certificate) bool {
 // IsUntrustedCA returns true if the certificate is a self-signed CA
 func IsUntrustedCA(certs []*x509.Certificate) bool {
 	for _, c := range certs {
-		if c != nil && c.IsCA && IsSelfSigned(c.AuthorityKeyId, c.SubjectKeyId) && !assets.IsRootCert(c) {
+		if c != nil && c.IsCA && IsSelfSigned(c.AuthorityKeyId, c.SubjectKeyId, c.DNSNames) && !assets.IsRootCert(c) {
 			return true
 		}
 	}
@@ -427,7 +465,7 @@ func IsUntrustedCA(certs []*x509.Certificate) bool {
 func IsZTLSUntrustedCA(certs []ztls.SimpleCertificate) bool {
 	for _, cert := range certs {
 		parsedCert, _ := x509.ParseCertificate(cert.Raw)
-		if parsedCert != nil && parsedCert.IsCA && IsSelfSigned(parsedCert.AuthorityKeyId, parsedCert.SubjectKeyId) && !assets.IsRootCert(parsedCert) {
+		if parsedCert != nil && parsedCert.IsCA && IsSelfSigned(parsedCert.AuthorityKeyId, parsedCert.SubjectKeyId, parsedCert.DNSNames) && !assets.IsRootCert(parsedCert) {
 			return true
 		}
 	}

@@ -15,7 +15,7 @@ builds:
     ldflags:
       - -s -w
       - "-extldflags '-static -lm -ldl -lpthread'"
-      - -X github.com/method-security/webscan/main.version={{.Version}}
+      - -X main.version={{.Version}}
     env:
       - CGO_ENABLED=1
     goos:
@@ -30,7 +30,7 @@ builds:
     binary: webscan
     ldflags:
       - -s -w
-      - -X github.com/method-security/webscan/main.version={{.Version}}
+      - -X main.version={{.Version}}
     env:
       - CGO_ENABLED=1
     goos:
@@ -44,7 +44,7 @@ builds:
     binary: webscan
     ldflags:
       - -s -w
-      - -X github.com/method-security/webscan/main.version={{.Version}}
+      - -X main.version={{.Version}}
     env:
       - CGO_ENABLED=1
     goos:

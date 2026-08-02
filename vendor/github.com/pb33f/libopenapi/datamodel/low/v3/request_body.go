@@ -1,19 +1,18 @@
-// Copyright 2022 Princess B33f Heavy Industries / Dave Shanley
+// Copyright 2022-2026 Princess B33f Heavy Industries / Dave Shanley
 // SPDX-License-Identifier: MIT
 
 package v3
 
 import (
 	"context"
-	"crypto/sha256"
-	"fmt"
-	"strings"
+	"hash/maphash"
+	"sync"
 
 	"github.com/pb33f/libopenapi/datamodel/low"
 	"github.com/pb33f/libopenapi/index"
 	"github.com/pb33f/libopenapi/orderedmap"
 	"github.com/pb33f/libopenapi/utils"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // RequestBody represents a low-level OpenAPI 3+ RequestBody object.
@@ -25,7 +24,22 @@ type RequestBody struct {
 	Extensions  *orderedmap.Map[low.KeyReference[string], low.ValueReference[*yaml.Node]]
 	KeyNode     *yaml.Node
 	RootNode    *yaml.Node
+	index       *index.SpecIndex
+	context     context.Context
+	nodeStore   sync.Map
+	reference   low.Reference
 	*low.Reference
+	low.NodeMap
+}
+
+// GetIndex returns the index.SpecIndex instance attached to the RequestBody object.
+func (rb *RequestBody) GetIndex() *index.SpecIndex {
+	return rb.index
+}
+
+// GetContext returns the context.Context instance used when building the RequestBody object.
+func (rb *RequestBody) GetContext() context.Context {
+	return rb.context
 }
 
 // GetRootNode returns the root yaml node of the RequestBody object.
@@ -56,11 +70,26 @@ func (rb *RequestBody) FindContent(cType string) *low.ValueReference[*MediaType]
 // Build will extract extensions and MediaType objects from the node.
 func (rb *RequestBody) Build(ctx context.Context, keyNode, root *yaml.Node, idx *index.SpecIndex) error {
 	rb.KeyNode = keyNode
+	rb.reference = low.Reference{}
+	rb.Reference = &rb.reference
+	if ok, _, ref := utils.IsNodeRefValue(root); ok {
+		rb.SetReference(ref, root)
+	}
 	root = utils.NodeAlias(root)
 	rb.RootNode = root
 	utils.CheckForMergeNodes(root)
-	rb.Reference = new(low.Reference)
+	rb.nodeStore = sync.Map{}
+	rb.Nodes = &rb.nodeStore
+	if len(root.Content) > 0 {
+		rb.NodeMap.ExtractNodes(root, false)
+	} else {
+		rb.AddNode(root.Line, root)
+	}
 	rb.Extensions = low.ExtractExtensions(root)
+	rb.index = idx
+	rb.context = ctx
+
+	low.ExtractExtensionNodes(ctx, rb.Extensions, rb.Nodes)
 
 	// handle content, if set.
 	con, cL, cN, cErr := low.ExtractMap[*MediaType](ctx, ContentLabel, root, idx)
@@ -73,22 +102,33 @@ func (rb *RequestBody) Build(ctx context.Context, keyNode, root *yaml.Node, idx 
 			KeyNode:   cL,
 			ValueNode: cN,
 		}
+		rb.Nodes.Store(cL.Line, cL)
+		for k, v := range con.FromOldest() {
+			v.Value.Nodes.Store(k.KeyNode.Line, k.KeyNode)
+		}
 	}
 	return nil
 }
 
-// Hash will return a consistent SHA256 Hash of the RequestBody object
-func (rb *RequestBody) Hash() [32]byte {
-	var f []string
-	if rb.Description.Value != "" {
-		f = append(f, rb.Description.Value)
-	}
-	if !rb.Required.IsEmpty() {
-		f = append(f, fmt.Sprint(rb.Required.Value))
-	}
-	for pair := orderedmap.First(orderedmap.SortAlpha(rb.Content.Value)); pair != nil; pair = pair.Next() {
-		f = append(f, low.GenerateHashString(pair.Value().Value))
-	}
-	f = append(f, low.HashExtensions(rb.Extensions)...)
-	return sha256.Sum256([]byte(strings.Join(f, "|")))
+// Hash will return a consistent Hash of the RequestBody object
+func (rb *RequestBody) Hash() uint64 {
+	return low.WithHasher(func(h *maphash.Hash) uint64 {
+		if rb.Description.Value != "" {
+			h.WriteString(rb.Description.Value)
+			h.WriteByte(low.HASH_PIPE)
+		}
+		if !rb.Required.IsEmpty() {
+			low.HashBool(h, rb.Required.Value)
+			h.WriteByte(low.HASH_PIPE)
+		}
+		for v := range orderedmap.SortAlpha(rb.Content.Value).ValuesFromOldest() {
+			h.WriteString(low.GenerateHashString(v.Value))
+			h.WriteByte(low.HASH_PIPE)
+		}
+		for _, ext := range low.HashExtensions(rb.Extensions) {
+			h.WriteString(ext)
+			h.WriteByte(low.HASH_PIPE)
+		}
+		return h.Sum64()
+	})
 }

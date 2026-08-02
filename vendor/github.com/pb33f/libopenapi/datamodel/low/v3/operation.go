@@ -1,21 +1,20 @@
-// Copyright 2022 Princess B33f Heavy Industries / Dave Shanley
+// Copyright 2022-2026 Princess B33f Heavy Industries / Dave Shanley
 // SPDX-License-Identifier: MIT
 
 package v3
 
 import (
 	"context"
-	"crypto/sha256"
-	"fmt"
+	"hash/maphash"
 	"sort"
-	"strings"
+	"sync"
 
 	"github.com/pb33f/libopenapi/datamodel/low"
 	"github.com/pb33f/libopenapi/datamodel/low/base"
 	"github.com/pb33f/libopenapi/index"
 	"github.com/pb33f/libopenapi/orderedmap"
 	"github.com/pb33f/libopenapi/utils"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // Operation is a low-level representation of an OpenAPI 3+ Operation object.
@@ -39,7 +38,22 @@ type Operation struct {
 	Extensions   *orderedmap.Map[low.KeyReference[string], low.ValueReference[*yaml.Node]]
 	KeyNode      *yaml.Node
 	RootNode     *yaml.Node
+	index        *index.SpecIndex
+	context      context.Context
+	nodeStore    sync.Map
+	reference    low.Reference
 	*low.Reference
+	low.NodeMap
+}
+
+// GetIndex returns the index.SpecIndex instance attached to the Operation object.
+func (o *Operation) GetIndex() *index.SpecIndex {
+	return o.index
+}
+
+// GetContext returns the context.Context instance used when building the Operation object.
+func (o *Operation) GetContext() context.Context {
+	return o.context
 }
 
 // FindCallback will attempt to locate a Callback instance by the supplied name.
@@ -51,9 +65,9 @@ func (o *Operation) FindCallback(callback string) *low.ValueReference[*Callback]
 func (o *Operation) FindSecurityRequirement(name string) []low.ValueReference[string] {
 	for k := range o.Security.Value {
 		requirements := o.Security.Value[k].Value.Requirements
-		for pair := orderedmap.First(requirements.Value); pair != nil; pair = pair.Next() {
-			if pair.Key().Value == name {
-				return pair.Value().Value
+		for k, v := range requirements.Value.FromOldest() {
+			if k.Value == name {
+				return v.Value
 			}
 		}
 	}
@@ -73,11 +87,22 @@ func (o *Operation) GetKeyNode() *yaml.Node {
 // Build will extract external docs, parameters, request body, responses, callbacks, security and servers.
 func (o *Operation) Build(ctx context.Context, keyNode, root *yaml.Node, idx *index.SpecIndex) error {
 	o.KeyNode = keyNode
-	o.RootNode = root
 	root = utils.NodeAlias(root)
+	o.RootNode = root
 	utils.CheckForMergeNodes(root)
-	o.Reference = new(low.Reference)
+	o.reference = low.Reference{}
+	o.Reference = &o.reference
+	o.nodeStore = sync.Map{}
+	o.Nodes = &o.nodeStore
+	if len(root.Content) > 0 {
+		o.NodeMap.ExtractNodes(root, false)
+	} else {
+		o.AddNode(root.Line, root)
+	}
 	o.Extensions = low.ExtractExtensions(root)
+	o.index = idx
+	o.context = ctx
+	low.ExtractExtensionNodes(ctx, o.Extensions, o.Nodes)
 
 	// extract externalDocs
 	extDocs, dErr := low.ExtractObject[*base.ExternalDoc](ctx, base.ExternalDocsLabel, root, idx)
@@ -97,6 +122,7 @@ func (o *Operation) Build(ctx context.Context, keyNode, root *yaml.Node, idx *in
 			KeyNode:   ln,
 			ValueNode: vn,
 		}
+		o.Nodes.Store(ln.Line, ln)
 	}
 
 	// extract request body
@@ -105,6 +131,13 @@ func (o *Operation) Build(ctx context.Context, keyNode, root *yaml.Node, idx *in
 		return rErr
 	}
 	o.RequestBody = rBody
+
+	// extract tags, but only extract nodes, the model has already been built
+	k, v := utils.FindKeyNode(TagsLabel, root.Content)
+	if k != nil && v != nil {
+		o.Nodes.Store(k.Line, k)
+		low.MergeRecursiveNodesIfLineAbsent(o.Nodes, v)
+	}
 
 	// extract responses
 	respBody, respErr := low.ExtractObject[*Responses](ctx, ResponsesLabel, root, idx)
@@ -124,6 +157,10 @@ func (o *Operation) Build(ctx context.Context, keyNode, root *yaml.Node, idx *in
 			KeyNode:   cbL,
 			ValueNode: cbN,
 		}
+		o.Nodes.Store(cbL.Line, cbL)
+		for k, v := range callbacks.FromOldest() {
+			v.Value.Nodes.Store(k.KeyNode.Line, k.KeyNode)
+		}
 	}
 
 	// extract security
@@ -139,16 +176,18 @@ func (o *Operation) Build(ctx context.Context, keyNode, root *yaml.Node, idx *in
 			KeyNode:   sln,
 			ValueNode: svn,
 		}
+		o.Nodes.Store(sln.Line, sln)
 	}
 
 	// if security is set, but no requirements are defined.
 	// https://github.com/pb33f/libopenapi/issues/111
-	if sln != nil && len(svn.Content) == 0 && sec == nil {
+	if sln != nil && len(svn.Content) == 0 && len(sec) == 0 {
 		o.Security = low.NodeReference[[]low.ValueReference[*base.SecurityRequirement]]{
-			Value:     []low.ValueReference[*base.SecurityRequirement]{}, // empty
+			Value:     []low.ValueReference[*base.SecurityRequirement]{},
 			KeyNode:   sln,
 			ValueNode: svn,
 		}
+		o.Nodes.Store(sln.Line, svn)
 	}
 
 	// extract servers
@@ -162,70 +201,108 @@ func (o *Operation) Build(ctx context.Context, keyNode, root *yaml.Node, idx *in
 			KeyNode:   sl,
 			ValueNode: sn,
 		}
+		o.Nodes.Store(sl.Line, sl)
 	}
 	return nil
 }
 
-// Hash will return a consistent SHA256 Hash of the Operation object
-func (o *Operation) Hash() [32]byte {
-	var f []string
-	if !o.Summary.IsEmpty() {
-		f = append(f, o.Summary.Value)
-	}
-	if !o.Description.IsEmpty() {
-		f = append(f, o.Description.Value)
-	}
-	if !o.OperationId.IsEmpty() {
-		f = append(f, o.OperationId.Value)
-	}
-	if !o.RequestBody.IsEmpty() {
-		f = append(f, low.GenerateHashString(o.RequestBody.Value))
-	}
-	if !o.Summary.IsEmpty() {
-		f = append(f, o.Summary.Value)
-	}
-	if !o.ExternalDocs.IsEmpty() {
-		f = append(f, low.GenerateHashString(o.ExternalDocs.Value))
-	}
-	if !o.Responses.IsEmpty() {
-		f = append(f, low.GenerateHashString(o.Responses.Value))
-	}
-	if !o.Security.IsEmpty() {
-		for k := range o.Security.Value {
-			f = append(f, low.GenerateHashString(o.Security.Value[k].Value))
+// Hash will return a consistent Hash of the Operation object
+func (o *Operation) Hash() uint64 {
+	return low.WithHasher(func(h *maphash.Hash) uint64 {
+		if !o.Summary.IsEmpty() {
+			h.WriteString(o.Summary.Value)
+			h.WriteByte(low.HASH_PIPE)
 		}
-	}
-	if !o.Deprecated.IsEmpty() {
-		f = append(f, fmt.Sprint(o.Deprecated.Value))
-	}
-	var keys []string
-	keys = make([]string, len(o.Tags.Value))
-	for k := range o.Tags.Value {
-		keys[k] = o.Tags.Value[k].Value
-	}
-	sort.Strings(keys)
-	f = append(f, keys...)
+		if !o.Description.IsEmpty() {
+			h.WriteString(o.Description.Value)
+			h.WriteByte(low.HASH_PIPE)
+		}
+		if !o.OperationId.IsEmpty() {
+			h.WriteString(o.OperationId.Value)
+			h.WriteByte(low.HASH_PIPE)
+		}
+		if !o.RequestBody.IsEmpty() {
+			h.WriteString(low.GenerateHashString(o.RequestBody.Value))
+			h.WriteByte(low.HASH_PIPE)
+		}
+		if !o.ExternalDocs.IsEmpty() {
+			h.WriteString(low.GenerateHashString(o.ExternalDocs.Value))
+			h.WriteByte(low.HASH_PIPE)
+		}
+		if !o.Responses.IsEmpty() {
+			h.WriteString(low.GenerateHashString(o.Responses.Value))
+			h.WriteByte(low.HASH_PIPE)
+		}
+		if !o.Security.IsEmpty() {
+			// Pre-allocate keys for sorting
+			secKeys := make([]string, len(o.Security.Value))
+			for k := range o.Security.Value {
+				secKeys[k] = low.GenerateHashString(o.Security.Value[k].Value)
+			}
+			sort.Strings(secKeys)
+			for _, key := range secKeys {
+				h.WriteString(key)
+				h.WriteByte(low.HASH_PIPE)
+			}
+		}
+		if !o.Deprecated.IsEmpty() {
+			low.HashBool(h, o.Deprecated.Value)
+			h.WriteByte(low.HASH_PIPE)
+		}
 
-	keys = make([]string, len(o.Servers.Value))
-	for k := range o.Servers.Value {
-		keys[k] = low.GenerateHashString(o.Servers.Value[k].Value)
-	}
-	sort.Strings(keys)
-	f = append(f, keys...)
+		// Tags array - pre-allocate and sort
+		if len(o.Tags.Value) > 0 {
+			tags := make([]string, len(o.Tags.Value))
+			for k := range o.Tags.Value {
+				tags[k] = o.Tags.Value[k].Value
+			}
+			sort.Strings(tags)
+			for _, tag := range tags {
+				h.WriteString(tag)
+				h.WriteByte(low.HASH_PIPE)
+			}
+		}
 
-	keys = make([]string, len(o.Parameters.Value))
-	for k := range o.Parameters.Value {
-		keys[k] = low.GenerateHashString(o.Parameters.Value[k].Value)
-	}
-	sort.Strings(keys)
-	f = append(f, keys...)
+		// Servers array - pre-allocate and sort
+		if len(o.Servers.Value) > 0 {
+			servers := make([]string, len(o.Servers.Value))
+			for k := range o.Servers.Value {
+				servers[k] = low.GenerateHashString(o.Servers.Value[k].Value)
+			}
+			sort.Strings(servers)
+			for _, server := range servers {
+				h.WriteString(server)
+				h.WriteByte(low.HASH_PIPE)
+			}
+		}
 
-	for pair := orderedmap.First(orderedmap.SortAlpha(o.Callbacks.Value)); pair != nil; pair = pair.Next() {
-		f = append(f, low.GenerateHashString(pair.Value().Value))
-	}
-	f = append(f, low.HashExtensions(o.Extensions)...)
+		// Parameters array - pre-allocate and sort
+		if len(o.Parameters.Value) > 0 {
+			params := make([]string, len(o.Parameters.Value))
+			for k := range o.Parameters.Value {
+				params[k] = low.GenerateHashString(o.Parameters.Value[k].Value)
+			}
+			sort.Strings(params)
+			for _, param := range params {
+				h.WriteString(param)
+				h.WriteByte(low.HASH_PIPE)
+			}
+		}
 
-	return sha256.Sum256([]byte(strings.Join(f, "|")))
+		// Callbacks
+		for v := range orderedmap.SortAlpha(o.Callbacks.Value).ValuesFromOldest() {
+			h.WriteString(low.GenerateHashString(v.Value))
+			h.WriteByte(low.HASH_PIPE)
+		}
+
+		// Extensions
+		for _, ext := range low.HashExtensions(o.Extensions) {
+			h.WriteString(ext)
+			h.WriteByte(low.HASH_PIPE)
+		}
+
+		return h.Sum64()
+	})
 }
 
 // methods to satisfy swagger operations interface
@@ -267,6 +344,14 @@ func (o *Operation) GetResponses() low.NodeReference[any] {
 		ValueNode: o.Responses.ValueNode,
 		KeyNode:   o.Responses.KeyNode,
 		Value:     o.Responses.Value,
+	}
+}
+
+func (o *Operation) GetRequestBody() low.NodeReference[any] {
+	return low.NodeReference[any]{
+		ValueNode: o.RequestBody.ValueNode,
+		KeyNode:   o.RequestBody.KeyNode,
+		Value:     o.RequestBody.Value,
 	}
 }
 

@@ -4,6 +4,7 @@
 package v3
 
 import (
+	"fmt"
 	"sort"
 
 	"github.com/pb33f/libopenapi/datamodel"
@@ -12,7 +13,7 @@ import (
 	v3low "github.com/pb33f/libopenapi/datamodel/low/v3"
 	"github.com/pb33f/libopenapi/orderedmap"
 	"github.com/pb33f/libopenapi/utils"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // Paths represents a high-level OpenAPI 3+ Paths object, that is backed by a low-level one.
@@ -86,9 +87,7 @@ func (p *Paths) MarshalYAML() (interface{}, error) {
 	}
 	var mapped []*pathItem
 
-	for pair := orderedmap.First(p.PathItems); pair != nil; pair = pair.Next() {
-		k := pair.Key()
-		pi := pair.Value()
+	for k, pi := range p.PathItems.FromOldest() {
 		ln := 9999 // default to a high value to weight new content to the bottom.
 		var style yaml.Style
 		if p.low != nil {
@@ -97,9 +96,9 @@ func (p *Paths) MarshalYAML() (interface{}, error) {
 				ln = lpi.ValueNode.Line
 			}
 
-			for pair := orderedmap.First(p.low.PathItems); pair != nil; pair = pair.Next() {
-				if pair.Key().Value == k {
-					style = pair.Key().KeyNode.Style
+			for lk := range p.low.PathItems.KeysFromOldest() {
+				if lk.Value == k {
+					style = lk.KeyNode.Style
 					break
 				}
 			}
@@ -146,6 +145,15 @@ func (p *Paths) MarshalYAML() (interface{}, error) {
 }
 
 func (p *Paths) MarshalYAMLInline() (interface{}, error) {
+	return p.marshalYAMLInlineWithContext(nil)
+}
+
+// MarshalYAMLInlineWithContext renders paths with a shared inline render context.
+func (p *Paths) MarshalYAMLInlineWithContext(ctx any) (interface{}, error) {
+	return p.marshalYAMLInlineWithContext(ctx)
+}
+
+func (p *Paths) marshalYAMLInlineWithContext(ctx any) (interface{}, error) {
 	// map keys correctly.
 	m := utils.CreateEmptyMapNode()
 	type pathItem struct {
@@ -157,9 +165,7 @@ func (p *Paths) MarshalYAMLInline() (interface{}, error) {
 	}
 	var mapped []*pathItem
 
-	for pair := orderedmap.First(p.PathItems); pair != nil; pair = pair.Next() {
-		k := pair.Key()
-		pi := pair.Value()
+	for k, pi := range p.PathItems.FromOldest() {
 		ln := 9999 // default to a high value to weight new content to the bottom.
 		var style yaml.Style
 		if p.low != nil {
@@ -168,9 +174,9 @@ func (p *Paths) MarshalYAMLInline() (interface{}, error) {
 				ln = lpi.ValueNode.Line
 			}
 
-			for pair := orderedmap.First(p.low.PathItems); pair != nil; pair = pair.Next() {
-				if pair.Key().Value == k {
-					style = pair.Key().KeyNode.Style
+			for lk := range p.low.PathItems.KeysFromOldest() {
+				if lk.Value == k {
+					style = lk.KeyNode.Style
 					break
 				}
 			}
@@ -180,6 +186,7 @@ func (p *Paths) MarshalYAMLInline() (interface{}, error) {
 
 	nb := high.NewNodeBuilder(p, p.low)
 	nb.Resolve = true
+	nb.RenderContext = ctx
 	extNode := nb.Render()
 	if extNode != nil && extNode.Content != nil {
 		var label string
@@ -200,7 +207,16 @@ func (p *Paths) MarshalYAMLInline() (interface{}, error) {
 	})
 	for _, mp := range mapped {
 		if mp.pi != nil {
-			rendered, _ := mp.pi.MarshalYAMLInline()
+			var rendered interface{}
+			var err error
+			if ctx != nil {
+				rendered, err = mp.pi.MarshalYAMLInlineWithContext(ctx)
+			} else {
+				rendered, err = mp.pi.MarshalYAMLInline()
+			}
+			if err != nil {
+				return nil, fmt.Errorf("failed to render path '%s' inline: %w", mp.path, err)
+			}
 
 			kn := utils.CreateStringNode(mp.path)
 			kn.Style = mp.style

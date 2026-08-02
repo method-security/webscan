@@ -21,11 +21,11 @@ import (
 	"github.com/pb33f/libopenapi/datamodel/low/base"
 	"github.com/pb33f/libopenapi/index"
 	"github.com/pb33f/libopenapi/orderedmap"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // processes a property of a Swagger document asynchronously using bool and error channels for signals.
-type documentFunction func(ctx context.Context, root *yaml.Node, doc *Swagger, idx *index.SpecIndex, c chan<- bool, e chan<- error)
+type documentFunction func(ctx context.Context, root *yaml.Node, doc *Swagger, idx *index.SpecIndex, c chan<- struct{}, e chan<- error)
 
 // Swagger represents a high-level Swagger / OpenAPI 2 document. An instance of Swagger is the root of the specification.
 type Swagger struct {
@@ -130,7 +130,8 @@ func (s *Swagger) GetExtensions() *orderedmap.Map[low.KeyReference[string], low.
 
 // CreateDocumentFromConfig will create a new Swagger document from the provided SpecInfo and DocumentConfiguration.
 func CreateDocumentFromConfig(info *datamodel.SpecInfo,
-	configuration *datamodel.DocumentConfiguration) (*Swagger, error) {
+	configuration *datamodel.DocumentConfiguration,
+) (*Swagger, error) {
 	return createDocument(info, configuration)
 }
 
@@ -143,10 +144,15 @@ func createDocument(info *datamodel.SpecInfo, config *datamodel.DocumentConfigur
 	idxConfig.SpecInfo = info
 	idxConfig.IgnoreArrayCircularReferences = config.IgnoreArrayCircularReferences
 	idxConfig.IgnorePolymorphicCircularReferences = config.IgnorePolymorphicCircularReferences
+	idxConfig.AllowUnknownExtensionContentDetection = config.AllowUnknownExtensionContentDetection
+	idxConfig.SkipExternalRefResolution = config.SkipExternalRefResolution
+	idxConfig.ResolveNestedRefsWithDocumentContext = config.ResolveNestedRefsWithDocumentContext
 	idxConfig.AvoidCircularReferenceCheck = true
 	idxConfig.BaseURL = config.BaseURL
 	idxConfig.BasePath = config.BasePath
 	idxConfig.Logger = config.Logger
+	idxConfig.ExcludeExtensionRefs = config.ExcludeExtensionRefs
+	idxConfig.SkipMetadataCollection = config.SkipMetadataCollection
 	rolodex := index.NewRolodex(idxConfig)
 	rolodex.SetRootNode(info.RootNode)
 	doc.Rolodex = rolodex
@@ -157,7 +163,23 @@ func createDocument(info *datamodel.SpecInfo, config *datamodel.DocumentConfigur
 		cwd, _ = filepath.Abs(config.BasePath)
 		// if a supplied local filesystem is provided, add it to the rolodex.
 		if config.LocalFS != nil {
-			rolodex.AddLocalFS(cwd, config.LocalFS)
+			var localFS index.RolodexFS
+			if fs, ok := config.LocalFS.(index.RolodexFS); ok {
+				localFS = fs
+			} else {
+				// wrap a plain fs.FS so it can be indexed.
+				localFSConf := index.LocalFSConfig{
+					BaseDirectory: cwd,
+					IndexConfig:   idxConfig,
+					FileFilters:   config.FileFilter,
+					DirFS:         config.LocalFS,
+				}
+
+				localFS, _ = index.NewLocalFSWithConfig(&localFSConf)
+				idxConfig.AllowFileLookup = true
+			}
+
+			rolodex.AddLocalFS(cwd, localFS)
 		} else {
 
 			// create a local filesystem
@@ -174,8 +196,8 @@ func createDocument(info *datamodel.SpecInfo, config *datamodel.DocumentConfigur
 		}
 	}
 
-	// if base url is provided, add a remote filesystem to the rolodex.
-	if idxConfig.BaseURL != nil {
+	// Only create a remote filesystem when the caller explicitly allows remote references.
+	if config.AllowRemoteReferences {
 
 		// create a remote filesystem
 		remoteFS, _ := index.NewRemoteFSWithConfig(idxConfig)
@@ -185,7 +207,11 @@ func createDocument(info *datamodel.SpecInfo, config *datamodel.DocumentConfigur
 		idxConfig.AllowRemoteLookup = true
 
 		// add to the rolodex
-		rolodex.AddRemoteFS(config.BaseURL.String(), remoteFS)
+		u := "default"
+		if config.BaseURL != nil {
+			u = config.BaseURL.String()
+		}
+		rolodex.AddRemoteFS(u, remoteFS)
 
 	}
 
@@ -194,7 +220,7 @@ func createDocument(info *datamodel.SpecInfo, config *datamodel.DocumentConfigur
 	var errs []error
 
 	// index all the things!
-	_ = rolodex.IndexTheRolodex()
+	_ = rolodex.IndexTheRolodex(context.Background())
 
 	// check for circular references
 	if !config.SkipCircularReferenceCheck {
@@ -234,7 +260,7 @@ func createDocument(info *datamodel.SpecInfo, config *datamodel.DocumentConfigur
 		extractTags,
 		extractSecurity,
 	}
-	doneChan := make(chan bool)
+	doneChan := make(chan struct{})
 	errChan := make(chan error)
 	for i := range extractionFuncs {
 		go extractionFuncs[i](ctx, info.RootNode.Content[0], &doc, rolodex.GetRootIndex(), doneChan, errChan)
@@ -261,67 +287,67 @@ func (s *Swagger) GetExternalDocs() *low.NodeReference[any] {
 	}
 }
 
-func extractInfo(ctx context.Context, root *yaml.Node, doc *Swagger, idx *index.SpecIndex, c chan<- bool, e chan<- error) {
+func extractInfo(ctx context.Context, root *yaml.Node, doc *Swagger, idx *index.SpecIndex, c chan<- struct{}, e chan<- error) {
 	info, err := low.ExtractObject[*base.Info](ctx, base.InfoLabel, root, idx)
 	if err != nil {
 		e <- err
 		return
 	}
 	doc.Info = info
-	c <- true
+	c <- struct{}{}
 }
 
-func extractPaths(ctx context.Context, root *yaml.Node, doc *Swagger, idx *index.SpecIndex, c chan<- bool, e chan<- error) {
+func extractPaths(ctx context.Context, root *yaml.Node, doc *Swagger, idx *index.SpecIndex, c chan<- struct{}, e chan<- error) {
 	paths, err := low.ExtractObject[*Paths](ctx, PathsLabel, root, idx)
 	if err != nil {
 		e <- err
 		return
 	}
 	doc.Paths = paths
-	c <- true
+	c <- struct{}{}
 }
 
-func extractDefinitions(ctx context.Context, root *yaml.Node, doc *Swagger, idx *index.SpecIndex, c chan<- bool, e chan<- error) {
+func extractDefinitions(ctx context.Context, root *yaml.Node, doc *Swagger, idx *index.SpecIndex, c chan<- struct{}, e chan<- error) {
 	def, err := low.ExtractObject[*Definitions](ctx, DefinitionsLabel, root, idx)
 	if err != nil {
 		e <- err
 		return
 	}
 	doc.Definitions = def
-	c <- true
+	c <- struct{}{}
 }
 
-func extractParamDefinitions(ctx context.Context, root *yaml.Node, doc *Swagger, idx *index.SpecIndex, c chan<- bool, e chan<- error) {
+func extractParamDefinitions(ctx context.Context, root *yaml.Node, doc *Swagger, idx *index.SpecIndex, c chan<- struct{}, e chan<- error) {
 	param, err := low.ExtractObject[*ParameterDefinitions](ctx, ParametersLabel, root, idx)
 	if err != nil {
 		e <- err
 		return
 	}
 	doc.Parameters = param
-	c <- true
+	c <- struct{}{}
 }
 
-func extractResponsesDefinitions(ctx context.Context, root *yaml.Node, doc *Swagger, idx *index.SpecIndex, c chan<- bool, e chan<- error) {
+func extractResponsesDefinitions(ctx context.Context, root *yaml.Node, doc *Swagger, idx *index.SpecIndex, c chan<- struct{}, e chan<- error) {
 	resp, err := low.ExtractObject[*ResponsesDefinitions](ctx, ResponsesLabel, root, idx)
 	if err != nil {
 		e <- err
 		return
 	}
 	doc.Responses = resp
-	c <- true
+	c <- struct{}{}
 }
 
-func extractSecurityDefinitions(ctx context.Context, root *yaml.Node, doc *Swagger, idx *index.SpecIndex, c chan<- bool, e chan<- error) {
+func extractSecurityDefinitions(ctx context.Context, root *yaml.Node, doc *Swagger, idx *index.SpecIndex, c chan<- struct{}, e chan<- error) {
 	sec, err := low.ExtractObject[*SecurityDefinitions](ctx, SecurityDefinitionsLabel, root, idx)
 	if err != nil {
 		e <- err
 		return
 	}
 	doc.SecurityDefinitions = sec
-	c <- true
+	c <- struct{}{}
 }
 
-func extractTags(ctx context.Context, root *yaml.Node, doc *Swagger, idx *index.SpecIndex, c chan<- bool, e chan<- error) {
+func extractTags(ctx context.Context, root *yaml.Node, doc *Swagger, idx *index.SpecIndex, c chan<- struct{}, e chan<- error) {
 	tags, ln, vn, err := low.ExtractArray[*base.Tag](ctx, base.TagsLabel, root, idx)
 	if err != nil {
 		e <- err
@@ -332,10 +358,10 @@ func extractTags(ctx context.Context, root *yaml.Node, doc *Swagger, idx *index.
 		KeyNode:   ln,
 		ValueNode: vn,
 	}
-	c <- true
+	c <- struct{}{}
 }
 
-func extractSecurity(ctx context.Context, root *yaml.Node, doc *Swagger, idx *index.SpecIndex, c chan<- bool, e chan<- error) {
+func extractSecurity(ctx context.Context, root *yaml.Node, doc *Swagger, idx *index.SpecIndex, c chan<- struct{}, e chan<- error) {
 	sec, ln, vn, err := low.ExtractArray[*base.SecurityRequirement](ctx, SecurityLabel, root, idx)
 	if err != nil {
 		e <- err
@@ -346,5 +372,5 @@ func extractSecurity(ctx context.Context, root *yaml.Node, doc *Swagger, idx *in
 		KeyNode:   ln,
 		ValueNode: vn,
 	}
-	c <- true
+	c <- struct{}{}
 }

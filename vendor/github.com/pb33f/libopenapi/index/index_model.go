@@ -4,44 +4,80 @@
 package index
 
 import (
+	"encoding/json"
 	"io/fs"
 	"log/slog"
 	"net/http"
 	"net/url"
+	"path/filepath"
 	"sync"
 
-	"github.com/pb33f/libopenapi/datamodel"
+	"github.com/pb33f/libopenapi/utils"
 
-	"gopkg.in/yaml.v3"
+	"github.com/pb33f/libopenapi/datamodel"
+	"go.yaml.in/yaml/v4"
 )
 
-// Reference is a wrapper around *yaml.Node results to make things more manageable when performing
-// algorithms on data models. the *yaml.Node def is just a bit too low level for tracking state.
+// Reference is a wrapper around *yaml.Node that tracks a single $ref usage in a specification.
+// It captures the full definition path, the resolved node, parent context, circular reference state,
+// and sibling properties. Used throughout the index for reference resolution and change detection.
 type Reference struct {
-	FullDefinition        string
-	Definition            string
-	Name                  string
-	Node                  *yaml.Node
-	KeyNode               *yaml.Node
-	ParentNode            *yaml.Node
-	ParentNodeSchemaType  string   // used to determine if the parent node is an array or not.
-	ParentNodeTypes       []string // used to capture deep journeys, if any item is an array, we need to know.
-	Resolved              bool
-	Circular              bool
-	Seen                  bool
-	IsRemote              bool
-	Index                 *SpecIndex // index that contains this reference.
-	RemoteLocation        string
-	Path                  string              // this won't always be available.
-	RequiredRefProperties map[string][]string // definition names (eg, #/definitions/One) to a list of required properties on this definition which reference that definition
+	FullDefinition        string                `json:"fullDefinition,omitempty"`
+	Definition            string                `json:"definition,omitempty"`
+	RawRef                string                `json:"-"`
+	SchemaIdBase          string                `json:"-"`
+	Name                  string                `json:"name,omitempty"`
+	Node                  *yaml.Node            `json:"-"`
+	KeyNode               *yaml.Node            `json:"-"`
+	ParentNode            *yaml.Node            `json:"-"`
+	ParentNodeSchemaType  string                `json:"-"` // used to determine if the parent node is an array or not.
+	ParentNodeTypes       []string              `json:"-"` // used to capture deep journeys, if any item is an array, we need to know.
+	Resolved              bool                  `json:"-"`
+	Circular              bool                  `json:"-"`
+	Seen                  bool                  `json:"-"`
+	IsRemote              bool                  `json:"isRemote,omitempty"`
+	IsExtensionRef        bool                  `json:"isExtensionRef,omitempty"` // true if ref is under an x-* extension path
+	Index                 *SpecIndex            `json:"-"`                        // index that contains this reference.
+	RemoteLocation        string                `json:"remoteLocation,omitempty"`
+	Path                  string                `json:"path,omitempty"`               // this won't always be available.
+	SourcePath            []string              `json:"-"`                            // OpenAPI path to the source $ref location.
+	RequiredRefProperties map[string][]string   `json:"requiredProperties,omitempty"` // definition names (eg, #/definitions/One) to a list of required properties on this definition which reference that definition
+	HasSiblingProperties  bool                  `json:"-"`                            // indicates if ref has sibling properties
+	SiblingProperties     map[string]*yaml.Node `json:"-"`                            // stores sibling property nodes
+	SiblingKeys           []*yaml.Node          `json:"-"`                            // stores sibling key nodes
+	In                    string                `json:"-"`                            // parameter location (path, query, header, cookie) - cached for performance
 }
 
-// ReferenceMapped is a helper struct for mapped references put into sequence (we lose the key)
+// ReferenceMapped is a helper struct that pairs a mapped reference with its original definition key,
+// preserving insertion order when references are sequenced from a map.
 type ReferenceMapped struct {
-	OriginalReference *Reference
-	Reference         *Reference
-	Definition        string
-	FullDefinition    string
+	OriginalReference *Reference `json:"originalReference,omitempty"`
+	Reference         *Reference `json:"reference,omitempty"`
+	Definition        string     `json:"definition,omitempty"`
+	FullDefinition    string     `json:"fullDefinition,omitempty"`
+	IsPolymorphic     bool       `json:"isPolymorphic,omitempty"`
+}
+
+// MarshalJSON is a custom JSON marshaller for the ReferenceMapped struct.
+func (rm *ReferenceMapped) MarshalJSON() ([]byte, error) {
+	d := map[string]interface{}{
+		"definition":     rm.Definition,
+		"fullDefinition": rm.FullDefinition,
+		"jsonPath":       rm.OriginalReference.Path,
+		"line":           rm.OriginalReference.Node.Line,
+		"startColumn":    rm.OriginalReference.Node.Column,
+		"endColumn": rm.OriginalReference.Node.Content[1].Column +
+			(len(rm.OriginalReference.Node.Content[1].Value) + 2),
+	}
+	if rm.IsPolymorphic {
+		d["isPolymorphic"] = true
+	}
+
+	if rm.Reference != nil && rm.Reference.KeyNode != nil {
+		d["targetLine"] = rm.Reference.KeyNode.Line
+		d["targetColumn"] = rm.Reference.KeyNode.Column
+	}
+	return json.Marshal(d)
 }
 
 // SpecIndexConfig is a configuration struct for the SpecIndex introduced in 0.6.0 that provides an expandable
@@ -66,7 +102,7 @@ type SpecIndexConfig struct {
 	// If resolving remotely, the RemoteURLHandler will be used to fetch the remote document.
 	// If not set, the default http client will be used.
 	// Resolves [#132]: https://github.com/pb33f/libopenapi/issues/132
-	// deprecated: Use the Rolodex instead
+	// Deprecated: Use the Rolodex instead.
 	RemoteURLHandler func(url string) (*http.Response, error)
 
 	// FSHandler is an entity that implements the `fs.FS` interface that will be used to fetch local or remote documents.
@@ -77,15 +113,18 @@ type SpecIndexConfig struct {
 	// the document. This is really useful if your application has a custom file system or uses a database for storing
 	// documents.
 	//
-	// Is the FSHandler is set, it will be used for all lookups, regardless of whether they are local or remote.
-	// it also overrides the RemoteURLHandler if set.
+	// If the FSHandler is set, it will be used for all lookups, regardless of whether they are local or remote.
+	// It also overrides the RemoteURLHandler if set.
 	//
-	// Resolves[#85] https://github.com/pb33f/libopenapi/issues/85
-	// deprecated: Use the Rolodex instead
+	// Resolves [#85]: https://github.com/pb33f/libopenapi/issues/85
+	// Deprecated: Use the Rolodex instead.
 	FSHandler fs.FS
 
 	// If resolving locally, the BasePath will be the root from which relative references will be resolved from
 	BasePath string // set the Base Path for resolving relative references if the spec is exploded.
+
+	// SpecFilePath is the name of the root specification file (usually named "openapi.yaml").
+	SpecFilePath string
 
 	// In an earlier version of libopenapi (pre 0.6.0) the index would automatically resolve all references
 	// They could have been local, or they could have been remote. This was a problem because it meant
@@ -141,33 +180,142 @@ type SpecIndexConfig struct {
 	// the file is a JSON Schema. To allow JSON Schema files to be included set this to true.
 	SkipDocumentCheck bool
 
+	// SkipExternalRefResolution will skip resolving external $ref references (those not starting with #).
+	// When enabled, external references will be left as-is during model building.
+	SkipExternalRefResolution bool
+
 	// ExtractRefsSequentially will extract all references sequentially, which means the index will look up references
 	// as it finds them, vs looking up everything asynchronously.
 	// This is a more thorough way of building the index, but it's slower. It's required building a document
 	// to be bundled.
 	ExtractRefsSequentially bool
 
+	// ExcludeExtensionReferences will prevent the indexing of any $ref pointers buried under extensions.
+	// defaults to false (which means extensions will be included)
+	ExcludeExtensionRefs bool
+
+	// UseSchemaQuickHash will use a quick hash to determine if a schema is the same as another schema if its a reference.
+	// This is important when a root / entry document does not have a components/schemas node, and schemas are defined in
+	// external documents. Enabling this will allow the what-changed module to perform deeper schema reference checks.
+	// -- IMPORTANT --
+	// Enabling this (default is false) will stop changes from being detected if a schema is circular.
+	// As identified in https://github.com/pb33f/libopenapi/pull/441
+	// So, in the edge case where you have circular references in your root / entry components/schemas and you also
+	// want changes in them to be picked up, then you should not enable this.
+	UseSchemaQuickHash bool
+
+	// AllowUnknownExtensionContentDetection will enable content detection for remote URLs that don't have
+	// a known file extension. When enabled, libopenapi will fetch the first 1-2KB of unknown URLs to determine
+	// if they contain valid JSON or YAML content. This is disabled by default for security and performance.
+	//
+	// If disabled, URLs without recognized extensions (.yaml, .yml, .json) will be rejected.
+	// If enabled, unknown URLs will be fetched and analyzed for JSON/YAML content with retry logic.
+	AllowUnknownExtensionContentDetection bool
+
+	// TransformSiblingRefs enables OpenAPI 3.1/JSON Schema Draft 2020-12 compliance for sibling refs.
+	// When enabled, schemas with $ref and additional properties will be transformed to use allOf.
+	TransformSiblingRefs bool
+
+	// MergeReferencedProperties enables merging of properties from referenced schemas with local properties.
+	// When enabled, properties from referenced schemas will be merged with local sibling properties.
+	MergeReferencedProperties bool
+
+	// ResolveNestedRefsWithDocumentContext uses the referenced document's path/index as the base for any nested refs.
+	// This is disabled by default to preserve historical resolver behavior.
+	ResolveNestedRefsWithDocumentContext bool
+
+	// PropertyMergeStrategy defines how to handle conflicts when merging properties.
+	PropertyMergeStrategy datamodel.PropertyMergeStrategy
+
+	// SkipMetadataCollection disables the collection of diagnostic metadata during indexing:
+	// descriptions, summaries, enums, objects-with-properties, security requirement
+	// references, and the JSONPath `Path` values on inline schema references. Skipping
+	// them significantly reduces allocations and retained memory when parsing large
+	// documents. Reference extraction and resolution are unaffected.
+	//
+	// -- UNSAFE FOR DIAGNOSTIC, RULE, OR PATH CONSUMERS --
+	// When enabled, GetAllDescriptions, GetAllSummaries, GetAllEnums,
+	// GetAllObjectsWithProperties, GetSecurityRequirementReferences and the related
+	// counts are intentionally empty/zero, and inline schema Reference.Path values are
+	// empty strings. vacuum and any other tool that consumes index metadata or Path
+	// values must NOT enable this. Defaults to false (everything is collected).
+	SkipMetadataCollection bool
+
 	// private fields
 	uri []string
+	id  string
+}
+
+// SetTheoreticalRoot sets the spec file paths to point to a theoretical spec file, which does not exist but is required
+//
+//	to formulate the absolute path to root references correctly.
+func (s *SpecIndexConfig) SetTheoreticalRoot() {
+	s.SpecFilePath = filepath.Join(s.BasePath, theoreticalRoot)
+
+	basePath := s.BasePath
+	if !filepath.IsAbs(basePath) {
+		basePath, _ = filepath.Abs(basePath)
+	}
+	s.SpecAbsolutePath = filepath.Join(basePath, theoreticalRoot)
+}
+
+// GetId returns the id of the SpecIndexConfig. If the id is not set, it will generate a random alphanumeric string
+func (s *SpecIndexConfig) GetId() string {
+	if s.id == "" {
+		s.id = utils.GenerateAlphanumericString(6)
+	}
+	return s.id
+}
+
+// ToDocumentConfiguration converts SpecIndexConfig to DocumentConfiguration for compatibility
+func (s *SpecIndexConfig) ToDocumentConfiguration() *datamodel.DocumentConfiguration {
+	if s == nil {
+		return nil
+	}
+	// default strategy if not set
+	strategy := s.PropertyMergeStrategy
+	if strategy == 0 {
+		strategy = datamodel.PreserveLocal
+	}
+	return &datamodel.DocumentConfiguration{
+		BaseURL:                               s.BaseURL,
+		BasePath:                              s.BasePath,
+		SpecFilePath:                          s.SpecFilePath,
+		AllowFileReferences:                   s.AllowFileLookup,
+		AllowRemoteReferences:                 s.AllowRemoteLookup,
+		BypassDocumentCheck:                   s.SkipDocumentCheck,
+		IgnorePolymorphicCircularReferences:   s.IgnorePolymorphicCircularReferences,
+		IgnoreArrayCircularReferences:         s.IgnoreArrayCircularReferences,
+		UseSchemaQuickHash:                    s.UseSchemaQuickHash,
+		AllowUnknownExtensionContentDetection: s.AllowUnknownExtensionContentDetection,
+		TransformSiblingRefs:                  s.TransformSiblingRefs,
+		MergeReferencedProperties:             s.MergeReferencedProperties,
+		ResolveNestedRefsWithDocumentContext:  s.ResolveNestedRefsWithDocumentContext,
+		PropertyMergeStrategy:                 strategy,
+		SkipExternalRefResolution:             s.SkipExternalRefResolution,
+		SkipMetadataCollection:                s.SkipMetadataCollection,
+		Logger:                                s.Logger,
+	}
 }
 
 // CreateOpenAPIIndexConfig is a helper function to create a new SpecIndexConfig with the AllowRemoteLookup and
-// AllowFileLookup set to true. This is the default behaviour of the index in previous versions of libopenapi. (pre 0.6.0)
+// AllowFileLookup set to true. This is the default behavior of the index in previous versions of libopenapi. (pre 0.6.0)
 //
 // The default BasePath is the current working directory.
 func CreateOpenAPIIndexConfig() *SpecIndexConfig {
 	return &SpecIndexConfig{
 		AllowRemoteLookup: true,
 		AllowFileLookup:   true,
+		id:                utils.GenerateAlphanumericString(6),
 	}
 }
 
 // CreateClosedAPIIndexConfig is a helper function to create a new SpecIndexConfig with the AllowRemoteLookup and
-// AllowFileLookup set to false. This is the default behaviour of the index in versions 0.6.0+
+// AllowFileLookup set to false. This is the default behavior of the index in versions 0.6.0+
 //
 // The default BasePath is the current working directory.
 func CreateClosedAPIIndexConfig() *SpecIndexConfig {
-	return &SpecIndexConfig{}
+	return &SpecIndexConfig{id: utils.GenerateAlphanumericString(6)}
 }
 
 // SpecIndex is a complete pre-computed index of the entire specification. Numbers are pre-calculated and
@@ -237,7 +385,9 @@ type SpecIndex struct {
 	allInlineSchemaObjectDefinitions    []*Reference                                  // all schemas that are objects found in document outside of components (openapi) or definitions (swagger).
 	allComponentSchemaDefinitions       *sync.Map                                     // all schemas found in components (openapi) or definitions (swagger).
 	securitySchemesNode                 *yaml.Node                                    // components/securitySchemes node
-	allSecuritySchemes                  map[string]*Reference                         // all security schemes / definitions.
+	allSecuritySchemes                  *sync.Map                                     // all security schemes / definitions.
+	allComponentSchemas                 map[string]*Reference                         // all component schema definitions
+	allComponentSchemasLock             sync.RWMutex                                  // prevent concurrent read writes to the schema file which causes a race condition
 	requestBodiesNode                   *yaml.Node                                    // components/requestBodies node
 	allRequestBodies                    map[string]*Reference                         // all request bodies
 	responsesNode                       *yaml.Node                                    // components/responses node
@@ -249,7 +399,9 @@ type SpecIndex struct {
 	linksNode                           *yaml.Node                                    // components/links node
 	allLinks                            map[string]*Reference                         // all links
 	callbacksNode                       *yaml.Node                                    // components/callbacks node
-	allCallbacks                        map[string]*Reference                         // all components examples
+	pathItemsNode                       *yaml.Node                                    // components/pathItems node
+	allCallbacks                        map[string]*Reference                         // all components callbacks
+	allComponentPathItems               map[string]*Reference                         // all components path items examples
 	allExternalDocuments                map[string]*Reference                         // all external documents
 	externalSpecIndex                   map[string]*SpecIndex                         // create a primary index of all external specs and componentIds
 	refErrors                           []error                                       // errors when indexing references
@@ -261,29 +413,45 @@ type SpecIndex struct {
 	enumCount                           int
 	descriptionCount                    int
 	summaryCount                        int
-	refLock                             sync.Mutex
+	refLock                             sync.RWMutex
+	nodeMapLock                         sync.RWMutex
 	componentLock                       sync.RWMutex
 	errorLock                           sync.RWMutex
 	circularReferences                  []*CircularReferenceResult // only available when the resolver has been used.
 	polyCircularReferences              []*CircularReferenceResult // only available when the resolver has been used.
 	arrayCircularReferences             []*CircularReferenceResult // only available when the resolver has been used.
+	tagCircularReferences               []*CircularReferenceResult // tag parent-child circular references for OpenAPI 3.2+
 	allowCircularReferences             bool                       // decide if you want to error out, or allow circular references, default is false.
 	config                              *SpecIndexConfig           // configuration for the index
-	componentIndexChan                  chan bool
-	polyComponentIndexChan              chan bool
+	componentIndexChan                  chan struct{}
+	polyComponentIndexChan              chan struct{}
 	resolver                            *Resolver
+	resolverLock                        sync.RWMutex
 	cache                               *sync.Map
 	built                               bool
 	uri                                 []string
 	logger                              *slog.Logger
-	nodeMap                             map[int]map[int]*yaml.Node
-	nodeMapCompleted                    chan bool
+	nodeLines                           [][]nodeLineEntry
+	legacyNodeMap                       map[int]map[int]*yaml.Node // materialized on demand by GetNodeMap only
+	nodeMapCompleted                    chan struct{}
 	pendingResolve                      []refMap
+	highModelCache                      Cache
+	schemaIdRegistry                    map[string]*SchemaIdEntry // registry of $id declarations for JSON Schema 2020-12
+	schemaIdRegistryLock                sync.RWMutex              // lock for concurrent access to schemaIdRegistry
 }
 
 // GetResolver returns the resolver for this index.
 func (index *SpecIndex) GetResolver() *Resolver {
+	index.resolverLock.RLock()
+	defer index.resolverLock.RUnlock()
 	return index.resolver
+}
+
+// SetResolver sets the resolver for this index.
+func (index *SpecIndex) SetResolver(resolver *Resolver) {
+	index.resolverLock.Lock()
+	defer index.resolverLock.Unlock()
+	index.resolver = resolver
 }
 
 // GetConfig returns the SpecIndexConfig for this index.
@@ -291,16 +459,196 @@ func (index *SpecIndex) GetConfig() *SpecIndexConfig {
 	return index.config
 }
 
-func (index *SpecIndex) SetCache(sync *sync.Map) {
-	index.cache = sync
-}
-
+// GetNodeMap returns the line-to-column-to-node map built during indexing.
+// The map is materialized from the internal line index on first call and cached.
+//
+// Deprecated: use GetNode for single lookups; this method exists for API
+// compatibility and allocates a full legacy map on first use.
 func (index *SpecIndex) GetNodeMap() map[int]map[int]*yaml.Node {
-	return index.nodeMap
+	index.awaitNodeMap()
+	index.nodeMapLock.Lock()
+	defer index.nodeMapLock.Unlock()
+	if index.legacyNodeMap != nil || index.nodeLines == nil {
+		return index.legacyNodeMap
+	}
+	legacy := make(map[int]map[int]*yaml.Node)
+	for line, entries := range index.nodeLines {
+		if len(entries) == 0 {
+			continue
+		}
+		cols := make(map[int]*yaml.Node, len(entries))
+		for _, e := range entries {
+			cols[int(e.column)] = e.node
+		}
+		legacy[line] = cols
+	}
+	index.legacyNodeMap = legacy
+	return legacy
 }
 
+// GetCache returns the reference lookup cache used during resolution.
 func (index *SpecIndex) GetCache() *sync.Map {
 	return index.cache
+}
+
+// Release nils every field on SpecIndex that can pin YAML node trees, Reference
+// maps, or large caches in memory. Call this once all consumers of the index are
+// finished so the GC can reclaim the underlying data even if an interface value
+// or escaped closure still holds a pointer to the SpecIndex struct itself.
+func (index *SpecIndex) Release() {
+	if index == nil {
+		return
+	}
+	index.releaseDocumentNodes()
+	index.releaseReferenceIndexes()
+	index.releaseComponentIndexes()
+	index.releaseDerivedState()
+	index.releaseOwnedResources()
+	index.resetRuntimeState()
+}
+
+func (index *SpecIndex) releaseDocumentNodes() {
+	index.root = nil
+	index.pathsNode = nil
+	index.tagsNode = nil
+	index.parametersNode = nil
+	index.schemasNode = nil
+	index.securitySchemesNode = nil
+	index.requestBodiesNode = nil
+	index.responsesNode = nil
+	index.headersNode = nil
+	index.examplesNode = nil
+	index.linksNode = nil
+	index.callbacksNode = nil
+	index.pathItemsNode = nil
+	index.rootServersNode = nil
+	index.rootSecurityNode = nil
+}
+
+func (index *SpecIndex) releaseReferenceIndexes() {
+	index.allRefs = nil
+	index.rawSequencedRefs = nil
+	index.linesWithRefs = nil
+	index.allMappedRefs = nil
+	index.allMappedRefsSequenced = nil
+	index.refsByLine = nil
+	index.pathRefs = nil
+	index.paramOpRefs = nil
+	index.paramCompRefs = nil
+	index.paramAllRefs = nil
+	index.paramInlineDuplicateNames = nil
+	index.globalTagRefs = nil
+	index.securitySchemeRefs = nil
+	index.requestBodiesRefs = nil
+	index.responsesRefs = nil
+	index.headersRefs = nil
+	index.examplesRefs = nil
+	index.securityRequirementRefs = nil
+	index.callbacksRefs = nil
+	index.linksRefs = nil
+	index.operationTagsRefs = nil
+	index.operationDescriptionRefs = nil
+	index.operationSummaryRefs = nil
+	index.callbackRefs = nil
+	index.serversRefs = nil
+	index.opServersRefs = nil
+	index.polymorphicRefs = nil
+	index.polymorphicAllOfRefs = nil
+	index.polymorphicOneOfRefs = nil
+	index.polymorphicAnyOfRefs = nil
+	index.externalDocumentsRef = nil
+	index.rootSecurity = nil
+	index.refsWithSiblings = nil
+}
+
+func (index *SpecIndex) releaseComponentIndexes() {
+	index.allRefSchemaDefinitions = nil
+	index.allInlineSchemaDefinitions = nil
+	index.allInlineSchemaObjectDefinitions = nil
+	index.allComponentSchemaDefinitions = nil
+	index.allSecuritySchemes = nil
+	index.allComponentSchemas = nil
+	index.allParameters = nil
+	index.allRequestBodies = nil
+	index.allResponses = nil
+	index.allHeaders = nil
+	index.allExamples = nil
+	index.allLinks = nil
+	index.allCallbacks = nil
+	index.allComponentPathItems = nil
+	index.allExternalDocuments = nil
+	index.externalSpecIndex = nil
+}
+
+func (index *SpecIndex) releaseDerivedState() {
+	// node-map state is read concurrently via awaitNodeMap/GetNode; nil it
+	// under the same lock those readers use.
+	index.nodeMapLock.Lock()
+	index.nodeLines = nil
+	index.legacyNodeMap = nil
+	index.nodeMapLock.Unlock()
+	index.allDescriptions = nil
+	index.allSummaries = nil
+	index.allEnums = nil
+	index.allObjectsWithProperties = nil
+	index.circularReferences = nil
+	index.polyCircularReferences = nil
+	index.arrayCircularReferences = nil
+	index.tagCircularReferences = nil
+	index.refErrors = nil
+	index.operationParamErrors = nil
+	index.cache = nil
+	index.highModelCache = nil
+	index.schemaIdRegistry = nil
+	index.pendingResolve = nil
+	index.uri = nil
+	index.logger = nil
+}
+
+func (index *SpecIndex) releaseOwnedResources() {
+	index.resolverLock.Lock()
+	if index.resolver != nil {
+		index.resolver.Release()
+		index.resolver = nil
+	}
+	index.resolverLock.Unlock()
+
+	if index.rolodex != nil {
+		index.rolodex.Release()
+		index.rolodex = nil
+	}
+
+	if index.config != nil {
+		index.config.SpecInfo.Release()
+		index.config = nil
+	}
+}
+
+func (index *SpecIndex) resetRuntimeState() {
+	index.externalDocumentsCount = 0
+	index.operationTagsCount = 0
+	index.globalTagsCount = 0
+	index.totalTagsCount = 0
+	index.globalLinksCount = 0
+	index.globalCallbacksCount = 0
+	index.pathCount = 0
+	index.operationCount = 0
+	index.operationParamCount = 0
+	index.componentParamCount = 0
+	index.componentsInlineParamUniqueCount = 0
+	index.componentsInlineParamDuplicateCount = 0
+	index.schemaCount = 0
+	index.refCount = 0
+	index.enumCount = 0
+	index.descriptionCount = 0
+	index.summaryCount = 0
+	index.allowCircularReferences = false
+	index.built = false
+	index.componentIndexChan = nil
+	index.polyComponentIndexChan = nil
+	// nodeMapCompleted is deliberately NOT nilled: it is closed (retaining
+	// nothing) and awaitNodeMap reads the field without a lock on the GetNode
+	// hot path - writing nil here would race every reader for zero benefit.
 }
 
 // SetAbsolutePath sets the absolute path to the spec file for the index. Will be absolute, either as a http link or a file.
@@ -317,7 +665,8 @@ func (index *SpecIndex) GetSpecAbsolutePath() string {
 // URI based document. Decides if the reference is local, remote or in a file.
 type ExternalLookupFunction func(id string) (foundNode *yaml.Node, rootNode *yaml.Node, lookupError error)
 
-// IndexingError holds data about something that went wrong during indexing.
+// IndexingError holds data about something that went wrong during indexing, including the
+// offending node and its path within the specification.
 type IndexingError struct {
 	Err     error
 	Node    *yaml.Node
@@ -325,6 +674,7 @@ type IndexingError struct {
 	Path    string
 }
 
+// Error returns the underlying error message.
 func (i *IndexingError) Error() string {
 	return i.Err.Error()
 }
@@ -339,6 +689,8 @@ type DescriptionReference struct {
 	IsSummary  bool
 }
 
+// EnumReference holds data about an enum definition found during indexing, including its
+// type, schema node, and location path within the specification.
 type EnumReference struct {
 	Node       *yaml.Node
 	KeyNode    *yaml.Node
@@ -348,6 +700,7 @@ type EnumReference struct {
 	ParentNode *yaml.Node
 }
 
+// ObjectReference holds data about an object with properties found during indexing.
 type ObjectReference struct {
 	Node       *yaml.Node
 	KeyNode    *yaml.Node

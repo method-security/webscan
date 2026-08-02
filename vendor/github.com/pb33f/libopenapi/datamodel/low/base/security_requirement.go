@@ -1,20 +1,19 @@
-// Copyright 2022 Princess B33f Heavy Industries / Dave Shanley
+// Copyright 2022-2026 Princess B33f Heavy Industries / Dave Shanley
 // SPDX-License-Identifier: MIT
 
 package base
 
 import (
 	"context"
-	"crypto/sha256"
-	"fmt"
+	"hash/maphash"
 	"sort"
-	"strings"
+	"sync"
 
 	"github.com/pb33f/libopenapi/datamodel/low"
 	"github.com/pb33f/libopenapi/index"
 	"github.com/pb33f/libopenapi/orderedmap"
 	"github.com/pb33f/libopenapi/utils"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // SecurityRequirement is a low-level representation of a Swagger / OpenAPI 3 SecurityRequirement object.
@@ -30,16 +29,51 @@ type SecurityRequirement struct {
 	KeyNode                  *yaml.Node
 	RootNode                 *yaml.Node
 	ContainsEmptyRequirement bool // if a requirement is empty (this means it's optional)
+	index                    *index.SpecIndex
+	context                  context.Context
+	nodeStore                sync.Map
+	reference                low.Reference
 	*low.Reference
+	low.NodeMap
+}
+
+// GetContext will return the context.Context instance used when building the SecurityRequirement object
+func (s *SecurityRequirement) GetContext() context.Context {
+	return s.context
+}
+
+// GetIndex will return the index.SpecIndex instance attached to the SecurityRequirement object
+func (s *SecurityRequirement) GetIndex() *index.SpecIndex {
+	return s.index
 }
 
 // Build will extract security requirements from the node (the structure is odd, to be honest)
-func (s *SecurityRequirement) Build(_ context.Context, keyNode, root *yaml.Node, _ *index.SpecIndex) error {
+func (s *SecurityRequirement) Build(ctx context.Context, keyNode, root *yaml.Node, idx *index.SpecIndex) error {
 	s.KeyNode = keyNode
+	s.reference = low.Reference{}
+	s.Reference = &s.reference
+	s.nodeStore = sync.Map{}
+	s.Nodes = &s.nodeStore
+	s.context = ctx
+	s.index = idx
+	if root == nil {
+		s.RootNode = nil
+		s.ContainsEmptyRequirement = true
+		s.Requirements = low.ValueReference[*orderedmap.Map[low.KeyReference[string], low.ValueReference[[]low.ValueReference[string]]]]{
+			Value:     orderedmap.New[low.KeyReference[string], low.ValueReference[[]low.ValueReference[string]]](),
+			ValueNode: nil,
+		}
+		return nil
+	}
 	root = utils.NodeAlias(root)
 	s.RootNode = root
 	utils.CheckForMergeNodes(root)
-	s.Reference = new(low.Reference)
+	if len(root.Content) > 0 {
+		s.NodeMap.ExtractNodes(root, false)
+	} else {
+		s.AddNode(root.Line, root)
+	}
+
 	var labelNode *yaml.Node
 	valueMap := orderedmap.New[low.KeyReference[string], low.ValueReference[[]low.ValueReference[string]]]()
 	var arr []low.ValueReference[string]
@@ -57,6 +91,7 @@ func (s *SecurityRequirement) Build(_ context.Context, keyNode, root *yaml.Node,
 				Value:     root.Content[i].Content[j].Value,
 				ValueNode: root.Content[i].Content[j],
 			})
+			s.Nodes.Store(root.Content[i].Content[j].Line, root.Content[i].Content[j])
 		}
 		valueMap.Set(
 			low.KeyReference[string]{
@@ -76,6 +111,7 @@ func (s *SecurityRequirement) Build(_ context.Context, keyNode, root *yaml.Node,
 		Value:     valueMap,
 		ValueNode: root,
 	}
+
 	return nil
 }
 
@@ -91,9 +127,9 @@ func (s *SecurityRequirement) GetKeyNode() *yaml.Node {
 
 // FindRequirement will attempt to locate a security requirement string from a supplied name.
 func (s *SecurityRequirement) FindRequirement(name string) []low.ValueReference[string] {
-	for pair := orderedmap.First(s.Requirements.Value); pair != nil; pair = pair.Next() {
-		if pair.Key().Value == name {
-			return pair.Value().Value
+	for k, v := range s.Requirements.Value.FromOldest() {
+		if k.Value == name {
+			return v.Value
 		}
 	}
 	return nil
@@ -103,23 +139,34 @@ func (s *SecurityRequirement) FindRequirement(name string) []low.ValueReference[
 func (s *SecurityRequirement) GetKeys() []string {
 	keys := make([]string, orderedmap.Len(s.Requirements.Value))
 	z := 0
-	for pair := orderedmap.First(s.Requirements.Value); pair != nil; pair = pair.Next() {
-		keys[z] = pair.Key().Value
+	for k := range s.Requirements.Value.KeysFromOldest() {
+		keys[z] = k.Value
+		z++
 	}
 	return keys
 }
 
-// Hash will return a consistent SHA256 Hash of the SecurityRequirement object
-func (s *SecurityRequirement) Hash() [32]byte {
-	var f []string
-	for pair := orderedmap.First(orderedmap.SortAlpha(s.Requirements.Value)); pair != nil; pair = pair.Next() {
-		var vals []string
-		for y := range pair.Value().Value {
-			vals = append(vals, pair.Value().Value[y].Value)
-		}
-		sort.Strings(vals)
+// Hash will return a consistent hash of the SecurityRequirement object
+func (s *SecurityRequirement) Hash() uint64 {
+	return low.WithHasher(func(h *maphash.Hash) uint64 {
+		for k, v := range orderedmap.SortAlpha(s.Requirements.Value).FromOldest() {
+			// Pre-allocate vals slice
+			vals := make([]string, len(v.Value))
+			for y := range v.Value {
+				vals[y] = v.Value[y].Value
+			}
+			sort.Strings(vals)
 
-		f = append(f, fmt.Sprintf("%s-%s", pair.Key().Value, strings.Join(vals, "|")))
-	}
-	return sha256.Sum256([]byte(strings.Join(f, "|")))
+			h.WriteString(k.Value)
+			h.WriteByte('-')
+			for i, val := range vals {
+				if i > 0 {
+					h.WriteByte(low.HASH_PIPE)
+				}
+				h.WriteString(val)
+			}
+			h.WriteByte(low.HASH_PIPE)
+		}
+		return h.Sum64()
+	})
 }

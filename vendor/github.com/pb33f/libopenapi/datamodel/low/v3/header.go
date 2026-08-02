@@ -1,20 +1,20 @@
-// Copyright 2022 Princess B33f Heavy Industries / Dave Shanley
+// Copyright 2022-2026 Princess B33f Heavy Industries / Dave Shanley
 // SPDX-License-Identifier: MIT
 
 package v3
 
 import (
 	"context"
-	"crypto/sha256"
 	"fmt"
-	"strings"
+	"hash/maphash"
+	"sync"
 
 	"github.com/pb33f/libopenapi/datamodel/low"
 	"github.com/pb33f/libopenapi/datamodel/low/base"
 	"github.com/pb33f/libopenapi/index"
 	"github.com/pb33f/libopenapi/orderedmap"
 	"github.com/pb33f/libopenapi/utils"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // Header represents a low-level OpenAPI 3+ Header object.
@@ -34,7 +34,22 @@ type Header struct {
 	Extensions      *orderedmap.Map[low.KeyReference[string], low.ValueReference[*yaml.Node]]
 	KeyNode         *yaml.Node
 	RootNode        *yaml.Node
+	index           *index.SpecIndex
+	context         context.Context
+	nodeStore       sync.Map
+	reference       low.Reference
 	*low.Reference
+	low.NodeMap
+}
+
+// GetIndex returns the index.SpecIndex instance attached to the Header object
+func (h *Header) GetIndex() *index.SpecIndex {
+	return h.index
+}
+
+// GetContext returns the context.Context instance used when building the Header object
+func (h *Header) GetContext() context.Context {
+	return h.context
 }
 
 // FindExtension will attempt to locate an extension with the supplied name
@@ -67,45 +82,74 @@ func (h *Header) GetExtensions() *orderedmap.Map[low.KeyReference[string], low.V
 	return h.Extensions
 }
 
-// Hash will return a consistent SHA256 Hash of the Header object
-func (h *Header) Hash() [32]byte {
-	var f []string
-	if h.Description.Value != "" {
-		f = append(f, h.Description.Value)
-	}
-	f = append(f, fmt.Sprint(h.Required.Value))
-	f = append(f, fmt.Sprint(h.Deprecated.Value))
-	f = append(f, fmt.Sprint(h.AllowEmptyValue.Value))
-	if h.Style.Value != "" {
-		f = append(f, h.Style.Value)
-	}
-	f = append(f, fmt.Sprint(h.Explode.Value))
-	f = append(f, fmt.Sprint(h.AllowReserved.Value))
-	if h.Schema.Value != nil {
-		f = append(f, low.GenerateHashString(h.Schema.Value))
-	}
-	if h.Example.Value != nil && !h.Example.Value.IsZero() {
-		f = append(f, low.GenerateHashString(h.Example.Value))
-	}
-	for pair := orderedmap.First(orderedmap.SortAlpha(h.Examples.Value)); pair != nil; pair = pair.Next() {
-		f = append(f, fmt.Sprintf("%s-%x", pair.Key().Value, pair.Value().Value.Hash()))
-	}
-	for pair := orderedmap.First(orderedmap.SortAlpha(h.Content.Value)); pair != nil; pair = pair.Next() {
-		f = append(f, fmt.Sprintf("%s-%x", pair.Key().Value, pair.Value().Value.Hash()))
-	}
-	f = append(f, low.HashExtensions(h.Extensions)...)
-	return sha256.Sum256([]byte(strings.Join(f, "|")))
+// Hash will return a consistent Hash of the Header object
+func (h *Header) Hash() uint64 {
+	return low.WithHasher(func(hsh *maphash.Hash) uint64 {
+		if h.Description.Value != "" {
+			hsh.WriteString(h.Description.Value)
+			hsh.WriteByte(low.HASH_PIPE)
+		}
+		low.HashBool(hsh, h.Required.Value)
+		hsh.WriteByte(low.HASH_PIPE)
+		low.HashBool(hsh, h.Deprecated.Value)
+		hsh.WriteByte(low.HASH_PIPE)
+		low.HashBool(hsh, h.AllowEmptyValue.Value)
+		hsh.WriteByte(low.HASH_PIPE)
+		if h.Style.Value != "" {
+			hsh.WriteString(h.Style.Value)
+			hsh.WriteByte(low.HASH_PIPE)
+		}
+		low.HashBool(hsh, h.Explode.Value)
+		hsh.WriteByte(low.HASH_PIPE)
+		low.HashBool(hsh, h.AllowReserved.Value)
+		hsh.WriteByte(low.HASH_PIPE)
+		if h.Schema.Value != nil {
+			hsh.WriteString(low.GenerateHashString(h.Schema.Value))
+			hsh.WriteByte(low.HASH_PIPE)
+		}
+		if h.Example.Value != nil && !h.Example.Value.IsZero() {
+			hsh.WriteString(low.GenerateHashString(h.Example.Value))
+			hsh.WriteByte(low.HASH_PIPE)
+		}
+		for k, v := range orderedmap.SortAlpha(h.Examples.Value).FromOldest() {
+			hsh.WriteString(fmt.Sprintf("%s-%x", k.Value, v.Value.Hash()))
+			hsh.WriteByte(low.HASH_PIPE)
+		}
+		for k, v := range orderedmap.SortAlpha(h.Content.Value).FromOldest() {
+			hsh.WriteString(fmt.Sprintf("%s-%x", k.Value, v.Value.Hash()))
+			hsh.WriteByte(low.HASH_PIPE)
+		}
+		for _, ext := range low.HashExtensions(h.Extensions) {
+			hsh.WriteString(ext)
+			hsh.WriteByte(low.HASH_PIPE)
+		}
+		return hsh.Sum64()
+	})
 }
 
 // Build will extract extensions, examples, schema and content/media types from node.
 func (h *Header) Build(ctx context.Context, keyNode, root *yaml.Node, idx *index.SpecIndex) error {
 	h.KeyNode = keyNode
+	h.reference = low.Reference{}
+	h.Reference = &h.reference
+	if ok, _, ref := utils.IsNodeRefValue(root); ok {
+		h.SetReference(ref, root)
+	}
 	root = utils.NodeAlias(root)
 	h.RootNode = root
 	utils.CheckForMergeNodes(root)
-	h.Reference = new(low.Reference)
+	h.nodeStore = sync.Map{}
+	h.Nodes = &h.nodeStore
+	if len(root.Content) > 0 {
+		h.NodeMap.ExtractNodes(root, false)
+	} else {
+		h.AddNode(root.Line, root)
+	}
 	h.Extensions = low.ExtractExtensions(root)
+	h.context = ctx
+	h.index = idx
 
+	low.ExtractExtensionNodes(ctx, h.Extensions, h.Nodes)
 	// handle example if set.
 	_, expLabel, expNode := utils.FindKeyNodeFull(base.ExampleLabel, root.Content)
 	if expNode != nil {
@@ -113,6 +157,12 @@ func (h *Header) Build(ctx context.Context, keyNode, root *yaml.Node, idx *index
 			Value:     expNode,
 			ValueNode: expNode,
 			KeyNode:   expLabel,
+		}
+		h.Nodes.Store(expLabel.Line, expLabel)
+		if len(expNode.Content) > 0 {
+			h.NodeMap.ExtractNodes(expNode, false)
+		} else {
+			h.AddNode(expNode.Line, expNode)
 		}
 	}
 
@@ -127,6 +177,7 @@ func (h *Header) Build(ctx context.Context, keyNode, root *yaml.Node, idx *index
 			KeyNode:   expsL,
 			ValueNode: expsN,
 		}
+		h.Nodes.Store(expsL.Line, expsL)
 	}
 
 	// handle schema
@@ -148,6 +199,9 @@ func (h *Header) Build(ctx context.Context, keyNode, root *yaml.Node, idx *index
 		KeyNode:   cL,
 		ValueNode: cN,
 	}
+	if cL != nil {
+		h.Nodes.Store(cL.Line, cL)
+	}
 	return nil
 }
 
@@ -156,15 +210,19 @@ func (h *Header) Build(ctx context.Context, keyNode, root *yaml.Node, idx *index
 func (h *Header) GetDescription() *low.NodeReference[string] {
 	return &h.Description
 }
+
 func (h *Header) GetRequired() *low.NodeReference[bool] {
 	return &h.Required
 }
+
 func (h *Header) GetDeprecated() *low.NodeReference[bool] {
 	return &h.Deprecated
 }
+
 func (h *Header) GetAllowEmptyValue() *low.NodeReference[bool] {
 	return &h.AllowEmptyValue
 }
+
 func (h *Header) GetSchema() *low.NodeReference[any] {
 	i := low.NodeReference[any]{
 		KeyNode:   h.Schema.KeyNode,
@@ -173,18 +231,23 @@ func (h *Header) GetSchema() *low.NodeReference[any] {
 	}
 	return &i
 }
+
 func (h *Header) GetStyle() *low.NodeReference[string] {
 	return &h.Style
 }
+
 func (h *Header) GetAllowReserved() *low.NodeReference[bool] {
 	return &h.AllowReserved
 }
+
 func (h *Header) GetExplode() *low.NodeReference[bool] {
 	return &h.Explode
 }
+
 func (h *Header) GetExample() *low.NodeReference[*yaml.Node] {
 	return &h.Example
 }
+
 func (h *Header) GetExamples() *low.NodeReference[any] {
 	i := low.NodeReference[any]{
 		KeyNode:   h.Examples.KeyNode,
@@ -193,6 +256,7 @@ func (h *Header) GetExamples() *low.NodeReference[any] {
 	}
 	return &i
 }
+
 func (h *Header) GetContent() *low.NodeReference[any] {
 	c := low.NodeReference[any]{
 		KeyNode:   h.Content.KeyNode,

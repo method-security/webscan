@@ -14853,6 +14853,28 @@
             "website": "https://www.cartful.com",
             "icon": "Cartful.svg"
         },
+        "Cartline": {
+            "cats": [
+                6
+            ],
+            "js": {
+                "Cartline.platform": "^Cartline$"
+            },
+            "headers": {
+                "x-cartline-platform": "cartline\\.pk"
+            },
+            "meta": {
+                "application-name": [
+                    "^cartline$"
+                ],
+                "generator": [
+                    "^cartline$"
+                ]
+            },
+            "description": "Cartline is a Pakistani ecommerce and WhatsApp-commerce platform for creating online stores with cart, checkout and order management. Part of the One Line commerce suite.",
+            "website": "https://cartline.pk",
+            "icon": "Cartline.svg"
+        },
         "Cartpanda": {
             "cats": [
                 6
@@ -18759,6 +18781,22 @@
             "description": "Commercio is a platform that allows promotional product distributors to set up fully branded company stores.",
             "website": "https://commercio.com",
             "icon": "Commercio.svg"
+        },
+        "Commercy": {
+            "cats": [
+                6
+            ],
+            "meta": {
+                "generator": [
+                    "^commercy$"
+                ]
+            },
+            "implies": [
+                "Next.js"
+            ],
+            "description": "Commercy is an Argentine commerce platform that combines an online store, point of sale, inventory and ARCA/AFIP electronic invoicing in a single system.",
+            "website": "https://commercy.com.ar",
+            "icon": "Commercy.svg"
         },
         "Common Ground": {
             "cats": [
@@ -86343,6 +86381,18 @@
             "website": "https://tanstack.com",
             "icon": "TanStack.svg"
         },
+        "TanStack Start": {
+            "cats": [
+                12,
+                18
+            ],
+            "js": {
+                "__TSS_START_OPTIONS__": ""
+            },
+            "description": "TanStack Start takes TanStack Router's typed route tree, URL state, loaders, and prefetching, then adds the server pieces: full-document SSR, streaming, server functions, server routes, and build output for the runtime you choose.",
+            "website": "https://tanstack.com/start",
+            "icon": "TanStack.svg"
+        },
         "Tangiblee": {
             "cats": [
                 105
@@ -93681,6 +93731,31 @@
             "website": "https://www.verseone.com",
             "icon": "VerseOne.svg"
         },
+        "VertaFlow": {
+            "cats": [
+                5,
+                6,
+                32,
+                53,
+                108
+            ],
+            "dom": {
+                "script[src*=\"api.vertaflow.io/v1/pixel.js\"][data-site]": {
+                    "exists": ""
+                }
+            },
+            "html": [
+                "\u003cscript[^\u003e]+src=[\"']https://api\\.vertaflow\\.io/v1/pixel\\.js[\"'][^\u003e]*data-site=",
+                "powered by vertaflow",
+                "window\\.__tenant_config__="
+            ],
+            "scriptSrc": [
+                "api\\.vertaflow\\.io/v1/pixel\\.js"
+            ],
+            "description": "VertaFlow is a vertical CRM and commerce platform for small businesses, with client portals, payments, storefront widgets, online ordering, messaging, and industry-specific workflows.",
+            "website": "https://vertaflow.io",
+            "icon": "VertaFlow.svg"
+        },
         "VertaFlow Analytics": {
             "cats": [
                 10
@@ -95319,6 +95394,26 @@
             "description": "WAR.PE is a platform designed to enhance the web experience by promoting user privacy and security.",
             "website": "https://war.pe",
             "icon": "WARPE.svg"
+        },
+        "WARP Performance": {
+            "cats": [
+                87,
+                92
+            ],
+            "dom": {
+                "script[data-src*='/wp-content/plugins/warp-performance/']": {
+                    "exists": ""
+                },
+                "script[src*='/wp-content/plugins/warp-performance/']": {
+                    "exists": ""
+                }
+            },
+            "scriptSrc": [
+                "/wp-content/plugins/warp-performance/"
+            ],
+            "description": "WARP Performance is a WordPress plugin that improves website performance through page caching, asset optimisation, lazy loading, and other speed-focused features.",
+            "website": "https://warpperformance.com",
+            "icon": "warp-performance.svg"
         },
         "WEBDEV": {
             "cats": [
@@ -102961,7 +103056,7 @@
                 "dcAPIKey": ""
             },
             "scriptSrc": [
-                "(?:((?:\\d+\\.)+\\d+)\\/(?:dc\\/)?)?dc(?:\\.leaflet)?\\.js\\;version:\\1"
+                "(?:((?:\\d+\\.)+\\d+)\\/(?:dc\\/)?)?(?:/|-)dc(?:\\.leaflet)?\\.js\\;version:\\1"
             ],
             "description": "A multi-dimensional charting library built to work natively with crossfilter and rendered using d3.js",
             "website": "https://dc-js.github.io/dc.js/",

@@ -11,24 +11,38 @@ import (
 // ServerChanges represents changes found between two OpenAPI Server Objects
 type ServerChanges struct {
 	*PropertyChanges
+	Server                *v3.Server
 	ServerVariableChanges map[string]*ServerVariableChanges `json:"serverVariables,omitempty" yaml:"serverVariables,omitempty"`
+	ExtensionChanges      *ExtensionChanges                 `json:"extensions,omitempty" yaml:"extensions,omitempty"`
 }
 
 // GetAllChanges returns a slice of all changes made between SecurityRequirement objects
 func (s *ServerChanges) GetAllChanges() []*Change {
+	if s == nil {
+		return nil
+	}
 	var changes []*Change
 	changes = append(changes, s.Changes...)
 	for k := range s.ServerVariableChanges {
 		changes = append(changes, s.ServerVariableChanges[k].GetAllChanges()...)
+	}
+	if s.ExtensionChanges != nil {
+		changes = append(changes, s.ExtensionChanges.GetAllChanges()...)
 	}
 	return changes
 }
 
 // TotalChanges returns total changes found between two OpenAPI Server Objects
 func (s *ServerChanges) TotalChanges() int {
+	if s == nil {
+		return 0
+	}
 	c := s.PropertyChanges.TotalChanges()
 	for k := range s.ServerVariableChanges {
 		c += s.ServerVariableChanges[k].TotalChanges()
+	}
+	if s.ExtensionChanges != nil {
+		c += s.ExtensionChanges.TotalChanges()
 	}
 	return c
 }
@@ -49,28 +63,19 @@ func CompareServers(l, r *v3.Server) *ServerChanges {
 		return nil
 	}
 	var changes []*Change
-	var props []*PropertyCheck
+	props := make([]*PropertyCheck, 0, 3)
 
-	// URL
-	props = append(props, &PropertyCheck{
-		LeftNode:  l.URL.ValueNode,
-		RightNode: r.URL.ValueNode,
-		Label:     v3.URLLabel,
-		Changes:   &changes,
-		Breaking:  true,
-		Original:  l,
-		New:       r,
-	})
-	// Description
-	props = append(props, &PropertyCheck{
-		LeftNode:  l.Description.ValueNode,
-		RightNode: r.Description.ValueNode,
-		Label:     v3.DescriptionLabel,
-		Changes:   &changes,
-		Breaking:  false,
-		Original:  l,
-		New:       r,
-	})
+	props = append(props,
+		NewPropertyCheck(CompServer, PropName,
+			l.Name.ValueNode, r.Name.ValueNode,
+			v3.NameLabel, &changes, l, r),
+		NewPropertyCheck(CompServer, PropURL,
+			l.URL.ValueNode, r.URL.ValueNode,
+			v3.URLLabel, &changes, l, r),
+		NewPropertyCheck(CompServer, PropDescription,
+			l.Description.ValueNode, r.Description.ValueNode,
+			v3.DescriptionLabel, &changes, l, r),
+	)
 
 	CheckProperties(props)
 	sc := new(ServerChanges)
@@ -78,5 +83,7 @@ func CompareServers(l, r *v3.Server) *ServerChanges {
 	sc.ServerVariableChanges = CheckMapForChanges(l.Variables.Value, r.Variables.Value,
 		&changes, v3.VariablesLabel, CompareServerVariables)
 
+	sc.ExtensionChanges = CompareExtensions(l.Extensions, r.Extensions)
+	sc.Server = r
 	return sc
 }

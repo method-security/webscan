@@ -5,38 +5,37 @@ package v3
 
 import (
 	"github.com/pb33f/libopenapi/datamodel/high"
-	low "github.com/pb33f/libopenapi/datamodel/low/v3"
+	"github.com/pb33f/libopenapi/datamodel/low"
+	lowv3 "github.com/pb33f/libopenapi/datamodel/low/v3"
 	"github.com/pb33f/libopenapi/orderedmap"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // Server represents a high-level OpenAPI 3+ Server object, that is backed by a low level one.
 //   - https://spec.openapis.org/oas/v3.1.0#server-object
 type Server struct {
+	Name        string                                   `json:"name,omitempty" yaml:"name,omitempty"` // OpenAPI 3.2+ name field for documentation
 	URL         string                                   `json:"url,omitempty" yaml:"url,omitempty"`
 	Description string                                   `json:"description,omitempty" yaml:"description,omitempty"`
 	Variables   *orderedmap.Map[string, *ServerVariable] `json:"variables,omitempty" yaml:"variables,omitempty"`
 	Extensions  *orderedmap.Map[string, *yaml.Node]      `json:"-" yaml:"-"`
-	low         *low.Server
+	low         *lowv3.Server
 }
 
 // NewServer will create a new high-level Server instance from a low-level one.
-func NewServer(server *low.Server) *Server {
+func NewServer(server *lowv3.Server) *Server {
 	s := new(Server)
 	s.low = server
+	s.Name = server.Name.Value
 	s.Description = server.Description.Value
 	s.URL = server.URL.Value
-	vars := orderedmap.New[string, *ServerVariable]()
-	for pair := orderedmap.First(server.Variables.Value); pair != nil; pair = pair.Next() {
-		vars.Set(pair.Key().Value, NewServerVariable(pair.Value().Value))
-	}
-	s.Variables = vars
+	s.Variables = low.FromReferenceMapWithFunc(server.Variables.Value, NewServerVariable)
 	s.Extensions = high.ExtractExtensions(server.Extensions)
 	return s
 }
 
 // GoLow returns the low-level Server instance that was used to create the high-level one
-func (s *Server) GoLow() *low.Server {
+func (s *Server) GoLow() *lowv3.Server {
 	return s.low
 }
 

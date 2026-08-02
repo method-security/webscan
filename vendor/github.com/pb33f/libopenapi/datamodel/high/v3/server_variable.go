@@ -6,7 +6,8 @@ package v3
 import (
 	"github.com/pb33f/libopenapi/datamodel/high"
 	low "github.com/pb33f/libopenapi/datamodel/low/v3"
-	"gopkg.in/yaml.v3"
+	"github.com/pb33f/libopenapi/orderedmap"
+	"go.yaml.in/yaml/v4"
 )
 
 // ServerVariable represents a high-level OpenAPI 3+ ServerVariable object, that is backed by a low-level one.
@@ -14,9 +15,10 @@ import (
 // ServerVariable is an object representing a Server Variable for server URL template substitution.
 // - https://spec.openapis.org/oas/v3.1.0#server-variable-object
 type ServerVariable struct {
-	Enum        []string `json:"enum,omitempty" yaml:"enum,omitempty"`
-	Default     string   `json:"default,omitempty" yaml:"default,omitempty"`
-	Description string   `json:"description,omitempty" yaml:"description,omitempty"`
+	Enum        []string                            `json:"enum,omitempty" yaml:"enum,omitempty"`
+	Default     string                              `json:"default,omitempty" yaml:"default,omitempty"`
+	Description string                              `json:"description,omitempty" yaml:"description,omitempty"`
+	Extensions  *orderedmap.Map[string, *yaml.Node] `json:"-" yaml:"-"`
 	low         *low.ServerVariable
 }
 
@@ -33,6 +35,7 @@ func NewServerVariable(variable *low.ServerVariable) *ServerVariable {
 	v.Default = variable.Default.Value
 	v.Description = variable.Description.Value
 	v.Enum = enums
+	v.Extensions = high.ExtractExtensions(variable.Extensions)
 	return v
 }
 

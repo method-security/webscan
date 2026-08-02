@@ -1,19 +1,19 @@
-// Copyright 2022 Princess B33f Heavy Industries / Dave Shanley
+// Copyright 2022-2026 Princess B33f Heavy Industries / Dave Shanley
 // SPDX-License-Identifier: MIT
 
 package base
 
 import (
 	"context"
-	"crypto/sha256"
-	"strings"
+	"hash/maphash"
+	"sync"
 
 	"github.com/pb33f/libopenapi/orderedmap"
 	"github.com/pb33f/libopenapi/utils"
 
 	"github.com/pb33f/libopenapi/datamodel/low"
 	"github.com/pb33f/libopenapi/index"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // Info represents a low-level Info object as defined by both OpenAPI 2 and OpenAPI 3.
@@ -34,7 +34,12 @@ type Info struct {
 	Extensions     *orderedmap.Map[low.KeyReference[string], low.ValueReference[*yaml.Node]]
 	KeyNode        *yaml.Node
 	RootNode       *yaml.Node
+	index          *index.SpecIndex
+	context        context.Context
+	nodeStore      sync.Map
+	reference      low.Reference
 	*low.Reference
+	low.NodeMap
 }
 
 // FindExtension attempts to locate an extension with the supplied key
@@ -60,10 +65,25 @@ func (i *Info) GetExtensions() *orderedmap.Map[low.KeyReference[string], low.Val
 // Build will extract out the Contact and Info objects from the supplied root node.
 func (i *Info) Build(ctx context.Context, keyNode, root *yaml.Node, idx *index.SpecIndex) error {
 	i.KeyNode = keyNode
+	i.reference = low.Reference{}
+	i.Reference = &i.reference
+	i.nodeStore = sync.Map{}
+	i.Nodes = &i.nodeStore
+	i.index = idx
+	i.context = ctx
+	if root == nil {
+		i.RootNode = nil
+		i.Extensions = nil
+		return nil
+	}
 	root = utils.NodeAlias(root)
 	i.RootNode = root
 	utils.CheckForMergeNodes(root)
-	i.Reference = new(low.Reference)
+	if len(root.Content) > 0 {
+		i.NodeMap.ExtractNodes(root, false)
+	} else {
+		i.AddNode(root.Line, root)
+	}
 	i.Extensions = low.ExtractExtensions(root)
 
 	// extract contact
@@ -76,31 +96,51 @@ func (i *Info) Build(ctx context.Context, keyNode, root *yaml.Node, idx *index.S
 	return nil
 }
 
-// Hash will return a consistent SHA256 Hash of the Info object
-func (i *Info) Hash() [32]byte {
-	var f []string
+// GetIndex will return the index.SpecIndex instance attached to the Info object
+func (i *Info) GetIndex() *index.SpecIndex {
+	return i.index
+}
 
-	if !i.Title.IsEmpty() {
-		f = append(f, i.Title.Value)
-	}
-	if !i.Summary.IsEmpty() {
-		f = append(f, i.Summary.Value)
-	}
-	if !i.Description.IsEmpty() {
-		f = append(f, i.Description.Value)
-	}
-	if !i.TermsOfService.IsEmpty() {
-		f = append(f, i.TermsOfService.Value)
-	}
-	if !i.Contact.IsEmpty() {
-		f = append(f, low.GenerateHashString(i.Contact.Value))
-	}
-	if !i.License.IsEmpty() {
-		f = append(f, low.GenerateHashString(i.License.Value))
-	}
-	if !i.Version.IsEmpty() {
-		f = append(f, i.Version.Value)
-	}
-	f = append(f, low.HashExtensions(i.Extensions)...)
-	return sha256.Sum256([]byte(strings.Join(f, "|")))
+// GetContext will return the context.Context instance used when building the Info object
+func (i *Info) GetContext() context.Context {
+	return i.context
+}
+
+// Hash will return a consistent hash of the Info object
+func (i *Info) Hash() uint64 {
+	return low.WithHasher(func(h *maphash.Hash) uint64 {
+		if !i.Title.IsEmpty() {
+			h.WriteString(i.Title.Value)
+			h.WriteByte(low.HASH_PIPE)
+		}
+		if !i.Summary.IsEmpty() {
+			h.WriteString(i.Summary.Value)
+			h.WriteByte(low.HASH_PIPE)
+		}
+		if !i.Description.IsEmpty() {
+			h.WriteString(i.Description.Value)
+			h.WriteByte(low.HASH_PIPE)
+		}
+		if !i.TermsOfService.IsEmpty() {
+			h.WriteString(i.TermsOfService.Value)
+			h.WriteByte(low.HASH_PIPE)
+		}
+		if !i.Contact.IsEmpty() {
+			h.WriteString(low.GenerateHashString(i.Contact.Value))
+			h.WriteByte(low.HASH_PIPE)
+		}
+		if !i.License.IsEmpty() {
+			h.WriteString(low.GenerateHashString(i.License.Value))
+			h.WriteByte(low.HASH_PIPE)
+		}
+		if !i.Version.IsEmpty() {
+			h.WriteString(i.Version.Value)
+			h.WriteByte(low.HASH_PIPE)
+		}
+		for _, ext := range low.HashExtensions(i.Extensions) {
+			h.WriteString(ext)
+			h.WriteByte(low.HASH_PIPE)
+		}
+		return h.Sum64()
+	})
 }

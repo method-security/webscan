@@ -1,19 +1,19 @@
-// Copyright 2022 Princess B33f Heavy Industries / Dave Shanley
+// Copyright 2022-2026 Princess B33f Heavy Industries / Dave Shanley
 // SPDX-License-Identifier: MIT
 
 package v3
 
 import (
 	"context"
-	"crypto/sha256"
-	"strings"
+	"hash/maphash"
+	"sync"
 
 	"github.com/pb33f/libopenapi/orderedmap"
 	"github.com/pb33f/libopenapi/utils"
 
 	"github.com/pb33f/libopenapi/datamodel/low"
 	"github.com/pb33f/libopenapi/index"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // Callback represents a low-level Callback object for OpenAPI 3+.
@@ -28,7 +28,22 @@ type Callback struct {
 	Extensions *orderedmap.Map[low.KeyReference[string], low.ValueReference[*yaml.Node]]
 	KeyNode    *yaml.Node
 	RootNode   *yaml.Node
+	index      *index.SpecIndex
+	context    context.Context
+	nodeStore  sync.Map
+	reference  low.Reference
 	*low.Reference
+	low.NodeMap
+}
+
+// GetIndex returns the index.SpecIndex instance attached to the Callback object
+func (cb *Callback) GetIndex() *index.SpecIndex {
+	return cb.index
+}
+
+// GetContext returns the context.Context instance used when building the Callback object
+func (cb *Callback) GetContext() context.Context {
+	return cb.context
 }
 
 // GetExtensions returns all Callback extensions and satisfies the low.HasExtensions interface.
@@ -54,28 +69,50 @@ func (cb *Callback) FindExpression(exp string) *low.ValueReference[*PathItem] {
 // Build will extract extensions, expressions and PathItem objects for Callback
 func (cb *Callback) Build(ctx context.Context, keyNode, root *yaml.Node, idx *index.SpecIndex) error {
 	cb.KeyNode = keyNode
+	cb.reference = low.Reference{}
+	cb.Reference = &cb.reference
+	if ok, _, ref := utils.IsNodeRefValue(root); ok {
+		cb.SetReference(ref, root)
+	}
 	root = utils.NodeAlias(root)
 	cb.RootNode = root
 	utils.CheckForMergeNodes(root)
-	cb.Reference = new(low.Reference)
+	cb.nodeStore = sync.Map{}
+	cb.Nodes = &cb.nodeStore
+	if len(root.Content) > 0 {
+		cb.NodeMap.ExtractNodes(root, false)
+	} else {
+		cb.AddNode(root.Line, root)
+	}
 	cb.Extensions = low.ExtractExtensions(root)
+	cb.context = ctx
+	cb.index = idx
+
+	low.ExtractExtensionNodes(ctx, cb.Extensions, cb.Nodes)
 
 	expressions, err := extractPathItemsMap(ctx, root, idx)
 	if err != nil {
 		return err
 	}
 	cb.Expression = expressions
-
+	for k := range expressions.KeysFromOldest() {
+		cb.Nodes.Store(k.KeyNode.Line, k.KeyNode)
+	}
 	return nil
 }
 
-// Hash will return a consistent SHA256 Hash of the Callback object
-func (cb *Callback) Hash() [32]byte {
-	var f []string
-	for pair := orderedmap.First(orderedmap.SortAlpha(cb.Expression)); pair != nil; pair = pair.Next() {
-		f = append(f, low.GenerateHashString(pair.Value().Value))
-	}
+// Hash will return a consistent Hash of the Callback object
+func (cb *Callback) Hash() uint64 {
+	return low.WithHasher(func(h *maphash.Hash) uint64 {
+		for v := range orderedmap.SortAlpha(cb.Expression).ValuesFromOldest() {
+			h.WriteString(low.GenerateHashString(v.Value))
+			h.WriteByte(low.HASH_PIPE)
+		}
 
-	f = append(f, low.HashExtensions(cb.Extensions)...)
-	return sha256.Sum256([]byte(strings.Join(f, "|")))
+		for _, ext := range low.HashExtensions(cb.Extensions) {
+			h.WriteString(ext)
+			h.WriteByte(low.HASH_PIPE)
+		}
+		return h.Sum64()
+	})
 }

@@ -11,14 +11,16 @@ package v3
 
 import (
 	"bytes"
+	"errors"
 
 	"github.com/pb33f/libopenapi/datamodel/high"
 	"github.com/pb33f/libopenapi/datamodel/high/base"
-	low "github.com/pb33f/libopenapi/datamodel/low/v3"
+	"github.com/pb33f/libopenapi/datamodel/low"
+	lowv3 "github.com/pb33f/libopenapi/datamodel/low/v3"
 	"github.com/pb33f/libopenapi/index"
 	"github.com/pb33f/libopenapi/json"
 	"github.com/pb33f/libopenapi/orderedmap"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // Document represents a high-level OpenAPI 3 document (both 3.0 & 3.1). A Document is the root of the specification.
@@ -76,6 +78,10 @@ type Document struct {
 	// - https://spec.openapis.org/oas/v3.1.0#schema-object
 	JsonSchemaDialect string `json:"jsonSchemaDialect,omitempty" yaml:"jsonSchemaDialect,omitempty"`
 
+	// Self is a 3.2+ property that sets the base URI for the document for resolving relative references
+	// - https://spec.openapis.org/oas/v3.2.0#openapi-object
+	Self string `json:"$self,omitempty" yaml:"$self,omitempty"`
+
 	// Webhooks is a 3.1+ property that is similar to callbacks, except, this defines incoming webhooks.
 	// The incoming webhooks that MAY be received as part of this API and that the API consumer MAY choose to implement.
 	// Closely related to the callbacks feature, this section describes requests initiated other than by an API call,
@@ -94,11 +100,11 @@ type Document struct {
 	// Rolodex is the low-level rolodex used when creating this document.
 	// This in an internal structure and not part of the OpenAPI schema.
 	Rolodex *index.Rolodex `json:"-" yaml:"-"`
-	low     *low.Document
+	low     *lowv3.Document
 }
 
 // NewDocument will create a new high-level Document from a low-level one.
-func NewDocument(document *low.Document) *Document {
+func NewDocument(document *lowv3.Document) *Document {
 	d := new(Document)
 	d.low = document
 	d.Index = document.Index
@@ -133,12 +139,11 @@ func NewDocument(document *low.Document) *Document {
 	if !document.JsonSchemaDialect.IsEmpty() {
 		d.JsonSchemaDialect = document.JsonSchemaDialect.Value
 	}
+	if !document.Self.IsEmpty() {
+		d.Self = document.Self.Value
+	}
 	if !document.Webhooks.IsEmpty() {
-		hooks := orderedmap.New[string, *PathItem]()
-		for pair := orderedmap.First(document.Webhooks.Value); pair != nil; pair = pair.Next() {
-			hooks.Set(pair.Key().Value, NewPathItem(pair.Value().Value))
-		}
-		d.Webhooks = hooks
+		d.Webhooks = low.FromReferenceMapWithFunc(document.Webhooks.Value, NewPathItem)
 	}
 	if !document.Security.IsEmpty() {
 		var security []*base.SecurityRequirement
@@ -151,7 +156,12 @@ func NewDocument(document *low.Document) *Document {
 }
 
 // GoLow returns the low-level Document that was used to create the high level one.
-func (d *Document) GoLow() *low.Document {
+func (d *Document) GoLow() *lowv3.Document {
+	return d.low
+}
+
+// GoLowUntyped returns the low-level Document that was used to create the high level one, however, it's untyped.
+func (d *Document) GoLowUntyped() any {
 	return d.low
 }
 
@@ -164,9 +174,10 @@ func (d *Document) Render() ([]byte, error) {
 // the rendering will use the original indention of the document.
 func (d *Document) RenderWithIndention(indent int) []byte {
 	var buf bytes.Buffer
-	yamlEncoder := yaml.NewEncoder(&buf)
-	yamlEncoder.SetIndent(indent)
-	_ = yamlEncoder.Encode(d)
+	yamlDumper, _ := yaml.NewDumper(&buf, yaml.WithV3Defaults(), yaml.WithLineWidth(-1))
+	yamlDumper.SetIndent(indent)
+	_ = yamlDumper.Dump(d)
+	_ = yamlDumper.Close()
 	return buf.Bytes()
 }
 
@@ -186,6 +197,16 @@ func (d *Document) RenderInline() ([]byte, error) {
 	return yaml.Marshal(di)
 }
 
+// RenderInlineWithContext renders the document using one shared inline render
+// context and propagates every NodeBuilder error before marshaling output.
+func (d *Document) RenderInlineWithContext(ctx *base.InlineRenderContext) ([]byte, error) {
+	di, err := d.MarshalYAMLInlineWithContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return yaml.Marshal(di)
+}
+
 // MarshalYAML will create a ready to render YAML representation of the Document object.
 func (d *Document) MarshalYAML() (interface{}, error) {
 	nb := high.NewNodeBuilder(d, d.low)
@@ -196,4 +217,26 @@ func (d *Document) MarshalYAMLInline() (interface{}, error) {
 	nb := high.NewNodeBuilder(d, d.low)
 	nb.Resolve = true
 	return nb.Render(), nil
+}
+
+// MarshalYAMLInlineWithContext creates the inline YAML node graph using one
+// context for the complete document render and returns accumulated builder
+// errors instead of silently emitting a partial document.
+func (d *Document) MarshalYAMLInlineWithContext(ctx any) (interface{}, error) {
+	renderCtx, ok := ctx.(*base.InlineRenderContext)
+	if !ok || renderCtx == nil {
+		renderCtx = base.NewInlineRenderContext()
+	}
+	nb := high.NewNodeBuilder(d, d.low)
+	nb.Resolve = true
+	nb.RenderContext = renderCtx
+	node := nb.Render()
+	if err := errors.Join(nb.Errors...); err != nil {
+		return nil, err
+	}
+	return node, nil
+}
+
+func (d *Document) GetIndex() *index.SpecIndex {
+	return d.Index
 }

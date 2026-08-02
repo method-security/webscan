@@ -27,7 +27,7 @@ import (
 	v2 "github.com/pb33f/libopenapi/datamodel/high/v2"
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 	orderedmap "github.com/pb33f/libopenapi/orderedmap"
-	yaml "gopkg.in/yaml.v3"
+	yaml "go.yaml.in/yaml/v4"
 )
 
 // detectOpenAPISpec tries to parse the response body as both JSON and YAML
@@ -470,16 +470,13 @@ func PerformAppEnumerateSwagger(ctx context.Context, config enumerateapiapplicat
 
 func handleSwaggerV2(document libopenapi.Document, report *enumerateapiapplicationfern.EnumerateSwaggerReport, target string) error {
 	report.Result.ApiType = enumerateapiapplicationfern.ApiTypeSwaggerV2
-	var errors []error
 	var v2Model *libopenapi.DocumentModel[v2.Swagger]
 
-	v2Model, errors = document.BuildV2Model()
-	if len(errors) > 0 {
-		for i := range errors {
-			errMsg := fmt.Sprintf("error: %v", errors[i])
-			report.Errors = append(report.Errors, errMsg)
-		}
-		return fmt.Errorf("cannot create v2 model from document: %d errors reported", len(errors))
+	var err error
+	v2Model, err = document.BuildV2Model()
+	if err != nil {
+		report.Errors = append(report.Errors, fmt.Sprintf("error: %v", err))
+		return fmt.Errorf("cannot create v2 model from document: %w", err)
 	}
 
 	model := v2Model.Model
@@ -591,16 +588,13 @@ func handleSwaggerV2(document libopenapi.Document, report *enumerateapiapplicati
 
 func handleOpenAPIV3(document libopenapi.Document, report *enumerateapiapplicationfern.EnumerateSwaggerReport, target string) error {
 	report.Result.ApiType = enumerateapiapplicationfern.ApiTypeSwaggerV3
-	var errors []error
 	var v3Model *libopenapi.DocumentModel[v3.Document]
 
-	v3Model, errors = document.BuildV3Model()
-	if len(errors) > 0 {
-		for i := range errors {
-			errMsg := fmt.Sprintf("error: %v", errors[i])
-			report.Errors = append(report.Errors, errMsg)
-		}
-		return fmt.Errorf("cannot create v3 model from document: %d errors reported", len(errors))
+	var err error
+	v3Model, err = document.BuildV3Model()
+	if err != nil {
+		report.Errors = append(report.Errors, fmt.Sprintf("error: %v", err))
+		return fmt.Errorf("cannot create v3 model from document: %w", err)
 	}
 
 	model := v3Model.Model

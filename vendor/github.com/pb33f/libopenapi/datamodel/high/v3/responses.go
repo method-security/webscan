@@ -4,6 +4,7 @@
 package v3
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 
@@ -13,7 +14,7 @@ import (
 	low "github.com/pb33f/libopenapi/datamodel/low/v3"
 	"github.com/pb33f/libopenapi/orderedmap"
 	"github.com/pb33f/libopenapi/utils"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // Responses represents a high-level OpenAPI 3+ Responses object that is backed by a low-level one.
@@ -101,18 +102,18 @@ func (r *Responses) MarshalYAML() (interface{}, error) {
 	}
 	var mapped []*responseItem
 
-	for pair := orderedmap.First(r.Codes); pair != nil; pair = pair.Next() {
+	for code, resp := range r.Codes.FromOldest() {
 		ln := 9999 // default to a high value to weight new content to the bottom.
 		var style yaml.Style
 		if r.low != nil {
-			for lPair := orderedmap.First(r.low.Codes); lPair != nil; lPair = lPair.Next() {
-				if lPair.Key().Value == pair.Key() {
-					ln = lPair.Key().KeyNode.Line
-					style = lPair.Key().KeyNode.Style
+			for lk := range r.low.Codes.KeysFromOldest() {
+				if lk.Value == code {
+					ln = lk.KeyNode.Line
+					style = lk.KeyNode.Style
 				}
 			}
 		}
-		mapped = append(mapped, &responseItem{pair.Value(), pair.Key(), ln, nil, style})
+		mapped = append(mapped, &responseItem{resp, code, ln, nil, style})
 	}
 
 	// extract extensions
@@ -155,6 +156,15 @@ func (r *Responses) MarshalYAML() (interface{}, error) {
 }
 
 func (r *Responses) MarshalYAMLInline() (interface{}, error) {
+	return r.marshalYAMLInlineWithContext(nil)
+}
+
+// MarshalYAMLInlineWithContext renders responses with a shared inline render context.
+func (r *Responses) MarshalYAMLInlineWithContext(ctx any) (interface{}, error) {
+	return r.marshalYAMLInlineWithContext(ctx)
+}
+
+func (r *Responses) marshalYAMLInlineWithContext(ctx any) (interface{}, error) {
 	// map keys correctly.
 	m := utils.CreateEmptyMapNode()
 	type responseItem struct {
@@ -166,24 +176,28 @@ func (r *Responses) MarshalYAMLInline() (interface{}, error) {
 	}
 	var mapped []*responseItem
 
-	for pair := orderedmap.First(r.Codes); pair != nil; pair = pair.Next() {
+	for code, resp := range r.Codes.FromOldest() {
 		ln := 9999 // default to a high value to weight new content to the bottom.
 		var style yaml.Style
 		if r.low != nil {
-			for lPair := orderedmap.First(r.low.Codes); lPair != nil; lPair = lPair.Next() {
-				if lPair.Key().Value == pair.Key() {
-					ln = lPair.Key().KeyNode.Line
-					style = lPair.Key().KeyNode.Style
+			for lk := range r.low.Codes.KeysFromOldest() {
+				if lk.Value == code {
+					ln = lk.KeyNode.Line
+					style = lk.KeyNode.Style
 				}
 			}
 		}
-		mapped = append(mapped, &responseItem{pair.Value(), pair.Key(), ln, nil, style})
+		mapped = append(mapped, &responseItem{resp, code, ln, nil, style})
 	}
 
 	// extract extensions
 	nb := high.NewNodeBuilder(r, r.low)
 	nb.Resolve = true
+	nb.RenderContext = ctx
 	extNode := nb.Render()
+	if err := errors.Join(nb.Errors...); err != nil {
+		return nil, err
+	}
 	if extNode != nil && extNode.Content != nil {
 		var label string
 		for u := range extNode.Content {
@@ -203,7 +217,16 @@ func (r *Responses) MarshalYAMLInline() (interface{}, error) {
 	})
 	for _, mp := range mapped {
 		if mp.resp != nil {
-			rendered, _ := mp.resp.MarshalYAMLInline()
+			var rendered interface{}
+			var err error
+			if ctx != nil {
+				rendered, err = mp.resp.MarshalYAMLInlineWithContext(ctx)
+			} else {
+				rendered, err = mp.resp.MarshalYAMLInline()
+			}
+			if err != nil {
+				return nil, fmt.Errorf("failed to render response '%s' inline: %w", mp.code, err)
+			}
 
 			kn := utils.CreateStringNode(mp.code)
 			kn.Style = mp.style

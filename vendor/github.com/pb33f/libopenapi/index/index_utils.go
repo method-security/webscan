@@ -28,7 +28,7 @@ func isHttpMethod(val string) bool {
 	return false
 }
 
-func boostrapIndexCollections(index *SpecIndex) {
+func bootstrapIndexCollections(index *SpecIndex) {
 	index.allRefs = make(map[string]*Reference)
 	index.allMappedRefs = make(map[string]*Reference)
 	index.refsByLine = make(map[string]map[int]bool)
@@ -53,7 +53,7 @@ func boostrapIndexCollections(index *SpecIndex) {
 	index.externalSpecIndex = make(map[string]*SpecIndex)
 	index.allComponentSchemaDefinitions = &sync.Map{}
 	index.allParameters = make(map[string]*Reference)
-	index.allSecuritySchemes = make(map[string]*Reference)
+	index.allSecuritySchemes = &sync.Map{}
 	index.allRequestBodies = make(map[string]*Reference)
 	index.allResponses = make(map[string]*Reference)
 	index.allHeaders = make(map[string]*Reference)
@@ -65,6 +65,7 @@ func boostrapIndexCollections(index *SpecIndex) {
 	index.polymorphicRefs = make(map[string]*Reference)
 	index.refsWithSiblings = make(map[string]Reference)
 	index.opServersRefs = make(map[string]map[string][]*Reference)
-	index.componentIndexChan = make(chan bool)
-	index.polyComponentIndexChan = make(chan bool)
+	index.componentIndexChan = make(chan struct{})
+	index.polyComponentIndexChan = make(chan struct{})
+	index.allComponentPathItems = make(map[string]*Reference)
 }

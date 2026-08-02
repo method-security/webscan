@@ -7,7 +7,7 @@ import (
 	"github.com/pb33f/libopenapi/index"
 	"github.com/pb33f/libopenapi/orderedmap"
 	"github.com/pb33f/libopenapi/utils"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 const (
@@ -71,10 +71,10 @@ type HasValueNodeUntyped interface {
 	IsReferenced
 }
 
-// Hashable defines any struct that implements a Hash function that returns a 256SHA hash of the state of the
+// Hashable defines any struct that implements a Hash function that returns a 64-bit hash of the state of the
 // representative object. Great for equality checking!
 type Hashable interface {
-	Hash() [32]byte
+	Hash() uint64
 }
 
 // HasExtensions is implemented by any object that exposes extensions
@@ -308,7 +308,16 @@ func GetCircularReferenceResult(node *yaml.Node, idx *index.SpecIndex) *index.Ci
 	if idx == nil {
 		return nil // no index! nothing we can do.
 	}
-	refs := idx.GetCircularReferences()
+	var refs []*index.CircularReferenceResult
+	if idx.GetResolver() != nil {
+		refs = append(refs, idx.GetResolver().GetCircularReferences()...)
+		refs = append(refs, idx.GetResolver().GetInfiniteCircularReferences()...)
+		refs = append(refs, idx.GetResolver().GetIgnoredCircularArrayReferences()...)
+		refs = append(refs, idx.GetResolver().GetIgnoredCircularPolyReferences()...)
+		refs = append(refs, idx.GetResolver().GetSafeCircularReferences()...)
+	} else {
+		refs = idx.GetCircularReferences()
+	}
 	for i := range refs {
 		if refs[i].LoopPoint.Node == node {
 			return refs[i]
@@ -335,6 +344,6 @@ func GetCircularReferenceResult(node *yaml.Node, idx *index.SpecIndex) *index.Ci
 	return nil
 }
 
-func HashToString(hash [32]byte) string {
+func HashToString(hash uint64) string {
 	return fmt.Sprintf("%x", hash)
 }

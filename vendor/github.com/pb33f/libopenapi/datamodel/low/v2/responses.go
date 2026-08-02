@@ -5,15 +5,15 @@ package v2
 
 import (
 	"context"
-	"crypto/sha256"
 	"fmt"
+	"hash/maphash"
 	"strings"
 
 	"github.com/pb33f/libopenapi/datamodel/low"
 	"github.com/pb33f/libopenapi/index"
 	"github.com/pb33f/libopenapi/orderedmap"
 	"github.com/pb33f/libopenapi/utils"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // Responses is a low-level representation of a Swagger / OpenAPI 2 Responses object.
@@ -57,12 +57,12 @@ func (r *Responses) Build(ctx context.Context, _, root *yaml.Node, idx *index.Sp
 }
 
 func (r *Responses) getDefault() *low.NodeReference[*Response] {
-	for pair := orderedmap.First(r.Codes); pair != nil; pair = pair.Next() {
-		if strings.ToLower(pair.Key().Value) == DefaultLabel {
+	for code, resp := range r.Codes.FromOldest() {
+		if strings.ToLower(code.Value) == DefaultLabel {
 			return &low.NodeReference[*Response]{
-				ValueNode: pair.Value().ValueNode,
-				KeyNode:   pair.Key().KeyNode,
-				Value:     pair.Value().Value,
+				ValueNode: resp.ValueNode,
+				KeyNode:   code.KeyNode,
+				Value:     resp.Value,
 			}
 		}
 	}
@@ -91,15 +91,21 @@ func (r *Responses) FindResponseByCode(code string) *low.ValueReference[*Respons
 	return low.FindItemInOrderedMap[*Response](code, r.Codes)
 }
 
-// Hash will return a consistent SHA256 Hash of the Examples object
-func (r *Responses) Hash() [32]byte {
-	var f []string
-	for pair := orderedmap.First(orderedmap.SortAlpha(r.Codes)); pair != nil; pair = pair.Next() {
-		f = append(f, fmt.Sprintf("%s-%s", pair.Key().Value, low.GenerateHashString(pair.Value().Value)))
-	}
-	if !r.Default.IsEmpty() {
-		f = append(f, low.GenerateHashString(r.Default.Value))
-	}
-	f = append(f, low.HashExtensions(r.Extensions)...)
-	return sha256.Sum256([]byte(strings.Join(f, "|")))
+// Hash will return a consistent Hash of the Responses object
+func (r *Responses) Hash() uint64 {
+	return low.WithHasher(func(h *maphash.Hash) uint64 {
+		for _, hash := range low.AppendMapHashes(nil, orderedmap.SortAlpha(r.Codes)) {
+			h.WriteString(hash)
+			h.WriteByte(low.HASH_PIPE)
+		}
+		if !r.Default.IsEmpty() {
+			h.WriteString(low.GenerateHashString(r.Default.Value))
+			h.WriteByte(low.HASH_PIPE)
+		}
+		for _, ext := range low.HashExtensions(r.Extensions) {
+			h.WriteString(ext)
+			h.WriteByte(low.HASH_PIPE)
+		}
+		return h.Sum64()
+	})
 }

@@ -8,7 +8,7 @@ import (
 
 	"github.com/pb33f/libopenapi/datamodel/low"
 	"github.com/pb33f/libopenapi/orderedmap"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // ExtensionChanges represents any changes to custom extensions defined for an OpenAPI object.
@@ -18,17 +18,26 @@ type ExtensionChanges struct {
 
 // GetAllChanges returns a slice of all changes made between Extension objects
 func (e *ExtensionChanges) GetAllChanges() []*Change {
+	if e == nil {
+		return nil
+	}
 	return e.Changes
 }
 
 // TotalChanges returns the total number of object extensions that were made.
 func (e *ExtensionChanges) TotalChanges() int {
+	if e == nil {
+		return 0
+	}
 	return e.PropertyChanges.TotalChanges()
 }
 
-// TotalBreakingChanges always returns 0 for Extension objects, they are non-binding.
+// TotalBreakingChanges returns the total number of breaking changes in Extension objects.
 func (e *ExtensionChanges) TotalBreakingChanges() int {
-	return 0
+	if e == nil {
+		return 0
+	}
+	return e.PropertyChanges.TotalBreakingChanges()
 }
 
 // CompareExtensions will compare a left and right map of Tag/ValueReference models for any changes to
@@ -42,19 +51,17 @@ func CompareExtensions(l, r *orderedmap.Map[low.KeyReference[string], low.ValueR
 	seenLeft := make(map[string]*low.ValueReference[*yaml.Node])
 	seenRight := make(map[string]*low.ValueReference[*yaml.Node])
 
-	for pair := orderedmap.First(l); pair != nil; pair = pair.Next() {
-		h := pair.Value()
-		seenLeft[strings.ToLower(pair.Key().Value)] = &h
+	for k, h := range l.FromOldest() {
+		seenLeft[strings.ToLower(k.Value)] = &h
 	}
-	for pair := orderedmap.First(r); pair != nil; pair = pair.Next() {
-		h := pair.Value()
-		seenRight[strings.ToLower(pair.Key().Value)] = &h
+	for k, h := range r.FromOldest() {
+		seenRight[strings.ToLower(k.Value)] = &h
 	}
 
 	var changes []*Change
 	for i := range seenLeft {
 
-		CheckForObjectAdditionOrRemoval[*yaml.Node](seenLeft, seenRight, i, &changes, false, true)
+		CheckForObjectAdditionOrRemovalWithEncoding[*yaml.Node](seenLeft, seenRight, i, &changes, false, true)
 
 		if seenRight[i] != nil {
 			var props []*PropertyCheck
@@ -69,13 +76,13 @@ func CompareExtensions(l, r *orderedmap.Map[low.KeyReference[string], low.ValueR
 				New:       seenRight[i].Value,
 			})
 
-			// check properties
-			CheckProperties(props)
+			// check properties with encoding for extensions
+			CheckPropertiesWithEncoding(props)
 		}
 	}
 	for i := range seenRight {
 		if seenLeft[i] == nil {
-			CheckForObjectAdditionOrRemoval[*yaml.Node](seenLeft, seenRight, i, &changes, false, true)
+			CheckForObjectAdditionOrRemovalWithEncoding[*yaml.Node](seenLeft, seenRight, i, &changes, false, true)
 		}
 	}
 	ex := new(ExtensionChanges)

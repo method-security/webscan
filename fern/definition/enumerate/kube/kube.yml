@@ -8,6 +8,8 @@ types:
       target: string
       verifyTls: boolean
       timeout: integer
+      maxRedirects: integer
+      ignoreCrossDomainRedirects: boolean
       sleep: integer
       jitter: integer
       userAgent: method.UserAgentPreset

@@ -86,7 +86,7 @@ func selectPlatformDigest(manifests []interface{}) string {
 
 // fetchPlatformManifestSize resolves a manifest list entry by fetching the
 // platform-specific v2 manifest and computing total size from config + layers.
-func fetchPlatformManifestSize(ctx context.Context, targetURL, repository, platformDigest string, verifyTLS bool, timeout int, userAgent common.UserAgentPreset) *int {
+func fetchPlatformManifestSize(ctx context.Context, targetURL, repository, platformDigest string, config *enumeratedockerfern.EnumerateDockerConfig) *int {
 	log := svc1log.FromContext(ctx)
 
 	manifestURL := strings.TrimSuffix(targetURL, "/") + "/v2/" + repository + "/manifests/" + platformDigest
@@ -100,7 +100,7 @@ func fetchPlatformManifestSize(ctx context.Context, targetURL, repository, platf
 		"application/vnd.docker.distribution.manifest.v2+json",
 		"application/vnd.oci.image.manifest.v1+json",
 	}
-	requestConfig := createSendHTTPRequestConfig(baseURL, path, queryParams, verifyTLS, timeout, userAgent, acceptHeaders)
+	requestConfig := createSendHTTPRequestConfig(baseURL, path, queryParams, config, acceptHeaders)
 
 	httpReqResp, err := standard.SendStandardRequest(ctx, requestConfig)
 	if err != nil {
@@ -122,7 +122,7 @@ func fetchPlatformManifestSize(ctx context.Context, targetURL, repository, platf
 	return nil
 }
 
-func createSendHTTPRequestConfig(baseURL, path string, queryParams map[string]string, verifyTLS bool, timeout int, userAgent common.UserAgentPreset, acceptHeaders []string) common.SendHttpRequestConfig {
+func createSendHTTPRequestConfig(baseURL, path string, queryParams map[string]string, config *enumeratedockerfern.EnumerateDockerConfig, acceptHeaders []string) common.SendHttpRequestConfig {
 	// Base Headers
 	headers := map[string][]string{
 		"Accept": {"application/json"},
@@ -142,20 +142,21 @@ func createSendHTTPRequestConfig(baseURL, path string, queryParams map[string]st
 		},
 	}
 	return common.SendHttpRequestConfig{
-		Request:            &request,
-		MaxRedirects:       0,
-		VerifyTls:          verifyTLS,
-		Timeout:            timeout,
-		UserAgent:          userAgent,
-		RequestMethod:      common.RequestMethodStandard,
-		HeadlessConfig:     nil,
-		BrowserbaseConfig:  nil,
-		BrowserbaseSecrets: nil,
+		Request:                    &request,
+		MaxRedirects:               config.MaxRedirects,
+		VerifyTls:                  config.VerifyTls,
+		Timeout:                    config.Timeout,
+		IgnoreCrossDomainRedirects: config.IgnoreCrossDomainRedirects,
+		UserAgent:                  config.UserAgent,
+		RequestMethod:              common.RequestMethodStandard,
+		HeadlessConfig:             nil,
+		BrowserbaseConfig:          nil,
+		BrowserbaseSecrets:         nil,
 	}
 }
 
 // enumerateRepositories gets the list of repositories from the registry
-func enumerateRepositories(ctx context.Context, targetURL string, verifyTLS bool, timeout int, userAgent common.UserAgentPreset) ([]string, *common.HttpRequestResponse, error) {
+func enumerateRepositories(ctx context.Context, targetURL string, config *enumeratedockerfern.EnumerateDockerConfig) ([]string, *common.HttpRequestResponse, error) {
 	log := svc1log.FromContext(ctx)
 
 	catalogURL := strings.TrimSuffix(targetURL, "/") + "/v2/_catalog"
@@ -166,7 +167,7 @@ func enumerateRepositories(ctx context.Context, targetURL string, verifyTLS bool
 		return nil, nil, err
 	}
 
-	requestConfig := createSendHTTPRequestConfig(baseURL, path, queryParams, verifyTLS, timeout, userAgent, nil)
+	requestConfig := createSendHTTPRequestConfig(baseURL, path, queryParams, config, nil)
 
 	httpReqResp, err := standard.SendStandardRequest(ctx, requestConfig)
 	if err != nil {
@@ -197,7 +198,7 @@ func enumerateRepositories(ctx context.Context, targetURL string, verifyTLS bool
 }
 
 // getImageTags retrieves tags for a specific image repository
-func getImageTags(ctx context.Context, targetURL, repository string, verifyTLS bool, timeout int, userAgent common.UserAgentPreset) ([]string, []*common.HttpRequestResponse, error) {
+func getImageTags(ctx context.Context, targetURL, repository string, config *enumeratedockerfern.EnumerateDockerConfig) ([]string, []*common.HttpRequestResponse, error) {
 	log := svc1log.FromContext(ctx)
 	var requests []*common.HttpRequestResponse
 
@@ -209,7 +210,7 @@ func getImageTags(ctx context.Context, targetURL, repository string, verifyTLS b
 		return nil, requests, err
 	}
 
-	requestConfig := createSendHTTPRequestConfig(baseURL, path, queryParams, verifyTLS, timeout, userAgent, nil)
+	requestConfig := createSendHTTPRequestConfig(baseURL, path, queryParams, config, nil)
 
 	httpReqResp, err := standard.SendStandardRequest(ctx, requestConfig)
 	if err != nil {
@@ -240,7 +241,7 @@ func getImageTags(ctx context.Context, targetURL, repository string, verifyTLS b
 }
 
 // getImageManifest retrieves the manifest for a specific image:tag and returns the digest, manifest content, size, and requests.
-func getImageManifest(ctx context.Context, targetURL, repository, tag string, verifyTLS bool, timeout int, userAgent common.UserAgentPreset) (string, string, *int, []*common.HttpRequestResponse, error) {
+func getImageManifest(ctx context.Context, targetURL, repository, tag string, config *enumeratedockerfern.EnumerateDockerConfig) (string, string, *int, []*common.HttpRequestResponse, error) {
 	log := svc1log.FromContext(ctx)
 	var requests []*common.HttpRequestResponse
 
@@ -257,7 +258,7 @@ func getImageManifest(ctx context.Context, targetURL, repository, tag string, ve
 		"application/vnd.oci.image.manifest.v1+json",
 		"application/vnd.oci.image.index.v1+json",
 	}
-	requestConfig := createSendHTTPRequestConfig(baseURL, path, queryParams, verifyTLS, timeout, userAgent, acceptHeaders)
+	requestConfig := createSendHTTPRequestConfig(baseURL, path, queryParams, config, acceptHeaders)
 
 	httpReqResp, err := standard.SendStandardRequest(ctx, requestConfig)
 	if err != nil {
@@ -297,7 +298,7 @@ func getImageManifest(ctx context.Context, targetURL, repository, tag string, ve
 								svc1log.SafeParam("repository", repository),
 								svc1log.SafeParam("tag", tag),
 								svc1log.SafeParam("platformDigest", platformDigest))
-							totalSize = fetchPlatformManifestSize(ctx, targetURL, repository, platformDigest, verifyTLS, timeout, userAgent)
+							totalSize = fetchPlatformManifestSize(ctx, targetURL, repository, platformDigest, config)
 						}
 					}
 				}
@@ -309,13 +310,13 @@ func getImageManifest(ctx context.Context, targetURL, repository, tag string, ve
 }
 
 // processRepository handles enumeration for a single repository: fetching tags, manifests, and computing sizes.
-func processRepository(ctx context.Context, targetURL, repoName string, verifyTLS bool, timeout int, userAgent common.UserAgentPreset, wg *sync.WaitGroup, results chan<- *enumeratedockerfern.ContainerRepository, errors chan<- string) {
+func processRepository(ctx context.Context, targetURL, repoName string, config *enumeratedockerfern.EnumerateDockerConfig, wg *sync.WaitGroup, results chan<- *enumeratedockerfern.ContainerRepository, errors chan<- string) {
 	defer wg.Done()
 	log := svc1log.FromContext(ctx)
 	log.Info("Processing repository", svc1log.SafeParam("repository", repoName))
 
 	// Step 2: Retrieve available tags
-	tags, _, err := getImageTags(ctx, targetURL, repoName, verifyTLS, timeout, userAgent)
+	tags, _, err := getImageTags(ctx, targetURL, repoName, config)
 	if err != nil {
 		errors <- fmt.Sprintf("Failed to get tags for repository %s: %v", repoName, err)
 		return
@@ -334,7 +335,7 @@ func processRepository(ctx context.Context, targetURL, repoName string, verifyTL
 
 	// Step 3: For each tag, fetch the manifest and digest
 	for _, tag := range tags {
-		digest, manifestContent, size, _, err := getImageManifest(ctx, targetURL, repoName, tag, verifyTLS, timeout, userAgent)
+		digest, manifestContent, size, _, err := getImageManifest(ctx, targetURL, repoName, tag, config)
 		if err != nil {
 			errors <- fmt.Sprintf("Failed to get manifest for %s:%s: %v", repoName, tag, err)
 			continue
@@ -387,11 +388,11 @@ func processRepository(ctx context.Context, targetURL, repoName string, verifyTL
 // Step 2: For each repository, hit /v2/{repo}/tags/list to retrieve available tags.
 // Step 3: For each tag, hit /v2/{repo}/manifests/{tag} to fetch the manifest and digest.
 // Step 4: Group images by digest so tags pointing to the same image are consolidated.
-func enumerateTarget(ctx context.Context, targetURL string, verifyTLS bool, timeout int, threads int, userAgent common.UserAgentPreset) (*enumeratedockerfern.EnumerateDockerResult, []string) {
+func enumerateTarget(ctx context.Context, targetURL string, config *enumeratedockerfern.EnumerateDockerConfig) (*enumeratedockerfern.EnumerateDockerResult, []string) {
 	log := svc1log.FromContext(ctx)
 
 	// Step 1: Hit /v2/_catalog to list all repositories
-	repositories, catalogRequest, err := enumerateRepositories(ctx, targetURL, verifyTLS, timeout, userAgent)
+	repositories, catalogRequest, err := enumerateRepositories(ctx, targetURL, config)
 	if err != nil {
 		return nil, []string{fmt.Sprintf("Failed to enumerate repositories: %v", err)}
 	}
@@ -419,7 +420,7 @@ func enumerateTarget(ctx context.Context, targetURL string, verifyTLS bool, time
 	errorsChan := make(chan string, len(repositories))
 
 	// Create semaphore to limit concurrent repository processing
-	semaphore := make(chan struct{}, threads)
+	semaphore := make(chan struct{}, config.Threads)
 
 	var wg sync.WaitGroup
 	for _, repoName := range repositories {
@@ -427,7 +428,7 @@ func enumerateTarget(ctx context.Context, targetURL string, verifyTLS bool, time
 		semaphore <- struct{}{}
 		go func(repo string) {
 			defer func() { <-semaphore }()
-			processRepository(ctx, targetURL, repo, verifyTLS, timeout, userAgent, &wg, results, errorsChan)
+			processRepository(ctx, targetURL, repo, config, &wg, results, errorsChan)
 		}(repoName)
 	}
 
@@ -478,7 +479,7 @@ func PerformAppEnumerateContainerRegistryDocker(ctx context.Context, config *enu
 	errors := []string{}
 
 	for i, targetURL := range config.Targets {
-		result, errs := enumerateTarget(ctx, targetURL, config.VerifyTls, config.Timeout, config.Threads, config.UserAgent)
+		result, errs := enumerateTarget(ctx, targetURL, config)
 		if result != nil {
 			targets = append(targets, result)
 		}

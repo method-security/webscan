@@ -12,6 +12,8 @@ types:
       jitter: integer
       verifyTls: boolean
       timeout: integer
+      maxRedirects: integer
+      ignoreCrossDomainRedirects: boolean
       threads: integer
       userAgent: method.UserAgentPreset
   # Report Struct

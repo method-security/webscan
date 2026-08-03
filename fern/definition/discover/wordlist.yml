@@ -10,6 +10,7 @@ types:
       includeComments: boolean
       includeAltText: boolean
       ignoreCrossDomain: boolean
+      maxRedirects: integer
       verifyTls: boolean
       timeout: integer
       threads: integer

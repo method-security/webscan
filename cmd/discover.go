@@ -99,6 +99,11 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			ignoreCrossDomainRedirects, err := cmd.Flags().GetBool("ignore-cross-domain-redirects")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
 
 			templatePaths, err := cmd.Flags().GetStringSlice("template-paths")
 			if err != nil {
@@ -127,7 +132,7 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Create config
-			config, err := getDiscoverApplicationConfig(targets, resourceType, templatePaths, timeout, threads, proxy, verboseLogs, globalRateLimit, globalTimeout, userAgentPreset, webServerIpAddress, webServerPort, webServerApplicationProtocol)
+			config, err := getDiscoverApplicationConfig(targets, resourceType, templatePaths, timeout, threads, proxy, verboseLogs, globalRateLimit, globalTimeout, userAgentPreset, ignoreCrossDomainRedirects, webServerIpAddress, webServerPort, webServerApplicationProtocol)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -1541,7 +1546,7 @@ func parseDiscoverRequestFiles(pairs []string) ([]*discover.RequestFile, error) 
 }
 
 // getDiscoverApplicationConfig builds the config for application fingerprinting discovery.
-func getDiscoverApplicationConfig(targets []string, resource string, templatePaths []string, timeout int, threads int, proxy string, verboseLogs bool, globalRateLimit int, globalTimeout int, userAgent common.UserAgentPreset, webServerIPAddress string, webServerPort int, webServerApplicationProtocol string) (*discover.DiscoverApplicationConfig, error) {
+func getDiscoverApplicationConfig(targets []string, resource string, templatePaths []string, timeout int, threads int, proxy string, verboseLogs bool, globalRateLimit int, globalTimeout int, userAgent common.UserAgentPreset, ignoreCrossDomainRedirects bool, webServerIPAddress string, webServerPort int, webServerApplicationProtocol string) (*discover.DiscoverApplicationConfig, error) {
 	resourceEnum, err := getDiscoverApplicationResourceConfigTypeFromString(resource)
 	if err != nil {
 		return nil, fmt.Errorf("invalid resource type: %s", resource)
@@ -1555,16 +1560,17 @@ func getDiscoverApplicationConfig(targets []string, resource string, templatePat
 	}
 
 	config := &discover.DiscoverApplicationConfig{
-		Targets:         targets,
-		ResourceType:    &resourceEnum,
-		TemplatePaths:   templatePaths,
-		Timeout:         timeout,
-		Threads:         threads,
-		Proxy:           &proxy,
-		VerboseLogs:     verboseLogs,
-		GlobalRateLimit: max(0, globalRateLimit),
-		GlobalTimeout:   max(0, globalTimeout),
-		UserAgent:       userAgent,
+		Targets:                    targets,
+		ResourceType:               &resourceEnum,
+		TemplatePaths:              templatePaths,
+		Timeout:                    timeout,
+		Threads:                    threads,
+		Proxy:                      &proxy,
+		VerboseLogs:                verboseLogs,
+		GlobalRateLimit:            max(0, globalRateLimit),
+		GlobalTimeout:              max(0, globalTimeout),
+		UserAgent:                  userAgent,
+		IgnoreCrossDomainRedirects: ignoreCrossDomainRedirects,
 	}
 	if webServerIPAddress != "" {
 		config.WebServerIpAddress = &webServerIPAddress

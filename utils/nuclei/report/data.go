@@ -16,27 +16,26 @@ import (
 	nout "github.com/projectdiscovery/nuclei/v3/pkg/output"
 )
 
-// getTargetURL extracts the target URL from a ResultEvent.
-// excludes query parameters and fragment ie. https://example.com/path?query#fragment -> https://example.com/path
-// Uses the path from the raw HTTP request if available, as ev.URL may not contain the tested path
-func getTargetURL(ev *nout.ResultEvent) string {
+// getRequestURL extracts the original request URL from a ResultEvent.
+// Uses the path from the raw HTTP request if available, as ev.URL may not
+// contain the tested path.
+func getRequestURL(ev *nout.ResultEvent) string {
 	parsedURL, err := url.Parse(ev.URL)
 	if err != nil {
 		return ev.URL
 	}
 
-	// Extract the actual path from the raw HTTP request
-	// This is necessary because ev.URL might not contain the tested path when using path fuzzing
 	if ev.Request != "" {
 		_, requestPath, _, _ := parseRawRequest(ev.Request)
-		// Only use the parsed path if it's non-empty and looks like a valid path (starts with /)
 		if requestPath != "" && strings.HasPrefix(requestPath, "/") {
-			// Strip query string and fragment if present to avoid URL encoding issues
-			if idx := strings.IndexAny(requestPath, "?#"); idx != -1 {
+			if idx := strings.IndexByte(requestPath, '#'); idx != -1 {
 				requestPath = requestPath[:idx]
 			}
-			// Decode the path since it comes URL-encoded from the HTTP request
-			// This prevents double-encoding when parsedURL.String() re-encodes it
+			parsedURL.RawQuery = ""
+			if idx := strings.IndexByte(requestPath, '?'); idx != -1 {
+				parsedURL.RawQuery = requestPath[idx+1:]
+				requestPath = requestPath[:idx]
+			}
 			if decodedPath, err := url.PathUnescape(requestPath); err == nil {
 				parsedURL.Path = decodedPath
 			} else {
@@ -45,10 +44,83 @@ func getTargetURL(ev *nout.ResultEvent) string {
 		}
 	}
 
+	parsedURL.Fragment = ""
+	parsedURL.RawFragment = ""
+	return parsedURL.String()
+}
+
+// getTargetURL extracts the target URL from a ResultEvent for report bucketing.
+// Query parameters and fragments are excluded.
+func getTargetURL(ev *nout.ResultEvent) string {
+	requestURL := getRequestURL(ev)
+	parsedURL, err := url.Parse(requestURL)
+	if err != nil {
+		return requestURL
+	}
 	parsedURL.RawQuery = ""
 	parsedURL.Fragment = ""
 	parsedURL.RawFragment = ""
 	return parsedURL.String()
+}
+
+// getMatchedURL returns the final URL that Nuclei matched after redirects.
+// Nuclei keeps ev.URL anchored on the original input host and stores the final
+// landed URL in ev.Matched for HTTP findings.
+func getMatchedURL(ev *nout.ResultEvent) string {
+	if ev.Matched != "" {
+		parsedURL, err := url.Parse(ev.Matched)
+		if err == nil && parsedURL.Hostname() != "" {
+			parsedURL.Fragment = ""
+			parsedURL.RawFragment = ""
+			return parsedURL.String()
+		}
+	}
+	return getRequestURL(ev)
+}
+
+func getNucleiNormalizedRequestURL(ev *nout.ResultEvent) string {
+	parsedURL, err := url.Parse(ev.URL)
+	if err != nil {
+		return ev.URL
+	}
+
+	if ev.Request != "" {
+		_, requestPath, _, _ := parseRawRequest(ev.Request)
+		if requestPath != "" && strings.HasPrefix(requestPath, "/") {
+			if parsedRequestPath, err := url.Parse(requestPath); err == nil {
+				if decodedPath, err := url.PathUnescape(parsedRequestPath.Path); err == nil {
+					parsedURL.Path = decodedPath
+				} else {
+					parsedURL.Path = parsedRequestPath.Path
+				}
+				parsedURL.RawPath = parsedRequestPath.Path
+				parsedURL.RawQuery = parsedRequestPath.RawQuery
+			}
+		}
+	}
+
+	parsedURL.Fragment = ""
+	parsedURL.RawFragment = ""
+	return parsedURL.String()
+}
+
+func urlsEqual(firstURL, secondURL string) bool {
+	if firstURL == secondURL {
+		return true
+	}
+
+	firstParsed, firstErr := url.Parse(firstURL)
+	secondParsed, secondErr := url.Parse(secondURL)
+	if firstErr != nil || secondErr != nil {
+		return false
+	}
+	if firstParsed.Path == "" {
+		firstParsed.Path = "/"
+	}
+	if secondParsed.Path == "" {
+		secondParsed.Path = "/"
+	}
+	return firstParsed.String() == secondParsed.String()
 }
 
 // parseRawRequest parses a raw HTTP request string into its components.
@@ -127,16 +199,15 @@ func getHTTPRequestResponse(ev *nout.ResultEvent) (*common.HttpRequestResponse, 
 		ResponseHeaders: map[string][]string{},
 	}
 
-	// Marshal Request Struct
-	// ev.URL contains the final destination URL after all redirects
-	finalURL, err := url.Parse(ev.URL)
+	// Marshal Request Struct from the original input URL.
+	requestURL, err := url.Parse(ev.URL)
 	if err != nil {
 		// If we can't parse the URL, still include what we can
 		request.BaseUrl = ev.URL
 		request.Path = "/"
 	} else {
-		request.BaseUrl = fmt.Sprintf("%s://%s", finalURL.Scheme, finalURL.Host)
-		request.Path = finalURL.Path
+		request.BaseUrl = fmt.Sprintf("%s://%s", requestURL.Scheme, requestURL.Host)
+		request.Path = requestURL.Path
 		if request.Path == "" {
 			request.Path = "/"
 		}
@@ -189,10 +260,10 @@ func getHTTPRequestResponse(ev *nout.ResultEvent) (*common.HttpRequestResponse, 
 		params.Body = requesthelpers.CreateBodyFromBytes(contentType, []byte(body))
 	}
 
-	// Parse query parameters - prefer raw request query string, fall back to finalURL
+	// Parse query parameters - prefer raw request query string, fall back to the input URL.
 	queryStringToParse := rawRequestQueryString
-	if queryStringToParse == "" && finalURL != nil && finalURL.RawQuery != "" {
-		queryStringToParse = finalURL.RawQuery
+	if queryStringToParse == "" && requestURL != nil && requestURL.RawQuery != "" {
+		queryStringToParse = requestURL.RawQuery
 	}
 
 	if queryStringToParse != "" {
@@ -212,11 +283,15 @@ func getHTTPRequestResponse(ev *nout.ResultEvent) (*common.HttpRequestResponse, 
 		responseBody = ev.Response
 	}
 
-	// Create redirect chain with the final URL if it's different from base
+	// Nuclei does not expose the full redirect hop list, but it does expose the
+	// original target and final landed URL.
 	var redirectChain []string
-	fullURL := request.GetBaseUrl() + request.GetPath()
-	if finalURL != nil {
-		redirectChain = append(redirectChain, fullURL)
+	originalURL := getRequestURL(ev)
+	if originalURL != "" {
+		redirectChain = append(redirectChain, originalURL)
+	}
+	if matchedURL := getMatchedURL(ev); matchedURL != "" && !urlsEqual(matchedURL, originalURL) && !urlsEqual(matchedURL, getNucleiNormalizedRequestURL(ev)) {
+		redirectChain = append(redirectChain, matchedURL)
 	}
 
 	response = requesthelpers.CreateHTTPResponse(statusCode, redirectChain, singleToMulti(responseHeaders), responseBody)

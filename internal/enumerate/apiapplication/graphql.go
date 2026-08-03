@@ -15,8 +15,6 @@ import (
 
 	// Generated
 	enumerateapiapplicationfern "github.com/Method-Security/webscan/generated/go/enumerate/apiapplication"
-	// Utils
-	utils "github.com/Method-Security/webscan/utils"
 	// External
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
@@ -149,7 +147,7 @@ func PerformAppEnumerateGraphQL(ctx context.Context, config enumerateapiapplicat
 		return report
 	}
 
-	body, err := fetchGraphQL(ctx, config.Target, requestBody, config.Headers, config.Cookies, config.Timeout, config.VerifyTls, config.MaxRedirects, config.IgnoreCrossDomainRedirects)
+	body, err := fetchGraphQL(ctx, config.Target, requestBody, config.Headers, config.Cookies, config.Timeout, config.VerifyTls)
 	if err != nil {
 		report.Errors = append(report.Errors, err.Error())
 		return report
@@ -211,7 +209,7 @@ func buildGraphQLRequestBody(config enumerateapiapplicationfern.EnumerateGraphql
 	return json.Marshal(payload)
 }
 
-func fetchGraphQL(ctx context.Context, target string, requestBody []byte, headers map[string]string, cookies map[string]string, timeout *int, verifyTls bool, maxRedirects int, ignoreCrossDomainRedirects bool) ([]byte, error) {
+func fetchGraphQL(ctx context.Context, target string, requestBody []byte, headers map[string]string, cookies map[string]string, timeout *int, verifyTls bool) ([]byte, error) {
 	log := svc1log.FromContext(ctx)
 
 	effectiveTimeout := defaultGraphQLTimeout
@@ -236,12 +234,6 @@ func fetchGraphQL(ctx context.Context, target string, requestBody []byte, header
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: !verifyTls},
 		},
-		CheckRedirect: func(_ *http.Request, via []*http.Request) error {
-			if len(via) > maxRedirects {
-				return http.ErrUseLastResponse
-			}
-			return nil
-		},
 	}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -253,9 +245,6 @@ func fetchGraphQL(ctx context.Context, target string, requestBody []byte, header
 			log.Error("Error closing response body", svc1log.SafeParam("error", err))
 		}
 	}()
-	if ignoreCrossDomainRedirects && !utils.IsHostInScope(target, resp.Request.URL.String()) {
-		return nil, fmt.Errorf("cross-domain redirect blocked: %s -> %s", target, resp.Request.URL.String())
-	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

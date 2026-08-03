@@ -38,16 +38,15 @@ func createSendHTTPRequestConfig(baseURL, path string, config discover.DiscoverS
 	}
 
 	return common.SendHttpRequestConfig{
-		Request:                    &request,
-		MaxRedirects:               config.MaxRedirects,
-		VerifyTls:                  config.VerifyTls,
-		Timeout:                    config.Timeout,
-		IgnoreCrossDomainRedirects: config.IgnoreCrossDomainRedirects,
-		RequestMethod:              config.RequestMethod,
-		HeadlessConfig:             config.HeadlessConfig,
-		BrowserbaseConfig:          config.BrowserbaseConfig,
-		BrowserbaseSecrets:         browserbaseSecrets,
-		UserAgent:                  config.UserAgent,
+		Request:            &request,
+		MaxRedirects:       config.MaxRedirects,
+		VerifyTls:          config.VerifyTls,
+		Timeout:            config.Timeout,
+		RequestMethod:      config.RequestMethod,
+		HeadlessConfig:     config.HeadlessConfig,
+		BrowserbaseConfig:  config.BrowserbaseConfig,
+		BrowserbaseSecrets: browserbaseSecrets,
+		UserAgent:          config.UserAgent,
 	}
 }
 

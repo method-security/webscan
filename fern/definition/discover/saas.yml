@@ -22,7 +22,6 @@ types:
       saasCompanies: optional<list<string>>
       ssoCompanies: optional<list<string>>
       maxRedirects: integer
-      ignoreCrossDomainRedirects: boolean
       verifyTls: boolean
       timeout: integer
       sleep: integer

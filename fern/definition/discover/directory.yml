@@ -27,7 +27,6 @@ types:
       threshold: float
       timeout: integer
       ignoreCrossDomainRedirects: boolean
-      maxRedirects: integer
       maxRedirectsBaselineRequest: integer
       maxRuntime: integer
       retries: integer

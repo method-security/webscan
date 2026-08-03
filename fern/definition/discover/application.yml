@@ -61,7 +61,6 @@ types:
       globalRateLimit: integer
       globalTimeout: integer
       userAgent: method.UserAgentPreset
-      ignoreCrossDomainRedirects: boolean
       webServerIpAddress: optional<string>
       webServerPort: optional<integer>
       webServerApplicationProtocol: optional<http.WebProtocol>

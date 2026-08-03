@@ -70,8 +70,6 @@ types:
       variables: optional<string>
       allowMutations: optional<boolean>
       verifyTls: boolean
-      maxRedirects: integer
-      ignoreCrossDomainRedirects: boolean
   EnumerateGraphqlData:
     properties:
       apiType: common.ApiType

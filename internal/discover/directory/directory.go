@@ -26,8 +26,8 @@ import (
 func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirectoryConfig) (*discover.DiscoverDirectoryReport, error) {
 	// Set context
 	var cancel context.CancelFunc
-	if config.MaxRuntime > 0 {
-		ctx, cancel = context.WithTimeout(ctx, time.Duration(config.MaxRuntime)*time.Second)
+	if config.GlobalTimeout > 0 {
+		ctx, cancel = context.WithTimeout(ctx, time.Duration(config.GlobalTimeout)*time.Second)
 		defer cancel()
 	}
 
@@ -39,6 +39,7 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 	report := discover.DiscoverDirectoryReport{Config: &config}
 	errors := []string{}
 	result := discover.DiscoverDirectoryResult{}
+	limiter := newDirectoryRateLimiter(config.GlobalRateLimit)
 
 	// Gather all paths
 	allPaths, err := gatherPaths(config.Paths, config.WordlistType, config.WordlistSize)
@@ -59,7 +60,7 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 	// Check for timeout before starting main processing
 	if ctx.Err() != nil {
 		report.Result = &result
-		report.Errors = append(report.Errors, fmt.Sprintf("directory discovery operation timed out after %d seconds before processing started", config.MaxRuntime))
+		report.Errors = append(report.Errors, fmt.Sprintf("directory discovery operation timed out after %d seconds before processing started", config.GlobalTimeout))
 		return &report, nil
 	}
 
@@ -72,7 +73,7 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 			// Return partial results collected so far
 			result.Targets = targets
 			report.Result = &result
-			report.Errors = append(report.Errors, fmt.Sprintf("directory discovery operation timed out after %d seconds during target processing", config.MaxRuntime))
+			report.Errors = append(report.Errors, fmt.Sprintf("directory discovery operation timed out after %d seconds during target processing", config.GlobalTimeout))
 			return &report, nil
 		}
 
@@ -94,7 +95,7 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 		var calibrationFailureSample string
 		if config.EnableCommonResponseFilters {
 			// Follow redirects to get the correct baseline size and word count.
-			baselineRequest, baselineSize, baselineWords, err := baseLine(ctx, baseURL, parsedTargetPath, validCodes, config.MaxRedirectsBaselineRequest, &config)
+			baselineRequest, baselineSize, baselineWords, err := baseLine(ctx, baseURL, parsedTargetPath, validCodes, config.MaxRedirectsBaselineRequest, &config, limiter)
 			if err != nil {
 				errors = append(errors, fmt.Sprintf("target %s: failed to get base response profile, skipping enumeration: %v", target, err))
 				report.Errors = errors
@@ -105,7 +106,7 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 			targetInfo.BaselineAttempts = append(targetInfo.BaselineAttempts, baselineRequest)
 			log.Info("Baseline size", svc1log.SafeParam("size", baselineSizeInt), svc1log.SafeParam("words", baselineWordsInt))
 
-			calibrationAttempts, failureCount, failureSample := calibrateCommonResponses(ctx, baseURL, parsedTargetPath, &config, detector)
+			calibrationAttempts, failureCount, failureSample := calibrateCommonResponses(ctx, baseURL, parsedTargetPath, &config, detector, limiter)
 			targetInfo.BaselineAttempts = append(targetInfo.BaselineAttempts, calibrationAttempts...)
 			calibrationFailureCount = failureCount
 			calibrationFailureSample = failureSample
@@ -119,7 +120,7 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 			// Return partial results collected so far
 			result.Targets = targets
 			report.Result = &result
-			report.Errors = append(report.Errors, fmt.Sprintf("directory discovery operation timed out after %d seconds during baseline setup", config.MaxRuntime))
+			report.Errors = append(report.Errors, fmt.Sprintf("directory discovery operation timed out after %d seconds during baseline setup", config.GlobalTimeout))
 			return &report, nil
 		}
 
@@ -173,7 +174,7 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 							targets = append(targets, &targetInfo)
 						}
 						result.Targets = targets
-						errors = append(errors, fmt.Sprintf("directory discovery operation timed out after %d seconds during request processing", config.MaxRuntime))
+						errors = append(errors, fmt.Sprintf("directory discovery operation timed out after %d seconds during request processing", config.GlobalTimeout))
 						report.Result = &result
 						report.Errors = errors
 						return &report, nil
@@ -221,6 +222,18 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 							return
 						}
 						defer func() { <-semaphore }()
+
+						if err := waitForDirectoryRateLimit(ctx, limiter); err != nil {
+							if ctx.Err() == nil {
+								attemptsMutex.Lock()
+								metrics.sendFailureCount++
+								if metrics.sendFailureSample == "" {
+									metrics.sendFailureSample = err.Error()
+								}
+								attemptsMutex.Unlock()
+							}
+							return
+						}
 
 						// Send request
 						requestConfig := createDirectorySendHTTPRequestConfig(ctx, baseURL, fullPath, method, common.HttpRequestParams{}, 0, &config)
@@ -311,7 +324,7 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 		// Check if context expired during processing - still return partial results
 		if ctx.Err() != nil {
 			result.Targets = targets
-			errors = append(errors, fmt.Sprintf("directory discovery operation timed out after %d seconds during processing, returning partial results", config.MaxRuntime))
+			errors = append(errors, fmt.Sprintf("directory discovery operation timed out after %d seconds during processing, returning partial results", config.GlobalTimeout))
 			report.Result = &result
 			report.Errors = errors
 			return &report, nil

@@ -259,12 +259,17 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			globalRateLimit, err := cmd.Flags().GetInt("global-rate-limit")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
 			maxRedirectsBaselineRequest, err := cmd.Flags().GetInt("max-redirects-baseline-request")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			maxRuntime, err := cmd.Flags().GetInt("max-runtime")
+			globalTimeout, err := cmd.Flags().GetInt("global-timeout")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -311,7 +316,7 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Set config
-			config := getDiscoverDirectoryConfig(targets, paths, wordlistType, wordlistSize, httpMethods, responseCodes, enableCommonResponseFilters, verifyTLS, threshold, timeout, ignoreCrossDomainRedirects, maxRedirectsBaselineRequest, threads, maxRuntime, retries, sleep, jitter, userAgentPreset)
+			config := getDiscoverDirectoryConfig(targets, paths, wordlistType, wordlistSize, httpMethods, responseCodes, enableCommonResponseFilters, verifyTLS, threshold, timeout, globalRateLimit, ignoreCrossDomainRedirects, maxRedirectsBaselineRequest, threads, globalTimeout, retries, sleep, jitter, userAgentPreset)
 
 			// Generate a report
 			rep, err := discoverdirectory.RunDirectoryDiscovery(cmd.Context(), config)
@@ -335,8 +340,9 @@ func (a *WebScan) InitDiscoverCommand() {
 	discoverDirectoryCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
 	discoverDirectoryCmd.Flags().Float64("threshold", 0.25, "Threshold for successful results")
 	discoverDirectoryCmd.Flags().Int("timeout", 20, "Timeout per request in seconds")
+	discoverDirectoryCmd.Flags().Int("global-rate-limit", 25, "Global rate limit in requests per second")
 	discoverDirectoryCmd.Flags().Int("max-redirects-baseline-request", 10, "Maximum number of redirects to follow for the baseline request")
-	discoverDirectoryCmd.Flags().Int("max-runtime", 650, "Maximum time to run the engagement in seconds")
+	discoverDirectoryCmd.Flags().Int("global-timeout", 650, "Maximum total scan time in seconds")
 	discoverDirectoryCmd.Flags().Int("threads", 25, "Number of threads to use")
 	discoverDirectoryCmd.Flags().Int("retries", 0, "Number of times to retry a request if it fails")
 	discoverDirectoryCmd.Flags().Int("sleep", 0, "Number of seconds to sleep between requests")
@@ -1725,7 +1731,7 @@ func getDiscoverSaasConfig(orgs []string, saasCompanies []string, ssoCompanies [
 }
 
 // getDiscoverDirectoryConfig builds the config for directory discovery.
-func getDiscoverDirectoryConfig(targets []string, paths []string, wordlistType string, wordlistSize string, httpMethods []common.HttpMethod, responseCodes string, enableCommonResponseFilters bool, verifyTLS bool, threshold float64, timeout int, ignoreCrossDomainRedirects bool, maxRedirectsBaselineRequest int, threads int, maxRuntime int, retries int, sleep int, jitter int, userAgent common.UserAgentPreset) discover.DiscoverDirectoryConfig {
+func getDiscoverDirectoryConfig(targets []string, paths []string, wordlistType string, wordlistSize string, httpMethods []common.HttpMethod, responseCodes string, enableCommonResponseFilters bool, verifyTLS bool, threshold float64, timeout int, globalRateLimit int, ignoreCrossDomainRedirects bool, maxRedirectsBaselineRequest int, threads int, globalTimeout int, retries int, sleep int, jitter int, userAgent common.UserAgentPreset) discover.DiscoverDirectoryConfig {
 	config := discover.DiscoverDirectoryConfig{
 		Targets:                     targets,
 		Paths:                       paths,
@@ -1735,10 +1741,11 @@ func getDiscoverDirectoryConfig(targets []string, paths []string, wordlistType s
 		VerifyTls:                   verifyTLS,
 		Threshold:                   threshold,
 		Timeout:                     timeout,
+		GlobalRateLimit:             max(0, globalRateLimit),
 		IgnoreCrossDomainRedirects:  ignoreCrossDomainRedirects,
 		MaxRedirectsBaselineRequest: maxRedirectsBaselineRequest,
 		Threads:                     threads,
-		MaxRuntime:                  maxRuntime,
+		GlobalTimeout:               max(0, globalTimeout),
 		Retries:                     retries,
 		Sleep:                       sleep,
 		Jitter:                      jitter,

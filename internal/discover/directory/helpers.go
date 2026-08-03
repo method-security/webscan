@@ -22,6 +22,7 @@ import (
 	// External
 	uuid "github.com/google/uuid"
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
+	"golang.org/x/time/rate"
 )
 
 // createDirectorySendHTTPRequestConfig builds the config for directory discovery.
@@ -49,6 +50,20 @@ func createDirectorySendHTTPRequestConfig(ctx context.Context, baseURL, path str
 	requesthelpers.ApplyProxySettings(ctx, &sendConfig)
 
 	return sendConfig
+}
+
+func newDirectoryRateLimiter(requestsPerSecond int) *rate.Limiter {
+	if requestsPerSecond <= 0 {
+		return nil
+	}
+	return rate.NewLimiter(rate.Limit(requestsPerSecond), 1)
+}
+
+func waitForDirectoryRateLimit(ctx context.Context, limiter *rate.Limiter) error {
+	if limiter == nil {
+		return nil
+	}
+	return limiter.Wait(ctx)
 }
 
 type directoryScanMetrics struct {
@@ -200,9 +215,13 @@ func logDirectoryFindings(ctx context.Context, attempts []*common.HttpRequestRes
 }
 
 // baseLine gets the baseline size and word count of the target to be used for validation of the response
-func baseLine(ctx context.Context, baseURL string, path string, validCodes map[int]bool, maxRedirects int, config *discover.DiscoverDirectoryConfig) (*common.HttpRequestResponse, *int, *int, error) {
+func baseLine(ctx context.Context, baseURL string, path string, validCodes map[int]bool, maxRedirects int, config *discover.DiscoverDirectoryConfig, limiter *rate.Limiter) (*common.HttpRequestResponse, *int, *int, error) {
 	// set request config
 	requestConfig := createDirectorySendHTTPRequestConfig(ctx, baseURL, path, common.HttpMethodGet, common.HttpRequestParams{}, maxRedirects, config)
+
+	if err := waitForDirectoryRateLimit(ctx, limiter); err != nil {
+		return nil, nil, nil, err
+	}
 
 	// send request
 	request, err := request.SendRequest(ctx, requestConfig)
@@ -228,7 +247,7 @@ func baseLine(ctx context.Context, baseURL string, path string, validCodes map[i
 
 // calibrateCommonResponses sends intentionally invalid paths and seeds the common-response
 // detector with the resulting body profiles.
-func calibrateCommonResponses(ctx context.Context, baseURL, parsedTargetPath string, config *discover.DiscoverDirectoryConfig, detector *commonResponseDetector) ([]*common.HttpRequestResponse, int, string) {
+func calibrateCommonResponses(ctx context.Context, baseURL, parsedTargetPath string, config *discover.DiscoverDirectoryConfig, detector *commonResponseDetector, limiter *rate.Limiter) ([]*common.HttpRequestResponse, int, string) {
 	var attempts []*common.HttpRequestResponse
 	var failureCount int
 	var failureSample string
@@ -236,6 +255,13 @@ func calibrateCommonResponses(ctx context.Context, baseURL, parsedTargetPath str
 	for _, method := range config.HttpMethods {
 		for _, probePath := range commonResponseCalibrationPaths(parsedTargetPath) {
 			requestConfig := createDirectorySendHTTPRequestConfig(ctx, baseURL, probePath, method, common.HttpRequestParams{}, 0, config)
+			if err := waitForDirectoryRateLimit(ctx, limiter); err != nil {
+				failureCount++
+				if failureSample == "" {
+					failureSample = err.Error()
+				}
+				continue
+			}
 			httpRequest, err := request.SendRequest(ctx, requestConfig)
 			if err != nil {
 				failureCount++

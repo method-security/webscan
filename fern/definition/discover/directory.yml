@@ -26,9 +26,10 @@ types:
       verifyTls: boolean
       threshold: float
       timeout: integer
+      globalRateLimit: integer
       ignoreCrossDomainRedirects: boolean
       maxRedirectsBaselineRequest: integer
-      maxRuntime: integer
+      globalTimeout: integer
       retries: integer
       sleep: integer
       jitter: integer

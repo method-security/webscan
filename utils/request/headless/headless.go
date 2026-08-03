@@ -575,7 +575,7 @@ func (b *Requester) sendRequestWithArtifactsOnce(ctx context.Context, config com
 	redirectChainMu.Lock()
 	finalRedirectChain := append([]string(nil), redirectChain...)
 	redirectChainMu.Unlock()
-	if finalErr == nil && config.IgnoreCrossDomainRedirects && len(finalRedirectChain) > 1 {
+	if config.IgnoreCrossDomainRedirects && len(finalRedirectChain) > 1 {
 		originalURL := finalRedirectChain[0]
 		finalURL := finalRedirectChain[len(finalRedirectChain)-1]
 		if isCrossDomainRedirect(originalURL, finalURL) {

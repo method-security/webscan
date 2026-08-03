@@ -66,15 +66,16 @@ func createRateLimitRequestConfig(baseURL, path string, queryParams map[string]s
 		},
 	}
 	return common.SendHttpRequestConfig{
-		Request:            &request,
-		MaxRedirects:       0,
-		VerifyTls:          config.VerifyTls,
-		Timeout:            config.Timeout,
-		UserAgent:          config.UserAgent,
-		RequestMethod:      common.RequestMethodStandard,
-		BrowserbaseSecrets: nil,
-		HeadlessConfig:     nil,
-		BrowserbaseConfig:  nil,
+		Request:                    &request,
+		MaxRedirects:               config.MaxRedirects,
+		VerifyTls:                  config.VerifyTls,
+		Timeout:                    config.Timeout,
+		IgnoreCrossDomainRedirects: config.IgnoreCrossDomainRedirects,
+		UserAgent:                  config.UserAgent,
+		RequestMethod:              common.RequestMethodStandard,
+		BrowserbaseSecrets:         nil,
+		HeadlessConfig:             nil,
+		BrowserbaseConfig:          nil,
 	}
 }
 

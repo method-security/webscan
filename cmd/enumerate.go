@@ -118,13 +118,20 @@ func (a *WebScan) InitEnumerateCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			maxRedirects, ignoreCrossDomainRedirects, err := getEnumerateRedirectFlags(cmd)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
 
 			config := enumerateapiapplicationfern.EnumerateGraphqlConfig{
-				Target:    target,
-				Headers:   headers,
-				Cookies:   cookies,
-				Timeout:   &timeout,
-				VerifyTls: verifyTLS,
+				Target:                     target,
+				Headers:                    headers,
+				Cookies:                    cookies,
+				Timeout:                    &timeout,
+				VerifyTls:                  verifyTLS,
+				MaxRedirects:               maxRedirects,
+				IgnoreCrossDomainRedirects: ignoreCrossDomainRedirects,
 			}
 			if query != "" {
 				config.Query = &query
@@ -152,6 +159,8 @@ func (a *WebScan) InitEnumerateCommand() {
 	enumerateAPIApplicationGraphqlCmd.Flags().String("variables", "", "JSON-encoded variables for the ad-hoc --query")
 	enumerateAPIApplicationGraphqlCmd.Flags().Bool("allow-mutations", false, "Permit mutation and subscription operations (default rejects them at the AST level)")
 	enumerateAPIApplicationGraphqlCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
+	enumerateAPIApplicationGraphqlCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
+	enumerateAPIApplicationGraphqlCmd.Flags().Bool("ignore-cross-domain-redirects", true, "If true, do not follow redirects to a different domain and treat them as errors")
 
 	// Mark required flags
 	_ = enumerateAPIApplicationGraphqlCmd.MarkFlagRequired("target")
@@ -238,15 +247,22 @@ func (a *WebScan) InitEnumerateCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			maxRedirects, ignoreCrossDomainRedirects, err := getEnumerateRedirectFlags(cmd)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
 
 			config := enumerateapiapplicationfern.EnumerateSwaggerConfig{
-				Target:         target,
-				Timeout:        timeout,
-				UserAgent:      userAgentPreset,
-				Headers:        headers,
-				Cookies:        cookies,
-				CandidatePaths: candidatePaths,
-				VerifyTls:      verifyTLS,
+				Target:                     target,
+				Timeout:                    timeout,
+				UserAgent:                  userAgentPreset,
+				Headers:                    headers,
+				Cookies:                    cookies,
+				CandidatePaths:             candidatePaths,
+				VerifyTls:                  verifyTLS,
+				MaxRedirects:               maxRedirects,
+				IgnoreCrossDomainRedirects: ignoreCrossDomainRedirects,
 			}
 			if specUrl != "" {
 				config.SpecUrl = &specUrl
@@ -267,6 +283,8 @@ func (a *WebScan) InitEnumerateCommand() {
 	enumerateAPIApplicationSwaggerCmd.Flags().StringSlice("candidate-paths", []string{}, "Additional spec paths to probe before built-in paths (comma-separated)")
 	enumerateAPIApplicationSwaggerCmd.Flags().String("spec-url", "", "Direct URL to OpenAPI/Swagger spec; skips all probing when set")
 	enumerateAPIApplicationSwaggerCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
+	enumerateAPIApplicationSwaggerCmd.Flags().Int("max-redirects", 1, "Maximum number of redirects to follow")
+	enumerateAPIApplicationSwaggerCmd.Flags().Bool("ignore-cross-domain-redirects", true, "If true, do not follow redirects to a different domain and treat them as errors")
 	// User Agent Flag
 	enumerateAPIApplicationSwaggerCmd.Flags().String("user-agent", "RANDOM", "User-Agent preset (RANDOM, CHROME, FIREFOX, SAFARI, EDGE)")
 
@@ -304,6 +322,11 @@ func (a *WebScan) InitEnumerateCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			maxRedirects, ignoreCrossDomainRedirects, err := getEnumerateRedirectFlags(cmd)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
 
 			sleep, err := cmd.Flags().GetInt("sleep")
 			if err != nil {
@@ -332,7 +355,7 @@ func (a *WebScan) InitEnumerateCommand() {
 			}
 
 			// Set Config
-			config := getEnumerateKubeConfig(target, verifyTLS, timeout, sleep, jitter, userAgentPreset)
+			config := getEnumerateKubeConfig(target, verifyTLS, timeout, maxRedirects, ignoreCrossDomainRedirects, sleep, jitter, userAgentPreset)
 
 			// Generate report
 			report := enumeratekube.PerformAppEnumerateKube(cmd.Context(), &config)
@@ -344,6 +367,8 @@ func (a *WebScan) InitEnumerateCommand() {
 	// Config Flags
 	enumerateKubeCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
 	enumerateKubeCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
+	enumerateKubeCmd.Flags().Int("max-redirects", 0, "Maximum number of redirects to follow")
+	enumerateKubeCmd.Flags().Bool("ignore-cross-domain-redirects", true, "If true, do not follow redirects to a different domain and treat them as errors")
 	enumerateKubeCmd.Flags().Int("sleep", 0, "Number of seconds to sleep between requests")
 	enumerateKubeCmd.Flags().Int("jitter", 0, "Jitter percentage (0-100) to apply random variance to sleep delay")
 	// User Agent Flag
@@ -443,6 +468,11 @@ func (a *WebScan) InitEnumerateCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			maxRedirects, ignoreCrossDomainRedirects, err := getEnumerateRedirectFlags(cmd)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
 			threads, err := cmd.Flags().GetInt("threads")
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -476,7 +506,7 @@ func (a *WebScan) InitEnumerateCommand() {
 			}
 
 			// Generate config
-			config := getEnumerateWordpressPluginsConfig(targets, plugins, PluginsFileSizeEnum, verifyTLS, timeout, sleep, jitter, threads, userAgentPreset)
+			config := getEnumerateWordpressPluginsConfig(targets, plugins, PluginsFileSizeEnum, verifyTLS, timeout, maxRedirects, ignoreCrossDomainRedirects, sleep, jitter, threads, userAgentPreset)
 
 			// Generate report
 			report := enumeratecms.PerformAppEnumerateCMSWordpressPlugins(cmd.Context(), config)
@@ -491,6 +521,8 @@ func (a *WebScan) InitEnumerateCommand() {
 	enumerateCMSWordpressPluginsCmd.Flags().String("plugins-file-size", "SMALL", "Size of the WordPress plugin list to use")
 	enumerateCMSWordpressPluginsCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
 	enumerateCMSWordpressPluginsCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
+	enumerateCMSWordpressPluginsCmd.Flags().Int("max-redirects", 0, "Maximum number of redirects to follow")
+	enumerateCMSWordpressPluginsCmd.Flags().Bool("ignore-cross-domain-redirects", true, "If true, do not follow redirects to a different domain and treat them as errors")
 	enumerateCMSWordpressPluginsCmd.Flags().Int("sleep", 0, "Number of seconds to sleep between requests")
 	enumerateCMSWordpressPluginsCmd.Flags().Int("jitter", 0, "Jitter percentage (0-100) to apply random variance to sleep delay")
 	enumerateCMSWordpressPluginsCmd.Flags().Int("threads", 50, "Number of concurrent threads for scanning")
@@ -586,6 +618,11 @@ func (a *WebScan) InitEnumerateCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			maxRedirects, ignoreCrossDomainRedirects, err := getEnumerateRedirectFlags(cmd)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
 			threads, err := cmd.Flags().GetInt("threads")
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -619,7 +656,7 @@ func (a *WebScan) InitEnumerateCommand() {
 			}
 
 			// Generate config
-			config := getEnumerateDrupalModulesConfig(targets, modules, modulesFileSizeEnum, verifyTLS, timeout, sleep, jitter, threads, userAgentPreset)
+			config := getEnumerateDrupalModulesConfig(targets, modules, modulesFileSizeEnum, verifyTLS, timeout, maxRedirects, ignoreCrossDomainRedirects, sleep, jitter, threads, userAgentPreset)
 
 			// Generate report
 			report := enumeratecms.PerformAppEnumerateCMSDrupalModules(cmd.Context(), config)
@@ -634,6 +671,8 @@ func (a *WebScan) InitEnumerateCommand() {
 	enumerateCMSDrupalModulesCmd.Flags().String("modules-file-size", string(enumeratecmsdrupalfern.ModulesFileSizeSmall), "Size of the Drupal module list to use")
 	enumerateCMSDrupalModulesCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
 	enumerateCMSDrupalModulesCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
+	enumerateCMSDrupalModulesCmd.Flags().Int("max-redirects", 0, "Maximum number of redirects to follow")
+	enumerateCMSDrupalModulesCmd.Flags().Bool("ignore-cross-domain-redirects", true, "If true, do not follow redirects to a different domain and treat them as errors")
 	enumerateCMSDrupalModulesCmd.Flags().Int("sleep", 0, "Number of seconds to sleep between requests")
 	enumerateCMSDrupalModulesCmd.Flags().Int("jitter", 0, "Jitter percentage (0-100) to apply random variance to sleep delay")
 	enumerateCMSDrupalModulesCmd.Flags().Int("threads", 50, "Number of concurrent threads for scanning")
@@ -696,6 +735,11 @@ func (a *WebScan) InitEnumerateCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			maxRedirects, ignoreCrossDomainRedirects, err := getEnumerateRedirectFlags(cmd)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
 			threads, err := cmd.Flags().GetInt("threads")
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -724,7 +768,7 @@ func (a *WebScan) InitEnumerateCommand() {
 			}
 
 			// Generate config
-			config := getEnumerateGeneralRateLimitConfig(targets, maxRequests, sleep, jitter, verifyTLS, timeout, threads, userAgentPreset)
+			config := getEnumerateGeneralRateLimitConfig(targets, maxRequests, sleep, jitter, verifyTLS, timeout, maxRedirects, ignoreCrossDomainRedirects, threads, userAgentPreset)
 
 			// Generate report
 			report := enumerategeneral.PerformGeneralRatelimit(cmd.Context(), &config)
@@ -739,6 +783,8 @@ func (a *WebScan) InitEnumerateCommand() {
 	enumerateGeneralRatelimitCmd.Flags().Int("jitter", 0, "Jitter percentage (0-100) to apply random variance to sleep delay")
 	enumerateGeneralRatelimitCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
 	enumerateGeneralRatelimitCmd.Flags().Int("timeout", 5, "Timeout per request in seconds")
+	enumerateGeneralRatelimitCmd.Flags().Int("max-redirects", 0, "Maximum number of redirects to follow")
+	enumerateGeneralRatelimitCmd.Flags().Bool("ignore-cross-domain-redirects", true, "If true, do not follow redirects to a different domain and treat them as errors")
 	enumerateGeneralRatelimitCmd.Flags().Int("threads", 100, "Number of concurrent threads for scanning")
 	// User Agent Flag
 	enumerateGeneralRatelimitCmd.Flags().String("user-agent", "RANDOM", "User-Agent preset (RANDOM, CHROME, FIREFOX, SAFARI, EDGE)")
@@ -786,6 +832,11 @@ func (a *WebScan) InitEnumerateCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			maxRedirects, ignoreCrossDomainRedirects, err := getEnumerateRedirectFlags(cmd)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
 			threads, err := cmd.Flags().GetInt("threads")
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -819,7 +870,7 @@ func (a *WebScan) InitEnumerateCommand() {
 			}
 
 			// Generate config
-			config := getEnumerateDockerConfig(targets, verifyTLS, timeout, sleep, jitter, threads, userAgentPreset)
+			config := getEnumerateDockerConfig(targets, verifyTLS, timeout, maxRedirects, ignoreCrossDomainRedirects, sleep, jitter, threads, userAgentPreset)
 
 			// Generate report
 			report := enumeratedocker.PerformAppEnumerateContainerRegistryDocker(cmd.Context(), &config)
@@ -831,6 +882,8 @@ func (a *WebScan) InitEnumerateCommand() {
 	// Config Flags
 	enumerateContainerRegistryDockerCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
 	enumerateContainerRegistryDockerCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
+	enumerateContainerRegistryDockerCmd.Flags().Int("max-redirects", 0, "Maximum number of redirects to follow")
+	enumerateContainerRegistryDockerCmd.Flags().Bool("ignore-cross-domain-redirects", true, "If true, do not follow redirects to a different domain and treat them as errors")
 	enumerateContainerRegistryDockerCmd.Flags().Int("sleep", 0, "Number of seconds to sleep between requests")
 	enumerateContainerRegistryDockerCmd.Flags().Int("jitter", 0, "Jitter percentage (0-100) to apply random variance to sleep delay")
 	enumerateContainerRegistryDockerCmd.Flags().Int("threads", 50, "Number of concurrent manifest requests per repository")
@@ -851,75 +904,97 @@ func (a *WebScan) InitEnumerateCommand() {
 }
 
 // getEnumerateWordpressPluginsConfig builds the config for WordPress plugin enumeration.
-func getEnumerateWordpressPluginsConfig(targets []string, plugins []string, PluginsFileSizeEnum enumeratecmswordpressfern.PluginsFileSize, verifyTLS bool, timeout int, sleep int, jitter int, threads int, userAgent common.UserAgentPreset) enumeratecmswordpressfern.EnumerateWordpressPluginsConfig {
+func getEnumerateRedirectFlags(cmd *cobra.Command) (int, bool, error) {
+	maxRedirects, err := cmd.Flags().GetInt("max-redirects")
+	if err != nil {
+		return 0, false, err
+	}
+	ignoreCrossDomainRedirects, err := cmd.Flags().GetBool("ignore-cross-domain-redirects")
+	if err != nil {
+		return 0, false, err
+	}
+	return maxRedirects, ignoreCrossDomainRedirects, nil
+}
+
+func getEnumerateWordpressPluginsConfig(targets []string, plugins []string, PluginsFileSizeEnum enumeratecmswordpressfern.PluginsFileSize, verifyTLS bool, timeout int, maxRedirects int, ignoreCrossDomainRedirects bool, sleep int, jitter int, threads int, userAgent common.UserAgentPreset) enumeratecmswordpressfern.EnumerateWordpressPluginsConfig {
 	config := enumeratecmswordpressfern.EnumerateWordpressPluginsConfig{
-		Targets:         targets,
-		Plugins:         plugins,
-		PluginsFileSize: &PluginsFileSizeEnum,
-		VerifyTls:       verifyTLS,
-		Timeout:         max(timeout, 0),
-		Sleep:           max(sleep, 0),
-		Jitter:          max(jitter, 0),
-		Threads:         max(threads, 0),
-		UserAgent:       userAgent,
+		Targets:                    targets,
+		Plugins:                    plugins,
+		PluginsFileSize:            &PluginsFileSizeEnum,
+		VerifyTls:                  verifyTLS,
+		Timeout:                    max(timeout, 0),
+		MaxRedirects:               max(maxRedirects, 0),
+		IgnoreCrossDomainRedirects: ignoreCrossDomainRedirects,
+		Sleep:                      max(sleep, 0),
+		Jitter:                     max(jitter, 0),
+		Threads:                    max(threads, 0),
+		UserAgent:                  userAgent,
 	}
 	return config
 }
 
 // getEnumerateKubeConfig builds the config for Kubernetes enumeration.
-func getEnumerateKubeConfig(target string, verifyTLS bool, timeout int, sleep int, jitter int, userAgent common.UserAgentPreset) enumeratekubefern.EnumerateKubeConfig {
+func getEnumerateKubeConfig(target string, verifyTLS bool, timeout int, maxRedirects int, ignoreCrossDomainRedirects bool, sleep int, jitter int, userAgent common.UserAgentPreset) enumeratekubefern.EnumerateKubeConfig {
 	config := enumeratekubefern.EnumerateKubeConfig{
-		Target:    target,
-		VerifyTls: verifyTLS,
-		Timeout:   max(timeout, 0),
-		Sleep:     max(sleep, 0),
-		Jitter:    max(jitter, 0),
-		UserAgent: userAgent,
+		Target:                     target,
+		VerifyTls:                  verifyTLS,
+		Timeout:                    max(timeout, 0),
+		MaxRedirects:               max(maxRedirects, 0),
+		IgnoreCrossDomainRedirects: ignoreCrossDomainRedirects,
+		Sleep:                      max(sleep, 0),
+		Jitter:                     max(jitter, 0),
+		UserAgent:                  userAgent,
 	}
 	return config
 }
 
 // getEnumerateGeneralRateLimitConfig builds the config for general rate limit enumeration.
-func getEnumerateGeneralRateLimitConfig(targets []string, maxRequests int, sleep int, jitter int, verifyTLS bool, timeout int, threads int, userAgent common.UserAgentPreset) enumerategeneralfern.EnumerateRateLimitConfig {
+func getEnumerateGeneralRateLimitConfig(targets []string, maxRequests int, sleep int, jitter int, verifyTLS bool, timeout int, maxRedirects int, ignoreCrossDomainRedirects bool, threads int, userAgent common.UserAgentPreset) enumerategeneralfern.EnumerateRateLimitConfig {
 	config := enumerategeneralfern.EnumerateRateLimitConfig{
-		Targets:     targets,
-		MaxRequests: maxRequests,
-		Sleep:       max(sleep, 0),
-		Jitter:      max(jitter, 0),
-		VerifyTls:   verifyTLS,
-		Timeout:     max(timeout, 0),
-		Threads:     max(threads, 0),
-		UserAgent:   userAgent,
+		Targets:                    targets,
+		MaxRequests:                maxRequests,
+		Sleep:                      max(sleep, 0),
+		Jitter:                     max(jitter, 0),
+		VerifyTls:                  verifyTLS,
+		Timeout:                    max(timeout, 0),
+		MaxRedirects:               max(maxRedirects, 0),
+		IgnoreCrossDomainRedirects: ignoreCrossDomainRedirects,
+		Threads:                    max(threads, 0),
+		UserAgent:                  userAgent,
 	}
 	return config
 }
 
 // getEnumerateDockerConfig builds the config for Docker registry enumeration.
-func getEnumerateDockerConfig(targets []string, verifyTLS bool, timeout int, sleep int, jitter int, threads int, userAgent common.UserAgentPreset) enumeratedockerfern.EnumerateDockerConfig {
+func getEnumerateDockerConfig(targets []string, verifyTLS bool, timeout int, maxRedirects int, ignoreCrossDomainRedirects bool, sleep int, jitter int, threads int, userAgent common.UserAgentPreset) enumeratedockerfern.EnumerateDockerConfig {
 	config := enumeratedockerfern.EnumerateDockerConfig{
-		Targets:   targets,
-		VerifyTls: verifyTLS,
-		Timeout:   max(timeout, 0),
-		Sleep:     max(sleep, 0),
-		Jitter:    max(jitter, 0),
-		Threads:   max(threads, 1),
-		UserAgent: userAgent,
+		Targets:                    targets,
+		VerifyTls:                  verifyTLS,
+		Timeout:                    max(timeout, 0),
+		MaxRedirects:               max(maxRedirects, 0),
+		IgnoreCrossDomainRedirects: ignoreCrossDomainRedirects,
+		Sleep:                      max(sleep, 0),
+		Jitter:                     max(jitter, 0),
+		Threads:                    max(threads, 1),
+		UserAgent:                  userAgent,
 	}
 	return config
 }
 
 // getEnumerateDrupalModulesConfig builds the config for Drupal module enumeration.
-func getEnumerateDrupalModulesConfig(targets []string, modules []string, modulesFileSizeEnum enumeratecmsdrupalfern.ModulesFileSize, verifyTLS bool, timeout int, sleep int, jitter int, threads int, userAgent common.UserAgentPreset) enumeratecmsdrupalfern.EnumerateDrupalModulesConfig {
+func getEnumerateDrupalModulesConfig(targets []string, modules []string, modulesFileSizeEnum enumeratecmsdrupalfern.ModulesFileSize, verifyTLS bool, timeout int, maxRedirects int, ignoreCrossDomainRedirects bool, sleep int, jitter int, threads int, userAgent common.UserAgentPreset) enumeratecmsdrupalfern.EnumerateDrupalModulesConfig {
 	config := enumeratecmsdrupalfern.EnumerateDrupalModulesConfig{
-		Targets:         targets,
-		Modules:         modules,
-		ModulesFileSize: &modulesFileSizeEnum,
-		VerifyTls:       verifyTLS,
-		Timeout:         max(timeout, 0),
-		Sleep:           max(sleep, 0),
-		Jitter:          max(jitter, 0),
-		Threads:         max(threads, 0),
-		UserAgent:       userAgent,
+		Targets:                    targets,
+		Modules:                    modules,
+		ModulesFileSize:            &modulesFileSizeEnum,
+		VerifyTls:                  verifyTLS,
+		Timeout:                    max(timeout, 0),
+		MaxRedirects:               max(maxRedirects, 0),
+		IgnoreCrossDomainRedirects: ignoreCrossDomainRedirects,
+		Sleep:                      max(sleep, 0),
+		Jitter:                     max(jitter, 0),
+		Threads:                    max(threads, 0),
+		UserAgent:                  userAgent,
 	}
 	return config
 }

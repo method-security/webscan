@@ -34,7 +34,7 @@ var commonKubepaths = []string{
 	"/api/v1/configmaps",
 }
 
-func createSendHTTPRequestConfig(baseURL, path string, verifyTLS bool, timeout int, userAgent common.UserAgentPreset) common.SendHttpRequestConfig {
+func createSendHTTPRequestConfig(baseURL, path string, verifyTLS bool, timeout int, maxRedirects int, ignoreCrossDomainRedirects bool, userAgent common.UserAgentPreset) common.SendHttpRequestConfig {
 	request := common.HttpRequest{
 		BaseUrl: baseURL,
 		Path:    path,
@@ -42,15 +42,16 @@ func createSendHTTPRequestConfig(baseURL, path string, verifyTLS bool, timeout i
 		Params:  &common.HttpRequestParams{},
 	}
 	return common.SendHttpRequestConfig{
-		Request:            &request,
-		MaxRedirects:       0,
-		VerifyTls:          verifyTLS,
-		Timeout:            timeout,
-		UserAgent:          userAgent,
-		RequestMethod:      common.RequestMethodStandard,
-		HeadlessConfig:     nil,
-		BrowserbaseConfig:  nil,
-		BrowserbaseSecrets: nil,
+		Request:                    &request,
+		MaxRedirects:               maxRedirects,
+		VerifyTls:                  verifyTLS,
+		Timeout:                    timeout,
+		IgnoreCrossDomainRedirects: ignoreCrossDomainRedirects,
+		UserAgent:                  userAgent,
+		RequestMethod:              common.RequestMethodStandard,
+		HeadlessConfig:             nil,
+		BrowserbaseConfig:          nil,
+		BrowserbaseSecrets:         nil,
 	}
 }
 
@@ -72,7 +73,7 @@ func PerformAppEnumerateKube(ctx context.Context, config *enumeratekubefern.Enum
 	requests := []*common.HttpRequestResponse{}
 	for i, path := range commonKubepaths {
 		// Create Request Config
-		requestConfig := createSendHTTPRequestConfig(baseURL, fmt.Sprintf("%s%s", parsedTargetPath, path), config.VerifyTls, config.Timeout, config.UserAgent)
+		requestConfig := createSendHTTPRequestConfig(baseURL, fmt.Sprintf("%s%s", parsedTargetPath, path), config.VerifyTls, config.Timeout, config.MaxRedirects, config.IgnoreCrossDomainRedirects, config.UserAgent)
 
 		// Send Request
 		request, err := request.SendRequest(ctx, requestConfig)

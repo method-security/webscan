@@ -8,6 +8,8 @@ import (
 
 	// Generated
 	nuclei "github.com/Method-Security/webscan/generated/go/common/nuclei"
+	// Utils
+	utils "github.com/Method-Security/webscan/utils"
 	// External
 	nucleilib "github.com/projectdiscovery/nuclei/v3/lib"
 	nout "github.com/projectdiscovery/nuclei/v3/pkg/output"
@@ -223,6 +225,11 @@ func (b *Builder) Consume(ev *nout.ResultEvent) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
+	targetURL := getTargetURL(ev)
+	if b.ignoreCrossDomainRedirects && !b.isTargetInScope(targetURL) {
+		return
+	}
+
 	// Get or create probe
 	probe, ok := b.probeIdx[ev.TemplateID]
 	if !ok {
@@ -231,7 +238,6 @@ func (b *Builder) Consume(ev *nout.ResultEvent) {
 	}
 
 	// Get or create target
-	targetURL := getTargetURL(ev)
 	targetInfo, ok := b.targetIdx[targetURL]
 	if !ok {
 		targetInfo = &nuclei.NucleiTargetInfo{Target: targetURL}
@@ -347,6 +353,16 @@ func (b *Builder) Consume(ev *nout.ResultEvent) {
 
 	// Always add the attempt to the report, even if there was an error parsing the request/response
 	targetInfo.Attempts = append(targetInfo.Attempts, attemptInfo)
+}
+
+func (b *Builder) isTargetInScope(targetURL string) bool {
+	for _, scopeTarget := range b.scopeTargets {
+		scopeTarget = strings.ReplaceAll(scopeTarget, "%s", "scope")
+		if utils.IsHostInScope(scopeTarget, targetURL) {
+			return true
+		}
+	}
+	return false
 }
 
 // Final returns the fully-populated Fern report.

@@ -59,7 +59,7 @@ func createRequestConfig(rawURL string, config discover.DiscoverWordlistConfig) 
 	// redirect resolution, at the link-enqueueing stage via utils.IsHostInScope.
 	return common.SendHttpRequestConfig{
 		Request:                    httpReq,
-		MaxRedirects:               config.MaxRedirects,
+		MaxRedirects:               10,
 		VerifyTls:                  config.VerifyTls,
 		Timeout:                    config.Timeout,
 		IgnoreCrossDomainRedirects: false,

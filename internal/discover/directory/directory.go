@@ -223,7 +223,7 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 						defer func() { <-semaphore }()
 
 						// Send request
-						requestConfig := createDirectorySendHTTPRequestConfig(ctx, baseURL, fullPath, method, common.HttpRequestParams{}, config.MaxRedirects, &config)
+						requestConfig := createDirectorySendHTTPRequestConfig(ctx, baseURL, fullPath, method, common.HttpRequestParams{}, 0, &config)
 						httpRequest, err := request.SendRequest(ctx, requestConfig)
 						if err != nil {
 							// Don't add errors if context was cancelled

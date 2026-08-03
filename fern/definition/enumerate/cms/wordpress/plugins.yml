@@ -13,8 +13,6 @@ types:
             pluginsFileSize: optional<PluginsFileSize>
             verifyTls: boolean
             timeout: integer
-            maxRedirects: integer
-            ignoreCrossDomainRedirects: boolean
             sleep: integer
             jitter: integer
             threads: integer

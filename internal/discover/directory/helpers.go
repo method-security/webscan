@@ -235,7 +235,7 @@ func calibrateCommonResponses(ctx context.Context, baseURL, parsedTargetPath str
 
 	for _, method := range config.HttpMethods {
 		for _, probePath := range commonResponseCalibrationPaths(parsedTargetPath) {
-			requestConfig := createDirectorySendHTTPRequestConfig(ctx, baseURL, probePath, method, common.HttpRequestParams{}, config.MaxRedirects, config)
+			requestConfig := createDirectorySendHTTPRequestConfig(ctx, baseURL, probePath, method, common.HttpRequestParams{}, 0, config)
 			httpRequest, err := request.SendRequest(ctx, requestConfig)
 			if err != nil {
 				failureCount++

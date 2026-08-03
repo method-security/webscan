@@ -99,11 +99,6 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			ignoreCrossDomainRedirects, err := cmd.Flags().GetBool("ignore-cross-domain-redirects")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
 
 			templatePaths, err := cmd.Flags().GetStringSlice("template-paths")
 			if err != nil {
@@ -132,7 +127,7 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Create config
-			config, err := getDiscoverApplicationConfig(targets, resourceType, templatePaths, timeout, threads, proxy, verboseLogs, globalRateLimit, globalTimeout, userAgentPreset, ignoreCrossDomainRedirects, webServerIpAddress, webServerPort, webServerApplicationProtocol)
+			config, err := getDiscoverApplicationConfig(targets, resourceType, templatePaths, timeout, threads, proxy, verboseLogs, globalRateLimit, globalTimeout, userAgentPreset, webServerIpAddress, webServerPort, webServerApplicationProtocol)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -259,16 +254,6 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			maxRedirects, err := cmd.Flags().GetInt("max-redirects")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			ignoreCrossDomainRedirects, err := cmd.Flags().GetBool("ignore-cross-domain-redirects")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
 			maxRedirectsBaselineRequest, err := cmd.Flags().GetInt("max-redirects-baseline-request")
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -307,6 +292,12 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(fmt.Errorf("jitter must be between 0 and 100"))
 				return
 			}
+			ignoreCrossDomainRedirects, err := cmd.Flags().GetBool("ignore-cross-domain-redirects")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
 			// Get User Agent flag
 			userAgentPreset, err := requesthelpers.GetUserAgentFlag(cmd)
 			if err != nil {
@@ -315,7 +306,7 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Set config
-			config := getDiscoverDirectoryConfig(targets, paths, wordlistType, wordlistSize, httpMethods, responseCodes, enableCommonResponseFilters, verifyTLS, threshold, timeout, ignoreCrossDomainRedirects, maxRedirects, maxRedirectsBaselineRequest, threads, maxRuntime, retries, sleep, jitter, userAgentPreset)
+			config := getDiscoverDirectoryConfig(targets, paths, wordlistType, wordlistSize, httpMethods, responseCodes, enableCommonResponseFilters, verifyTLS, threshold, timeout, ignoreCrossDomainRedirects, maxRedirectsBaselineRequest, threads, maxRuntime, retries, sleep, jitter, userAgentPreset)
 
 			// Generate a report
 			rep, err := discoverdirectory.RunDirectoryDiscovery(cmd.Context(), config)
@@ -339,7 +330,6 @@ func (a *WebScan) InitDiscoverCommand() {
 	discoverDirectoryCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
 	discoverDirectoryCmd.Flags().Float64("threshold", 0.25, "Threshold for successful results")
 	discoverDirectoryCmd.Flags().Int("timeout", 20, "Timeout per request in seconds")
-	discoverDirectoryCmd.Flags().Int("max-redirects", 0, "Maximum number of redirects to follow")
 	discoverDirectoryCmd.Flags().Int("max-redirects-baseline-request", 10, "Maximum number of redirects to follow for the baseline request")
 	discoverDirectoryCmd.Flags().Int("max-runtime", 650, "Maximum time to run the engagement in seconds")
 	discoverDirectoryCmd.Flags().Int("threads", 25, "Number of threads to use")
@@ -384,17 +374,18 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			ignoreCrossDomainRedirects, err := cmd.Flags().GetBool("ignore-cross-domain-redirects")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
 			verifyTLS, err := cmd.Flags().GetBool("verify-tls")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
 			timeout, err := cmd.Flags().GetInt("timeout")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			ignoreCrossDomainRedirects, err := cmd.Flags().GetBool("ignore-cross-domain-redirects")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -649,11 +640,6 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			ignoreCrossDomainRedirects, err := cmd.Flags().GetBool("ignore-cross-domain-redirects")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
 			verifyTLS, err := cmd.Flags().GetBool("verify-tls")
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -664,6 +650,12 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
+			ignoreCrossDomainRedirects, err := cmd.Flags().GetBool("ignore-cross-domain-redirects")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
 			// Get User Agent flag
 			userAgentPreset, err := requesthelpers.GetUserAgentFlag(cmd)
 			if err != nil {
@@ -753,11 +745,6 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			ignoreCrossDomainRedirects, err := cmd.Flags().GetBool("ignore-cross-domain-redirects")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
 			verifyTLS, err := cmd.Flags().GetBool("verify-tls")
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -785,6 +772,11 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 			if jitter < 0 || jitter > 100 {
 				a.OutputSignal.AddError(fmt.Errorf("jitter must be between 0 and 100"))
+				return
+			}
+			ignoreCrossDomainRedirects, err := cmd.Flags().GetBool("ignore-cross-domain-redirects")
+			if err != nil {
+				a.OutputSignal.AddError(err)
 				return
 			}
 
@@ -1145,11 +1137,6 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			ignoreCrossDomainRedirects, err := cmd.Flags().GetBool("ignore-cross-domain-redirects")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
 			verifyTLS, err := cmd.Flags().GetBool("verify-tls")
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -1211,7 +1198,7 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Get the config
-			config := getDiscoverSaasConfig(orgs, saasCompanies, ssoCompanies, maxRedirects, ignoreCrossDomainRedirects, verifyTLS, timeout, sleep, jitter, threads, userAgentPreset, requestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
+			config := getDiscoverSaasConfig(orgs, saasCompanies, ssoCompanies, maxRedirects, verifyTLS, timeout, sleep, jitter, threads, userAgentPreset, requestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
 
 			// Generate the report
 			report, err := discoversaas.LaunchDiscoverSaas(cmd.Context(), config, *filteredSaasFingerprints, *filteredSsoFingerprints, requestMethodConfig.BrowserbaseSecrets)
@@ -1296,11 +1283,6 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			maxRedirects, err := cmd.Flags().GetInt("max-redirects")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
 			verifyTLS, err := cmd.Flags().GetBool("verify-tls")
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -1343,7 +1325,7 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Set Config
-			config := getDiscoverWordlistConfig(target, minWordLength, spiderDepth, includeMetadata, includeComments, includeAltText, ignoreCrossDomain, maxRedirects, verifyTLS, timeout, threads, sleep, jitter, userAgentPreset)
+			config := getDiscoverWordlistConfig(target, minWordLength, spiderDepth, includeMetadata, includeComments, includeAltText, ignoreCrossDomain, verifyTLS, timeout, threads, sleep, jitter, userAgentPreset)
 
 			// Generate a report
 			report := discoverwordlist.PerformWordlistCapture(cmd.Context(), config)
@@ -1359,7 +1341,6 @@ func (a *WebScan) InitDiscoverCommand() {
 	discoverWordlistCmd.Flags().Bool("include-comments", false, "Include words from HTML comments")
 	discoverWordlistCmd.Flags().Bool("include-alt-text", false, "Include words from image alt attributes")
 	discoverWordlistCmd.Flags().Bool("ignore-cross-domain", true, "Ignore links that lead to a different domain")
-	discoverWordlistCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
 	discoverWordlistCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
 	discoverWordlistCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
 	discoverWordlistCmd.Flags().Int("threads", 5, "Number of concurrent threads for crawling")
@@ -1560,7 +1541,7 @@ func parseDiscoverRequestFiles(pairs []string) ([]*discover.RequestFile, error) 
 }
 
 // getDiscoverApplicationConfig builds the config for application fingerprinting discovery.
-func getDiscoverApplicationConfig(targets []string, resource string, templatePaths []string, timeout int, threads int, proxy string, verboseLogs bool, globalRateLimit int, globalTimeout int, userAgent common.UserAgentPreset, ignoreCrossDomainRedirects bool, webServerIPAddress string, webServerPort int, webServerApplicationProtocol string) (*discover.DiscoverApplicationConfig, error) {
+func getDiscoverApplicationConfig(targets []string, resource string, templatePaths []string, timeout int, threads int, proxy string, verboseLogs bool, globalRateLimit int, globalTimeout int, userAgent common.UserAgentPreset, webServerIPAddress string, webServerPort int, webServerApplicationProtocol string) (*discover.DiscoverApplicationConfig, error) {
 	resourceEnum, err := getDiscoverApplicationResourceConfigTypeFromString(resource)
 	if err != nil {
 		return nil, fmt.Errorf("invalid resource type: %s", resource)
@@ -1574,17 +1555,16 @@ func getDiscoverApplicationConfig(targets []string, resource string, templatePat
 	}
 
 	config := &discover.DiscoverApplicationConfig{
-		Targets:                    targets,
-		ResourceType:               &resourceEnum,
-		TemplatePaths:              templatePaths,
-		Timeout:                    timeout,
-		Threads:                    threads,
-		Proxy:                      &proxy,
-		VerboseLogs:                verboseLogs,
-		GlobalRateLimit:            max(0, globalRateLimit),
-		GlobalTimeout:              max(0, globalTimeout),
-		UserAgent:                  userAgent,
-		IgnoreCrossDomainRedirects: ignoreCrossDomainRedirects,
+		Targets:         targets,
+		ResourceType:    &resourceEnum,
+		TemplatePaths:   templatePaths,
+		Timeout:         timeout,
+		Threads:         threads,
+		Proxy:           &proxy,
+		VerboseLogs:     verboseLogs,
+		GlobalRateLimit: max(0, globalRateLimit),
+		GlobalTimeout:   max(0, globalTimeout),
+		UserAgent:       userAgent,
 	}
 	if webServerIPAddress != "" {
 		config.WebServerIpAddress = &webServerIPAddress
@@ -1719,28 +1699,27 @@ func getDiscoverRouteConfig(target string, ignoreCrossDomainRoutes bool, ignoreC
 }
 
 // getDiscoverSaasConfig builds the config for SaaS active discovery.
-func getDiscoverSaasConfig(orgs []string, saasCompanies []string, ssoCompanies []string, maxRedirects int, ignoreCrossDomainRedirects bool, verifyTLS bool, timeout int, sleep int, jitter int, threads int, userAgent common.UserAgentPreset, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) discover.DiscoverSaasConfig {
+func getDiscoverSaasConfig(orgs []string, saasCompanies []string, ssoCompanies []string, maxRedirects int, verifyTLS bool, timeout int, sleep int, jitter int, threads int, userAgent common.UserAgentPreset, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) discover.DiscoverSaasConfig {
 	config := discover.DiscoverSaasConfig{
-		Orgs:                       orgs,
-		SaasCompanies:              saasCompanies,
-		SsoCompanies:               ssoCompanies,
-		MaxRedirects:               maxRedirects,
-		IgnoreCrossDomainRedirects: ignoreCrossDomainRedirects,
-		VerifyTls:                  verifyTLS,
-		Timeout:                    max(timeout, 0),
-		Sleep:                      max(sleep, 0),
-		Jitter:                     max(jitter, 0),
-		Threads:                    max(threads, 0),
-		UserAgent:                  userAgent,
-		RequestMethod:              requestMethod,
-		HeadlessConfig:             headlessConfig,
-		BrowserbaseConfig:          browserbaseConfig,
+		Orgs:              orgs,
+		SaasCompanies:     saasCompanies,
+		SsoCompanies:      ssoCompanies,
+		MaxRedirects:      maxRedirects,
+		VerifyTls:         verifyTLS,
+		Timeout:           max(timeout, 0),
+		Sleep:             max(sleep, 0),
+		Jitter:            max(jitter, 0),
+		Threads:           max(threads, 0),
+		UserAgent:         userAgent,
+		RequestMethod:     requestMethod,
+		HeadlessConfig:    headlessConfig,
+		BrowserbaseConfig: browserbaseConfig,
 	}
 	return config
 }
 
 // getDiscoverDirectoryConfig builds the config for directory discovery.
-func getDiscoverDirectoryConfig(targets []string, paths []string, wordlistType string, wordlistSize string, httpMethods []common.HttpMethod, responseCodes string, enableCommonResponseFilters bool, verifyTLS bool, threshold float64, timeout int, ignoreCrossDomainRedirects bool, maxRedirects int, maxRedirectsBaselineRequest int, threads int, maxRuntime int, retries int, sleep int, jitter int, userAgent common.UserAgentPreset) discover.DiscoverDirectoryConfig {
+func getDiscoverDirectoryConfig(targets []string, paths []string, wordlistType string, wordlistSize string, httpMethods []common.HttpMethod, responseCodes string, enableCommonResponseFilters bool, verifyTLS bool, threshold float64, timeout int, ignoreCrossDomainRedirects bool, maxRedirectsBaselineRequest int, threads int, maxRuntime int, retries int, sleep int, jitter int, userAgent common.UserAgentPreset) discover.DiscoverDirectoryConfig {
 	config := discover.DiscoverDirectoryConfig{
 		Targets:                     targets,
 		Paths:                       paths,
@@ -1751,7 +1730,6 @@ func getDiscoverDirectoryConfig(targets []string, paths []string, wordlistType s
 		Threshold:                   threshold,
 		Timeout:                     timeout,
 		IgnoreCrossDomainRedirects:  ignoreCrossDomainRedirects,
-		MaxRedirects:                maxRedirects,
 		MaxRedirectsBaselineRequest: maxRedirectsBaselineRequest,
 		Threads:                     threads,
 		MaxRuntime:                  maxRuntime,
@@ -1785,7 +1763,7 @@ func getDiscoverDirectoryConfig(targets []string, paths []string, wordlistType s
 }
 
 // getDiscoverWordlistConfig builds the config for wordlist generation.
-func getDiscoverWordlistConfig(target string, minWordLength int, spiderDepth int, includeMetadata bool, includeComments bool, includeAltText bool, ignoreCrossDomain bool, maxRedirects int, verifyTLS bool, timeout int, threads int, sleep int, jitter int, userAgent common.UserAgentPreset) discover.DiscoverWordlistConfig {
+func getDiscoverWordlistConfig(target string, minWordLength int, spiderDepth int, includeMetadata bool, includeComments bool, includeAltText bool, ignoreCrossDomain bool, verifyTLS bool, timeout int, threads int, sleep int, jitter int, userAgent common.UserAgentPreset) discover.DiscoverWordlistConfig {
 	return discover.DiscoverWordlistConfig{
 		Target:            target,
 		MinWordLength:     max(minWordLength, 1),
@@ -1794,7 +1772,6 @@ func getDiscoverWordlistConfig(target string, minWordLength int, spiderDepth int
 		IncludeComments:   includeComments,
 		IncludeAltText:    includeAltText,
 		IgnoreCrossDomain: ignoreCrossDomain,
-		MaxRedirects:      maxRedirects,
 		VerifyTls:         verifyTLS,
 		Timeout:           max(timeout, 0),
 		Threads:           max(threads, 0),

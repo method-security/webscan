@@ -12,8 +12,6 @@ types:
       specUrl: optional<string>
       candidatePaths: optional<list<string>>
       verifyTls: boolean
-      maxRedirects: integer
-      ignoreCrossDomainRedirects: boolean
   EnumerateSwaggerResult:
     properties:
       apiType: common.ApiType

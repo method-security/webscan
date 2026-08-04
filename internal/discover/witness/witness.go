@@ -15,7 +15,6 @@ import (
 
 	// Utils
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
-	useragent "github.com/Method-Security/webscan/utils/useragent"
 
 	// External
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
@@ -90,8 +89,7 @@ func processTarget(
 	}
 	faviconURL := witnesshelpers.ExtractFaviconURL(string(bodyBytes), finalURL)
 	if faviconURL != "" {
-		resolvedUA := useragent.Resolve(config.UserAgent)
-		if faviconBytes, faviconHash, faviconErr := witnesshelpers.FetchFavicon(ctx, faviconURL, config.Timeout, config.VerifyTls, resolvedUA); faviconErr == nil && len(faviconBytes) > 0 {
+		if faviconBytes, faviconHash, faviconErr := witnesshelpers.FetchFavicon(ctx, faviconURL, config); faviconErr == nil && len(faviconBytes) > 0 {
 			result.Favicon = &discover.DiscoverWitnessFavicon{
 				Url:    faviconURL,
 				Binary: faviconBytes,

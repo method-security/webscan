@@ -3,14 +3,18 @@ package witnesshelpers
 import (
 	// Standard
 	"context"
-	"crypto/tls"
 	"encoding/base64"
 	"fmt"
-	"io"
-	"net/http"
 	neturl "net/url"
 	"strings"
-	"time"
+
+	// Generated
+	common "github.com/Method-Security/webscan/generated/go/common"
+	discover "github.com/Method-Security/webscan/generated/go/discover"
+
+	// Utils
+	request "github.com/Method-Security/webscan/utils/request"
+	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
 
 	// External
 	"github.com/PuerkitoBio/goquery"
@@ -56,72 +60,96 @@ func ExtractFaviconURL(html, finalURL string) string {
 	return fmt.Sprintf("%s://%s/favicon.ico", parsed.Scheme, parsed.Host)
 }
 
-// FetchFavicon downloads the favicon at faviconURL using a fresh HTTP client
-// that respects verifyTLS and timeout. The caller supplies userAgent (typically
-// the resolved discover-page UA) so favicon traffic matches what the headless
-// browser advertised - servers that vary their favicon on UA work correctly.
+// FetchFavicon downloads the favicon at faviconURL through the shared request
+// helper (request.SendRequest) so the fetch honors the same config the rest of
+// the witness scan runs under - most importantly MaxRedirects and
+// IgnoreCrossDomainRedirects, but also VerifyTls, Timeout, UserAgent, and any
+// proxy settings carried on the context. A favicon that 3xx-redirects to a
+// different host is therefore dropped (rather than silently followed) when
+// cross-domain redirects are disabled.
 //
-// IMPORTANT: a fresh context is derived from `ctx` instead of using `ctx` as a
-// deadline-bearing parent. The combined headless capture exhausts most of its
-// own `requestCtx` window during navigation + DOM stabilization; if we reused
-// that deadline here, the favicon fetch could see ~0s of slack and always
-// time out. We still inherit cancellation by piggy-backing on `ctx.Done()`
-// (so a parent cancel propagates) but reset the timeout to a fresh budget.
+// The favicon fetch is pinned to the STANDARD request method regardless of the
+// witness config's RequestMethod: favicons are binary assets and the standard
+// HTTP capture preserves the raw bytes, whereas headless/browserbase
+// navigations do not reliably return the underlying image bytes.
 //
 // Returns the raw bytes and a Shodan-compatible mmh3-32 hash (signed int32,
-// decimal string). On non-2xx, network error, or empty body, it returns
-// (nil, "", nil) - caller treats this as not found.
-func FetchFavicon(ctx context.Context, faviconURL string, timeout int, verifyTLS bool, userAgent string) ([]byte, string, error) {
+// decimal string). On a blocked cross-domain redirect, non-2xx, network error,
+// or empty body, it returns (nil, "", nil) - caller treats this as not found.
+func FetchFavicon(ctx context.Context, faviconURL string, config discover.DiscoverWitnessConfig) ([]byte, string, error) {
 	if faviconURL == "" {
 		return nil, "", nil
 	}
 
-	fetchTimeout := time.Duration(timeout) * time.Second
+	baseURL, path, queryParams, err := requesthelpers.SplitTargetURL(faviconURL)
+	if err != nil {
+		return nil, "", nil
+	}
 
-	// Derive a fresh-timeout context that still cancels when the parent does.
-	fetchCtx, cancel := context.WithTimeout(context.Background(), fetchTimeout)
-	defer cancel()
-	go func() {
-		select {
-		case <-ctx.Done():
-			cancel()
-		case <-fetchCtx.Done():
-		}
-	}()
-
-	client := &http.Client{
-		Timeout: fetchTimeout,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: !verifyTLS}, //nolint:gosec
+	sendConfig := common.SendHttpRequestConfig{
+		Request: &common.HttpRequest{
+			BaseUrl: baseURL,
+			Path:    path,
+			Method:  common.HttpMethodGet,
+			Params: &common.HttpRequestParams{
+				Query: queryParams,
+			},
 		},
+		MaxRedirects:               config.MaxRedirects,
+		VerifyTls:                  config.VerifyTls,
+		Timeout:                    config.Timeout,
+		IgnoreCrossDomainRedirects: config.IgnoreCrossDomainRedirects,
+		UserAgent:                  config.UserAgent,
+		RequestMethod:              common.RequestMethodStandard,
 	}
 
-	req, err := http.NewRequestWithContext(fetchCtx, http.MethodGet, faviconURL, nil)
-	if err != nil {
-		return nil, "", nil
-	}
-	if userAgent != "" {
-		req.Header.Set("User-Agent", userAgent)
-	}
+	// Carry proxy settings from the context, matching the other discover flows.
+	requesthelpers.ApplyProxySettings(ctx, &sendConfig)
 
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, "", nil
-	}
-	defer resp.Body.Close() //nolint:errcheck
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+	resp, err := request.SendRequest(ctx, sendConfig)
+	if err != nil || resp == nil || resp.Response == nil {
 		return nil, "", nil
 	}
 
-	limited := io.LimitReader(resp.Body, maxFaviconBytes)
-	body, err := io.ReadAll(limited)
-	if err != nil || len(body) == 0 {
+	statusCode := resp.Response.StatusCode
+	if statusCode == nil || *statusCode < 200 || *statusCode >= 300 {
 		return nil, "", nil
+	}
+
+	body := faviconResponseBytes(resp.Response.ResponseBody)
+	if len(body) == 0 {
+		return nil, "", nil
+	}
+	if len(body) > maxFaviconBytes {
+		body = body[:maxFaviconBytes]
 	}
 
 	hashStr := computeFaviconHash(body)
 	return body, hashStr, nil
+}
+
+// faviconResponseBytes returns the raw favicon octets from a captured Body.
+// The standard HTTP capture stores image responses as a base64-encoded binary
+// body, so those are decoded back to their real bytes; text/json kinds (e.g. an
+// SVG favicon served as text) fall through to the literal string content.
+func faviconResponseBytes(body *common.Body) []byte {
+	if body == nil {
+		return nil
+	}
+	if body.Kind == "binary" {
+		if body.Binary == nil {
+			return nil
+		}
+		decoded, err := base64.StdEncoding.DecodeString(body.Binary.Base64)
+		if err != nil {
+			return nil
+		}
+		return decoded
+	}
+	if str := requesthelpers.GetResponseBodyStringFromBodyStruct(body); str != nil {
+		return []byte(*str)
+	}
+	return nil
 }
 
 // computeFaviconHash computes the Shodan-compatible mmh3-32 hash of a favicon.

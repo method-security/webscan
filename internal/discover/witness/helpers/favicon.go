@@ -22,7 +22,6 @@ import (
 )
 
 const (
-	maxFaviconBytes  = 1 << 20 // 1 MiB
 	shodanLineLength = 76
 )
 
@@ -119,9 +118,6 @@ func FetchFavicon(ctx context.Context, faviconURL string, config discover.Discov
 	body := faviconResponseBytes(resp.Response.ResponseBody)
 	if len(body) == 0 {
 		return nil, "", nil
-	}
-	if len(body) > maxFaviconBytes {
-		body = body[:maxFaviconBytes]
 	}
 
 	hashStr := computeFaviconHash(body)

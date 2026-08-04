@@ -15,7 +15,6 @@ import (
 
 	// Utils
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
-
 	// External
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )

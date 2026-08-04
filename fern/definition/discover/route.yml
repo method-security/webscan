@@ -45,11 +45,19 @@ types:
       bodyParams: optional<list<RouteBodyParam>>
       evidence: optional<string>
       pathTemplate: optional<string>
+  StaticAssetDetails:
+    properties:
+      local: optional<list<string>>
+      remote: optional<list<string>>
+  WebApplicationDetails:
+    properties:
+      baseURL: string
+      routes: optional<list<RouteDetails>>
+      staticAssets: optional<StaticAssetDetails>
   DiscoverRouteResult:
     properties:
       target: string
-      routes: optional<list<RouteDetails>>
-      staticAssets: optional<list<string>>
+      webApplications: optional<list<WebApplicationDetails>>
   DiscoverRouteReport:
     properties:
       config: DiscoverRouteConfig

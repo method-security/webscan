@@ -20,6 +20,7 @@ import (
 
 	// External
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
+	"github.com/projectdiscovery/gologger"
 	nucleilib "github.com/projectdiscovery/nuclei/v3/lib"
 	"github.com/projectdiscovery/nuclei/v3/pkg/catalog/disk"
 )
@@ -156,6 +157,7 @@ func buildNucleiOptions(cfg Config, templateDir, workflowDir string) []nucleilib
 	}
 
 	opts := []nucleilib.NucleiSDKOptions{
+		nucleilib.WithLogger(gologger.DefaultLogger),
 		nucleilib.WithTemplatesOrWorkflows(templateSources),
 		nucleilib.EnableSelfContainedTemplates(),
 		nucleilib.DisableUpdateCheck(),

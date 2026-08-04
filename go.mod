@@ -13,6 +13,7 @@ require (
 	github.com/palantir/pkg/safejson v1.2.0
 	github.com/palantir/witchcraft-go-logging v1.70.0
 	github.com/pb33f/libopenapi v0.38.7
+	github.com/projectdiscovery/gologger v1.1.71
 	github.com/projectdiscovery/nuclei/v3 v3.11.0
 	github.com/projectdiscovery/useragent v0.0.108
 	github.com/projectdiscovery/wappalyzergo v0.2.92
@@ -295,7 +296,6 @@ require (
 	github.com/projectdiscovery/goflags v0.1.74 // indirect
 	github.com/projectdiscovery/goja v0.0.0-20260618133720-acb73e419534 // indirect
 	github.com/projectdiscovery/goja_nodejs v0.0.0-20260618132410-8519f75f703d // indirect
-	github.com/projectdiscovery/gologger v1.1.71 // indirect
 	github.com/projectdiscovery/gostruct v0.0.2 // indirect
 	github.com/projectdiscovery/govaluate v0.0.0-20260615100919-5ee2581bbf7e // indirect
 	github.com/projectdiscovery/gozero v0.1.1-0.20260530071156-fa1dad563d76 // indirect

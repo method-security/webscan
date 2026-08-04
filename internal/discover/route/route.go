@@ -345,6 +345,99 @@ func extractRoutes(ctx context.Context, httpRequestResponse *common.HttpRequestR
 	return mergedRoutes, staticAssetsList, errors
 }
 
+func getResponseBaseURL(httpRequestResponse *common.HttpRequestResponse, fallbackURL string) string {
+	rawURL := fallbackURL
+	if httpRequestResponse != nil && httpRequestResponse.Response != nil && len(httpRequestResponse.Response.RedirectChain) > 0 {
+		rawURL = httpRequestResponse.Response.RedirectChain[len(httpRequestResponse.Response.RedirectChain)-1]
+	}
+
+	baseURL, _, err := discoverroutehelpers.SplitURLBaseAndPath(rawURL)
+	if err != nil {
+		return ""
+	}
+	return baseURL
+}
+
+func sortRoutes(routes []*discover.RouteDetails) {
+	sort.SliceStable(routes, func(i, j int) bool {
+		ri := routes[i]
+		rj := routes[j]
+		hasEvi := ri.Evidence != nil
+		hasEvj := rj.Evidence != nil
+		if hasEvi != hasEvj {
+			return hasEvi
+		}
+		return ri.BaseUrl+ri.Path < rj.BaseUrl+rj.Path
+	})
+}
+
+func buildWebApplications(routes []*discover.RouteDetails, staticAssetsByBaseURL map[string][]string) []*discover.WebApplicationDetails {
+	webApplicationsByBaseURL := make(map[string]*discover.WebApplicationDetails)
+	getWebApplication := func(baseURL string) *discover.WebApplicationDetails {
+		if baseURL == "" {
+			return nil
+		}
+		if webApplication, ok := webApplicationsByBaseURL[baseURL]; ok {
+			return webApplication
+		}
+		webApplication := &discover.WebApplicationDetails{BaseUrl: baseURL}
+		webApplicationsByBaseURL[baseURL] = webApplication
+		return webApplication
+	}
+
+	for _, route := range routes {
+		if route == nil {
+			continue
+		}
+		webApplication := getWebApplication(route.BaseUrl)
+		if webApplication == nil {
+			continue
+		}
+		webApplication.Routes = append(webApplication.Routes, route)
+	}
+
+	for baseURL, staticAssets := range staticAssetsByBaseURL {
+		webApplication := getWebApplication(baseURL)
+		if webApplication == nil {
+			continue
+		}
+
+		staticAssetDetails := webApplication.StaticAssets
+		if staticAssetDetails == nil {
+			staticAssetDetails = &discover.StaticAssetDetails{}
+		}
+		for _, staticAsset := range discoverroutehelpers.MergeStaticAssets(staticAssets) {
+			staticAssetBaseURL, _, err := discoverroutehelpers.SplitURLBaseAndPath(staticAsset)
+			if err != nil {
+				continue
+			}
+			if staticAssetBaseURL == baseURL {
+				staticAssetDetails.Local = append(staticAssetDetails.Local, staticAsset)
+			} else {
+				staticAssetDetails.Remote = append(staticAssetDetails.Remote, staticAsset)
+			}
+		}
+		if len(staticAssetDetails.Local) > 0 || len(staticAssetDetails.Remote) > 0 {
+			webApplication.StaticAssets = staticAssetDetails
+		}
+	}
+
+	webApplications := make([]*discover.WebApplicationDetails, 0, len(webApplicationsByBaseURL))
+	for _, webApplication := range webApplicationsByBaseURL {
+		if webApplication.StaticAssets != nil {
+			webApplication.StaticAssets.Local = discoverroutehelpers.MergeStaticAssets(webApplication.StaticAssets.Local)
+			webApplication.StaticAssets.Remote = discoverroutehelpers.MergeStaticAssets(webApplication.StaticAssets.Remote)
+			sort.Strings(webApplication.StaticAssets.Local)
+			sort.Strings(webApplication.StaticAssets.Remote)
+		}
+		webApplications = append(webApplications, webApplication)
+	}
+	sort.SliceStable(webApplications, func(i, j int) bool {
+		return webApplications[i].BaseUrl < webApplications[j].BaseUrl
+	})
+	return webApplications
+}
+
 // PerformRouteCapture performs route discovery and spidering for the given config, returning a DiscoverRouteReport.
 func PerformRouteCapture(ctx context.Context, config discover.DiscoverRouteConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) discover.DiscoverRouteReport {
 	// Get the logger from the context
@@ -366,7 +459,7 @@ func PerformRouteCapture(ctx context.Context, config discover.DiscoverRouteConfi
 
 	// Keep track of all discovered routes and static assets
 	allRoutes := []*discover.RouteDetails{}
-	allStaticAssets := []string{}
+	allStaticAssetsByBaseURL := make(map[string][]string)
 
 	// Mutex to protect shared data structures
 	var mu sync.Mutex
@@ -479,11 +572,14 @@ func PerformRouteCapture(ctx context.Context, config discover.DiscoverRouteConfi
 				}
 
 				routes, staticAssets, newErrors := extractRoutes(ctx, request, requestConfig, config)
+				responseBaseURL := getResponseBaseURL(request, targetURL)
 
 				// Safely append to shared data structures
 				mu.Lock()
 				allRoutes = append(allRoutes, routes...)
-				allStaticAssets = append(allStaticAssets, staticAssets...)
+				if responseBaseURL != "" {
+					allStaticAssetsByBaseURL[responseBaseURL] = append(allStaticAssetsByBaseURL[responseBaseURL], staticAssets...)
+				}
 				errors = append(errors, newErrors...)
 				mu.Unlock()
 
@@ -534,21 +630,9 @@ func PerformRouteCapture(ctx context.Context, config discover.DiscoverRouteConfi
 		currentDepth++
 	}
 
-	// Remove duplicate Routes and Static Assets
-	report.Result.Routes = discoverroutehelpers.MergeWebRoutes(allRoutes)
-	sort.SliceStable(report.Result.Routes, func(i, j int) bool {
-		ri := report.Result.Routes[i]
-		rj := report.Result.Routes[j]
-		// Prefer evidence-tagged routes while keeping output deterministic.
-		hasEvi := ri.Evidence != nil
-		hasEvj := rj.Evidence != nil
-		if hasEvi != hasEvj {
-			return hasEvi // true means ri comes first
-		}
-		// Same evidence tier: lexical for determinism
-		return ri.BaseUrl+ri.Path < rj.BaseUrl+rj.Path
-	})
-	report.Result.StaticAssets = discoverroutehelpers.MergeStaticAssets(allStaticAssets)
+	mergedRoutes := discoverroutehelpers.MergeWebRoutes(allRoutes)
+	sortRoutes(mergedRoutes)
+	report.Result.WebApplications = buildWebApplications(mergedRoutes, allStaticAssetsByBaseURL)
 	report.Errors = append(report.Errors, errors...)
 	return report
 }

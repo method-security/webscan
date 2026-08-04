@@ -1646,6 +1646,15 @@ func getDiscoverWitnessConfig(target string, responseCodes string, takeScreensho
 
 // getDiscoverProbeConfig builds the config for probe discovery.
 func getDiscoverProbeConfig(targets []string, protocol string, maxRedirects int, verifyTLS bool, timeout int, sleep int, jitter int, ignoreCrossDomainRedirects bool, userAgent common.UserAgentPreset, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig, webServerIPAddress string, webServerPort int, webServerApplicationProtocol string) (*discover.DiscoverProbeConfig, error) {
+	var protocolEnum common.WebProtocol
+	if protocol != "" {
+		var err error
+		protocolEnum, err = common.NewWebProtocolFromString(strings.ToUpper(protocol))
+		if err != nil {
+			return nil, fmt.Errorf("invalid protocol: %s", protocol)
+		}
+	}
+
 	var webServerApplicationProtocolEnum common.WebProtocol
 	if len(webServerApplicationProtocol) > 0 {
 		var err error
@@ -1667,6 +1676,9 @@ func getDiscoverProbeConfig(targets []string, protocol string, maxRedirects int,
 		RequestMethod:              requestMethod,
 		HeadlessConfig:             headlessConfig,
 		BrowserbaseConfig:          browserbaseConfig,
+	}
+	if protocol != "" {
+		config.Protocol = &protocolEnum
 	}
 	if webServerIPAddress != "" {
 		config.WebServerIpAddress = &webServerIPAddress

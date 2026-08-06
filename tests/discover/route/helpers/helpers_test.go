@@ -73,29 +73,57 @@ func TestCollapseTemplatedRoutesFoldsNumericSiblings(t *testing.T) {
 }
 
 func TestCollapseTemplatedRoutesFoldsSlugSiblingsOnCardinality(t *testing.T) {
-	// Slugs match none of the shape patterns, so only sibling cardinality can catch them.
+	// Slugs match none of the shape patterns, so only sibling cardinality can catch them. The
+	// shared /reviews sub-path is what makes the position an identifier rather than a page name.
 	routes := discoverroute.CollapseTemplatedRoutes([]*discover.RouteDetails{
-		routeAt("/products/widget-pro"),
-		routeAt("/products/gizmo-max"),
-		routeAt("/products/thing-lite"),
+		routeAt("/products/widget-pro/reviews"),
+		routeAt("/products/gizmo-max/reviews"),
+		routeAt("/products/thing-lite/reviews"),
 	})
 
 	if len(routes) != 1 {
 		t.Fatalf("expected 3 slug siblings to fold into 1 route, got %v", pathsOf(routes))
 	}
-	findRoute(t, routes, "/products/{productId}")
+	findRoute(t, routes, "/products/{productId}/reviews")
 }
 
 func TestCollapseTemplatedRoutesLeavesSubThresholdSiblingsAlone(t *testing.T) {
 	// Two distinct values is below the cardinality threshold and is just as likely to be two
 	// genuinely different endpoints.
 	routes := discoverroute.CollapseTemplatedRoutes([]*discover.RouteDetails{
-		routeAt("/products/widget-pro"),
-		routeAt("/products/gizmo-max"),
+		routeAt("/products/widget-pro/reviews"),
+		routeAt("/products/gizmo-max/reviews"),
 	})
 
 	if len(routes) != 2 {
 		t.Fatalf("expected sub-threshold siblings to stay separate, got %v", pathsOf(routes))
+	}
+}
+
+func TestCollapseTemplatedRoutesPreservesTopLevelPages(t *testing.T) {
+	// Three distinct values in one position, but they are ordinary pages rather than identifiers.
+	// Nothing follows them, so there is no corroborating structure and they must be left alone.
+	routes := discoverroute.CollapseTemplatedRoutes([]*discover.RouteDetails{
+		routeAt("/about"),
+		routeAt("/contact"),
+		routeAt("/pricing"),
+	})
+
+	if len(routes) != 3 {
+		t.Fatalf("expected top-level pages to survive as distinct endpoints, got %v", pathsOf(routes))
+	}
+}
+
+func TestCollapseTemplatedRoutesPreservesSiblingCollections(t *testing.T) {
+	// Sibling collections under a shared prefix are the same trap one level down.
+	routes := discoverroute.CollapseTemplatedRoutes([]*discover.RouteDetails{
+		routeAt("/blog/posts"),
+		routeAt("/blog/authors"),
+		routeAt("/blog/tags"),
+	})
+
+	if len(routes) != 3 {
+		t.Fatalf("expected sibling collections to survive as distinct endpoints, got %v", pathsOf(routes))
 	}
 }
 

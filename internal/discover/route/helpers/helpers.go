@@ -593,6 +593,22 @@ func applyPathTemplate(route *discover.RouteDetails, indices map[int]struct{}) b
 	return true
 }
 
+// hasDeeperStructure reports whether any non-empty segment follows index i.
+//
+// Cardinality alone cannot tell an identifier from a distinct page: /about, /contact and /pricing
+// are also three values in one position. A shared sub-path beneath the position is the
+// corroborating evidence, because distinct static pages rarely carry identical child structure
+// under different names. This does mean a leaf slug such as /products/widget-pro is left alone —
+// the safe direction, since collapsing is a merge and a wrong call erases a real endpoint.
+func hasDeeperStructure(segments []string, i int) bool {
+	for _, segment := range segments[i+1:] {
+		if segment != "" {
+			return true
+		}
+	}
+	return false
+}
+
 // collapseKey identifies a set of sibling routes that differ only at segment position pos.
 type collapseKey struct {
 	method  string
@@ -617,7 +633,7 @@ func collapseSiblingRoutes(routes []*discover.RouteDetails) ([]*discover.RouteDe
 	for _, route := range routes {
 		segments := strings.Split(route.Path, "/")
 		for i, segment := range segments {
-			if !isCollapseCandidate(segment) {
+			if !isCollapseCandidate(segment) || !hasDeeperStructure(segments, i) {
 				continue
 			}
 			key := collapseKey{string(route.Method), route.BaseUrl, maskSegment(segments, i), i}
@@ -644,7 +660,7 @@ func collapseSiblingRoutes(routes []*discover.RouteDetails) ([]*discover.RouteDe
 		segments := strings.Split(route.Path, "/")
 		indices := map[int]struct{}{}
 		for i, segment := range segments {
-			if !isCollapseCandidate(segment) {
+			if !isCollapseCandidate(segment) || !hasDeeperStructure(segments, i) {
 				continue
 			}
 			key := collapseKey{string(route.Method), route.BaseUrl, maskSegment(segments, i), i}

@@ -173,6 +173,68 @@ func parseRouteMethod(method string) (common.HttpMethod, bool) {
 	return parsedMethod, true
 }
 
+// routeTablePatterns match client-side route declarations in shipped bundles. Unlike apiPatterns,
+// which capture concrete URLs a caller happened to request, these capture the application's own
+// route table — so the parameter and its name are declared rather than inferred.
+var routeTablePatterns = []struct {
+	pattern *regexp.Regexp
+	// declaresLiterals marks patterns that unambiguously delimit a route table, so a match without
+	// a parameter is still a declared route. The generic `path:` key is too common in ordinary
+	// config objects to treat that way, so it only contributes parameterized declarations.
+	declaresLiterals bool
+}{
+	// Route config objects: { path: "/documents/:id", component: ... }
+	// React Router, Vue Router and Angular all emit this shape.
+	{regexp.MustCompile(`\bpath\s*:\s*['"]([^'"]+)['"]`), false},
+	// JSX route elements that survived compilation: <Route path="/documents/:id"
+	{regexp.MustCompile(`<Route[^>]*?\spath\s*=\s*['"]([^'"]+)['"]`), true},
+	// Express-style registration bundled into a client or SSR chunk: router.get('/documents/:id'
+	{regexp.MustCompile(`\.(?:get|post|put|patch|delete)\(\s*['"](/[^'"]*)['"]`), true},
+	// Next.js build manifest entries: "/documents/[id]" and "/docs/[...slug]"
+	{regexp.MustCompile(`['"](/[^'"]*\[[^'"\]]+\][^'"]*)['"]`), true},
+}
+
+// extractDeclaredRouteTemplates pulls parameterized route declarations out of bundle content. Only
+// paths that actually declare a parameter are returned; ordinary literal routes are left to the
+// other extractors.
+func extractDeclaredRouteTemplates(content string, baseURL string) []*discover.RouteDetails {
+	seen := map[string]struct{}{}
+	var routes []*discover.RouteDetails
+
+	for _, routePattern := range routeTablePatterns {
+		for _, match := range routePattern.pattern.FindAllStringSubmatch(content, -1) {
+			declared := match[1]
+			if !strings.HasPrefix(declared, "/") || strings.Contains(declared, " ") {
+				continue
+			}
+			template, params, ok := discoverroutehelpers.NormalizeDeclaredTemplate(declared)
+			if !ok && !routePattern.declaresLiterals {
+				continue
+			}
+			if _, exists := seen[template]; exists {
+				continue
+			}
+			seen[template] = struct{}{}
+
+			evidence := discoverroutehelpers.DeclaredRouteEvidence
+			route := &discover.RouteDetails{
+				BaseUrl:  baseURL,
+				Path:     template,
+				Method:   common.HttpMethodGet,
+				Evidence: &evidence,
+			}
+			if ok {
+				templateValue := template
+				route.PathParams = params
+				route.PathTemplate = &templateValue
+			}
+			routes = append(routes, route)
+		}
+	}
+
+	return routes
+}
+
 // Common API call patterns in JavaScript
 var apiPatterns = []struct {
 	pattern *regexp.Regexp
@@ -357,6 +419,9 @@ func extractScriptContentRoutes(ctx context.Context, scriptContent string, baseU
 			svc1log.SafeParam("reason", reason))
 		return routes, discoverroutehelpers.SetToListString(urls), errors
 	}
+
+	// Declared route tables are independent of whether the bundle parses, so collect them first.
+	routes = append(routes, extractDeclaredRouteTemplates(scriptContent, baseURL)...)
 
 	// First try to parse the JavaScript code into an AST
 	program, err := parser.ParseFile(nil, "", scriptContent, parser.IgnoreRegExpErrors)

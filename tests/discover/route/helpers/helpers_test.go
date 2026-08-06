@@ -17,6 +17,18 @@ func routeAt(path string) *discover.RouteDetails {
 	}
 }
 
+func declaredRoute(t *testing.T, declared string) *discover.RouteDetails {
+	t.Helper()
+	template, params, ok := discoverroute.NormalizeDeclaredTemplate(declared)
+	if !ok {
+		t.Fatalf("expected %q to declare a path parameter", declared)
+	}
+	route := routeAt(template)
+	route.PathParams = params
+	route.PathTemplate = &template
+	return route
+}
+
 func pathsOf(routes []*discover.RouteDetails) []string {
 	paths := make([]string, 0, len(routes))
 	for _, route := range routes {
@@ -37,8 +49,46 @@ func findRoute(t *testing.T, routes []*discover.RouteDetails, path string) *disc
 	return nil
 }
 
-func TestCollapseTemplatedRoutesFoldsNumericSiblings(t *testing.T) {
-	routes := discoverroute.CollapseTemplatedRoutes([]*discover.RouteDetails{
+func TestNormalizeDeclaredTemplateHandlesEachConvention(t *testing.T) {
+	cases := []struct {
+		declared string
+		template string
+		param    string
+	}{
+		{"/documents/:id", "/documents/{id}", "id"},
+		{"/documents/:documentId?", "/documents/{documentId}", "documentId"},
+		{"/documents/[id]", "/documents/{id}", "id"},
+		{"/docs/[...slug]", "/docs/{slug}", "slug"},
+		{"/documents/{id}", "/documents/{id}", "id"},
+	}
+
+	for _, testCase := range cases {
+		template, params, ok := discoverroute.NormalizeDeclaredTemplate(testCase.declared)
+		if !ok {
+			t.Errorf("%q: expected a declared parameter", testCase.declared)
+			continue
+		}
+		if template != testCase.template {
+			t.Errorf("%q: template = %q, want %q", testCase.declared, template, testCase.template)
+		}
+		if len(params) != 1 || params[0].Name != testCase.param {
+			t.Errorf("%q: params = %v, want a single %q", testCase.declared, params, testCase.param)
+		}
+	}
+}
+
+func TestNormalizeDeclaredTemplateIgnoresLiteralPaths(t *testing.T) {
+	// Nothing is inferred from shape, so a numeric segment is just a literal here.
+	for _, path := range []string{"/about", "/documents/1042", "/api/v2/users", "/assets/app.js"} {
+		if _, _, ok := discoverroute.NormalizeDeclaredTemplate(path); ok {
+			t.Errorf("%q: expected no declared parameter", path)
+		}
+	}
+}
+
+func TestApplyDeclaredRouteTemplatesFoldsLiteralsIntoDeclaration(t *testing.T) {
+	routes := discoverroute.ApplyDeclaredRouteTemplates([]*discover.RouteDetails{
+		declaredRoute(t, "/documents/:id"),
 		routeAt("/documents/1042"),
 		routeAt("/documents/3517"),
 		routeAt("/documents/6820"),
@@ -46,20 +96,20 @@ func TestCollapseTemplatedRoutesFoldsNumericSiblings(t *testing.T) {
 	})
 
 	if len(routes) != 1 {
-		t.Fatalf("expected 4 sibling paths to fold into 1 route, got %v", pathsOf(routes))
+		t.Fatalf("expected observed literals to fold into the declared route, got %v", pathsOf(routes))
 	}
-	route := findRoute(t, routes, "/documents/{documentId}")
+	route := findRoute(t, routes, "/documents/{id}")
 	if len(route.PathParams) != 1 {
-		t.Fatalf("expected exactly one path param, got %d", len(route.PathParams))
+		t.Fatalf("expected one path param, got %d", len(route.PathParams))
 	}
 	param := route.PathParams[0]
-	if param.Name != "documentId" {
-		t.Errorf("expected param name derived from the preceding segment, got %q", param.Name)
+	if param.Name != "id" {
+		t.Errorf("expected the declared name, got %q", param.Name)
 	}
 	sort.Strings(param.ExampleValues)
 	want := []string{"1042", "3517", "6820", "8394"}
 	if len(param.ExampleValues) != len(want) {
-		t.Fatalf("expected every observed value retained as an example, got %v", param.ExampleValues)
+		t.Fatalf("expected each observed value retained, got %v", param.ExampleValues)
 	}
 	for i, value := range want {
 		if param.ExampleValues[i] != value {
@@ -67,43 +117,23 @@ func TestCollapseTemplatedRoutesFoldsNumericSiblings(t *testing.T) {
 			break
 		}
 	}
-	if route.PathTemplate == nil || *route.PathTemplate != "/documents/{documentId}" {
-		t.Errorf("expected PathTemplate to mirror the collapsed path, got %v", route.PathTemplate)
-	}
 }
 
-func TestCollapseTemplatedRoutesFoldsSlugSiblingsOnCardinality(t *testing.T) {
-	// Slugs match none of the shape patterns, so only sibling cardinality can catch them. The
-	// shared /reviews sub-path is what makes the position an identifier rather than a page name.
-	routes := discoverroute.CollapseTemplatedRoutes([]*discover.RouteDetails{
-		routeAt("/products/widget-pro/reviews"),
-		routeAt("/products/gizmo-max/reviews"),
-		routeAt("/products/thing-lite/reviews"),
+func TestApplyDeclaredRouteTemplatesLeavesUndeclaredLiteralsAlone(t *testing.T) {
+	// Without a declaration there is no evidence, so the literals stay as distinct endpoints.
+	routes := discoverroute.ApplyDeclaredRouteTemplates([]*discover.RouteDetails{
+		routeAt("/documents/1042"),
+		routeAt("/documents/3517"),
+		routeAt("/documents/6820"),
 	})
 
-	if len(routes) != 1 {
-		t.Fatalf("expected 3 slug siblings to fold into 1 route, got %v", pathsOf(routes))
-	}
-	findRoute(t, routes, "/products/{productId}/reviews")
-}
-
-func TestCollapseTemplatedRoutesLeavesSubThresholdSiblingsAlone(t *testing.T) {
-	// Two distinct values is below the cardinality threshold and is just as likely to be two
-	// genuinely different endpoints.
-	routes := discoverroute.CollapseTemplatedRoutes([]*discover.RouteDetails{
-		routeAt("/products/widget-pro/reviews"),
-		routeAt("/products/gizmo-max/reviews"),
-	})
-
-	if len(routes) != 2 {
-		t.Fatalf("expected sub-threshold siblings to stay separate, got %v", pathsOf(routes))
+	if len(routes) != 3 {
+		t.Fatalf("expected undeclared literals to survive untouched, got %v", pathsOf(routes))
 	}
 }
 
-func TestCollapseTemplatedRoutesPreservesTopLevelPages(t *testing.T) {
-	// Three distinct values in one position, but they are ordinary pages rather than identifiers.
-	// Nothing follows them, so there is no corroborating structure and they must be left alone.
-	routes := discoverroute.CollapseTemplatedRoutes([]*discover.RouteDetails{
+func TestApplyDeclaredRouteTemplatesPreservesTopLevelPages(t *testing.T) {
+	routes := discoverroute.ApplyDeclaredRouteTemplates([]*discover.RouteDetails{
 		routeAt("/about"),
 		routeAt("/contact"),
 		routeAt("/pricing"),
@@ -114,101 +144,85 @@ func TestCollapseTemplatedRoutesPreservesTopLevelPages(t *testing.T) {
 	}
 }
 
-func TestCollapseTemplatedRoutesPreservesSiblingCollections(t *testing.T) {
-	// Sibling collections under a shared prefix are the same trap one level down.
-	routes := discoverroute.CollapseTemplatedRoutes([]*discover.RouteDetails{
-		routeAt("/blog/posts"),
-		routeAt("/blog/authors"),
-		routeAt("/blog/tags"),
+func TestApplyDeclaredRouteTemplatesPrefersExplicitLiteralDeclaration(t *testing.T) {
+	// Router semantics: /documents/new is declared in its own right, so it must not be swallowed
+	// by the /documents/:id template that also matches it.
+	explicit := routeAt("/documents/new")
+	evidence := discoverroute.DeclaredRouteEvidence
+	explicit.Evidence = &evidence
+	routes := discoverroute.ApplyDeclaredRouteTemplates([]*discover.RouteDetails{
+		declaredRoute(t, "/documents/:id"),
+		explicit,
+		routeAt("/documents/1042"),
 	})
 
-	if len(routes) != 3 {
-		t.Fatalf("expected sibling collections to survive as distinct endpoints, got %v", pathsOf(routes))
-	}
+	findRoute(t, routes, "/documents/{id}")
+	findRoute(t, routes, "/documents/new")
 }
 
-func TestCollapseTemplatedRoutesPreservesVersionSegments(t *testing.T) {
-	routes := discoverroute.CollapseTemplatedRoutes([]*discover.RouteDetails{
-		routeAt("/api/v1/users"),
-		routeAt("/api/v2/users"),
-		routeAt("/api/v3/users"),
+func TestApplyDeclaredRouteTemplatesRespectsSegmentCount(t *testing.T) {
+	routes := discoverroute.ApplyDeclaredRouteTemplates([]*discover.RouteDetails{
+		declaredRoute(t, "/documents/:id"),
+		routeAt("/documents/1042/comments"),
 	})
 
-	if len(routes) != 3 {
-		t.Fatalf("expected API versions to remain distinct endpoints, got %v", pathsOf(routes))
-	}
+	// The literal has an extra segment, so it is not an instance of the declared template.
+	findRoute(t, routes, "/documents/1042/comments")
 }
 
-func TestCollapseTemplatedRoutesPreservesStaticAssetNames(t *testing.T) {
-	routes := discoverroute.CollapseTemplatedRoutes([]*discover.RouteDetails{
-		routeAt("/assets/app.js"),
-		routeAt("/assets/vendor.js"),
-		routeAt("/assets/main.js"),
-	})
-
-	if len(routes) != 3 {
-		t.Fatalf("expected dotted filenames to remain distinct, got %v", pathsOf(routes))
-	}
-}
-
-func TestCollapseTemplatedRoutesTemplatesUuidOnShapeAlone(t *testing.T) {
-	// Shape is per-route evidence, so a single observation is enough.
-	routes := discoverroute.CollapseTemplatedRoutes([]*discover.RouteDetails{
-		routeAt("/sessions/3f2504e0-4f89-11d3-9a0c-0305e82c3301"),
-	})
-
-	route := findRoute(t, routes, "/sessions/{sessionId}")
-	if len(route.PathParams) != 1 || route.PathParams[0].Name != "sessionId" {
-		t.Fatalf("expected a single sessionId path param, got %v", route.PathParams)
-	}
-}
-
-func TestCollapseTemplatedRoutesNamesEachPositionDistinctly(t *testing.T) {
-	// The ontology keys a WebEndpointParameter on (parameter_name, parameter_location), so two
-	// path params on one route must not share a name.
-	routes := discoverroute.CollapseTemplatedRoutes([]*discover.RouteDetails{
-		routeAt("/orders/12/items/45"),
-	})
-
-	route := findRoute(t, routes, "/orders/{orderId}/items/{itemId}")
-	if len(route.PathParams) != 2 {
-		t.Fatalf("expected both positions captured, got %v", route.PathParams)
-	}
-	if route.PathParams[0].Name == route.PathParams[1].Name {
-		t.Errorf("path param names collided: %q", route.PathParams[0].Name)
-	}
-}
-
-func TestCollapseTemplatedRoutesKeepsMethodsSeparate(t *testing.T) {
-	get := routeAt("/documents/1042")
-	post := routeAt("/documents/3517")
+func TestApplyDeclaredRouteTemplatesKeepsMethodsSeparate(t *testing.T) {
+	post := routeAt("/documents/1042")
 	post.Method = common.HttpMethodPost
 
-	routes := discoverroute.CollapseTemplatedRoutes([]*discover.RouteDetails{get, post})
+	routes := discoverroute.ApplyDeclaredRouteTemplates([]*discover.RouteDetails{
+		declaredRoute(t, "/documents/:id"),
+		post,
+	})
 
 	if len(routes) != 2 {
-		t.Fatalf("expected GET and POST to stay separate endpoints, got %d", len(routes))
+		t.Fatalf("expected a POST literal not to fold into a GET declaration, got %v", pathsOf(routes))
 	}
 }
 
-func TestCollapseTemplatedRoutesMergesQueryParamsOfFoldedSiblings(t *testing.T) {
+func TestApplyDeclaredRouteTemplatesMergesQueryParamsOfFoldedLiterals(t *testing.T) {
 	first := routeAt("/documents/1042")
 	first.QueryParams = []*discover.RouteQueryParam{{Name: "format", ExampleValues: []string{"pdf"}}}
 	second := routeAt("/documents/3517")
 	second.QueryParams = []*discover.RouteQueryParam{{Name: "download", ExampleValues: []string{"1"}}}
 
-	routes := discoverroute.CollapseTemplatedRoutes([]*discover.RouteDetails{first, second})
+	routes := discoverroute.ApplyDeclaredRouteTemplates([]*discover.RouteDetails{
+		declaredRoute(t, "/documents/:id"),
+		first,
+		second,
+	})
 
-	route := findRoute(t, routes, "/documents/{documentId}")
+	route := findRoute(t, routes, "/documents/{id}")
 	if len(route.QueryParams) != 2 {
-		t.Fatalf("expected query params from both siblings to survive the fold, got %v", route.QueryParams)
+		t.Fatalf("expected query params from both literals to survive the fold, got %v", route.QueryParams)
+	}
+}
+
+func TestApplyDeclaredRouteTemplatesHandlesMultipleParameters(t *testing.T) {
+	routes := discoverroute.ApplyDeclaredRouteTemplates([]*discover.RouteDetails{
+		declaredRoute(t, "/orders/:orderId/items/:itemId"),
+		routeAt("/orders/12/items/45"),
+	})
+
+	route := findRoute(t, routes, "/orders/{orderId}/items/{itemId}")
+	if len(route.PathParams) != 2 {
+		t.Fatalf("expected both declared params, got %v", route.PathParams)
+	}
+	for _, param := range route.PathParams {
+		if len(param.ExampleValues) != 1 {
+			t.Errorf("expected %q to capture its observed value, got %v", param.Name, param.ExampleValues)
+		}
 	}
 }
 
 func TestMergePathParamsUnionsExampleValues(t *testing.T) {
 	merged := discoverroute.MergePathParams(
-		[]*discover.RoutePathParam{{Name: "documentId", ExampleValues: []string{"1042"}}},
-		[]*discover.RoutePathParam{{Name: "documentId", ExampleValues: []string{"1042", "3517"}}},
+		[]*discover.RoutePathParam{{Name: "id", ExampleValues: []string{"1042"}}},
+		[]*discover.RoutePathParam{{Name: "id", ExampleValues: []string{"1042", "3517"}}},
 	)
 
 	if len(merged) != 1 {

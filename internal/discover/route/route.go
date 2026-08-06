@@ -632,7 +632,7 @@ func PerformRouteCapture(ctx context.Context, config discover.DiscoverRouteConfi
 
 	mergedRoutes := discoverroutehelpers.MergeWebRoutes(allRoutes)
 	// Runs after the crawl so templated paths are never fetched as literal URLs.
-	mergedRoutes = discoverroutehelpers.CollapseTemplatedRoutes(mergedRoutes)
+	mergedRoutes = discoverroutehelpers.ApplyDeclaredRouteTemplates(mergedRoutes)
 	sortRoutes(mergedRoutes)
 	report.Result.WebApplications = buildWebApplications(mergedRoutes, allStaticAssetsByBaseURL)
 	report.Errors = append(report.Errors, errors...)

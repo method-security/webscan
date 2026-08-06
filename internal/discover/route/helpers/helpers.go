@@ -474,242 +474,163 @@ func IsAbsoluteURL(u string) bool {
 	return strings.HasPrefix(u, "http://") || strings.HasPrefix(u, "https://") || strings.HasPrefix(u, "//")
 }
 
-const (
-	// pathParamMinCardinality is how many distinct values a path segment must take across sibling
-	// routes before it is treated as an identifier rather than a literal.
-	pathParamMinCardinality = 3
-	// maxCollapsePasses bounds the sibling-collapse loop so a pathological route set can't spin.
-	maxCollapsePasses = 8
-)
+// DeclaredRouteEvidence tags routes that came from an application's own route table rather than
+// from an observed request, so precedence between a declared literal and a declared template can be
+// resolved the way a router would resolve it.
+const DeclaredRouteEvidence = "route-table"
 
-// numericSegmentPattern matches purely numeric path segments.
-var numericSegmentPattern = regexp.MustCompile(`^\d+$`)
+// declaredParamPattern matches a parameter placeholder in a client-side route declaration.
+// Covers the three conventions that appear in shipped bundles: `:id` (React Router, Vue Router,
+// Angular, Express), `[id]` and `[...slug]` (Next.js file-based routing), and `{id}` (already
+// normalized, and the form ConstructURL substitutes).
+var declaredParamPattern = regexp.MustCompile(`^(?::([A-Za-z_][A-Za-z0-9_]*)\??|\[\.{0,3}([A-Za-z_][A-Za-z0-9_.]*)\]|\{([A-Za-z_][A-Za-z0-9_]*)\})$`)
 
-// uuidSegmentPattern matches UUID-like segments (8-4-4-4-12 hex).
-var uuidSegmentPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
-
-// longHexSegmentPattern matches long hex strings (16+ hex chars) that are not UUIDs.
-var longHexSegmentPattern = regexp.MustCompile(`^[0-9a-fA-F]{16,}$`)
-
-// versionSegmentPattern matches API version segments. These are literals, but a cardinality count
-// over /v1, /v2, /v3 would otherwise mistake them for an identifier.
-var versionSegmentPattern = regexp.MustCompile(`^[vV]\d+$`)
-
-// templatedSegmentPattern matches a segment that is already a `{name}` placeholder.
-var templatedSegmentPattern = regexp.MustCompile(`^\{[^{}]+\}$`)
-
-// wordSegmentPattern matches segments usable as the stem of a derived parameter name.
-var wordSegmentPattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_-]*$`)
-
-// IsIdentifierSegment reports whether a segment looks like an identifier on shape alone.
-func IsIdentifierSegment(segment string) bool {
-	if versionSegmentPattern.MatchString(segment) {
-		return false
+// DeclaredParamName returns the parameter name a route-declaration segment names, and whether the
+// segment is a placeholder at all. The name is authoritative — it comes from the application's own
+// route table rather than being synthesized from surrounding path text.
+func DeclaredParamName(segment string) (string, bool) {
+	match := declaredParamPattern.FindStringSubmatch(segment)
+	if match == nil {
+		return "", false
 	}
-	return numericSegmentPattern.MatchString(segment) ||
-		uuidSegmentPattern.MatchString(segment) ||
-		longHexSegmentPattern.MatchString(segment)
-}
-
-// isCollapseCandidate reports whether a segment may be considered for cardinality-based collapsing.
-// Version segments are literals, dotted segments are usually filenames, and already-templated
-// segments are done.
-func isCollapseCandidate(segment string) bool {
-	if segment == "" || strings.Contains(segment, ".") {
-		return false
-	}
-	return !versionSegmentPattern.MatchString(segment) && !templatedSegmentPattern.MatchString(segment)
-}
-
-// singularize strips a naive English plural suffix so `/documents/1042` yields `documentId`.
-func singularize(word string) string {
-	switch {
-	case strings.HasSuffix(word, "ies") && len(word) > 3:
-		return word[:len(word)-3] + "y"
-	case strings.HasSuffix(word, "sses"), strings.HasSuffix(word, "shes"), strings.HasSuffix(word, "ches"):
-		return word[:len(word)-2]
-	case strings.HasSuffix(word, "ss"):
-		return word
-	case strings.HasSuffix(word, "s") && len(word) > 1:
-		return word[:len(word)-1]
-	}
-	return word
-}
-
-// pathParamNameFor derives a parameter name for the segment at index i, preferring the preceding
-// segment as a stem. Names must be unique within a route because the ontology keys a
-// WebEndpointParameter on (parameter_name, parameter_location).
-func pathParamNameFor(segments []string, i int, taken map[string]struct{}) string {
-	name := fmt.Sprintf("param%d", i+1)
-	if i > 0 && wordSegmentPattern.MatchString(segments[i-1]) {
-		name = singularize(segments[i-1]) + "Id"
-	}
-	candidate := name
-	for suffix := 2; ; suffix++ {
-		if _, exists := taken[candidate]; !exists {
-			return candidate
+	for _, group := range match[1:] {
+		if group != "" {
+			return strings.TrimPrefix(group, "..."), true
 		}
-		candidate = fmt.Sprintf("%s%d", name, suffix)
 	}
+	return "", false
 }
 
-// existingPathParamNames collects the parameter names already recorded on a route.
-func existingPathParamNames(route *discover.RouteDetails) map[string]struct{} {
-	names := make(map[string]struct{}, len(route.PathParams))
-	for _, param := range route.PathParams {
-		names[param.Name] = struct{}{}
-	}
-	return names
-}
+// NormalizeDeclaredTemplate rewrites a declared route template into the `{name}` form that
+// ConstructURL substitutes, and returns the parameters it declares. Returns ok=false when the path
+// declares no parameters, so callers can leave ordinary routes untouched.
+func NormalizeDeclaredTemplate(path string) (string, []*discover.RoutePathParam, bool) {
+	segments := strings.Split(path, "/")
+	params := make([]*discover.RoutePathParam, 0, len(segments))
+	seen := map[string]struct{}{}
 
-// applyPathTemplate rewrites the segments at the given indices to `{name}` placeholders, recording
-// each replaced literal as an example value. The concrete path is recoverable from those examples.
-func applyPathTemplate(route *discover.RouteDetails, indices map[int]struct{}) bool {
-	if len(indices) == 0 {
-		return false
-	}
-	original := strings.Split(route.Path, "/")
-	templated := append([]string(nil), original...)
-	taken := existingPathParamNames(route)
-	var params []*discover.RoutePathParam
-
-	for i := range original {
-		if _, ok := indices[i]; !ok {
+	for i, segment := range segments {
+		name, isParam := DeclaredParamName(segment)
+		if !isParam {
 			continue
 		}
-		name := pathParamNameFor(original, i, taken)
-		taken[name] = struct{}{}
-		params = append(params, &discover.RoutePathParam{Name: name, ExampleValues: []string{original[i]}})
-		templated[i] = "{" + name + "}"
+		segments[i] = "{" + name + "}"
+		if _, exists := seen[name]; exists {
+			continue
+		}
+		seen[name] = struct{}{}
+		params = append(params, &discover.RoutePathParam{Name: name})
 	}
+
 	if len(params) == 0 {
-		return false
+		return path, nil, false
 	}
-
-	template := strings.Join(templated, "/")
-	route.Path = template
-	route.PathTemplate = &template
-	route.PathParams = MergePathParams(route.PathParams, params)
-	return true
+	return strings.Join(segments, "/"), params, true
 }
 
-// hasDeeperStructure reports whether any non-empty segment follows index i.
-//
-// Cardinality alone cannot tell an identifier from a distinct page: /about, /contact and /pricing
-// are also three values in one position. A shared sub-path beneath the position is the
-// corroborating evidence, because distinct static pages rarely carry identical child structure
-// under different names. This does mean a leaf slug such as /products/widget-pro is left alone —
-// the safe direction, since collapsing is a merge and a wrong call erases a real endpoint.
-func hasDeeperStructure(segments []string, i int) bool {
-	for _, segment := range segments[i+1:] {
-		if segment != "" {
-			return true
+// templateMatchesLiteral reports whether a literal path is an instance of a normalized template,
+// and returns the value each placeholder took. Matching is exact on segment count and on every
+// non-placeholder segment, so this is a decision about the declared route rather than a guess.
+func templateMatchesLiteral(template string, literal string) (map[string]string, bool) {
+	templateSegments := strings.Split(template, "/")
+	literalSegments := strings.Split(literal, "/")
+	if len(templateSegments) != len(literalSegments) {
+		return nil, false
+	}
+
+	values := map[string]string{}
+	for i, templateSegment := range templateSegments {
+		name, isParam := DeclaredParamName(templateSegment)
+		if !isParam {
+			if templateSegment != literalSegments[i] {
+				return nil, false
+			}
+			continue
+		}
+		if literalSegments[i] == "" {
+			return nil, false
+		}
+		values[name] = literalSegments[i]
+	}
+	return values, true
+}
+
+// ApplyDeclaredRouteTemplates folds observed literal routes into the templates the application
+// declares, so `/documents/1042` becomes an example of a declared `/documents/{id}` rather than a
+// separate endpoint. Nothing is inferred: a literal is only folded when the application's own route
+// table says that template exists, and an exact literal declaration always wins over a template.
+func ApplyDeclaredRouteTemplates(routes []*discover.RouteDetails) []*discover.RouteDetails {
+	type templateRoute struct {
+		route    *discover.RouteDetails
+		template string
+	}
+
+	var templates []templateRoute
+	declaredLiterals := map[string]struct{}{}
+	for _, route := range routes {
+		if len(route.PathParams) > 0 && route.PathTemplate != nil {
+			templates = append(templates, templateRoute{route: route, template: *route.PathTemplate})
+			continue
+		}
+		// Only a literal the route table itself declares outranks a matching template. An observed
+		// crawl hit carries no such claim and is free to fold.
+		if route.Evidence != nil && *route.Evidence == DeclaredRouteEvidence {
+			declaredLiterals[routeKey(route.Method, route.BaseUrl, route.Path)] = struct{}{}
 		}
 	}
-	return false
-}
+	if len(templates) == 0 {
+		return routes
+	}
 
-// collapseKey identifies a set of sibling routes that differ only at segment position pos.
-type collapseKey struct {
-	method  string
-	baseURL string
-	masked  string
-	pos     int
-}
-
-// maskSegment renders a path with the segment at index i replaced by a wildcard, so routes that
-// differ only at that position share a key.
-func maskSegment(segments []string, i int) string {
-	masked := append([]string(nil), segments...)
-	masked[i] = "\x00"
-	return strings.Join(masked, "/")
-}
-
-// collapseSiblingRoutes templates any segment position that takes at least pathParamMinCardinality
-// distinct values across otherwise-identical sibling routes. This is the only signal that catches
-// non-numeric identifiers such as slugs, which shape matching cannot see.
-func collapseSiblingRoutes(routes []*discover.RouteDetails) ([]*discover.RouteDetails, bool) {
-	observed := map[collapseKey]map[string]struct{}{}
+	folded := make([]*discover.RouteDetails, 0, len(routes))
 	for _, route := range routes {
-		segments := strings.Split(route.Path, "/")
-		for i, segment := range segments {
-			if !isCollapseCandidate(segment) || !hasDeeperStructure(segments, i) {
+		if len(route.PathParams) > 0 && route.PathTemplate != nil {
+			folded = append(folded, route)
+			continue
+		}
+
+		matched := false
+		for _, candidate := range templates {
+			if candidate.route.Method != route.Method || candidate.route.BaseUrl != route.BaseUrl {
 				continue
 			}
-			key := collapseKey{string(route.Method), route.BaseUrl, maskSegment(segments, i), i}
-			if observed[key] == nil {
-				observed[key] = map[string]struct{}{}
-			}
-			observed[key][segment] = struct{}{}
-		}
-	}
-
-	targets := map[collapseKey]struct{}{}
-	for key, distinct := range observed {
-		if len(distinct) >= pathParamMinCardinality {
-			targets[key] = struct{}{}
-		}
-	}
-	if len(targets) == 0 {
-		return routes, false
-	}
-
-	changed := false
-	for _, route := range routes {
-		// Key off the original segments; templating earlier positions would change later masks.
-		segments := strings.Split(route.Path, "/")
-		indices := map[int]struct{}{}
-		for i, segment := range segments {
-			if !isCollapseCandidate(segment) || !hasDeeperStructure(segments, i) {
+			values, ok := templateMatchesLiteral(candidate.template, route.Path)
+			if !ok {
 				continue
 			}
-			key := collapseKey{string(route.Method), route.BaseUrl, maskSegment(segments, i), i}
-			if _, ok := targets[key]; ok {
-				indices[i] = struct{}{}
+			// Router semantics: an explicitly declared literal beats a template that also matches.
+			if _, isDeclared := declaredLiterals[routeKey(route.Method, route.BaseUrl, route.Path)]; isDeclared {
+				continue
 			}
-		}
-		if applyPathTemplate(route, indices) {
-			changed = true
-		}
-	}
-	if !changed {
-		return routes, false
-	}
-	return MergeWebRoutes(routes), true
-}
-
-// CollapseTemplatedRoutes folds routes that differ only by an identifier segment into a single
-// templated route carrying PathParams, so `/documents/1042` and `/documents/3517` become
-// `/documents/{documentId}` with both values retained as examples.
-//
-// Run this once over the full route set. It is deliberately not part of MergeWebRoutes, which the
-// extractors call on partial corpora where a premature collapse could not be re-merged.
-func CollapseTemplatedRoutes(routes []*discover.RouteDetails) []*discover.RouteDetails {
-	// Shape evidence is per-route and needs no corpus.
-	changed := false
-	for _, route := range routes {
-		segments := strings.Split(route.Path, "/")
-		indices := map[int]struct{}{}
-		for i, segment := range segments {
-			if IsIdentifierSegment(segment) {
-				indices[i] = struct{}{}
+			for _, param := range candidate.route.PathParams {
+				if value, exists := values[param.Name]; exists {
+					param.ExampleValues = appendUniqueValue(param.ExampleValues, value)
+				}
 			}
-		}
-		if applyPathTemplate(route, indices) {
-			changed = true
-		}
-	}
-	if changed {
-		routes = MergeWebRoutes(routes)
-	}
-
-	// Cardinality evidence needs the whole corpus, and collapsing one position can expose another.
-	for pass := 0; pass < maxCollapsePasses; pass++ {
-		next, collapsed := collapseSiblingRoutes(routes)
-		routes = next
-		if !collapsed {
+			candidate.route.QueryParams = MergeQueryParams(candidate.route.QueryParams, route.QueryParams)
+			candidate.route.BodyParams = MergeBodyParams(candidate.route.BodyParams, route.BodyParams)
+			matched = true
 			break
 		}
+		if !matched {
+			folded = append(folded, route)
+		}
 	}
-	return routes
+
+	return MergeWebRoutes(folded)
+}
+
+// routeKey builds the identity a route is deduplicated on.
+func routeKey(method common.HttpMethod, baseURL string, path string) string {
+	return fmt.Sprintf("%s:%s%s", method, baseURL, path)
+}
+
+// appendUniqueValue appends a value if it is not already present.
+func appendUniqueValue(values []string, value string) []string {
+	for _, existing := range values {
+		if existing == value {
+			return values
+		}
+	}
+	return append(values, value)
 }

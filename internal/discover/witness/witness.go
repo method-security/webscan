@@ -14,7 +14,9 @@ import (
 	witnesshelpers "github.com/Method-Security/webscan/internal/discover/witness/helpers"
 
 	// Utils
+	utils "github.com/Method-Security/webscan/utils"
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
+
 	// External
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
@@ -87,7 +89,7 @@ func processTarget(
 		finalURL = resp.RedirectChain[len(resp.RedirectChain)-1]
 	}
 	faviconURL := witnesshelpers.ExtractFaviconURL(string(bodyBytes), finalURL)
-	if faviconURL != "" {
+	if faviconURL != "" && (!config.IgnoreCrossDomainRedirects || utils.IsHostInScope(target, faviconURL)) {
 		if faviconBytes, faviconHash, faviconErr := witnesshelpers.FetchFavicon(ctx, faviconURL, config); faviconErr == nil && len(faviconBytes) > 0 {
 			result.Favicon = &discover.DiscoverWitnessFavicon{
 				Url:    faviconURL,

@@ -2,6 +2,7 @@ package witnesshelpers
 
 import (
 	// Standard
+	"bytes"
 	"sort"
 	"strings"
 	"sync"
@@ -9,6 +10,7 @@ import (
 	// Generated
 	discover "github.com/Method-Security/webscan/generated/go/discover"
 	// External
+	"github.com/PuerkitoBio/goquery"
 	wappalyzer "github.com/projectdiscovery/wappalyzergo"
 )
 
@@ -252,6 +254,7 @@ func Fingerprint(headers map[string][]string, body []byte) (*discover.DiscoverWi
 	}
 
 	appInfoMap := wap.FingerprintWithInfo(headers, body)
+	mergeAppInfo(appInfoMap, fingerprintDOM(wap, body))
 
 	technologies := &discover.DiscoverWitnessTechnologies{}
 	keys := make([]string, 0, len(appInfoMap))
@@ -313,6 +316,95 @@ func Fingerprint(headers map[string][]string, body []byte) (*discover.DiscoverWi
 	}
 
 	return technologies, nil
+}
+
+// fingerprintDOM supplements wappalyzergo's header/body pass with the DOM
+// rules in the embedded catalog. The upstream FingerprintWithInfo API does not
+// evaluate DOM rules, but headless captures already return rendered HTML, so
+// selectors such as Angular's [ng-version] are available here.
+func fingerprintDOM(wap *wappalyzer.Wappalyze, body []byte) map[string]wappalyzer.AppInfo {
+	result := make(map[string]wappalyzer.AppInfo)
+	if len(body) == 0 {
+		return result
+	}
+
+	doc, err := goquery.NewDocumentFromReader(bytes.NewReader(body))
+	if err != nil {
+		return result
+	}
+
+	for app, fingerprint := range wap.GetCompiledFingerprints().Apps {
+		var matched bool
+		var version string
+
+		for selector, rules := range fingerprint.GetDOMRules() {
+			selection := doc.Find(selector)
+			if selection.Length() == 0 {
+				continue
+			}
+
+			for ruleName, pattern := range rules {
+				if pattern == nil || pattern.Confidence == 0 {
+					continue
+				}
+
+				selection.EachWithBreak(func(_ int, element *goquery.Selection) bool {
+					value := element.Text()
+					if ruleName != "main" {
+						var ok bool
+						value, ok = element.Attr(ruleName)
+						if !ok {
+							return true
+						}
+					}
+
+					valid, candidateVersion := pattern.Evaluate(strings.ToLower(value))
+					if !valid {
+						return true
+					}
+
+					matched = true
+					if candidateVersion != "" && (version == "" || len(candidateVersion) > len(version)) {
+						version = candidateVersion
+					}
+					return false
+				})
+			}
+		}
+
+		if matched {
+			nameVersion := wappalyzer.FormatAppVersion(app, version)
+			result[nameVersion] = wappalyzer.AppInfoFromFingerprint(fingerprint)
+		}
+	}
+
+	return result
+}
+
+func mergeAppInfo(dst, src map[string]wappalyzer.AppInfo) {
+	for nameVersion, info := range src {
+		baseName := nameVersion
+		if idx := strings.Index(nameVersion, versionSeparator); idx != -1 {
+			baseName = nameVersion[:idx]
+		}
+
+		hasVersionedEntry := false
+		for existing := range dst {
+			if idx := strings.Index(existing, versionSeparator); idx != -1 {
+				if existing[:idx] == baseName {
+					hasVersionedEntry = true
+				}
+			}
+		}
+
+		if nameVersion == baseName && hasVersionedEntry {
+			continue
+		}
+		if nameVersion != baseName {
+			delete(dst, baseName)
+		}
+		dst[nameVersion] = info
+	}
 }
 
 func classifyTechnology(name string, categories []string) (technologyBucket, discover.DetectedTechnologyType) {

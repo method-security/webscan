@@ -152,15 +152,6 @@ type sourceMap struct {
 // allCapsVarPattern matches ALL_CAPS variable names (at least two chars).
 var allCapsVarPattern = regexp.MustCompile(`^[A-Z][A-Z0-9_]+$`)
 
-// numericSegmentPattern matches purely numeric path segments.
-var numericSegmentPattern = regexp.MustCompile(`^\d+$`)
-
-// uuidSegmentPattern matches UUID-like segments (8-4-4-4-12 hex).
-var uuidSegmentPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
-
-// longHexSegmentPattern matches long hex strings (16+ hex chars) that are not UUIDs.
-var longHexSegmentPattern = regexp.MustCompile(`^[0-9a-fA-F]{16,}$`)
-
 // unresolvedJSTemplateExpressionPattern matches JavaScript template placeholders
 // that were captured as literal text instead of being resolved by the parser.
 var unresolvedJSTemplateExpressionPattern = regexp.MustCompile(`\$\{[^}]*\}`)
@@ -180,40 +171,6 @@ func parseRouteMethod(method string) (common.HttpMethod, bool) {
 	}
 
 	return parsedMethod, true
-}
-
-// normalizePathTemplate replaces dynamic path segments with placeholder tokens.
-// - Numeric segments become <id>
-// - UUID segments become <uuid>
-// - Long hex strings (16+ chars) become <hash>
-func normalizePathTemplate(path string) string {
-	if path == "" || path == "/" {
-		return path
-	}
-	segments := strings.Split(path, "/")
-	for i, seg := range segments {
-		if uuidSegmentPattern.MatchString(seg) {
-			segments[i] = "<uuid>"
-		} else if longHexSegmentPattern.MatchString(seg) {
-			segments[i] = "<hash>"
-		} else if numericSegmentPattern.MatchString(seg) {
-			segments[i] = "<id>"
-		}
-	}
-	return strings.Join(segments, "/")
-}
-
-// hasTemplateSegments returns true if any segment in the path is dynamic (numeric/uuid/hex).
-func hasTemplateSegments(path string) bool {
-	if path == "" {
-		return false
-	}
-	for _, seg := range strings.Split(path, "/") {
-		if uuidSegmentPattern.MatchString(seg) || longHexSegmentPattern.MatchString(seg) || numericSegmentPattern.MatchString(seg) {
-			return true
-		}
-	}
-	return false
 }
 
 // Common API call patterns in JavaScript
@@ -328,12 +285,6 @@ func extractRoutesFromPatterns(content string, baseURL string, routeCaptureConfi
 				BaseUrl: routeBaseURL,
 				Path:    routePath,
 				Method:  routeMethod,
-			}
-
-			// Apply path templating if the path has dynamic segments
-			if hasTemplateSegments(routePath) {
-				tmpl := normalizePathTemplate(routePath)
-				route.PathTemplate = &tmpl
 			}
 
 			routes = append(routes, route)
@@ -560,13 +511,11 @@ func (v *visitor) handleVariableStatement(node *ast.VariableStatement) {
 					routeBaseURL, routePath, err := discoverroutehelpers.SplitURLBaseAndPath(urlNoQuery)
 					if err == nil {
 						evidence := "CONST:" + varName
-						tmpl := normalizePathTemplate(routePath)
 						route := &discover.RouteDetails{
-							BaseUrl:      routeBaseURL,
-							Path:         routePath,
-							Method:       common.HttpMethodGet,
-							Evidence:     &evidence,
-							PathTemplate: &tmpl,
+							BaseUrl:  routeBaseURL,
+							Path:     routePath,
+							Method:   common.HttpMethodGet,
+							Evidence: &evidence,
 						}
 						*v.routes = append(*v.routes, route)
 						v.urls[fullURL] = struct{}{}
@@ -684,12 +633,6 @@ func (v *visitor) addRoute(urlStr, method string, bodyParams []*discover.RouteBo
 		QueryParams: queryParams,
 	}
 
-	// Apply path templating if the path has dynamic segments
-	if hasTemplateSegments(routePath) {
-		tmpl := normalizePathTemplate(routePath)
-		route.PathTemplate = &tmpl
-	}
-
 	*v.routes = append(*v.routes, route)
 	v.urls[urlStr] = struct{}{}
 }
@@ -749,11 +692,6 @@ func fetchSourceMapRoutes(ctx context.Context, sourceMapURL string, baseURL stri
 			if sourceName != "" {
 				evidence := "sourcemap:" + sourceName
 				route.Evidence = &evidence
-			}
-			// Apply path templating
-			if route.PathTemplate == nil && hasTemplateSegments(route.Path) {
-				tmpl := normalizePathTemplate(route.Path)
-				route.PathTemplate = &tmpl
 			}
 		}
 		routes = append(routes, contentRoutes...)

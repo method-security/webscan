@@ -89,6 +89,9 @@ var baseSpecPaths = []string{
 // Spec file extensions to try (in order of preference)
 var specExtensions = []string{"", ".json", ".yaml", ".yml"}
 
+// pathTemplatePlaceholderPattern matches `{name}` placeholders in an OpenAPI path template.
+var pathTemplatePlaceholderPattern = regexp.MustCompile(`\{([^{}/]+)\}`)
+
 // generateSpecPaths creates all possible spec paths by combining base paths with extensions
 func generateSpecPaths() []string {
 	var paths []string
@@ -572,6 +575,7 @@ func handleSwaggerV2(document libopenapi.Document, report *enumerateapiapplicati
 				Path:               path,
 				Method:             method,
 				QueryParams:        getQueryParamsV2(operation.Parameters),
+				PathParams:         getPathParamsV2(pathItem.Parameters, operation.Parameters, path),
 				Security:           securityRequirements,
 				Type:               enumerateapiapplicationfern.ApiTypeSwaggerV2,
 				Description:        operation.Description,
@@ -685,6 +689,7 @@ func handleOpenAPIV3(document libopenapi.Document, report *enumerateapiapplicati
 				Path:               path,
 				Method:             method,
 				QueryParams:        getQueryParamsV3(operation.Parameters),
+				PathParams:         getPathParamsV3(pathItem.Parameters, operation.Parameters, path),
 				Security:           securityRequirements,
 				Type:               enumerateapiapplicationfern.ApiTypeSwaggerV3,
 				Description:        operation.Description,
@@ -737,6 +742,63 @@ func getQueryParamsV3(params []*v3.Parameter) []string {
 		}
 	}
 	return queryParams
+}
+
+// pathParamNamesFromTemplate extracts `{name}` placeholders from a templated path.
+func pathParamNamesFromTemplate(path string) []string {
+	matches := pathTemplatePlaceholderPattern.FindAllStringSubmatch(path, -1)
+	names := make([]string, 0, len(matches))
+	for _, match := range matches {
+		if name := strings.TrimSpace(match[1]); name != "" {
+			names = append(names, name)
+		}
+	}
+	return names
+}
+
+// mergePathParamNames unions declared `in: path` parameter names with the placeholders present in
+// the path template. Specs routinely omit one or the other, so neither source alone is complete.
+func mergePathParamNames(declared []string, path string) []string {
+	seen := make(map[string]struct{}, len(declared))
+	merged := make([]string, 0, len(declared))
+	for _, name := range append(declared, pathParamNamesFromTemplate(path)...) {
+		if name == "" {
+			continue
+		}
+		if _, exists := seen[name]; exists {
+			continue
+		}
+		seen[name] = struct{}{}
+		merged = append(merged, name)
+	}
+	if len(merged) == 0 {
+		return nil
+	}
+	return merged
+}
+
+// getPathParamsV2 extracts path parameters from the path item and operation parameters for Swagger
+// (OpenAPI 2.0), unioned with any placeholders in the path itself.
+func getPathParamsV2(pathItemParams []*v2.Parameter, operationParams []*v2.Parameter, path string) []string {
+	var declared []string
+	for _, param := range append(pathItemParams, operationParams...) {
+		if param.In == "path" {
+			declared = append(declared, param.Name)
+		}
+	}
+	return mergePathParamNames(declared, path)
+}
+
+// getPathParamsV3 extracts path parameters from the path item and operation parameters for OpenAPI
+// 3.0+, unioned with any placeholders in the path itself.
+func getPathParamsV3(pathItemParams []*v3.Parameter, operationParams []*v3.Parameter, path string) []string {
+	var declared []string
+	for _, param := range append(pathItemParams, operationParams...) {
+		if param.In == "path" {
+			declared = append(declared, param.Name)
+		}
+	}
+	return mergePathParamNames(declared, path)
 }
 
 func convertSecurityDefinitionsV2(securityDefinitions map[string]*v2.SecurityScheme) map[string]*enumerateapiapplicationfern.SecurityScheme {

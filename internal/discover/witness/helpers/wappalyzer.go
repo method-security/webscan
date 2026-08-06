@@ -375,6 +375,7 @@ func fingerprintDOM(wap *wappalyzer.Wappalyze, body []byte) map[string]wappalyze
 		if matched {
 			nameVersion := wappalyzer.FormatAppVersion(app, version)
 			result[nameVersion] = wappalyzer.AppInfoFromFingerprint(fingerprint)
+			addImpliedTechnologies(result, wap, app)
 		}
 	}
 
@@ -383,27 +384,85 @@ func fingerprintDOM(wap *wappalyzer.Wappalyze, body []byte) map[string]wappalyze
 
 func mergeAppInfo(dst, src map[string]wappalyzer.AppInfo) {
 	for nameVersion, info := range src {
-		baseName := nameVersion
-		if idx := strings.Index(nameVersion, versionSeparator); idx != -1 {
-			baseName = nameVersion[:idx]
-		}
-
-		hasVersionedEntry := false
-		for existing := range dst {
-			if idx := strings.Index(existing, versionSeparator); idx != -1 {
-				if existing[:idx] == baseName {
-					hasVersionedEntry = true
-				}
-			}
-		}
-
-		if nameVersion == baseName && hasVersionedEntry {
+		baseName := technologyBaseName(nameVersion)
+		existingKeys := appInfoKeysForBase(dst, baseName)
+		if !hasTechnologyVersion(nameVersion) && hasVersionedTechnologyKey(existingKeys) {
+			removeUnversionedTechnologyKeys(dst, existingKeys)
 			continue
 		}
-		if nameVersion != baseName {
-			delete(dst, baseName)
+		for _, existingKey := range existingKeys {
+			delete(dst, existingKey)
 		}
 		dst[nameVersion] = info
+	}
+}
+
+func addImpliedTechnologies(result map[string]wappalyzer.AppInfo, wap *wappalyzer.Wappalyze, app string) {
+	fingerprint := wap.GetFingerprints().Apps[app]
+	if fingerprint == nil {
+		return
+	}
+
+	for _, implied := range fingerprint.Implies {
+		nameVersion := impliedTechnologyNameVersion(implied)
+		baseName := technologyBaseName(nameVersion)
+		compiledFingerprint := wap.GetCompiledFingerprints().Apps[baseName]
+		if compiledFingerprint == nil {
+			continue
+		}
+		result[nameVersion] = wappalyzer.AppInfoFromFingerprint(compiledFingerprint)
+	}
+}
+
+func impliedTechnologyNameVersion(implied string) string {
+	parts := strings.Split(implied, `\;`)
+	name := parts[0]
+	var version string
+	for _, part := range parts[1:] {
+		if strings.HasPrefix(part, "version:") {
+			version = strings.TrimPrefix(part, "version:")
+			break
+		}
+	}
+	return wappalyzer.FormatAppVersion(name, version)
+}
+
+func technologyBaseName(nameVersion string) string {
+	if idx := strings.Index(nameVersion, versionSeparator); idx != -1 {
+		return nameVersion[:idx]
+	}
+	return nameVersion
+}
+
+func hasTechnologyVersion(nameVersion string) bool {
+	return strings.Index(nameVersion, versionSeparator) != -1
+}
+
+func appInfoKeysForBase(appInfo map[string]wappalyzer.AppInfo, baseName string) []string {
+	keys := make([]string, 0)
+	for nameVersion := range appInfo {
+		if technologyBaseName(nameVersion) == baseName {
+			keys = append(keys, nameVersion)
+		}
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func hasVersionedTechnologyKey(keys []string) bool {
+	for _, key := range keys {
+		if hasTechnologyVersion(key) {
+			return true
+		}
+	}
+	return false
+}
+
+func removeUnversionedTechnologyKeys(appInfo map[string]wappalyzer.AppInfo, keys []string) {
+	for _, key := range keys {
+		if !hasTechnologyVersion(key) {
+			delete(appInfo, key)
+		}
 	}
 }
 

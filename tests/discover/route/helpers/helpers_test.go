@@ -58,7 +58,6 @@ func TestNormalizeDeclaredTemplateHandlesEachConvention(t *testing.T) {
 		{"/documents/:id", "/documents/{id}", "id"},
 		{"/documents/:documentId?", "/documents/{documentId}", "documentId"},
 		{"/documents/[id]", "/documents/{id}", "id"},
-		{"/docs/[...slug]", "/docs/{slug}", "slug"},
 		{"/documents/{id}", "/documents/{id}", "id"},
 	}
 
@@ -74,6 +73,35 @@ func TestNormalizeDeclaredTemplateHandlesEachConvention(t *testing.T) {
 		if len(params) != 1 || params[0].Name != testCase.param {
 			t.Errorf("%q: params = %v, want a single %q", testCase.declared, params, testCase.param)
 		}
+	}
+}
+
+func TestNormalizeDeclaredTemplateRejectsCatchAllParams(t *testing.T) {
+	// A catch-all matches one or more segments. Normalizing it to a single placeholder would make
+	// a root-level `/{slug}` swallow every top-level page while never folding the multi-segment
+	// paths it actually serves, so it is not treated as a declaration at all.
+	for _, path := range []string{"/[...slug]", "/docs/[...slug]", "/docs/[[...slug]]"} {
+		if template, _, ok := discoverroute.NormalizeDeclaredTemplate(path); ok {
+			t.Errorf("%q: expected no declaration, got template %q", path, template)
+		}
+	}
+}
+
+func TestApplyDeclaredRouteTemplatesNormalizesOriginForFolding(t *testing.T) {
+	// MergeWebRoutes and buildWebApplications compare origins via NormalizeBaseURLForIdentity, so
+	// an explicit default port must not split one application in two here either.
+	declared := declaredRoute(t, "/documents/:id")
+	literal := routeAt("/documents/1042")
+	literal.BaseUrl = "https://example.com:443"
+
+	routes := discoverroute.ApplyDeclaredRouteTemplates([]*discover.RouteDetails{declared, literal})
+
+	if len(routes) != 1 {
+		t.Fatalf("expected the literal to fold despite the explicit port, got %v", pathsOf(routes))
+	}
+	route := findRoute(t, routes, "/documents/{id}")
+	if len(route.PathParams) != 1 || len(route.PathParams[0].ExampleValues) != 1 {
+		t.Errorf("expected the observed value captured, got %v", route.PathParams)
 	}
 }
 

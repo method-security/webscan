@@ -786,10 +786,17 @@ func fetchSourceMapRoutes(ctx context.Context, sourceMapURL string, baseURL stri
 		contentRoutes, contentUrls, contentErrors := extractScriptContentRoutes(ctx, content, baseURL, routeCaptureConfig)
 		// Tag each extracted route with source map evidence
 		for _, route := range contentRoutes {
-			if sourceName != "" {
-				evidence := "sourcemap:" + sourceName
-				route.Evidence = &evidence
+			if sourceName == "" {
+				continue
 			}
+			// A route-table tag records how the route was declared; the source map only records
+			// where the content came from. Overwriting it would strip the marker that lets a
+			// declared literal outrank a matching template.
+			if route.Evidence != nil && *route.Evidence == discoverroutehelpers.DeclaredRouteEvidence {
+				continue
+			}
+			evidence := "sourcemap:" + sourceName
+			route.Evidence = &evidence
 		}
 		routes = append(routes, contentRoutes...)
 		urls = append(urls, contentUrls...)

@@ -18,9 +18,13 @@ const DeclaredRouteEvidence = "route-table"
 
 // declaredParamPattern matches a parameter placeholder in a client-side route declaration.
 // Covers the three conventions that appear in shipped bundles: `:id` (React Router, Vue Router,
-// Angular, Express), `[id]` and `[...slug]` (Next.js file-based routing), and `{id}` (already
-// normalized, and the form ConstructURL substitutes).
-var declaredParamPattern = regexp.MustCompile(`^(?::([A-Za-z_][A-Za-z0-9_]*)\??|\[\.{0,3}([A-Za-z_][A-Za-z0-9_.]*)\]|\{([A-Za-z_][A-Za-z0-9_]*)\})$`)
+// Angular, Express), `[id]` (Next.js file-based routing), and `{id}` (already normalized, and the
+// form ConstructURL substitutes).
+//
+// Next.js rest parameters (`[...slug]`) are deliberately excluded. A catch-all matches one or more
+// segments, which a single placeholder cannot express: a root-level `/{slug}` would swallow every
+// unrelated top-level page while never folding the multi-segment paths the route actually serves.
+var declaredParamPattern = regexp.MustCompile(`^(?::([A-Za-z_][A-Za-z0-9_]*)\??|\[([A-Za-z_][A-Za-z0-9_.]*)\]|\{([A-Za-z_][A-Za-z0-9_]*)\})$`)
 
 // DeclaredParamName returns the parameter name a route-declaration segment names, and whether the
 // segment is a placeholder at all. The name is authoritative — it comes from the application's own
@@ -128,7 +132,8 @@ func ApplyDeclaredRouteTemplates(routes []*discover.RouteDetails) []*discover.Ro
 
 		matched := false
 		for _, candidate := range templates {
-			if candidate.route.Method != route.Method || candidate.route.BaseUrl != route.BaseUrl {
+			if candidate.route.Method != route.Method ||
+				NormalizeBaseURLForIdentity(candidate.route.BaseUrl) != NormalizeBaseURLForIdentity(route.BaseUrl) {
 				continue
 			}
 			values, ok := templateMatchesLiteral(candidate.template, route.Path)
@@ -157,9 +162,10 @@ func ApplyDeclaredRouteTemplates(routes []*discover.RouteDetails) []*discover.Ro
 	return MergeWebRoutes(folded)
 }
 
-// routeKey builds the identity a route is deduplicated on.
+// routeKey builds the identity a route is deduplicated on. The origin is normalized so an explicit
+// default port or differing case does not split one application in two, matching MergeWebRoutes.
 func routeKey(method common.HttpMethod, baseURL string, path string) string {
-	return fmt.Sprintf("%s:%s%s", method, baseURL, path)
+	return fmt.Sprintf("%s:%s%s", method, NormalizeBaseURLForIdentity(baseURL), path)
 }
 
 // appendUniqueValue appends a value if it is not already present.

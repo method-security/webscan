@@ -111,7 +111,13 @@ func TestExtractDeclaredRouteTemplatesReadsNextJsManifestEntries(t *testing.T) {
 	routes := extractors.ExtractDeclaredRouteTemplates(`{"/documents/[id]":["static/chunks/doc.js"],"/docs/[...slug]":["x.js"]}`, bundleURL)
 
 	findDeclared(t, routes, "/documents/{id}")
-	findDeclared(t, routes, "/docs/{slug}")
+	// The catch-all entry is not a declaration, since one placeholder cannot stand for the one-or-
+	// more segments it matches.
+	for _, route := range routes {
+		if route.Path == "/docs/{slug}" {
+			t.Errorf("expected the catch-all entry to be skipped")
+		}
+	}
 }
 
 func TestExtractDeclaredRouteTemplatesTakesLiteralsOnlyFromRouteTables(t *testing.T) {

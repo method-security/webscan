@@ -377,6 +377,7 @@ func buildWebApplications(routes []*discover.RouteDetails, staticAssetsByBaseURL
 		if baseURL == "" {
 			return nil
 		}
+		baseURL = discoverroutehelpers.NormalizeBaseURLForIdentity(baseURL)
 		if webApplication, ok := webApplicationsByBaseURL[baseURL]; ok {
 			return webApplication
 		}
@@ -393,7 +394,9 @@ func buildWebApplications(routes []*discover.RouteDetails, staticAssetsByBaseURL
 		if webApplication == nil {
 			continue
 		}
-		webApplication.Routes = append(webApplication.Routes, route)
+		outputRoute := *route
+		outputRoute.BaseUrl = discoverroutehelpers.NormalizeBaseURLForIdentity(route.BaseUrl)
+		webApplication.Routes = append(webApplication.Routes, &outputRoute)
 	}
 
 	for baseURL, staticAssets := range staticAssetsByBaseURL {
@@ -407,7 +410,7 @@ func buildWebApplications(routes []*discover.RouteDetails, staticAssetsByBaseURL
 			staticAssetDetails = &discover.StaticAssetDetails{}
 		}
 		for _, staticAsset := range discoverroutehelpers.MergeStaticAssets(staticAssets) {
-			if utils.IsHostInScope(baseURL, staticAsset) {
+			if utils.IsHostInScope(webApplication.BaseUrl, staticAsset) {
 				staticAssetDetails.Local = append(staticAssetDetails.Local, staticAsset)
 			} else {
 				staticAssetDetails.Remote = append(staticAssetDetails.Remote, staticAsset)
@@ -504,12 +507,13 @@ func PerformRouteCapture(ctx context.Context, config discover.DiscoverRouteConfi
 				defer func() { <-semaphore }() // Release semaphore when done
 
 				// Skip if already visited
+				targetURLIdentity := discoverroutehelpers.NormalizeURLForIdentity(targetURL)
 				mu.Lock()
-				if _, visited := visitedURLs[targetURL]; visited {
+				if _, visited := visitedURLs[targetURLIdentity]; visited {
 					mu.Unlock()
 					return
 				}
-				visitedURLs[targetURL] = struct{}{}
+				visitedURLs[targetURLIdentity] = struct{}{}
 				mu.Unlock()
 
 				// Parse the URL to preserve query parameters
@@ -586,8 +590,9 @@ func PerformRouteCapture(ctx context.Context, config discover.DiscoverRouteConfi
 					}
 					// Visit the base route (without parameters)
 					baseRouteURL := route.BaseUrl + route.Path
+					baseRouteURLIdentity := discoverroutehelpers.NormalizeURLForIdentity(baseRouteURL)
 					mu.Lock()
-					if _, visited := visitedURLs[baseRouteURL]; !visited {
+					if _, visited := visitedURLs[baseRouteURLIdentity]; !visited {
 						nextDepthMu.Lock()
 						nextDepthUrls = append(nextDepthUrls, baseRouteURL)
 						nextDepthMu.Unlock()
@@ -600,7 +605,8 @@ func PerformRouteCapture(ctx context.Context, config discover.DiscoverRouteConfi
 						allParameterURLs := buildAllParameterURLs(route)
 						mu.Lock()
 						for _, paramURL := range allParameterURLs {
-							if _, visited := visitedURLs[paramURL]; !visited {
+							paramURLIdentity := discoverroutehelpers.NormalizeURLForIdentity(paramURL)
+							if _, visited := visitedURLs[paramURLIdentity]; !visited {
 								nextDepthMu.Lock()
 								nextDepthUrls = append(nextDepthUrls, paramURL)
 								nextDepthMu.Unlock()

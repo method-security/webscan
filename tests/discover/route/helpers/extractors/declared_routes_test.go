@@ -63,6 +63,31 @@ func TestExtractDeclaredRouteTemplatesSeparatesVerbsOnOnePath(t *testing.T) {
 	}
 }
 
+func TestExtractDeclaredRouteTemplatesIgnoresNonRouterReceivers(t *testing.T) {
+	// The Cache API and storage wrappers share the HTTP verb names. Without a router-like receiver
+	// these would surface as declared destructive endpoints.
+	serviceWorker := `caches.open('v1').then(function(cache){ cache.delete('/offline.html'); cache.put('/index.html', res); });`
+
+	routes := extractors.ExtractDeclaredRouteTemplates(serviceWorker, bundleURL)
+
+	for _, route := range routes {
+		t.Errorf("expected no declared routes, got %s %s", route.Method, route.Path)
+	}
+}
+
+func TestExtractDeclaredRouteTemplatesAcceptsRouterReceiverForms(t *testing.T) {
+	for _, declaration := range []string{
+		`router.post('/documents/:id', h)`,
+		`app.delete('/documents/:id', h)`,
+		`this.server.put('/documents/:id', h)`,
+		`apiRouter.patch('/documents/:id', h)`,
+	} {
+		if got := extractors.ExtractDeclaredRouteTemplates(declaration, bundleURL); len(got) != 1 {
+			t.Errorf("%s: expected one declared route, got %d", declaration, len(got))
+		}
+	}
+}
+
 func TestExtractDeclaredRouteTemplatesIgnoresBracketedNonRoutes(t *testing.T) {
 	// A bracketed string that declares no parameter is a regex or selector, not a route.
 	routes := extractors.ExtractDeclaredRouteTemplates(`var re = "/assets/[0-9]+/thumb"; var sel = "/a[href]";`, bundleURL)

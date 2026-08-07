@@ -193,7 +193,9 @@ var routeTablePatterns = []struct {
 	// JSX route elements that survived compilation: <Route path="/documents/:id"
 	{regexp.MustCompile(`<Route[^>]*?\spath\s*=\s*['"]([^'"]+)['"]`), 1, 0, true},
 	// Express-style registration bundled into a client or SSR chunk: router.post('/documents/:id'
-	{regexp.MustCompile(`\.(get|post|put|patch|delete)\(\s*['"](/[^'"]*)['"]`), 2, 1, true},
+	// The receiver must look like a router. Bare `.delete(`/`.put(` also matches the Cache API and
+	// storage wrappers, which would otherwise be reported as declared destructive endpoints.
+	{regexp.MustCompile(`(?:^|[^\w$])[\w$]*(?:[Rr]outer|[Aa]pp|[Ss]erver|[Aa]pi)\.(get|post|put|patch|delete)\(\s*['"](/[^'"]*)['"]`), 2, 1, true},
 	// Next.js build manifest entries: "/documents/[id]" and "/docs/[...slug]". A bracketed string
 	// that declares no parameter is a regex or selector rather than a route, so literals are not
 	// taken from this pattern.

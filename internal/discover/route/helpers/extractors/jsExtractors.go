@@ -267,6 +267,122 @@ func ExtractDeclaredRouteTemplates(content string, sourceURL string) []*discover
 	return routes
 }
 
+// templateLiteralPattern matches a backtick template literal containing at least one interpolation.
+var templateLiteralPattern = regexp.MustCompile("`([^`\\\\]{0,300}?\\$\\{[^`]{0,300}?)`")
+
+// leadingInterpolationPattern matches an interpolation at the very start of a literal. In practice
+// that is the API base URL (`${this.hostServer}/rest/...`), not a path parameter — the dominant
+// shape in shipped bundles, and the reason a plain leading-slash rule finds nothing.
+var leadingInterpolationPattern = regexp.MustCompile(`^\$\{[^}]*\}`)
+
+// interpolationPattern matches one `${...}` placeholder and captures its expression.
+var interpolationPattern = regexp.MustCompile(`\$\{([^}]*)\}`)
+
+// ExtractInterpolatedRouteTemplates recovers parameterized endpoints from interpolated URLs in
+// bundle content, e.g. `${this.hostServer}/rest/basket/${id}/coupon/${code}`.
+//
+// An interpolation in a URL position is evidence that a parameter exists there — the developer put
+// a variable in the path. That is weaker than a route table, which also names the parameter, but
+// far stronger than inferring an identifier from the shape of an observed path.
+func ExtractInterpolatedRouteTemplates(content string, sourceURL string) []*discover.RouteDetails {
+	origin, _, err := discoverroutehelpers.SplitURLBaseAndPath(sourceURL)
+	if err != nil || origin == "" {
+		return nil
+	}
+
+	seen := map[string]struct{}{}
+	var routes []*discover.RouteDetails
+
+	for _, match := range templateLiteralPattern.FindAllStringSubmatch(content, -1) {
+		template, params, ok := interpolatedTemplateFrom(match[1])
+		if !ok {
+			continue
+		}
+		if _, exists := seen[template]; exists {
+			continue
+		}
+		seen[template] = struct{}{}
+
+		evidence := discoverroutehelpers.InterpolatedRouteEvidence
+		templateValue := template
+		routes = append(routes, &discover.RouteDetails{
+			BaseUrl:      origin,
+			Path:         template,
+			Method:       common.HttpMethodGet,
+			PathParams:   params,
+			PathTemplate: &templateValue,
+			Evidence:     &evidence,
+		})
+	}
+
+	return routes
+}
+
+// interpolatedTemplateFrom converts one template literal into a `{name}` path template, or reports
+// ok=false when the literal is not a usable parameterized path.
+func interpolatedTemplateFrom(literal string) (string, []*discover.RoutePathParam, bool) {
+	// Markup and inline styles are the main non-URL sources of interpolated slashes.
+	if strings.ContainsAny(literal, "<>() ") {
+		return "", nil, false
+	}
+
+	path := leadingInterpolationPattern.ReplaceAllString(literal, "")
+	path = strings.SplitN(path, "?", 2)[0]
+	path = strings.SplitN(path, "#", 2)[0]
+
+	// A protocol-relative URL interpolates a host, not a path parameter.
+	if !strings.HasPrefix(path, "/") || strings.HasPrefix(path, "//") {
+		return "", nil, false
+	}
+	if !strings.Contains(path, "${") {
+		return "", nil, false
+	}
+
+	segments := strings.Split(path, "/")
+	taken := map[string]struct{}{}
+	var params []*discover.RoutePathParam
+
+	for i, segment := range segments {
+		if !strings.Contains(segment, "${") {
+			continue
+		}
+		previousSegment := ""
+		if i > 0 {
+			previousSegment = segments[i-1]
+		}
+		rewritten := segment
+		for {
+			location := interpolationPattern.FindStringSubmatchIndex(rewritten)
+			if location == nil {
+				break
+			}
+			expression := rewritten[location[2]:location[3]]
+			name := discoverroutehelpers.UniqueParamName(
+				discoverroutehelpers.InterpolatedParamName(expression, rewritten[:location[0]], previousSegment),
+				taken,
+			)
+			taken[name] = struct{}{}
+			params = append(params, &discover.RoutePathParam{Name: name})
+			rewritten = rewritten[:location[0]] + "{" + name + "}" + rewritten[location[1]:]
+		}
+		segments[i] = rewritten
+	}
+
+	if len(params) == 0 {
+		return "", nil, false
+	}
+
+	// A leading placeholder means the interpolated base carried the real prefix, which was
+	// discarded — `${this.host}/${id}/reviews` is `/rest/products/{id}/reviews`, not
+	// `/{id}/reviews`. Emitting it would assert an endpoint at the origin root that does not exist.
+	if len(segments) > 1 && strings.HasPrefix(segments[1], "{") {
+		return "", nil, false
+	}
+
+	template := strings.Join(segments, "/")
+	return template, params, true
+}
+
 // Common API call patterns in JavaScript
 var apiPatterns = []struct {
 	pattern *regexp.Regexp
@@ -454,6 +570,7 @@ func extractScriptContentRoutes(ctx context.Context, scriptContent string, baseU
 
 	// Declared route tables are independent of whether the bundle parses, so collect them first.
 	routes = append(routes, ExtractDeclaredRouteTemplates(scriptContent, baseURL)...)
+	routes = append(routes, ExtractInterpolatedRouteTemplates(scriptContent, baseURL)...)
 
 	// First try to parse the JavaScript code into an AST
 	program, err := parser.ParseFile(nil, "", scriptContent, parser.IgnoreRegExpErrors)

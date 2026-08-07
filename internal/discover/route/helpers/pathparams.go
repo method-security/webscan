@@ -239,3 +239,77 @@ func MergePathParams(params1 []*discover.RoutePathParam, params2 []*discover.Rou
 	}
 	return mergedParams
 }
+
+// InterpolatedRouteEvidence tags routes recovered from an interpolated URL in a bundle. The
+// interpolation proves a parameter exists at that position, but unlike a route table it does not
+// reliably name it — bundles are minified and the expression is often a single letter.
+const InterpolatedRouteEvidence = "interpolated"
+
+// identifierExpressionPattern matches an interpolation body that is a plain identifier or property
+// access, e.g. `orderId` or `this.orderId`, as opposed to a call or arithmetic expression.
+var identifierExpressionPattern = regexp.MustCompile(`^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*$`)
+
+// trailingWordPattern captures the last alphabetic word in a fragment of literal path text.
+var trailingWordPattern = regexp.MustCompile(`([A-Za-z][A-Za-z0-9]*)[^A-Za-z0-9]*$`)
+
+// singularize strips a naive English plural suffix so `basket` and `products` both read naturally
+// with an `Id` suffix.
+func singularize(word string) string {
+	switch {
+	case strings.HasSuffix(word, "ies") && len(word) > 3:
+		return word[:len(word)-3] + "y"
+	case strings.HasSuffix(word, "sses"), strings.HasSuffix(word, "shes"), strings.HasSuffix(word, "ches"):
+		return word[:len(word)-2]
+	case strings.HasSuffix(word, "ss"):
+		return word
+	case strings.HasSuffix(word, "s") && len(word) > 1:
+		return word[:len(word)-1]
+	}
+	return word
+}
+
+// trailingWord returns the last alphabetic word in a fragment, or "" when there is none.
+func trailingWord(fragment string) string {
+	match := trailingWordPattern.FindStringSubmatch(fragment)
+	if match == nil {
+		return ""
+	}
+	return match[1]
+}
+
+// InterpolatedParamName picks the most defensible name for a parameter recovered from an
+// interpolated URL, preferring evidence in this order: the interpolated expression itself, the
+// literal text preceding it inside the same segment, then the preceding path segment.
+//
+// Unlike a declared route this name is derived rather than authoritative. The interpolation is what
+// proves the parameter exists; only the label is a best effort.
+func InterpolatedParamName(expression string, segmentPrefix string, previousSegment string) string {
+	if identifierExpressionPattern.MatchString(expression) {
+		parts := strings.Split(expression, ".")
+		last := parts[len(parts)-1]
+		// Minified bundles collapse locals to one or two characters, which carry no meaning.
+		if len(last) >= 3 && !strings.EqualFold(last, "this") {
+			return last
+		}
+	}
+	if word := trailingWord(segmentPrefix); word != "" {
+		return singularize(word) + "Id"
+	}
+	if word := trailingWord(previousSegment); word != "" {
+		return singularize(word) + "Id"
+	}
+	return "param"
+}
+
+// UniqueParamName returns name, or the first numbered variant not already taken. Path parameter
+// names must be unique within a route because the ontology keys a WebEndpointParameter on
+// (parameter_name, parameter_location).
+func UniqueParamName(name string, taken map[string]struct{}) string {
+	candidate := name
+	for suffix := 2; ; suffix++ {
+		if _, exists := taken[candidate]; !exists {
+			return candidate
+		}
+		candidate = fmt.Sprintf("%s%d", name, suffix)
+	}
+}

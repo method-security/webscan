@@ -312,7 +312,9 @@ func URLRemoveQueryParams(rawURL string) (string, error) {
 	return parsedURL.String(), nil
 }
 
-// SplitURLBaseAndPath returns the URL origin and escaped path as separate route fields.
+// SplitURLBaseAndPath returns the URL origin and escaped path as separate route
+// fields. HTTP(S) origins always include their effective port so implicit and
+// explicit default-port URLs collapse into the same route/application bucket.
 func SplitURLBaseAndPath(rawURL string) (string, string, error) {
 	parsedURL, err := url.Parse(rawURL)
 	if err != nil {
@@ -321,12 +323,37 @@ func SplitURLBaseAndPath(rawURL string) (string, string, error) {
 
 	baseURL := ""
 	if parsedURL.Scheme != "" && parsedURL.Host != "" {
-		baseURL = fmt.Sprintf("%s://%s", parsedURL.Scheme, parsedURL.Host)
+		baseURL = fmt.Sprintf("%s://%s", parsedURL.Scheme, hostWithDefaultPort(parsedURL))
 	} else if parsedURL.Host != "" {
 		baseURL = "//" + parsedURL.Host
 	}
 
 	return strings.TrimRight(baseURL, "/"), parsedURL.EscapedPath(), nil
+}
+
+func hostWithDefaultPort(parsedURL *url.URL) string {
+	if parsedURL == nil {
+		return ""
+	}
+	if parsedURL.Host == "" || parsedURL.Port() != "" {
+		return parsedURL.Host
+	}
+
+	var defaultPort string
+	switch strings.ToLower(parsedURL.Scheme) {
+	case "http":
+		defaultPort = "80"
+	case "https":
+		defaultPort = "443"
+	default:
+		return parsedURL.Host
+	}
+
+	host := net.JoinHostPort(parsedURL.Hostname(), defaultPort)
+	if parsedURL.User != nil {
+		host = parsedURL.User.String() + "@" + host
+	}
+	return host
 }
 
 // IsURLAllowed checks if a target URL is allowed based on the scope anchor, host

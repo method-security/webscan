@@ -407,11 +407,7 @@ func buildWebApplications(routes []*discover.RouteDetails, staticAssetsByBaseURL
 			staticAssetDetails = &discover.StaticAssetDetails{}
 		}
 		for _, staticAsset := range discoverroutehelpers.MergeStaticAssets(staticAssets) {
-			staticAssetBaseURL, _, err := discoverroutehelpers.SplitURLBaseAndPath(staticAsset)
-			if err != nil {
-				continue
-			}
-			if staticAssetBaseURL == baseURL {
+			if utils.IsHostInScope(baseURL, staticAsset) {
 				staticAssetDetails.Local = append(staticAssetDetails.Local, staticAsset)
 			} else {
 				staticAssetDetails.Remote = append(staticAssetDetails.Remote, staticAsset)

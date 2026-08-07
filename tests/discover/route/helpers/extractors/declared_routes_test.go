@@ -75,6 +75,16 @@ func TestExtractDeclaredRouteTemplatesIgnoresNonRouterReceivers(t *testing.T) {
 	}
 }
 
+func TestExtractDeclaredRouteTemplatesIgnoresHttpClientCallSites(t *testing.T) {
+	// `api` and `app` are also the usual names for an axios/fetch client. A concrete call site
+	// recorded as a declared literal would outrank a matching template and block folding.
+	routes := extractors.ExtractDeclaredRouteTemplates(`api.get('/documents/1042').then(r => r.data)`, bundleURL)
+
+	for _, route := range routes {
+		t.Errorf("expected no declared routes from a call site, got %s %s", route.Method, route.Path)
+	}
+}
+
 func TestExtractDeclaredRouteTemplatesAcceptsRouterReceiverForms(t *testing.T) {
 	for _, declaration := range []string{
 		`router.post('/documents/:id', h)`,

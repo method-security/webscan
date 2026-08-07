@@ -195,7 +195,11 @@ var routeTablePatterns = []struct {
 	// Express-style registration bundled into a client or SSR chunk: router.post('/documents/:id'
 	// The receiver must look like a router. Bare `.delete(`/`.put(` also matches the Cache API and
 	// storage wrappers, which would otherwise be reported as declared destructive endpoints.
-	{regexp.MustCompile(`(?:^|[^\w$])[\w$]*(?:[Rr]outer|[Aa]pp|[Ss]erver|[Aa]pi)\.(get|post|put|patch|delete)\(\s*['"](/[^'"]*)['"]`), 2, 1, true},
+	//
+	// Literals are not taken from this pattern: `api` and `app` are also the usual names for an
+	// HTTP client, so `api.get('/documents/1042')` is a call site rather than a declaration. A
+	// parameterized match stays trustworthy because a call site never carries a literal `:id`.
+	{regexp.MustCompile(`(?:^|[^\w$])[\w$]*(?:[Rr]outer|[Aa]pp|[Ss]erver|[Aa]pi)\.(get|post|put|patch|delete)\(\s*['"](/[^'"]*)['"]`), 2, 1, false},
 	// Next.js build manifest entries: "/documents/[id]" and "/docs/[...slug]". A bracketed string
 	// that declares no parameter is a regex or selector rather than a route, so literals are not
 	// taken from this pattern.

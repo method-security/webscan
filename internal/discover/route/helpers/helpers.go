@@ -64,7 +64,7 @@ func MergeWebRoutes(routes []*discover.RouteDetails) []*discover.RouteDetails {
 			normalizedPath = ""
 		}
 
-		key := fmt.Sprintf("%s:%s%s", method, route.BaseUrl, normalizedPath)
+		key := fmt.Sprintf("%s:%s%s", method, NormalizeBaseURLForIdentity(route.BaseUrl), normalizedPath)
 
 		if existingRoute, exists := routeMap[key]; exists {
 			// Merge QueryParams
@@ -327,6 +327,54 @@ func SplitURLBaseAndPath(rawURL string) (string, string, error) {
 	}
 
 	return strings.TrimRight(baseURL, "/"), parsedURL.EscapedPath(), nil
+}
+
+// NormalizeBaseURLForIdentity returns a stable origin key for route comparison
+// and result bucketing without changing the URL used for outbound requests.
+// HTTP(S) origins include their effective port so implicit and explicit default
+// ports collapse into the same identity. Userinfo is intentionally excluded.
+func NormalizeBaseURLForIdentity(rawURL string) string {
+	parsedURL, err := url.Parse(rawURL)
+	if err != nil || parsedURL.Scheme == "" || parsedURL.Host == "" {
+		return strings.TrimRight(rawURL, "/")
+	}
+
+	scheme := strings.ToLower(parsedURL.Scheme)
+	host := strings.ToLower(parsedURL.Hostname())
+	port := parsedURL.Port()
+	if port == "" {
+		switch scheme {
+		case "http":
+			port = "80"
+		case "https":
+			port = "443"
+		}
+	}
+	if port != "" {
+		host = net.JoinHostPort(host, port)
+	}
+
+	return fmt.Sprintf("%s://%s", scheme, host)
+}
+
+// NormalizeURLForIdentity returns a stable request URL key for visited-route
+// deduplication while preserving the original URL for the actual request.
+func NormalizeURLForIdentity(rawURL string) string {
+	parsedURL, err := url.Parse(rawURL)
+	if err != nil {
+		return rawURL
+	}
+
+	baseURL := NormalizeBaseURLForIdentity(rawURL)
+	if baseURL == "" {
+		return rawURL
+	}
+
+	identity := baseURL + parsedURL.EscapedPath()
+	if parsedURL.RawQuery != "" {
+		identity += "?" + parsedURL.RawQuery
+	}
+	return identity
 }
 
 // IsURLAllowed checks if a target URL is allowed based on the scope anchor, host

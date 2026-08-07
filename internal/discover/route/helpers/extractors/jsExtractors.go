@@ -321,11 +321,6 @@ func ExtractInterpolatedRouteTemplates(content string, sourceURL string) []*disc
 // interpolatedTemplateFrom converts one template literal into a `{name}` path template, or reports
 // ok=false when the literal is not a usable parameterized path.
 func interpolatedTemplateFrom(literal string) (string, []*discover.RoutePathParam, bool) {
-	// Markup and inline styles are the main non-URL sources of interpolated slashes.
-	if strings.ContainsAny(literal, "<>() ") {
-		return "", nil, false
-	}
-
 	path := leadingInterpolationPattern.ReplaceAllString(literal, "")
 	path = strings.SplitN(path, "?", 2)[0]
 	path = strings.SplitN(path, "#", 2)[0]
@@ -380,6 +375,13 @@ func interpolatedTemplateFrom(literal string) (string, []*discover.RoutePathPara
 	}
 
 	template := strings.Join(segments, "/")
+	// Validate the literal text only after substitution, so an expression like
+	// `${encodeURIComponent(id)}` is not mistaken for prose. Markup and spaces in what remains mean
+	// this was never a URL — a closing tag such as `</div>` is slash-prefixed and would otherwise
+	// survive every check above.
+	if strings.ContainsAny(template, "<> ") {
+		return "", nil, false
+	}
 	return template, params, true
 }
 

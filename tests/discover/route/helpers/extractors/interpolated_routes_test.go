@@ -79,6 +79,21 @@ func TestExtractInterpolatedRoutesHandlesPartialSegmentInterpolation(t *testing.
 	}
 }
 
+func TestExtractInterpolatedRoutesAcceptsWrappedExpressions(t *testing.T) {
+	// Wrapping an id in encodeURIComponent is standard practice, and whitespace inside an
+	// interpolation says nothing about whether the literal is a URL. Validation therefore runs on
+	// the substituted template rather than the raw literal.
+	for declaration, want := range map[string]string{
+		"fetch(`/api/user/${encodeURIComponent(id)}`)": "/api/user/{userId}",
+		"fetch(`/api/item/${ id }`)":                   "/api/item/{itemId}",
+	} {
+		route := onlyRoute(t, interpolated(t, declaration))
+		if route.Path != want {
+			t.Errorf("%s: path = %q, want %q", declaration, route.Path, want)
+		}
+	}
+}
+
 func TestExtractInterpolatedRoutesRejectsNonPathInterpolations(t *testing.T) {
 	cases := map[string]string{
 		"markup":              "const h = `<code>${e.data[0].orderId}</code>`",
@@ -88,6 +103,9 @@ func TestExtractInterpolatedRoutesRejectsNonPathInterpolations(t *testing.T) {
 		"leading param":       "const u = `${this.host}/${e}/reviews`",
 		"whole path is param": "const u = `${this.host}/${e}`",
 		"no interpolation":    "const u = `/rest/languages`",
+		// A closing tag is slash-prefixed and survives every other check.
+		"closing tag": "const x = `</div>${y}`",
+		"prose":       "const p = `/5 items ${count}`",
 	}
 
 	for name, content := range cases {

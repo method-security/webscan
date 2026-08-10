@@ -3,7 +3,9 @@ package data
 // Data consists of the main set of fake information
 var Data = map[string]map[string][]string{
 	"person":    Person,
+	"auth":      Auth,
 	"address":   Address,
+	"airline":   Airline,
 	"company":   Company,
 	"job":       Job,
 	"lorem":     Lorem,
@@ -22,7 +24,7 @@ var Data = map[string]map[string][]string{
 	"car":       Car,
 	"emoji":     Emoji,
 	"word":      Word,
-	"sentence":  Sentence,
+	"text":      Text,
 	"food":      Food,
 	"minecraft": Minecraft,
 	"celebrity": Celebrity,
@@ -33,6 +35,7 @@ var Data = map[string]map[string][]string{
 	"school":    School,
 	"song":      Songs,
 	"product":   Product,
+	"bank":      Bank,
 }
 
 func List() map[string][]string {

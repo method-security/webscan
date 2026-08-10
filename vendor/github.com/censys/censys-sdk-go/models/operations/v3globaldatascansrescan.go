@@ -10,32 +10,38 @@ type V3GlobaldataScansRescanGlobals struct {
 	OrganizationID *string `queryParam:"style=form,explode=true,name=organization_id"`
 }
 
-func (o *V3GlobaldataScansRescanGlobals) GetOrganizationID() *string {
-	if o == nil {
+func (v *V3GlobaldataScansRescanGlobals) GetOrganizationID() *string {
+	if v == nil {
 		return nil
 	}
-	return o.OrganizationID
+	return v.OrganizationID
 }
 
+// #region class-body-v3globaldatascansrescanglobals
+// #endregion class-body-v3globaldatascansrescanglobals
+
 type V3GlobaldataScansRescanRequest struct {
-	// The ID of a Censys organization to associate the request with. See the [Getting Started docs](https://docs.censys.com/reference/get-started#step-3-set-your-organization-id) for more information.
+	// The ID of a Censys organization to associate the request with. See the [Getting Started docs](https://docs.censys.com/reference/get-started#step-3-find-and-use-your-organization-id-optional) for more information.
 	OrganizationID       *string                         `queryParam:"style=form,explode=false,name=organization_id"`
 	ScansRescanInputBody components.ScansRescanInputBody `request:"mediaType=application/json"`
 }
 
-func (o *V3GlobaldataScansRescanRequest) GetOrganizationID() *string {
-	if o == nil {
+func (v *V3GlobaldataScansRescanRequest) GetOrganizationID() *string {
+	if v == nil {
 		return nil
 	}
-	return o.OrganizationID
+	return v.OrganizationID
 }
 
-func (o *V3GlobaldataScansRescanRequest) GetScansRescanInputBody() components.ScansRescanInputBody {
-	if o == nil {
+func (v *V3GlobaldataScansRescanRequest) GetScansRescanInputBody() components.ScansRescanInputBody {
+	if v == nil {
 		return components.ScansRescanInputBody{}
 	}
-	return o.ScansRescanInputBody
+	return v.ScansRescanInputBody
 }
+
+// #region class-body-v3globaldatascansrescanrequest
+// #endregion class-body-v3globaldatascansrescanrequest
 
 type V3GlobaldataScansRescanResponse struct {
 	HTTPMeta components.HTTPMetadata `json:"-"`
@@ -44,23 +50,26 @@ type V3GlobaldataScansRescanResponse struct {
 	Headers                     map[string][]string
 }
 
-func (o *V3GlobaldataScansRescanResponse) GetHTTPMeta() components.HTTPMetadata {
-	if o == nil {
+func (v *V3GlobaldataScansRescanResponse) GetHTTPMeta() components.HTTPMetadata {
+	if v == nil {
 		return components.HTTPMetadata{}
 	}
-	return o.HTTPMeta
+	return v.HTTPMeta
 }
 
-func (o *V3GlobaldataScansRescanResponse) GetResponseEnvelopeTrackedScan() *components.ResponseEnvelopeTrackedScan {
-	if o == nil {
+func (v *V3GlobaldataScansRescanResponse) GetResponseEnvelopeTrackedScan() *components.ResponseEnvelopeTrackedScan {
+	if v == nil {
 		return nil
 	}
-	return o.ResponseEnvelopeTrackedScan
+	return v.ResponseEnvelopeTrackedScan
 }
 
-func (o *V3GlobaldataScansRescanResponse) GetHeaders() map[string][]string {
-	if o == nil {
+func (v *V3GlobaldataScansRescanResponse) GetHeaders() map[string][]string {
+	if v == nil {
 		return map[string][]string{}
 	}
-	return o.Headers
+	return v.Headers
 }
+
+// #region class-body-v3globaldatascansrescanresponse
+// #endregion class-body-v3globaldatascansrescanresponse

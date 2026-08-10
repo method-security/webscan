@@ -3,20 +3,20 @@
 package components
 
 type ElasticSearchResultsNodeInfoClusterCombinedInfoIndicesStore struct {
-	ReservedInBytes *int `json:"reserved_in_bytes,omitempty"`
-	SizeInBytes     *int `json:"size_in_bytes,omitempty"`
+	ReservedInBytes *int64 `json:"reserved_in_bytes,omitempty"`
+	SizeInBytes     *int64 `json:"size_in_bytes,omitempty"`
 }
 
-func (o *ElasticSearchResultsNodeInfoClusterCombinedInfoIndicesStore) GetReservedInBytes() *int {
-	if o == nil {
+func (e *ElasticSearchResultsNodeInfoClusterCombinedInfoIndicesStore) GetReservedInBytes() *int64 {
+	if e == nil {
 		return nil
 	}
-	return o.ReservedInBytes
+	return e.ReservedInBytes
 }
 
-func (o *ElasticSearchResultsNodeInfoClusterCombinedInfoIndicesStore) GetSizeInBytes() *int {
-	if o == nil {
+func (e *ElasticSearchResultsNodeInfoClusterCombinedInfoIndicesStore) GetSizeInBytes() *int64 {
+	if e == nil {
 		return nil
 	}
-	return o.SizeInBytes
+	return e.SizeInBytes
 }

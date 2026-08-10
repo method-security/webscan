@@ -179,6 +179,14 @@ func (this EvaluableExpression) Eval(parameters Parameters) (interface{}, error)
 }
 
 func (this EvaluableExpression) evaluateStage(stage *evaluationStage, parameters Parameters) (interface{}, error) {
+	// Defensive invariant checks. Under normal planning these never fail, but a
+	// nil stage/operator would otherwise panic on the hot path.
+	if stage == nil {
+		return nil, fmt.Errorf("invalid evaluation stage for expression '%v': nil stage", this.inputExpression)
+	}
+	if stage.operator == nil {
+		return nil, fmt.Errorf("invalid evaluation stage for expression '%v': nil operator at symbol '%v'", this.inputExpression, stage.symbol.String())
+	}
 
 	var left, right interface{}
 	var err error
@@ -284,7 +292,11 @@ func (this EvaluableExpression) Vars() []string {
 	var varlist []string
 	for _, val := range this.Tokens() {
 		if val.Kind == VARIABLE {
-			varlist = append(varlist, val.Value.(string))
+			name, ok := val.Value.(string)
+			if !ok {
+				continue
+			}
+			varlist = append(varlist, name)
 		}
 	}
 	return varlist

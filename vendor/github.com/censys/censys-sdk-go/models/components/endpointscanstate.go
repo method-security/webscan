@@ -2,253 +2,342 @@
 
 package components
 
-import (
-	"encoding/json"
-	"fmt"
-)
-
-type TransportProtocol string
+type EndpointScanStateTransportProtocol string
 
 const (
-	TransportProtocolUnknown TransportProtocol = ""
-	TransportProtocolTCP     TransportProtocol = "tcp"
-	TransportProtocolUDP     TransportProtocol = "udp"
-	TransportProtocolIcmp    TransportProtocol = "icmp"
-	TransportProtocolQuic    TransportProtocol = "quic"
+	EndpointScanStateTransportProtocolUnknown EndpointScanStateTransportProtocol = ""
+	EndpointScanStateTransportProtocolTCP     EndpointScanStateTransportProtocol = "tcp"
+	EndpointScanStateTransportProtocolUDP     EndpointScanStateTransportProtocol = "udp"
+	EndpointScanStateTransportProtocolIcmp    EndpointScanStateTransportProtocol = "icmp"
+	EndpointScanStateTransportProtocolQuic    EndpointScanStateTransportProtocol = "quic"
 )
 
-func (e TransportProtocol) ToPointer() *TransportProtocol {
+func (e EndpointScanStateTransportProtocol) ToPointer() *EndpointScanStateTransportProtocol {
 	return &e
 }
-func (e *TransportProtocol) UnmarshalJSON(data []byte) error {
-	var v string
-	if err := json.Unmarshal(data, &v); err != nil {
-		return err
+
+// IsExact returns true if the value matches a known enum value, false otherwise.
+func (e *EndpointScanStateTransportProtocol) IsExact() bool {
+	if e != nil {
+		switch *e {
+		case "", "tcp", "udp", "icmp", "quic":
+			return true
+		}
 	}
-	switch v {
-	case "":
-		fallthrough
-	case "tcp":
-		fallthrough
-	case "udp":
-		fallthrough
-	case "icmp":
-		fallthrough
-	case "quic":
-		*e = TransportProtocol(v)
-		return nil
-	default:
-		return fmt.Errorf("invalid value for TransportProtocol: %v", v)
-	}
+	return false
 }
 
 type EndpointScanState struct {
-	Banner            *string            `json:"banner,omitempty"`
-	BannerHashSha256  *string            `json:"banner_hash_sha256,omitempty"`
-	ChromeDevtools    *ChromeDevtools    `json:"chrome_devtools,omitempty"`
-	CobaltStrike      *CobaltStrike      `json:"cobalt_strike,omitempty"`
-	Elasticsearch     *ElasticSearch     `json:"elasticsearch,omitempty"`
-	EndpointType      *string            `json:"endpoint_type,omitempty"`
-	Fortigate         *Fortigate         `json:"fortigate,omitempty"`
-	Graphql           *Graphql           `json:"graphql,omitempty"`
-	Hostname          *string            `json:"hostname,omitempty"`
-	HTTP              *HTTP              `json:"http,omitempty"`
-	IP                *string            `json:"ip,omitempty"`
-	IvantiAvalanche   *IvantiAvalanche   `json:"ivanti_avalanche,omitempty"`
-	Kubernetes        *Kubernetes        `json:"kubernetes,omitempty"`
-	Ollama            *Ollama            `json:"ollama,omitempty"`
-	OpenDirectory     *OpenDirectory     `json:"open_directory,omitempty"`
-	Path              *string            `json:"path,omitempty"`
-	PlexMediaServer   *PlexMediaServer   `json:"plex_media_server,omitempty"`
-	Port              *int               `json:"port,omitempty"`
-	Pprof             *Pprof             `json:"pprof,omitempty"`
-	Prometheus        *Prometheus        `json:"prometheus,omitempty"`
-	PrometheusTarget  *PrometheusTarget  `json:"prometheus_target,omitempty"`
-	RedlionWeb        *RedlionWeb        `json:"redlion_web,omitempty"`
-	ScadaView         *ScadaView         `json:"scada_view,omitempty"`
-	ScanTime          *string            `json:"scan_time,omitempty"`
-	Screenshots       []Screenshot       `json:"screenshots,omitempty"`
-	TransportProtocol *TransportProtocol `json:"transport_protocol,omitempty"`
+	Argocd            *Argocd                             `json:"argocd,omitempty"`
+	Banner            *string                             `json:"banner,omitempty"`
+	BannerHashSha256  *string                             `json:"banner_hash_sha256,omitempty"`
+	ChromeDevtools    *ChromeDevtools                     `json:"chrome_devtools,omitempty"`
+	ClickhouseHTTP    *ClickHouseHTTP                     `json:"clickhouse_http,omitempty"`
+	CobaltStrike      *CobaltStrike                       `json:"cobalt_strike,omitempty"`
+	Elasticsearch     *ElasticSearch                      `json:"elasticsearch,omitempty"`
+	EndpointType      *string                             `json:"endpoint_type,omitempty"`
+	Extracted         *ExtractedEndpointData              `json:"extracted,omitempty"`
+	Fortigate         *Fortigate                          `json:"fortigate,omitempty"`
+	Graphql           *Graphql                            `json:"graphql,omitempty"`
+	Hostname          *string                             `json:"hostname,omitempty"`
+	HTTP              *HTTP                               `json:"http,omitempty"`
+	Influxdb          *Influxdb                           `json:"influxdb,omitempty"`
+	IP                *string                             `json:"ip,omitempty"`
+	IvantiAvalanche   *IvantiAvalanche                    `json:"ivanti_avalanche,omitempty"`
+	Jenkins           *Jenkins                            `json:"jenkins,omitempty"`
+	Jupyter           *Jupyter                            `json:"jupyter,omitempty"`
+	Keycloak          *Keycloak                           `json:"keycloak,omitempty"`
+	Kubernetes        *Kubernetes                         `json:"kubernetes,omitempty"`
+	Mcp               *Mcp                                `json:"mcp,omitempty"`
+	NginxProxyManager *NginxProxyManager                  `json:"nginx_proxy_manager,omitempty"`
+	Ollama            *Ollama                             `json:"ollama,omitempty"`
+	OpenDirectory     *OpenDirectory                      `json:"open_directory,omitempty"`
+	Path              *string                             `json:"path,omitempty"`
+	PlexMediaServer   *PlexMediaServer                    `json:"plex_media_server,omitempty"`
+	Port              *int                                `json:"port,omitempty"`
+	Pprof             *Pprof                              `json:"pprof,omitempty"`
+	Prometheus        *Prometheus                         `json:"prometheus,omitempty"`
+	PrometheusTarget  *PrometheusTarget                   `json:"prometheus_target,omitempty"`
+	ProxmoxVe         *ProxmoxVe                          `json:"proxmox_ve,omitempty"`
+	RedlionWeb        *RedlionWeb                         `json:"redlion_web,omitempty"`
+	ScadaView         *ScadaView                          `json:"scada_view,omitempty"`
+	ScanTime          *string                             `json:"scan_time,omitempty"`
+	Screenshots       []Screenshot                        `json:"screenshots,omitempty"`
+	SynologyDsm       *SynologyDsm                        `json:"synology_dsm,omitempty"`
+	TransportProtocol *EndpointScanStateTransportProtocol `json:"transport_protocol,omitempty"`
+	Vault             *Vault                              `json:"vault,omitempty"`
+	Wordpress         *Wordpress                          `json:"wordpress,omitempty"`
 }
 
-func (o *EndpointScanState) GetBanner() *string {
-	if o == nil {
+func (e *EndpointScanState) GetArgocd() *Argocd {
+	if e == nil {
 		return nil
 	}
-	return o.Banner
+	return e.Argocd
 }
 
-func (o *EndpointScanState) GetBannerHashSha256() *string {
-	if o == nil {
+func (e *EndpointScanState) GetBanner() *string {
+	if e == nil {
 		return nil
 	}
-	return o.BannerHashSha256
+	return e.Banner
 }
 
-func (o *EndpointScanState) GetChromeDevtools() *ChromeDevtools {
-	if o == nil {
+func (e *EndpointScanState) GetBannerHashSha256() *string {
+	if e == nil {
 		return nil
 	}
-	return o.ChromeDevtools
+	return e.BannerHashSha256
 }
 
-func (o *EndpointScanState) GetCobaltStrike() *CobaltStrike {
-	if o == nil {
+func (e *EndpointScanState) GetChromeDevtools() *ChromeDevtools {
+	if e == nil {
 		return nil
 	}
-	return o.CobaltStrike
+	return e.ChromeDevtools
 }
 
-func (o *EndpointScanState) GetElasticsearch() *ElasticSearch {
-	if o == nil {
+func (e *EndpointScanState) GetClickhouseHTTP() *ClickHouseHTTP {
+	if e == nil {
 		return nil
 	}
-	return o.Elasticsearch
+	return e.ClickhouseHTTP
 }
 
-func (o *EndpointScanState) GetEndpointType() *string {
-	if o == nil {
+func (e *EndpointScanState) GetCobaltStrike() *CobaltStrike {
+	if e == nil {
 		return nil
 	}
-	return o.EndpointType
+	return e.CobaltStrike
 }
 
-func (o *EndpointScanState) GetFortigate() *Fortigate {
-	if o == nil {
+func (e *EndpointScanState) GetElasticsearch() *ElasticSearch {
+	if e == nil {
 		return nil
 	}
-	return o.Fortigate
+	return e.Elasticsearch
 }
 
-func (o *EndpointScanState) GetGraphql() *Graphql {
-	if o == nil {
+func (e *EndpointScanState) GetEndpointType() *string {
+	if e == nil {
 		return nil
 	}
-	return o.Graphql
+	return e.EndpointType
 }
 
-func (o *EndpointScanState) GetHostname() *string {
-	if o == nil {
+func (e *EndpointScanState) GetExtracted() *ExtractedEndpointData {
+	if e == nil {
 		return nil
 	}
-	return o.Hostname
+	return e.Extracted
 }
 
-func (o *EndpointScanState) GetHTTP() *HTTP {
-	if o == nil {
+func (e *EndpointScanState) GetFortigate() *Fortigate {
+	if e == nil {
 		return nil
 	}
-	return o.HTTP
+	return e.Fortigate
 }
 
-func (o *EndpointScanState) GetIP() *string {
-	if o == nil {
+func (e *EndpointScanState) GetGraphql() *Graphql {
+	if e == nil {
 		return nil
 	}
-	return o.IP
+	return e.Graphql
 }
 
-func (o *EndpointScanState) GetIvantiAvalanche() *IvantiAvalanche {
-	if o == nil {
+func (e *EndpointScanState) GetHostname() *string {
+	if e == nil {
 		return nil
 	}
-	return o.IvantiAvalanche
+	return e.Hostname
 }
 
-func (o *EndpointScanState) GetKubernetes() *Kubernetes {
-	if o == nil {
+func (e *EndpointScanState) GetHTTP() *HTTP {
+	if e == nil {
 		return nil
 	}
-	return o.Kubernetes
+	return e.HTTP
 }
 
-func (o *EndpointScanState) GetOllama() *Ollama {
-	if o == nil {
+func (e *EndpointScanState) GetInfluxdb() *Influxdb {
+	if e == nil {
 		return nil
 	}
-	return o.Ollama
+	return e.Influxdb
 }
 
-func (o *EndpointScanState) GetOpenDirectory() *OpenDirectory {
-	if o == nil {
+func (e *EndpointScanState) GetIP() *string {
+	if e == nil {
 		return nil
 	}
-	return o.OpenDirectory
+	return e.IP
 }
 
-func (o *EndpointScanState) GetPath() *string {
-	if o == nil {
+func (e *EndpointScanState) GetIvantiAvalanche() *IvantiAvalanche {
+	if e == nil {
 		return nil
 	}
-	return o.Path
+	return e.IvantiAvalanche
 }
 
-func (o *EndpointScanState) GetPlexMediaServer() *PlexMediaServer {
-	if o == nil {
+func (e *EndpointScanState) GetJenkins() *Jenkins {
+	if e == nil {
 		return nil
 	}
-	return o.PlexMediaServer
+	return e.Jenkins
 }
 
-func (o *EndpointScanState) GetPort() *int {
-	if o == nil {
+func (e *EndpointScanState) GetJupyter() *Jupyter {
+	if e == nil {
 		return nil
 	}
-	return o.Port
+	return e.Jupyter
 }
 
-func (o *EndpointScanState) GetPprof() *Pprof {
-	if o == nil {
+func (e *EndpointScanState) GetKeycloak() *Keycloak {
+	if e == nil {
 		return nil
 	}
-	return o.Pprof
+	return e.Keycloak
 }
 
-func (o *EndpointScanState) GetPrometheus() *Prometheus {
-	if o == nil {
+func (e *EndpointScanState) GetKubernetes() *Kubernetes {
+	if e == nil {
 		return nil
 	}
-	return o.Prometheus
+	return e.Kubernetes
 }
 
-func (o *EndpointScanState) GetPrometheusTarget() *PrometheusTarget {
-	if o == nil {
+func (e *EndpointScanState) GetMcp() *Mcp {
+	if e == nil {
 		return nil
 	}
-	return o.PrometheusTarget
+	return e.Mcp
 }
 
-func (o *EndpointScanState) GetRedlionWeb() *RedlionWeb {
-	if o == nil {
+func (e *EndpointScanState) GetNginxProxyManager() *NginxProxyManager {
+	if e == nil {
 		return nil
 	}
-	return o.RedlionWeb
+	return e.NginxProxyManager
 }
 
-func (o *EndpointScanState) GetScadaView() *ScadaView {
-	if o == nil {
+func (e *EndpointScanState) GetOllama() *Ollama {
+	if e == nil {
 		return nil
 	}
-	return o.ScadaView
+	return e.Ollama
 }
 
-func (o *EndpointScanState) GetScanTime() *string {
-	if o == nil {
+func (e *EndpointScanState) GetOpenDirectory() *OpenDirectory {
+	if e == nil {
 		return nil
 	}
-	return o.ScanTime
+	return e.OpenDirectory
 }
 
-func (o *EndpointScanState) GetScreenshots() []Screenshot {
-	if o == nil {
+func (e *EndpointScanState) GetPath() *string {
+	if e == nil {
 		return nil
 	}
-	return o.Screenshots
+	return e.Path
 }
 
-func (o *EndpointScanState) GetTransportProtocol() *TransportProtocol {
-	if o == nil {
+func (e *EndpointScanState) GetPlexMediaServer() *PlexMediaServer {
+	if e == nil {
 		return nil
 	}
-	return o.TransportProtocol
+	return e.PlexMediaServer
+}
+
+func (e *EndpointScanState) GetPort() *int {
+	if e == nil {
+		return nil
+	}
+	return e.Port
+}
+
+func (e *EndpointScanState) GetPprof() *Pprof {
+	if e == nil {
+		return nil
+	}
+	return e.Pprof
+}
+
+func (e *EndpointScanState) GetPrometheus() *Prometheus {
+	if e == nil {
+		return nil
+	}
+	return e.Prometheus
+}
+
+func (e *EndpointScanState) GetPrometheusTarget() *PrometheusTarget {
+	if e == nil {
+		return nil
+	}
+	return e.PrometheusTarget
+}
+
+func (e *EndpointScanState) GetProxmoxVe() *ProxmoxVe {
+	if e == nil {
+		return nil
+	}
+	return e.ProxmoxVe
+}
+
+func (e *EndpointScanState) GetRedlionWeb() *RedlionWeb {
+	if e == nil {
+		return nil
+	}
+	return e.RedlionWeb
+}
+
+func (e *EndpointScanState) GetScadaView() *ScadaView {
+	if e == nil {
+		return nil
+	}
+	return e.ScadaView
+}
+
+func (e *EndpointScanState) GetScanTime() *string {
+	if e == nil {
+		return nil
+	}
+	return e.ScanTime
+}
+
+func (e *EndpointScanState) GetScreenshots() []Screenshot {
+	if e == nil {
+		return nil
+	}
+	return e.Screenshots
+}
+
+func (e *EndpointScanState) GetSynologyDsm() *SynologyDsm {
+	if e == nil {
+		return nil
+	}
+	return e.SynologyDsm
+}
+
+func (e *EndpointScanState) GetTransportProtocol() *EndpointScanStateTransportProtocol {
+	if e == nil {
+		return nil
+	}
+	return e.TransportProtocol
+}
+
+func (e *EndpointScanState) GetVault() *Vault {
+	if e == nil {
+		return nil
+	}
+	return e.Vault
+}
+
+func (e *EndpointScanState) GetWordpress() *Wordpress {
+	if e == nil {
+		return nil
+	}
+	return e.Wordpress
 }

@@ -6,17 +6,18 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 
 	utils "github.com/sashabaranov/go-openai/internal"
 )
 
 var (
-	headerData  = []byte("data: ")
-	errorPrefix = []byte(`data: {"error":`)
+	headerData  = regexp.MustCompile(`^data:\s*`)
+	errorPrefix = regexp.MustCompile(`^data:\s*{"error":`)
 )
 
 type streamable interface {
-	ChatCompletionStreamResponse | CompletionResponse
+	ChatCompletionStreamResponse | CompletionResponse | ResponseStreamEvent
 }
 
 type streamReader[T streamable] struct {
@@ -63,19 +64,25 @@ func (stream *streamReader[T]) processLines() ([]byte, error) {
 		rawLine, readErr := stream.reader.ReadBytes('\n')
 		if readErr != nil || hasErrorPrefix {
 			respErr := stream.unmarshalError()
-			if respErr != nil {
+			// respErr.Error can be nil even when respErr itself isn't:
+			// any payload that round-trips through unmarshaler.Unmarshal
+			// (an empty object, an aborted partial frame after context
+			// cancellation, etc.) ends up as a non-nil *ErrorResponse with
+			// a nil Error field. Wrapping that produced the famously
+			// useless "error, <nil>" message in #1060.
+			if respErr != nil && respErr.Error != nil {
 				return nil, fmt.Errorf("error, %w", respErr.Error)
 			}
 			return nil, readErr
 		}
 
 		noSpaceLine := bytes.TrimSpace(rawLine)
-		if bytes.HasPrefix(noSpaceLine, errorPrefix) {
+		if errorPrefix.Match(noSpaceLine) {
 			hasErrorPrefix = true
 		}
-		if !bytes.HasPrefix(noSpaceLine, headerData) || hasErrorPrefix {
+		if !headerData.Match(noSpaceLine) || hasErrorPrefix {
 			if hasErrorPrefix {
-				noSpaceLine = bytes.TrimPrefix(noSpaceLine, headerData)
+				noSpaceLine = headerData.ReplaceAll(noSpaceLine, nil)
 			}
 			writeErr := stream.errAccumulator.Write(noSpaceLine)
 			if writeErr != nil {
@@ -89,7 +96,7 @@ func (stream *streamReader[T]) processLines() ([]byte, error) {
 			continue
 		}
 
-		noPrefixLine := bytes.TrimPrefix(noSpaceLine, headerData)
+		noPrefixLine := headerData.ReplaceAll(noSpaceLine, nil)
 		if string(noPrefixLine) == "[DONE]" {
 			stream.isFinished = true
 			return nil, io.EOF

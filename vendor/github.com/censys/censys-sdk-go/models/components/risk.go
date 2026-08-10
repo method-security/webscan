@@ -2,11 +2,6 @@
 
 package components
 
-import (
-	"encoding/json"
-	"fmt"
-)
-
 type RiskSource string
 
 const (
@@ -18,22 +13,16 @@ const (
 func (e RiskSource) ToPointer() *RiskSource {
 	return &e
 }
-func (e *RiskSource) UnmarshalJSON(data []byte) error {
-	var v string
-	if err := json.Unmarshal(data, &v); err != nil {
-		return err
+
+// IsExact returns true if the value matches a known enum value, false otherwise.
+func (e *RiskSource) IsExact() bool {
+	if e != nil {
+		switch *e {
+		case "", "censys", "cve":
+			return true
+		}
 	}
-	switch v {
-	case "":
-		fallthrough
-	case "censys":
-		fallthrough
-	case "cve":
-		*e = RiskSource(v)
-		return nil
-	default:
-		return fmt.Errorf("invalid value for RiskSource: %v", v)
-	}
+	return false
 }
 
 type Severity string
@@ -49,61 +38,42 @@ const (
 func (e Severity) ToPointer() *Severity {
 	return &e
 }
-func (e *Severity) UnmarshalJSON(data []byte) error {
-	var v string
-	if err := json.Unmarshal(data, &v); err != nil {
-		return err
+
+// IsExact returns true if the value matches a known enum value, false otherwise.
+func (e *Severity) IsExact() bool {
+	if e != nil {
+		switch *e {
+		case "", "low", "medium", "high", "critical":
+			return true
+		}
 	}
-	switch v {
-	case "":
-		fallthrough
-	case "low":
-		fallthrough
-	case "medium":
-		fallthrough
-	case "high":
-		fallthrough
-	case "critical":
-		*e = Severity(v)
-		return nil
-	default:
-		return fmt.Errorf("invalid value for Severity: %v", v)
-	}
+	return false
 }
 
 type RiskSource1 string
 
 const (
-	RiskSource1Unknown    RiskSource1 = ""
-	RiskSource1Censys     RiskSource1 = "censys"
-	RiskSource1Recog      RiskSource1 = "recog"
-	RiskSource1Wappalyzer RiskSource1 = "wappalyzer"
-	RiskSource1ThirdParty RiskSource1 = "third_party"
+	RiskSource1Unknown           RiskSource1 = ""
+	RiskSource1Censys            RiskSource1 = "censys"
+	RiskSource1Recog             RiskSource1 = "recog"
+	RiskSource1Wappalyzer        RiskSource1 = "wappalyzer"
+	RiskSource1ThirdParty        RiskSource1 = "third_party"
+	RiskSource1HTMLMetaExtractor RiskSource1 = "html_meta_extractor"
 )
 
 func (e RiskSource1) ToPointer() *RiskSource1 {
 	return &e
 }
-func (e *RiskSource1) UnmarshalJSON(data []byte) error {
-	var v string
-	if err := json.Unmarshal(data, &v); err != nil {
-		return err
+
+// IsExact returns true if the value matches a known enum value, false otherwise.
+func (e *RiskSource1) IsExact() bool {
+	if e != nil {
+		switch *e {
+		case "", "censys", "recog", "wappalyzer", "third_party", "html_meta_extractor":
+			return true
+		}
 	}
-	switch v {
-	case "":
-		fallthrough
-	case "censys":
-		fallthrough
-	case "recog":
-		fallthrough
-	case "wappalyzer":
-		fallthrough
-	case "third_party":
-		*e = RiskSource1(v)
-		return nil
-	default:
-		return fmt.Errorf("invalid value for RiskSource1: %v", v)
-	}
+	return false
 }
 
 type Risk struct {
@@ -116,75 +86,83 @@ type Risk struct {
 	RiskSource *RiskSource  `json:"risk_source,omitempty"`
 	Severity   *Severity    `json:"severity,omitempty"`
 	Source     *RiskSource1 `json:"source,omitempty"`
+	Type       []string     `json:"type,omitempty"`
 	Year       *int         `json:"year,omitempty"`
 }
 
-func (o *Risk) GetConfidence() *float64 {
-	if o == nil {
+func (r *Risk) GetConfidence() *float64 {
+	if r == nil {
 		return nil
 	}
-	return o.Confidence
+	return r.Confidence
 }
 
-func (o *Risk) GetCvss() *Cvss {
-	if o == nil {
+func (r *Risk) GetCvss() *Cvss {
+	if r == nil {
 		return nil
 	}
-	return o.Cvss
+	return r.Cvss
 }
 
-func (o *Risk) GetEvidence() []Evidence {
-	if o == nil {
+func (r *Risk) GetEvidence() []Evidence {
+	if r == nil {
 		return nil
 	}
-	return o.Evidence
+	return r.Evidence
 }
 
-func (o *Risk) GetID() *string {
-	if o == nil {
+func (r *Risk) GetID() *string {
+	if r == nil {
 		return nil
 	}
-	return o.ID
+	return r.ID
 }
 
-func (o *Risk) GetMetrics() *Metrics {
-	if o == nil {
+func (r *Risk) GetMetrics() *Metrics {
+	if r == nil {
 		return nil
 	}
-	return o.Metrics
+	return r.Metrics
 }
 
-func (o *Risk) GetName() *string {
-	if o == nil {
+func (r *Risk) GetName() *string {
+	if r == nil {
 		return nil
 	}
-	return o.Name
+	return r.Name
 }
 
-func (o *Risk) GetRiskSource() *RiskSource {
-	if o == nil {
+func (r *Risk) GetRiskSource() *RiskSource {
+	if r == nil {
 		return nil
 	}
-	return o.RiskSource
+	return r.RiskSource
 }
 
-func (o *Risk) GetSeverity() *Severity {
-	if o == nil {
+func (r *Risk) GetSeverity() *Severity {
+	if r == nil {
 		return nil
 	}
-	return o.Severity
+	return r.Severity
 }
 
-func (o *Risk) GetSource() *RiskSource1 {
-	if o == nil {
+func (r *Risk) GetSource() *RiskSource1 {
+	if r == nil {
 		return nil
 	}
-	return o.Source
+	return r.Source
 }
 
-func (o *Risk) GetYear() *int {
-	if o == nil {
+func (r *Risk) GetType() []string {
+	if r == nil {
 		return nil
 	}
-	return o.Year
+	return r.Type
+}
+
+func (r *Risk) GetYear() *int {
+	if r == nil {
+		return nil
+	}
+	return r.Year
 }

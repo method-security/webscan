@@ -2,11 +2,6 @@
 
 package components
 
-import (
-	"encoding/json"
-	"fmt"
-)
-
 type RejectType string
 
 const (
@@ -24,34 +19,16 @@ const (
 func (e RejectType) ToPointer() *RejectType {
 	return &e
 }
-func (e *RejectType) UnmarshalJSON(data []byte) error {
-	var v string
-	if err := json.Unmarshal(data, &v); err != nil {
-		return err
+
+// IsExact returns true if the value matches a known enum value, false otherwise.
+func (e *RejectType) IsExact() bool {
+	if e != nil {
+		switch *e {
+		case "", "wrong_version", "invalid_username", "wrong_user_pw", "wrong_server_pw", "username_in_use", "server_full", "no_certificate", "authenticator_fail":
+			return true
+		}
 	}
-	switch v {
-	case "":
-		fallthrough
-	case "wrong_version":
-		fallthrough
-	case "invalid_username":
-		fallthrough
-	case "wrong_user_pw":
-		fallthrough
-	case "wrong_server_pw":
-		fallthrough
-	case "username_in_use":
-		fallthrough
-	case "server_full":
-		fallthrough
-	case "no_certificate":
-		fallthrough
-	case "authenticator_fail":
-		*e = RejectType(v)
-		return nil
-	default:
-		return fmt.Errorf("invalid value for RejectType: %v", v)
-	}
+	return false
 }
 
 type Reject struct {
@@ -59,16 +36,16 @@ type Reject struct {
 	Type   *RejectType `json:"type,omitempty"`
 }
 
-func (o *Reject) GetReason() *string {
-	if o == nil {
+func (r *Reject) GetReason() *string {
+	if r == nil {
 		return nil
 	}
-	return o.Reason
+	return r.Reason
 }
 
-func (o *Reject) GetType() *RejectType {
-	if o == nil {
+func (r *Reject) GetType() *RejectType {
+	if r == nil {
 		return nil
 	}
-	return o.Type
+	return r.Type
 }

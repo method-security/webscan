@@ -12,21 +12,24 @@ type V3GlobaldataAssetHostTimelineGlobals struct {
 	OrganizationID *string `queryParam:"style=form,explode=true,name=organization_id"`
 }
 
-func (o *V3GlobaldataAssetHostTimelineGlobals) GetOrganizationID() *string {
-	if o == nil {
+func (v *V3GlobaldataAssetHostTimelineGlobals) GetOrganizationID() *string {
+	if v == nil {
 		return nil
 	}
-	return o.OrganizationID
+	return v.OrganizationID
 }
 
+// #region class-body-v3globaldataassethosttimelineglobals
+// #endregion class-body-v3globaldataassethosttimelineglobals
+
 type V3GlobaldataAssetHostTimelineRequest struct {
-	// The ID of a Censys organization to associate the request with. See the [Getting Started docs](https://docs.censys.com/reference/get-started#step-3-set-your-organization-id) for more information.
+	// The ID of a Censys organization to associate the request with. If omitted, the request will be processed using the authenticated user's free wallet where applicable. See the [Getting Started docs](https://docs.censys.com/reference/get-started#step-3-find-and-use-your-organization-id-optional) for more information.
 	OrganizationID *string `queryParam:"style=form,explode=false,name=organization_id"`
 	// The IP address of a host.
 	HostID string `pathParam:"style=simple,explode=false,name=host_id"`
-	// Start time of the host timeline. Must be a valid RFC3339 string. Ensure that you suffix the date with T00:00:00Z or a specific time.
+	// Start time of the host timeline. Equivalent to the To field in the event history UI. This must be the timestamp closest to the current time. For example, if you want events from January 1, 2025 to the start of January 2, 2025, input the January 2 timestamp here. Must be a valid RFC3339 string. Ensure that you suffix the date with T00:00:00Z or a specific time.
 	StartTime time.Time `queryParam:"style=form,explode=false,name=start_time"`
-	// End time of the host timeline. Must be a valid RFC3339 string. Ensure that you suffix the date with T00:00:00Z or a specific time.
+	// End time of the host timeline. Equivalent to the From field in the event history UI. This must be the timestamp furthest from the current time. For example, if you want events from January 1, 2025 to the start of January 2, 2025, input the January 1 timestamp here. Must be a valid RFC3339 string. Ensure that you suffix the date with T00:00:00Z or a specific time.
 	EndTime time.Time `queryParam:"style=form,explode=false,name=end_time"`
 }
 
@@ -35,39 +38,42 @@ func (v V3GlobaldataAssetHostTimelineRequest) MarshalJSON() ([]byte, error) {
 }
 
 func (v *V3GlobaldataAssetHostTimelineRequest) UnmarshalJSON(data []byte) error {
-	if err := utils.UnmarshalJSON(data, &v, "", false, false); err != nil {
+	if err := utils.UnmarshalJSON(data, &v, "", false, nil); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (o *V3GlobaldataAssetHostTimelineRequest) GetOrganizationID() *string {
-	if o == nil {
+func (v *V3GlobaldataAssetHostTimelineRequest) GetOrganizationID() *string {
+	if v == nil {
 		return nil
 	}
-	return o.OrganizationID
+	return v.OrganizationID
 }
 
-func (o *V3GlobaldataAssetHostTimelineRequest) GetHostID() string {
-	if o == nil {
+func (v *V3GlobaldataAssetHostTimelineRequest) GetHostID() string {
+	if v == nil {
 		return ""
 	}
-	return o.HostID
+	return v.HostID
 }
 
-func (o *V3GlobaldataAssetHostTimelineRequest) GetStartTime() time.Time {
-	if o == nil {
+func (v *V3GlobaldataAssetHostTimelineRequest) GetStartTime() time.Time {
+	if v == nil {
 		return time.Time{}
 	}
-	return o.StartTime
+	return v.StartTime
 }
 
-func (o *V3GlobaldataAssetHostTimelineRequest) GetEndTime() time.Time {
-	if o == nil {
+func (v *V3GlobaldataAssetHostTimelineRequest) GetEndTime() time.Time {
+	if v == nil {
 		return time.Time{}
 	}
-	return o.EndTime
+	return v.EndTime
 }
+
+// #region class-body-v3globaldataassethosttimelinerequest
+// #endregion class-body-v3globaldataassethosttimelinerequest
 
 type V3GlobaldataAssetHostTimelineResponse struct {
 	HTTPMeta components.HTTPMetadata `json:"-"`
@@ -76,23 +82,26 @@ type V3GlobaldataAssetHostTimelineResponse struct {
 	Headers                      map[string][]string
 }
 
-func (o *V3GlobaldataAssetHostTimelineResponse) GetHTTPMeta() components.HTTPMetadata {
-	if o == nil {
+func (v *V3GlobaldataAssetHostTimelineResponse) GetHTTPMeta() components.HTTPMetadata {
+	if v == nil {
 		return components.HTTPMetadata{}
 	}
-	return o.HTTPMeta
+	return v.HTTPMeta
 }
 
-func (o *V3GlobaldataAssetHostTimelineResponse) GetResponseEnvelopeHostTimeline() *components.ResponseEnvelopeHostTimeline {
-	if o == nil {
+func (v *V3GlobaldataAssetHostTimelineResponse) GetResponseEnvelopeHostTimeline() *components.ResponseEnvelopeHostTimeline {
+	if v == nil {
 		return nil
 	}
-	return o.ResponseEnvelopeHostTimeline
+	return v.ResponseEnvelopeHostTimeline
 }
 
-func (o *V3GlobaldataAssetHostTimelineResponse) GetHeaders() map[string][]string {
-	if o == nil {
+func (v *V3GlobaldataAssetHostTimelineResponse) GetHeaders() map[string][]string {
+	if v == nil {
 		return map[string][]string{}
 	}
-	return o.Headers
+	return v.Headers
 }
+
+// #region class-body-v3globaldataassethosttimelineresponse
+// #endregion class-body-v3globaldataassethosttimelineresponse

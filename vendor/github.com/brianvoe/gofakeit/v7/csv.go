@@ -46,7 +46,7 @@ func csvFunc(f *Faker, co *CSVOptions) ([]byte, error) {
 	}
 
 	// Check fields
-	if co.Fields == nil || len(co.Fields) <= 0 {
+	if len(co.Fields) <= 0 {
 		return nil, errors.New("must pass fields in order to build json object(s)")
 	}
 
@@ -134,6 +134,12 @@ func addFileCSVLookup() {
 2,Osborne,Hilll,XPJ9OVNbs5lm`,
 		Output:      "[]byte",
 		ContentType: "text/csv",
+		Aliases: []string{
+			"comma separated", "csv file", "data table", "flat file", "spreadsheet format", "tabular data",
+		},
+		Keywords: []string{
+			"comma", "separated", "values", "format", "data", "spreadsheet", "entries", "rows", "columns", "dataset", "records",
+		},
 		Params: []Param{
 			{Field: "delimiter", Display: "Delimiter", Type: "string", Default: ",", Description: "Separator in between row values"},
 			{Field: "rowcount", Display: "Row Count", Type: "int", Default: "100", Description: "Number of rows"},

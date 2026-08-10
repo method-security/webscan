@@ -40,12 +40,12 @@ type DataSocket interface {
 }
 
 type activeSocket struct {
-	conn *net.TCPConn
+	conn   *net.TCPConn
 	reader io.Reader
 	writer io.Writer
-	sess *Session
-	host string
-	port int
+	sess   *Session
+	host   string
+	port   int
 }
 
 func newActiveSocket(sess *Session, remote string, port int) (DataSocket, error) {
@@ -105,8 +105,8 @@ func (socket *activeSocket) Close() error {
 type passiveSocket struct {
 	sess    *Session
 	conn    net.Conn
-	reader io.Reader
-	writer io.Writer
+	reader  io.Reader
+	writer  io.Writer
 	port    int
 	host    string
 	ingress chan []byte
@@ -243,7 +243,7 @@ func (socket *passiveSocket) ListenAndServe() (err error) {
 	}
 
 	socket.port = port
-	if socket.sess.server.tlsConfig != nil {
+	if socket.sess.server.tlsConfig != nil && socket.sess.tls {
 		listener = tls.NewListener(listener, socket.sess.server.tlsConfig)
 	}
 

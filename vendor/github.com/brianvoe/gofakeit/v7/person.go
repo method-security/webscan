@@ -3,7 +3,6 @@ package gofakeit
 import (
 	"math"
 	"strconv"
-	"strings"
 )
 
 // PersonInfo is a struct of person information
@@ -11,6 +10,7 @@ type PersonInfo struct {
 	FirstName  string          `json:"first_name" xml:"first_name"`
 	LastName   string          `json:"last_name" xml:"last_name"`
 	Gender     string          `json:"gender" xml:"gender"`
+	Age        int             `json:"age" xml:"age"`
 	SSN        string          `json:"ssn" xml:"ssn"`
 	Hobby      string          `json:"hobby" xml:"hobby"`
 	Job        *JobInfo        `json:"job" xml:"job"`
@@ -30,6 +30,7 @@ func person(f *Faker) *PersonInfo {
 		FirstName:  firstName(f),
 		LastName:   lastName(f),
 		Gender:     gender(f),
+		Age:        age(f),
 		SSN:        ssn(f),
 		Hobby:      hobby(f),
 		Job:        job(f),
@@ -89,6 +90,22 @@ func (f *Faker) NameSuffix() string { return nameSuffix(f) }
 
 func nameSuffix(f *Faker) string { return getRandValue(f, []string{"person", "suffix"}) }
 
+// Age will generate a random age between 0 and 100
+func Age() int { return age(GlobalFaker) }
+
+// Age will generate a random age between 0 and 100
+func (f *Faker) Age() int { return age(f) }
+
+func age(f *Faker) int { return randIntRange(f, 0, 100) }
+
+// Ethnicity will generate a random ethnicity string
+func Ethnicity() string { return ethnicity(GlobalFaker) }
+
+// Ethnicity will generate a random ethnicity string
+func (f *Faker) Ethnicity() string { return ethnicity(f) }
+
+func ethnicity(f *Faker) string { return getRandValue(f, []string{"person", "ethnicity"}) }
+
 // SSN will generate a random Social Security Number
 func SSN() string { return ssn(GlobalFaker) }
 
@@ -96,6 +113,27 @@ func SSN() string { return ssn(GlobalFaker) }
 func (f *Faker) SSN() string { return ssn(f) }
 
 func ssn(f *Faker) string { return strconv.Itoa(randIntRange(f, 100000000, 999999999)) }
+
+// EIN will generate a random Employer Identification Number
+func EIN() string { return ein(GlobalFaker) }
+
+// EIN will generate a random Employer Identification Number
+func (f *Faker) EIN() string { return ein(f) }
+
+func ein(f *Faker) string {
+	// EIN format: XX-XXXXXXX (2 digits, dash, 7 digits)
+	// First two digits have specific valid prefixes
+	prefixes := []string{"10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31", "32", "33", "34", "35", "36", "37", "38", "39", "40", "41", "42", "43", "44", "45", "46", "47", "48", "49", "50", "51", "52", "53", "54", "55", "56", "57", "58", "59", "60", "61", "62", "63", "64", "65", "66", "67", "68", "69", "70", "71", "72", "73", "74", "75", "76", "77", "78", "79", "80", "81", "82", "83", "84", "85", "86", "87", "88", "89", "90", "91", "92", "93", "94", "95", "96", "97", "98", "99"}
+	prefix := prefixes[f.IntN(len(prefixes))]
+
+	// Generate 7 random digits
+	sevenDigits := ""
+	for i := 0; i < 7; i++ {
+		sevenDigits += string(rune('0' + f.IntN(10)))
+	}
+
+	return prefix + "-" + sevenDigits
+}
 
 // Gender will generate a random gender string
 func Gender() string { return gender(GlobalFaker) }
@@ -118,6 +156,44 @@ func Hobby() string { return hobby(GlobalFaker) }
 func (f *Faker) Hobby() string { return hobby(f) }
 
 func hobby(f *Faker) string { return getRandValue(f, []string{"person", "hobby"}) }
+
+// SocialMedia will generate a random social media string
+func SocialMedia() string { return socialMedia(GlobalFaker) }
+
+// SocialMedia will generate a random social media string
+func (f *Faker) SocialMedia() string { return socialMedia(f) }
+
+func socialMedia(f *Faker) string {
+	template := getRandValue(f, []string{"person", "social_media"})
+	social, err := generate(f, template)
+	if err != nil {
+		return template // fallback to raw template if generation fails
+	}
+
+	return social
+}
+
+// Bio will generate a random biography using mad libs style templates
+func Bio() string {
+	return bio(GlobalFaker)
+}
+
+// Bio will generate a random biography using mad libs style templates
+func (f *Faker) Bio() string {
+	return bio(f)
+}
+
+func bio(f *Faker) string {
+	template := getRandValue(f, []string{"person", "bio"})
+
+	// Use generate function to process the template with all available lookups
+	bio, err := generate(f, template)
+	if err != nil {
+		return template // fallback to raw template if generation fails
+	}
+
+	return bio
+}
 
 // ContactInfo struct full of contact info
 type ContactInfo struct {
@@ -163,11 +239,78 @@ func Email() string { return email(GlobalFaker) }
 func (f *Faker) Email() string { return email(f) }
 
 func email(f *Faker) string {
-	email := getRandValue(f, []string{"person", "first"}) + getRandValue(f, []string{"person", "last"})
-	email += "@"
-	email += getRandValue(f, []string{"person", "last"}) + "." + getRandValue(f, []string{"internet", "domain_suffix"})
+	first := getRandValue(f, []string{"person", "first"})
+	last := getRandValue(f, []string{"person", "last"})
+	domain := getRandValue(f, []string{"person", "last"})
+	suffix := getRandValue(f, []string{"internet", "domain_suffix"})
 
-	return strings.ToLower(email)
+	b := make([]byte, 0, len(first)+len(last)+len(domain)+len(suffix)+6)
+	appendLower := func(s string) {
+		for i := 0; i < len(s); i++ {
+			c := s[i]
+			if c >= 'A' && c <= 'Z' {
+				c += 'a' - 'A'
+			}
+			b = append(b, c)
+		}
+	}
+	appendFirstLower := func(s string) {
+		if len(s) == 0 {
+			return
+		}
+		c := s[0]
+		if c >= 'A' && c <= 'Z' {
+			c += 'a' - 'A'
+		}
+		b = append(b, c)
+	}
+
+	// One draw encodes local-part style and optional numeric suffix so we only
+	// advance RNG once beyond the name/domain lookups.
+	mix := f.Uint64()
+	w := mix % 100
+	mix /= 100
+
+	// Weighted local-part styles (no role-style addresses; numbers are rarer).
+	switch {
+	case w < 38:
+		appendLower(first)
+		appendLower(last)
+	case w < 66:
+		appendLower(first)
+		b = append(b, '.')
+		appendLower(last)
+	case w < 80:
+		appendFirstLower(first)
+		appendLower(last)
+	case w < 88:
+		appendLower(first)
+		appendFirstLower(last)
+	case w < 94:
+		appendLower(first)
+		b = append(b, '_')
+		appendLower(last)
+	default:
+		appendLower(first)
+		b = append(b, '-')
+		appendLower(last)
+	}
+
+	if mix%100 < 10 {
+		mix /= 100
+		sub := mix % 100
+		if sub < 30 {
+			b = append(b, byte('0'+byte(2+sub%8))) // 2–9
+		} else {
+			b = strconv.AppendInt(b, int64(sub%90+10), 10) // 10–99
+		}
+	}
+
+	b = append(b, '@')
+	appendLower(domain)
+	b = append(b, '.')
+	b = append(b, suffix...)
+	return string(b)
 }
 
 // Teams takes in an array of people and team names and randomly places the people into teams as evenly as possible
@@ -211,6 +354,7 @@ func addPersonLookup() {
 	"first_name": "Markus",
 	"last_name": "Moen",
 	"gender": "male",
+	"age": 30,
 	"ssn": "275413589",
 	"image": "https://picsum.photos/208/500",
 	"hobby": "Lacrosse",
@@ -243,141 +387,411 @@ func addPersonLookup() {
 }`,
 		Output:      "map[string]any",
 		ContentType: "application/json",
+		Aliases: []string{
+			"person record",
+			"identity profile",
+			"user profile",
+			"personal info",
+			"individual data",
+		},
+		Keywords: []string{
+			"profile", "identity", "individual",
+			"user", "account", "record", "contact",
+			"name", "details", "attributes", "information",
+			"bio", "demographics", "personal", "data",
+		},
 		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
 			return person(f), nil
 		},
 	})
 
+	// full name
 	AddFuncLookup("name", Info{
 		Display:     "Name",
 		Category:    "person",
 		Description: "The given and family name of an individual",
 		Example:     "Markus Moen",
 		Output:      "string",
-		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
-			return name(f), nil
+		Aliases: []string{
+			"full name",
+			"person name",
+			"complete name",
+			"name string",
+			"display name",
 		},
+		Keywords: []string{
+			"fullname", "given", "family",
+			"first", "last", "forename", "surname",
+			"display", "legal",
+		},
+		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) { return name(f), nil },
 	})
 
+	// name prefix (honorific)
 	AddFuncLookup("nameprefix", Info{
 		Display:     "Name Prefix",
 		Category:    "person",
 		Description: "A title or honorific added before a person's name",
 		Example:     "Mr.",
 		Output:      "string",
-		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
-			return namePrefix(f), nil
+		Aliases: []string{
+			"name prefix",
+			"honorific",
+			"title prefix",
+			"courtesy title",
+			"pre-nominal",
 		},
+		Keywords: []string{
+			"prefix", "title", "mr", "ms", "mrs",
+			"dr", "prof", "sir", "madam", "rev", "fr",
+		},
+		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) { return namePrefix(f), nil },
 	})
 
+	// name suffix (generational/professional)
 	AddFuncLookup("namesuffix", Info{
 		Display:     "Name Suffix",
 		Category:    "person",
 		Description: "A title or designation added after a person's name",
 		Example:     "Jr.",
 		Output:      "string",
-		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
-			return nameSuffix(f), nil
+		Aliases: []string{
+			"name suffix",
+			"post nominal",
+			"suffix designation",
+			"generational suffix",
+			"professional suffix",
 		},
+		Keywords: []string{
+			"suffix", "jr", "sr", "iii", "iv",
+			"esq", "phd", "md", "mba", "cpa",
+			"designation",
+		},
+		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) { return nameSuffix(f), nil },
 	})
 
+	// first name
 	AddFuncLookup("firstname", Info{
 		Display:     "First Name",
 		Category:    "person",
 		Description: "The name given to a person at birth",
 		Example:     "Markus",
 		Output:      "string",
-		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
-			return firstName(f), nil
+		Aliases: []string{
+			"first name",
+			"given name",
+			"forename",
+			"personal name",
+			"given label",
 		},
+		Keywords: []string{
+			"first", "given", "name",
+			"preferred", "callname", "initial",
+			"personal",
+		},
+		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) { return firstName(f), nil },
 	})
 
+	// middle name
 	AddFuncLookup("middlename", Info{
 		Display:     "Middle Name",
 		Category:    "person",
 		Description: "Name between a person's first name and last name",
 		Example:     "Belinda",
 		Output:      "string",
-		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
-			return middleName(f), nil
+		Aliases: []string{
+			"middle name",
+			"second name",
+			"additional name",
+			"secondary name",
+			"middle initial label",
 		},
+		Keywords: []string{
+			"middle", "second", "additional", "secondary",
+			"name", "initial", "intermediate", "optional",
+		},
+		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) { return middleName(f), nil },
 	})
 
+	// last name
 	AddFuncLookup("lastname", Info{
 		Display:     "Last Name",
 		Category:    "person",
 		Description: "The family name or surname of an individual",
 		Example:     "Daniel",
 		Output:      "string",
-		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
-			return lastName(f), nil
+		Aliases: []string{
+			"last name",
+			"family name",
+			"surname",
+			"patronymic",
+			"family designation",
 		},
+		Keywords: []string{
+			"last", "family", "name",
+			"lineage", "heritage", "ancestry", "clan",
+			"tribe",
+		},
+		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) { return lastName(f), nil },
 	})
 
+	// gender
 	AddFuncLookup("gender", Info{
 		Display:     "Gender",
 		Category:    "person",
-		Description: "Classification based on social and cultural norms that identifies an individual",
+		Description: "Classification that identifies gender",
 		Example:     "male",
 		Output:      "string",
-		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
-			return gender(f), nil
+		Aliases: []string{
+			"gender identity",
+			"gender label",
+			"sex category",
+			"gender marker",
+			"presentation",
 		},
+		Keywords: []string{
+			"male", "female", "nonbinary",
+			"identity", "label", "category", "sex",
+		},
+		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) { return gender(f), nil },
 	})
 
+	// age
+	AddFuncLookup("age", Info{
+		Display:     "Age",
+		Category:    "person",
+		Description: "The number of years a person has lived",
+		Example:     "40",
+		Output:      "int",
+		Aliases: []string{
+			"age of person", "person age", "age of individual", "years old", "years of age",
+		},
+		Keywords: []string{
+			"years", "old", "birthday", "birthdate", "birth-date",
+			"lifespan", "maturity", "elderly", "young", "adult", "teenager", "child",
+			"senior", "juvenile", "minor", "majority", "minority", "generation",
+		},
+		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) { return age(f), nil },
+	})
+
+	// ethnicity
+	AddFuncLookup("ethnicity", Info{
+		Display:     "Ethnicity",
+		Category:    "person",
+		Description: "Classification that identifies a person's cultural or ethnic background",
+		Example:     "German",
+		Output:      "string",
+		Aliases: []string{
+			"ethnic background",
+			"ethnic identity",
+			"cultural background",
+			"cultural heritage",
+			"ethnic origin",
+		},
+		Keywords: []string{
+			"ethnic", "heritage", "ancestry",
+			"origin", "identity", "cultural", "nationality",
+			"background", "descent", "lineage",
+		},
+		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) { return ethnicity(f), nil },
+	})
+
+	// ssn
 	AddFuncLookup("ssn", Info{
 		Display:     "SSN",
 		Category:    "person",
 		Description: "Unique nine-digit identifier used for government and financial purposes in the United States",
 		Example:     "296446360",
 		Output:      "string",
-		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
-			return ssn(f), nil
+		Aliases: []string{
+			"social security number",
+			"ssn number",
+			"us ssn",
+			"tax id us",
+			"federal id",
 		},
+		Keywords: []string{
+			"social", "security", "number",
+			"us", "tax", "irs", "employment",
+			"benefits", "identification",
+		},
+		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) { return ssn(f), nil },
 	})
 
+	AddFuncLookup("ein", Info{
+		Display:     "EIN",
+		Category:    "person",
+		Description: "Nine-digit Employer Identification Number used by businesses for tax purposes",
+		Example:     "12-3456789",
+		Output:      "string",
+		Aliases: []string{
+			"employer id",
+			"tax id",
+			"business tax id",
+			"federal tax id",
+			"irs number",
+		},
+		Keywords: []string{
+			"employer", "identification", "tax", "business", "federal", "irs", "number", "id",
+		},
+		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) { return ein(f), nil },
+	})
+
+	// hobby
 	AddFuncLookup("hobby", Info{
 		Display:     "Hobby",
 		Category:    "person",
 		Description: "An activity pursued for leisure and pleasure",
 		Example:     "Swimming",
 		Output:      "string",
-		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
-			return hobby(f), nil
+		Aliases: []string{
+			"pastime",
+			"leisure activity",
+			"recreational activity",
+			"interest",
+			"free-time pursuit",
 		},
+		Keywords: []string{
+			"leisure", "recreation",
+			"activity", "sport", "craft",
+			"game", "collection",
+		},
+		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) { return hobby(f), nil },
 	})
 
+	AddFuncLookup("socialmedia", Info{
+		Display:     "Social Media",
+		Category:    "person",
+		Description: "Random social media string",
+		Example:     "https://twitter.com/ImpossibleTrousers",
+		Output:      "string",
+		Aliases: []string{
+			"social media",
+			"social link",
+			"social url",
+			"social handle",
+			"social username",
+			"social profile",
+			"profile link",
+			"profile url",
+			"profile handle",
+			"account link",
+			"account url",
+			"account handle",
+			"username handle",
+			"screen name",
+			// platform-intent phrases (useful for fuzzy scoring)
+			"twitter link",
+			"x link",
+			"instagram link",
+			"linkedin url",
+			"github url",
+			"tiktok handle",
+			"facebook profile",
+		},
+		Keywords: []string{
+			"social", "media", "profile", "account", "handle", "username",
+			"screenname", "link", "url",
+			"twitter", "x", "instagram", "linkedin", "github",
+			"tiktok", "facebook", "dribbble", "behance",
+		},
+		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) { return socialMedia(f), nil },
+	})
+
+	AddFuncLookup("bio", Info{
+		Display:     "Biography",
+		Category:    "person",
+		Description: "Random biography",
+		Example:     "Born in New York, John grew up to become a Software Engineer who codes applications.",
+		Output:      "string",
+		Aliases: []string{
+			"bio",
+			"short bio",
+			"mini bio",
+			"one line bio",
+			"profile bio",
+			"user bio",
+			"author bio",
+			"about",
+			"about me",
+			"profile summary",
+			"personal summary",
+			"blurb",
+			"elevator pitch",
+		},
+		Keywords: []string{
+			"profile", "summary", "tagline", "intro",
+			"overview", "description", "story", "background",
+			"career", "job", "role", "hobby", "personal", "person",
+			"one-liner", "author", "user",
+		},
+		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) { return f.Bio(), nil },
+	})
+
+	// email
 	AddFuncLookup("email", Info{
 		Display:     "Email",
 		Category:    "person",
-		Description: "Electronic mail used for sending digital messages and communication over the internet",
+		Description: "Electronic mail address",
 		Example:     "markusmoen@pagac.net",
 		Output:      "string",
-		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
-			return email(f), nil
+		Aliases: []string{
+			"email address",
+			"mail address",
+			"contact email",
+			"user email",
+			"electronic mailbox",
 		},
+		Keywords: []string{
+			"address", "mail", "inbox",
+			"account", "contact", "sender", "recipient",
+			"domain", "username",
+		},
+		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) { return email(f), nil },
 	})
 
+	// phone (raw digits)
 	AddFuncLookup("phone", Info{
 		Display:     "Phone",
 		Category:    "person",
 		Description: "Numerical sequence used to contact individuals via telephone or mobile devices",
 		Example:     "6136459948",
 		Output:      "string",
-		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
-			return phone(f), nil
+		Aliases: []string{
+			"phone number",
+			"telephone number",
+			"mobile number",
+			"contact number",
+			"voice number",
 		},
+		Keywords: []string{
+			"number", "telephone", "mobile",
+			"contact", "dial", "cell", "landline",
+			"e164", "voice",
+		},
+		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) { return phone(f), nil },
 	})
 
+	// phone formatted (readable)
 	AddFuncLookup("phoneformatted", Info{
 		Display:     "Phone Formatted",
 		Category:    "person",
 		Description: "Formatted phone number of a person",
 		Example:     "136-459-9489",
 		Output:      "string",
-		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
-			return phoneFormatted(f), nil
+		Aliases: []string{
+			"formatted phone",
+			"pretty phone",
+			"display phone",
+			"readable phone",
+			"formatted telephone",
 		},
+		Keywords: []string{
+			"phone", "formatted", "format", "pattern",
+			"dashes", "parentheses", "spaces", "separators",
+			"telephone", "contact",
+		},
+		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) { return phoneFormatted(f), nil },
 	})
 
 	AddFuncLookup("teams", Info{
@@ -402,6 +816,17 @@ func addPersonLookup() {
 }`,
 		Output:      "map[string][]string",
 		ContentType: "application/json",
+		Aliases: []string{
+			"people grouping",
+			"team assignment",
+			"random partition",
+			"group allocator",
+			"roster builder",
+		},
+		Keywords: []string{
+			"randomly", "person", "into",
+			"distribution", "allocation", "roster", "squad",
+		},
 		Params: []Param{
 			{Field: "people", Display: "Strings", Type: "[]string", Description: "Array of people"},
 			{Field: "teams", Display: "Strings", Type: "[]string", Description: "Array of teams"},

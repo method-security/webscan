@@ -2,7 +2,7 @@
 
 package censyssdkgo
 
-// Generated from OpenAPI doc version 1.0.25 and generator version 2.672.0
+// Generated from OpenAPI doc version 1.0.124 and generator version 2.926.2
 
 import (
 	"context"
@@ -51,12 +51,18 @@ func Pointer[T any](v T) *T { return &v }
 
 type SDK struct {
 	SDKVersion string
+	// Endpoints related to the Account Management product
+	AccountManagement *AccountManagement
 	// Endpoints related to the Collections product
 	Collections *Collections
+	// Endpoints related to asset tagging and commenting
+	TagsAndComments *TagsAndComments
 	// Endpoints related to the Global Data product
 	GlobalData *GlobalData
-	// Endpoints related to the Threat Hunting product
+	// Endpoints related to the Adversary Investigation product
 	ThreatHunting *ThreatHunting
+	// Endpoints related to the Adversary Investigation product
+	AdversaryInvestigation *AdversaryInvestigation
 
 	sdkConfiguration config.SDKConfiguration
 	hooks            *hooks.Hooks
@@ -64,7 +70,7 @@ type SDK struct {
 
 type SDKOption func(*SDK)
 
-// WithServerURL allows the overriding of the default server URL
+// WithServerURL allows providing an alternative server URL
 func WithServerURL(serverURL string) SDKOption {
 	return func(sdk *SDK) {
 		sdk.sdkConfiguration.ServerURL = serverURL
@@ -140,9 +146,9 @@ func WithTimeout(timeout time.Duration) SDKOption {
 // New creates a new instance of the SDK with the provided options
 func New(opts ...SDKOption) *SDK {
 	sdk := &SDK{
-		SDKVersion: "0.19.1",
+		SDKVersion: "0.25.27",
 		sdkConfiguration: config.SDKConfiguration{
-			UserAgent:  "speakeasy-sdk/go 0.19.1 2.672.0 1.0.25 github.com/censys/censys-sdk-go",
+			UserAgent:  "speakeasy-sdk/go 0.25.27 2.926.2 1.0.124 github.com/censys/censys-sdk-go",
 			Globals:    globals.Globals{},
 			ServerList: ServerList,
 		},
@@ -164,9 +170,12 @@ func New(opts ...SDKOption) *SDK {
 		sdk.sdkConfiguration.ServerURL = serverURL
 	}
 
+	sdk.AccountManagement = newAccountManagement(sdk, sdk.sdkConfiguration, sdk.hooks)
 	sdk.Collections = newCollections(sdk, sdk.sdkConfiguration, sdk.hooks)
+	sdk.TagsAndComments = newTagsAndComments(sdk, sdk.sdkConfiguration, sdk.hooks)
 	sdk.GlobalData = newGlobalData(sdk, sdk.sdkConfiguration, sdk.hooks)
 	sdk.ThreatHunting = newThreatHunting(sdk, sdk.sdkConfiguration, sdk.hooks)
+	sdk.AdversaryInvestigation = newAdversaryInvestigation(sdk, sdk.sdkConfiguration, sdk.hooks)
 
 	return sdk
 }

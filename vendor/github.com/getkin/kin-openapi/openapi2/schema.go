@@ -2,15 +2,13 @@ package openapi2
 
 import (
 	"encoding/json"
-	"strings"
+	"maps"
 
 	"github.com/getkin/kin-openapi/openapi3"
 )
 
-type (
-	Schemas    map[string]*SchemaRef
-	SchemaRefs []*SchemaRef
-)
+type Schemas map[string]*SchemaRef
+type SchemaRefs []*SchemaRef
 
 // Schema is specified by OpenAPI/Swagger 2.0 standard.
 // See https://swagger.io/specification/v2/#schema-object
@@ -77,9 +75,7 @@ func (schema Schema) MarshalJSON() ([]byte, error) {
 // MarshalYAML returns the YAML encoding of Schema.
 func (schema Schema) MarshalYAML() (any, error) {
 	m := make(map[string]any, 36+len(schema.Extensions))
-	for k, v := range schema.Extensions {
-		m[k] = v
-	}
+	maps.Copy(m, schema.Extensions)
 
 	if x := schema.AllOf; len(x) != 0 {
 		m["allOf"] = x
@@ -258,12 +254,5 @@ func (schema *Schema) UnmarshalJSON(data []byte) error {
 	}
 
 	*schema = Schema(x)
-
-	if schema.Format == "date" {
-		// This is a fix for: https://github.com/getkin/kin-openapi/issues/697
-		if eg, ok := schema.Example.(string); ok {
-			schema.Example = strings.TrimSuffix(eg, "T00:00:00Z")
-		}
-	}
 	return nil
 }

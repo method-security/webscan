@@ -221,6 +221,11 @@ func (c *Session) ListSharenames() ([]string, error) {
 	return r2.ShareNameList(), nil
 }
 
+// NegotiatedDialect returns the negotiated dialect of the session.
+func (c *Session) NegotiatedDialect() uint16 {
+	return c.s.dialect
+}
+
 // Share represents a SMB tree connection with VFS interface.
 type Share struct {
 	*treeConn

@@ -11,7 +11,7 @@ import (
 
 // FuncLookups is the primary map array with mapping to all available data
 var FuncLookups map[string]Info
-var lockFuncLookups sync.Mutex
+var lockFuncLookups sync.RWMutex
 
 // MapParams is the values to pass into a lookup generate
 type MapParams map[string]MapParamsValue
@@ -20,15 +20,17 @@ type MapParamsValue []string
 
 // Info structures fields to better break down what each one generates
 type Info struct {
-	Display     string                                                `json:"display"`
-	Category    string                                                `json:"category"`
-	Description string                                                `json:"description"`
-	Example     string                                                `json:"example"`
-	Output      string                                                `json:"output"`
-	ContentType string                                                `json:"content_type"`
-	Params      []Param                                               `json:"params"`
-	Any         any                                                   `json:"any"`
-	Generate    func(f *Faker, m *MapParams, info *Info) (any, error) `json:"-"`
+	Display     string                                                `json:"display"`      // display name
+	Category    string                                                `json:"category"`     // category
+	Description string                                                `json:"description"`  // description
+	Example     string                                                `json:"example"`      // example
+	Output      string                                                `json:"output"`       // output type
+	Aliases     []string                                              `json:"aliases"`      // alt names users might type
+	Keywords    []string                                              `json:"keywords"`     // free words and domain terms
+	ContentType string                                                `json:"content_type"` // content type
+	Params      []Param                                               `json:"params"`       // params
+	Any         any                                                   `json:"any"`          // any
+	Generate    func(f *Faker, m *MapParams, info *Info) (any, error) `json:"-"`            // generate function
 }
 
 // Param is a breakdown of param requirements and type definition
@@ -54,6 +56,7 @@ func init() { initLookup() }
 // init will add all the functions to MapLookups
 func initLookup() {
 	addAddressLookup()
+	addAirlineLookup()
 	addAnimalLookup()
 	addAppLookup()
 	addAuthLookup()
@@ -78,10 +81,10 @@ func initLookup() {
 	addHackerLookup()
 	addHipsterLookup()
 	addHtmlLookup()
+	addIDLookup()
 	addImageLookup()
 	addInternetLookup()
 	addLanguagesLookup()
-	addLoremLookup()
 	addMinecraftLookup()
 	addMiscLookup()
 	addMovieLookup()
@@ -98,15 +101,12 @@ func initLookup() {
 	addWordAdverbLookup()
 	addWordConnectiveLookup()
 	addWordGeneralLookup()
-	addWordGrammerLookup()
 	addWordNounLookup()
-	addWordPhraseLookup()
 	addWordPrepositionLookup()
 	addWordPronounLookup()
-	addWordSentenceLookup()
 	addWordVerbLookup()
-	addWordCommentLookup()
 	addWordMiscLookup()
+	addTextLookup()
 }
 
 // internalFuncLookups is the internal map array with mapping to all available data
@@ -193,6 +193,9 @@ func (m *MapParamsValue) UnmarshalJSON(data []byte) error {
 }
 
 func GetRandomSimpleFunc(f *Faker) (string, Info) {
+	lockFuncLookups.RLock()
+	defer lockFuncLookups.RUnlock()
+	
 	// Loop through all the functions and add them to a slice
 	var keys []string
 	for k, info := range FuncLookups {
@@ -211,18 +214,19 @@ func GetRandomSimpleFunc(f *Faker) (string, Info) {
 
 // AddFuncLookup takes a field and adds it to map
 func AddFuncLookup(functionName string, info Info) {
-	if FuncLookups == nil {
-		FuncLookups = make(map[string]Info)
-	}
-
 	// Check content type
 	if info.ContentType == "" {
 		info.ContentType = "text/plain"
 	}
 
 	lockFuncLookups.Lock()
+	defer lockFuncLookups.Unlock()
+	
+	if FuncLookups == nil {
+		FuncLookups = make(map[string]Info)
+	}
+	
 	FuncLookups[functionName] = info
-	lockFuncLookups.Unlock()
 }
 
 // GetFuncLookup will lookup
@@ -236,7 +240,10 @@ func GetFuncLookup(functionName string) *Info {
 		return &info
 	}
 
+	lockFuncLookups.RLock()
 	info, ok = FuncLookups[functionName]
+	lockFuncLookups.RUnlock()
+	
 	if ok {
 		return &info
 	}
@@ -246,14 +253,15 @@ func GetFuncLookup(functionName string) *Info {
 
 // RemoveFuncLookup will remove a function from lookup
 func RemoveFuncLookup(functionName string) {
+	lockFuncLookups.Lock()
+	defer lockFuncLookups.Unlock()
+	
 	_, ok := FuncLookups[functionName]
 	if !ok {
 		return
 	}
 
-	lockFuncLookups.Lock()
 	delete(FuncLookups, functionName)
-	lockFuncLookups.Unlock()
 }
 
 // GetAny will retrieve Any field from Info

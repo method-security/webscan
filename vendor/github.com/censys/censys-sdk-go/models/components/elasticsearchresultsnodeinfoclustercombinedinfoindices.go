@@ -3,28 +3,28 @@
 package components
 
 type ElasticSearchResultsNodeInfoClusterCombinedInfoIndices struct {
-	Count *int                                                         `json:"count,omitempty"`
+	Count *int64                                                       `json:"count,omitempty"`
 	Docs  *ElasticSearchResultsNodeInfoClusterCombinedInfoIndicesDocs  `json:"docs,omitempty"`
 	Store *ElasticSearchResultsNodeInfoClusterCombinedInfoIndicesStore `json:"store,omitempty"`
 }
 
-func (o *ElasticSearchResultsNodeInfoClusterCombinedInfoIndices) GetCount() *int {
-	if o == nil {
+func (e *ElasticSearchResultsNodeInfoClusterCombinedInfoIndices) GetCount() *int64 {
+	if e == nil {
 		return nil
 	}
-	return o.Count
+	return e.Count
 }
 
-func (o *ElasticSearchResultsNodeInfoClusterCombinedInfoIndices) GetDocs() *ElasticSearchResultsNodeInfoClusterCombinedInfoIndicesDocs {
-	if o == nil {
+func (e *ElasticSearchResultsNodeInfoClusterCombinedInfoIndices) GetDocs() *ElasticSearchResultsNodeInfoClusterCombinedInfoIndicesDocs {
+	if e == nil {
 		return nil
 	}
-	return o.Docs
+	return e.Docs
 }
 
-func (o *ElasticSearchResultsNodeInfoClusterCombinedInfoIndices) GetStore() *ElasticSearchResultsNodeInfoClusterCombinedInfoIndicesStore {
-	if o == nil {
+func (e *ElasticSearchResultsNodeInfoClusterCombinedInfoIndices) GetStore() *ElasticSearchResultsNodeInfoClusterCombinedInfoIndicesStore {
+	if e == nil {
 		return nil
 	}
-	return o.Store
+	return e.Store
 }

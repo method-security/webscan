@@ -8,55 +8,55 @@ type ElasticSearchResultsNodeInfoNodesNodeDataOS struct {
 	AvailableProc     *int    `json:"available_proc,omitempty"`
 	Name              *string `json:"name,omitempty"`
 	PrettyName        *string `json:"pretty_name,omitempty"`
-	RefreshIntervalMs *int    `json:"refresh_interval_ms,omitempty"`
+	RefreshIntervalMs *int64  `json:"refresh_interval_ms,omitempty"`
 	Version           *string `json:"version,omitempty"`
 }
 
-func (o *ElasticSearchResultsNodeInfoNodesNodeDataOS) GetAllocatedProc() *int {
-	if o == nil {
+func (e *ElasticSearchResultsNodeInfoNodesNodeDataOS) GetAllocatedProc() *int {
+	if e == nil {
 		return nil
 	}
-	return o.AllocatedProc
+	return e.AllocatedProc
 }
 
-func (o *ElasticSearchResultsNodeInfoNodesNodeDataOS) GetArch() *string {
-	if o == nil {
+func (e *ElasticSearchResultsNodeInfoNodesNodeDataOS) GetArch() *string {
+	if e == nil {
 		return nil
 	}
-	return o.Arch
+	return e.Arch
 }
 
-func (o *ElasticSearchResultsNodeInfoNodesNodeDataOS) GetAvailableProc() *int {
-	if o == nil {
+func (e *ElasticSearchResultsNodeInfoNodesNodeDataOS) GetAvailableProc() *int {
+	if e == nil {
 		return nil
 	}
-	return o.AvailableProc
+	return e.AvailableProc
 }
 
-func (o *ElasticSearchResultsNodeInfoNodesNodeDataOS) GetName() *string {
-	if o == nil {
+func (e *ElasticSearchResultsNodeInfoNodesNodeDataOS) GetName() *string {
+	if e == nil {
 		return nil
 	}
-	return o.Name
+	return e.Name
 }
 
-func (o *ElasticSearchResultsNodeInfoNodesNodeDataOS) GetPrettyName() *string {
-	if o == nil {
+func (e *ElasticSearchResultsNodeInfoNodesNodeDataOS) GetPrettyName() *string {
+	if e == nil {
 		return nil
 	}
-	return o.PrettyName
+	return e.PrettyName
 }
 
-func (o *ElasticSearchResultsNodeInfoNodesNodeDataOS) GetRefreshIntervalMs() *int {
-	if o == nil {
+func (e *ElasticSearchResultsNodeInfoNodesNodeDataOS) GetRefreshIntervalMs() *int64 {
+	if e == nil {
 		return nil
 	}
-	return o.RefreshIntervalMs
+	return e.RefreshIntervalMs
 }
 
-func (o *ElasticSearchResultsNodeInfoNodesNodeDataOS) GetVersion() *string {
-	if o == nil {
+func (e *ElasticSearchResultsNodeInfoNodesNodeDataOS) GetVersion() *string {
+	if e == nil {
 		return nil
 	}
-	return o.Version
+	return e.Version
 }

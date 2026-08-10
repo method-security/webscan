@@ -6,6 +6,7 @@ type CobaltStrikeConfig struct {
 	CookieBeacon *int                    `json:"cookie_beacon,omitempty"`
 	CryptoScheme *int                    `json:"crypto_scheme,omitempty"`
 	DNS          *bool                   `json:"dns,omitempty"`
+	HostHeader   *string                 `json:"host_header,omitempty"`
 	HTTPGet      *CobaltStrikeHTTPConfig `json:"http_get,omitempty"`
 	HTTPPost     *CobaltStrikeHTTPConfig `json:"http_post,omitempty"`
 	Jitter       *int                    `json:"jitter,omitempty"`
@@ -20,107 +21,114 @@ type CobaltStrikeConfig struct {
 	Watermark    *int                    `json:"watermark,omitempty"`
 }
 
-func (o *CobaltStrikeConfig) GetCookieBeacon() *int {
-	if o == nil {
+func (c *CobaltStrikeConfig) GetCookieBeacon() *int {
+	if c == nil {
 		return nil
 	}
-	return o.CookieBeacon
+	return c.CookieBeacon
 }
 
-func (o *CobaltStrikeConfig) GetCryptoScheme() *int {
-	if o == nil {
+func (c *CobaltStrikeConfig) GetCryptoScheme() *int {
+	if c == nil {
 		return nil
 	}
-	return o.CryptoScheme
+	return c.CryptoScheme
 }
 
-func (o *CobaltStrikeConfig) GetDNS() *bool {
-	if o == nil {
+func (c *CobaltStrikeConfig) GetDNS() *bool {
+	if c == nil {
 		return nil
 	}
-	return o.DNS
+	return c.DNS
 }
 
-func (o *CobaltStrikeConfig) GetHTTPGet() *CobaltStrikeHTTPConfig {
-	if o == nil {
+func (c *CobaltStrikeConfig) GetHostHeader() *string {
+	if c == nil {
 		return nil
 	}
-	return o.HTTPGet
+	return c.HostHeader
 }
 
-func (o *CobaltStrikeConfig) GetHTTPPost() *CobaltStrikeHTTPConfig {
-	if o == nil {
+func (c *CobaltStrikeConfig) GetHTTPGet() *CobaltStrikeHTTPConfig {
+	if c == nil {
 		return nil
 	}
-	return o.HTTPPost
+	return c.HTTPGet
 }
 
-func (o *CobaltStrikeConfig) GetJitter() *int {
-	if o == nil {
+func (c *CobaltStrikeConfig) GetHTTPPost() *CobaltStrikeHTTPConfig {
+	if c == nil {
 		return nil
 	}
-	return o.Jitter
+	return c.HTTPPost
 }
 
-func (o *CobaltStrikeConfig) GetKilldate() *int {
-	if o == nil {
+func (c *CobaltStrikeConfig) GetJitter() *int {
+	if c == nil {
 		return nil
 	}
-	return o.Killdate
+	return c.Jitter
 }
 
-func (o *CobaltStrikeConfig) GetPostEx() *CobaltStrikePostEx {
-	if o == nil {
+func (c *CobaltStrikeConfig) GetKilldate() *int {
+	if c == nil {
 		return nil
 	}
-	return o.PostEx
+	return c.Killdate
 }
 
-func (o *CobaltStrikeConfig) GetPublicKey() *string {
-	if o == nil {
+func (c *CobaltStrikeConfig) GetPostEx() *CobaltStrikePostEx {
+	if c == nil {
 		return nil
 	}
-	return o.PublicKey
+	return c.PostEx
 }
 
-func (o *CobaltStrikeConfig) GetSleepTime() *int {
-	if o == nil {
+func (c *CobaltStrikeConfig) GetPublicKey() *string {
+	if c == nil {
 		return nil
 	}
-	return o.SleepTime
+	return c.PublicKey
 }
 
-func (o *CobaltStrikeConfig) GetSsl() *bool {
-	if o == nil {
+func (c *CobaltStrikeConfig) GetSleepTime() *int {
+	if c == nil {
 		return nil
 	}
-	return o.Ssl
+	return c.SleepTime
 }
 
-func (o *CobaltStrikeConfig) GetUnknownBytes() map[string]*string {
-	if o == nil {
+func (c *CobaltStrikeConfig) GetSsl() *bool {
+	if c == nil {
 		return nil
 	}
-	return o.UnknownBytes
+	return c.Ssl
 }
 
-func (o *CobaltStrikeConfig) GetUnknownInt() map[string]int {
-	if o == nil {
+func (c *CobaltStrikeConfig) GetUnknownBytes() map[string]*string {
+	if c == nil {
 		return nil
 	}
-	return o.UnknownInt
+	return c.UnknownBytes
 }
 
-func (o *CobaltStrikeConfig) GetUserAgent() *string {
-	if o == nil {
+func (c *CobaltStrikeConfig) GetUnknownInt() map[string]int {
+	if c == nil {
 		return nil
 	}
-	return o.UserAgent
+	return c.UnknownInt
 }
 
-func (o *CobaltStrikeConfig) GetWatermark() *int {
-	if o == nil {
+func (c *CobaltStrikeConfig) GetUserAgent() *string {
+	if c == nil {
 		return nil
 	}
-	return o.Watermark
+	return c.UserAgent
+}
+
+func (c *CobaltStrikeConfig) GetWatermark() *int {
+	if c == nil {
+		return nil
+	}
+	return c.Watermark
 }

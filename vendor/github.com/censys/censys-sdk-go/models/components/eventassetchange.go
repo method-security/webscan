@@ -3,8 +3,6 @@
 package components
 
 import (
-	"encoding/json"
-	"fmt"
 	"github.com/censys/censys-sdk-go/internal/utils"
 	"time"
 )
@@ -19,20 +17,16 @@ const (
 func (e ChangeType) ToPointer() *ChangeType {
 	return &e
 }
-func (e *ChangeType) UnmarshalJSON(data []byte) error {
-	var v string
-	if err := json.Unmarshal(data, &v); err != nil {
-		return err
+
+// IsExact returns true if the value matches a known enum value, false otherwise.
+func (e *ChangeType) IsExact() bool {
+	if e != nil {
+		switch *e {
+		case "added", "removed":
+			return true
+		}
 	}
-	switch v {
-	case "added":
-		fallthrough
-	case "removed":
-		*e = ChangeType(v)
-		return nil
-	default:
-		return fmt.Errorf("invalid value for ChangeType: %v", v)
-	}
+	return false
 }
 
 type EventAssetChange struct {
@@ -46,29 +40,29 @@ func (e EventAssetChange) MarshalJSON() ([]byte, error) {
 }
 
 func (e *EventAssetChange) UnmarshalJSON(data []byte) error {
-	if err := utils.UnmarshalJSON(data, &e, "", false, false); err != nil {
+	if err := utils.UnmarshalJSON(data, &e, "", false, nil); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (o *EventAssetChange) GetChangeType() ChangeType {
-	if o == nil {
+func (e *EventAssetChange) GetChangeType() ChangeType {
+	if e == nil {
 		return ChangeType("")
 	}
-	return o.ChangeType
+	return e.ChangeType
 }
 
-func (o *EventAssetChange) GetEventTime() time.Time {
-	if o == nil {
+func (e *EventAssetChange) GetEventTime() time.Time {
+	if e == nil {
 		return time.Time{}
 	}
-	return o.EventTime
+	return e.EventTime
 }
 
-func (o *EventAssetChange) GetReason() string {
-	if o == nil {
+func (e *EventAssetChange) GetReason() string {
+	if e == nil {
 		return ""
 	}
-	return o.Reason
+	return e.Reason
 }

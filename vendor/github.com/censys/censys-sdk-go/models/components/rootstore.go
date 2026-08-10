@@ -2,11 +2,6 @@
 
 package components
 
-import (
-	"encoding/json"
-	"fmt"
-)
-
 // Type - The certificate's type. Options include root, intermediate, or leaf.
 type Type string
 
@@ -20,24 +15,16 @@ const (
 func (e Type) ToPointer() *Type {
 	return &e
 }
-func (e *Type) UnmarshalJSON(data []byte) error {
-	var v string
-	if err := json.Unmarshal(data, &v); err != nil {
-		return err
+
+// IsExact returns true if the value matches a known enum value, false otherwise.
+func (e *Type) IsExact() bool {
+	if e != nil {
+		switch *e {
+		case "", "root", "intermediate", "leaf":
+			return true
+		}
 	}
-	switch v {
-	case "":
-		fallthrough
-	case "root":
-		fallthrough
-	case "intermediate":
-		fallthrough
-	case "leaf":
-		*e = Type(v)
-		return nil
-	default:
-		return fmt.Errorf("invalid value for Type: %v", v)
-	}
+	return false
 }
 
 type RootStore struct {
@@ -59,58 +46,58 @@ type RootStore struct {
 	Type *Type `json:"type,omitempty"`
 }
 
-func (o *RootStore) GetChains() []RootStoreChain {
-	if o == nil {
+func (r *RootStore) GetChains() []RootStoreChain {
+	if r == nil {
 		return nil
 	}
-	return o.Chains
+	return r.Chains
 }
 
-func (o *RootStore) GetEverValid() *bool {
-	if o == nil {
+func (r *RootStore) GetEverValid() *bool {
+	if r == nil {
 		return nil
 	}
-	return o.EverValid
+	return r.EverValid
 }
 
-func (o *RootStore) GetHadTrustedPath() *bool {
-	if o == nil {
+func (r *RootStore) GetHadTrustedPath() *bool {
+	if r == nil {
 		return nil
 	}
-	return o.HadTrustedPath
+	return r.HadTrustedPath
 }
 
-func (o *RootStore) GetHasTrustedPath() *bool {
-	if o == nil {
+func (r *RootStore) GetHasTrustedPath() *bool {
+	if r == nil {
 		return nil
 	}
-	return o.HasTrustedPath
+	return r.HasTrustedPath
 }
 
-func (o *RootStore) GetInRevocationSet() *bool {
-	if o == nil {
+func (r *RootStore) GetInRevocationSet() *bool {
+	if r == nil {
 		return nil
 	}
-	return o.InRevocationSet
+	return r.InRevocationSet
 }
 
-func (o *RootStore) GetIsValid() *bool {
-	if o == nil {
+func (r *RootStore) GetIsValid() *bool {
+	if r == nil {
 		return nil
 	}
-	return o.IsValid
+	return r.IsValid
 }
 
-func (o *RootStore) GetParents() []string {
-	if o == nil {
+func (r *RootStore) GetParents() []string {
+	if r == nil {
 		return nil
 	}
-	return o.Parents
+	return r.Parents
 }
 
-func (o *RootStore) GetType() *Type {
-	if o == nil {
+func (r *RootStore) GetType() *Type {
+	if r == nil {
 		return nil
 	}
-	return o.Type
+	return r.Type
 }

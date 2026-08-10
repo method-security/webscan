@@ -2,6 +2,7 @@ package govaluate
 
 import (
 	"bytes"
+	"errors"
 )
 
 /*
@@ -17,16 +18,24 @@ func (this *expressionOutputStream) add(transaction string) {
 	this.transactions = append(this.transactions, transaction)
 }
 
-func (this *expressionOutputStream) rollback() string {
+func (this *expressionOutputStream) rollback() (string, error) {
+
+	if len(this.transactions) == 0 {
+		return "", errors.New("Unable to rollback SQL output: no prior token")
+	}
 
 	index := len(this.transactions) - 1
 	ret := this.transactions[index]
 
 	this.transactions = this.transactions[:index]
-	return ret
+	return ret, nil
 }
 
 func (this *expressionOutputStream) createString(delimiter string) string {
+
+	if len(this.transactions) == 0 {
+		return ""
+	}
 
 	var retBuffer bytes.Buffer
 	var transaction string

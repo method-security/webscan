@@ -234,8 +234,14 @@ func ParseQueryParams(reqURL *url.URL) []*discover.RouteQueryParam {
 // ParseBodyParams parses body parameters from a JSON or form-urlencoded string into RouteBodyParam structs.
 func ParseBodyParams(postData string) ([]*discover.RouteBodyParam, error) {
 	var bodyParams []*discover.RouteBodyParam
+	postData = strings.TrimSpace(postData)
+	if postData == "" {
+		return bodyParams, nil
+	}
 
-	// For simplicity, assume the body is JSON or form-urlencoded
+	// Network captures frequently include opaque bodies that are neither JSON nor
+	// form-urlencoded. Parameter extraction is best-effort; malformed payloads
+	// should not turn a valid route capture into a report error.
 	if strings.HasPrefix(postData, "{") {
 		// Try to parse JSON
 		var jsonData map[string]interface{}
@@ -256,7 +262,7 @@ func ParseBodyParams(postData string) ([]*discover.RouteBodyParam, error) {
 				}
 			}
 		} else {
-			return bodyParams, fmt.Errorf("failed to parse json: %v", err)
+			return bodyParams, nil
 		}
 	} else {
 		// Parse form-urlencoded data
@@ -281,7 +287,7 @@ func ParseBodyParams(postData string) ([]*discover.RouteBodyParam, error) {
 				})
 			}
 		} else {
-			return bodyParams, fmt.Errorf("failed to parse form-urlencoded data: %v", err)
+			return bodyParams, nil
 		}
 	}
 
@@ -290,6 +296,8 @@ func ParseBodyParams(postData string) ([]*discover.RouteBodyParam, error) {
 
 // ResolveURL resolves a reference URL relative to a base URL.
 func ResolveURL(base, ref string) string {
+	base = strings.TrimSpace(base)
+	ref = strings.TrimSpace(ref)
 	baseURL, err := url.Parse(base)
 	if err != nil {
 		return ref

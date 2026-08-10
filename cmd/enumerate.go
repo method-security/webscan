@@ -11,6 +11,7 @@ import (
 	enumeratedockerfern "github.com/Method-Security/webscan/generated/go/enumerate/containerregistry"
 	enumerategeneralfern "github.com/Method-Security/webscan/generated/go/enumerate/general"
 	enumeratekubefern "github.com/Method-Security/webscan/generated/go/enumerate/kube"
+	enumeratewebpagefern "github.com/Method-Security/webscan/generated/go/enumerate/webpage"
 
 	// Internal
 	enumerateapiapplication "github.com/Method-Security/webscan/internal/enumerate/apiapplication"
@@ -18,6 +19,7 @@ import (
 	enumeratedocker "github.com/Method-Security/webscan/internal/enumerate/containerregistry"
 	enumerategeneral "github.com/Method-Security/webscan/internal/enumerate/general"
 	enumeratekube "github.com/Method-Security/webscan/internal/enumerate/kube"
+	enumeratewebpage "github.com/Method-Security/webscan/internal/enumerate/webpage"
 
 	// Configs
 	"github.com/Method-Security/webscan/configs"
@@ -33,7 +35,7 @@ import (
 func (a *WebScan) InitEnumerateCommand() {
 
 	// Enumerate Command
-	// Subcommands: api-application, cms, kube, webserver, general
+	// Subcommands: api-application, cms, kube, web-page, general
 	enumerateCmd := &cobra.Command{
 		Use:   "enumerate",
 		Short: "Perform various enumeration scans",
@@ -277,6 +279,126 @@ func (a *WebScan) InitEnumerateCommand() {
 
 	// Add Command to 'Enumerate' Command
 	enumerateCmd.AddCommand(enumerateAPIApplicationCmd)
+
+	// Web Page Command
+	// Subcommands: js-bundles
+	enumerateWebPageCmd := &cobra.Command{
+		Use:   "web-page",
+		Short: "Enumerate web page client-side behavior",
+		Long:  `Inspect web pages and their client-side resources for risky implementation patterns.`,
+	}
+
+	// JavaScript Bundles Command
+	enumerateWebPageJsBundlesCmd := &cobra.Command{
+		Use:   "js-bundles",
+		Short: "Enumerate risky JavaScript bundle functions",
+		Long:  `Fetch external JavaScript bundles referenced by an HTML page and identify risky browser APIs and DOM sinks with source evidence.`,
+		Run: func(cmd *cobra.Command, args []string) {
+			defer a.OutputSignal.PanicHandler(cmd.Context())
+
+			targets, err := cmd.Flags().GetStringSlice("targets")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			maxBundles, err := cmd.Flags().GetInt("max-bundles")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			if maxBundles < -1 {
+				a.OutputSignal.AddError(errors.New("max-bundles must be -1, 0, or a positive integer"))
+				return
+			}
+			maxRedirects, err := cmd.Flags().GetInt("max-redirects")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			ignoreCrossDomainRedirects, err := cmd.Flags().GetBool("ignore-cross-domain-redirects")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			ignoreCrossDomainBundles, err := cmd.Flags().GetBool("ignore-cross-domain-bundles")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			verifyTLS, err := cmd.Flags().GetBool("verify-tls")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			timeout, err := cmd.Flags().GetInt("timeout")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			userAgentPreset, err := requesthelpers.GetUserAgentFlag(cmd)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			requestMethodConfig, err := requesthelpers.GetRequestMethodFlags(cmd)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			if err := requesthelpers.ValidateUserAgentWithRequestMethod(userAgentPreset, requestMethodConfig.RequestMethodEnum, cmd.Flags().Changed("user-agent")); err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			headerPairs, err := cmd.Flags().GetStringArray("header")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			headers, err := requesthelpers.ParseHeaderPairs(headerPairs)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			cookiePairs, err := cmd.Flags().GetStringArray("cookie")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			cookies, err := requesthelpers.ParseCookiePairs(cookiePairs)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			config := getEnumerateWebPageJsBundlesConfig(targets, maxBundles, maxRedirects, ignoreCrossDomainRedirects, ignoreCrossDomainBundles, verifyTLS, timeout, userAgentPreset, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig, headers, cookies)
+
+			report := enumeratewebpage.PerformAppEnumerateWebPageJsBundles(cmd.Context(), config, requestMethodConfig.BrowserbaseSecrets)
+			a.OutputSignal.Content = report
+		},
+	}
+
+	enumerateWebPageJsBundlesCmd.Flags().StringSlice("targets", []string{}, "HTML page URLs whose external JavaScript bundles should be analyzed")
+	enumerateWebPageJsBundlesCmd.Flags().Int("max-bundles", 10, "Maximum number of successfully fetched JavaScript bundles to analyze (-1 = unlimited, 0 = disabled)")
+	enumerateWebPageJsBundlesCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
+	enumerateWebPageJsBundlesCmd.Flags().Bool("ignore-cross-domain-redirects", true, "If true, do not follow redirects to a different domain and treat them as errors")
+	enumerateWebPageJsBundlesCmd.Flags().Bool("ignore-cross-domain-bundles", false, "Ignore JavaScript bundle URLs whose host is not the target host or a subdomain of it")
+	enumerateWebPageJsBundlesCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
+	enumerateWebPageJsBundlesCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
+	enumerateWebPageJsBundlesCmd.Flags().String("user-agent", "RANDOM", "User-Agent preset (RANDOM, CHROME, FIREFOX, SAFARI, EDGE)")
+	enumerateWebPageJsBundlesCmd.Flags().String("request-method", "HEADLESS", "Request method to use for the HTML page (standard, headless, browserbase)")
+	enumerateWebPageJsBundlesCmd.Flags().String("headless-path", "", "Path to headless browser executable")
+	enumerateWebPageJsBundlesCmd.Flags().Int("min-dom-stabalize-time", 20, "Minimum time to wait for DOM stabilization in seconds")
+	enumerateWebPageJsBundlesCmd.Flags().String("browserbase-token", "", "Browserbase project token")
+	enumerateWebPageJsBundlesCmd.Flags().String("browserbase-project", "", "Browserbase project ID")
+	enumerateWebPageJsBundlesCmd.Flags().Bool("browserbase-proxy", false, "Use Browserbase proxy for requests")
+	enumerateWebPageJsBundlesCmd.Flags().StringSlice("browserbase-countries", []string{}, "List of countries to use for Browserbase proxy")
+	enumerateWebPageJsBundlesCmd.Flags().StringArray("header", []string{}, "Request header as 'Name: Value' (repeatable; missing colon errors; repeated names are case-insensitively comma-joined per RFC 7230 §3.2.2)")
+	enumerateWebPageJsBundlesCmd.Flags().StringArray("cookie", []string{}, "Request cookie as 'name=value' (repeatable; missing equals errors)")
+
+	_ = enumerateWebPageJsBundlesCmd.MarkFlagRequired("targets")
+
+	enumerateWebPageCmd.AddCommand(enumerateWebPageJsBundlesCmd)
+	enumerateCmd.AddCommand(enumerateWebPageCmd)
 
 	// Kube Command
 	enumerateKubeCmd := &cobra.Command{
@@ -920,6 +1042,26 @@ func getEnumerateDrupalModulesConfig(targets []string, modules []string, modules
 		Jitter:          max(jitter, 0),
 		Threads:         max(threads, 0),
 		UserAgent:       userAgent,
+	}
+	return config
+}
+
+// getEnumerateWebPageJsBundlesConfig builds the config for JavaScript bundle enumeration.
+func getEnumerateWebPageJsBundlesConfig(targets []string, maxBundles int, maxRedirects int, ignoreCrossDomainRedirects bool, ignoreCrossDomainBundles bool, verifyTLS bool, timeout int, userAgent common.UserAgentPreset, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig, headers map[string]string, cookies map[string]string) enumeratewebpagefern.EnumerateWebPageJsBundlesConfig {
+	config := enumeratewebpagefern.EnumerateWebPageJsBundlesConfig{
+		Targets:                    targets,
+		MaxBundles:                 maxBundles,
+		MaxRedirects:               maxRedirects,
+		IgnoreCrossDomainRedirects: ignoreCrossDomainRedirects,
+		IgnoreCrossDomainBundles:   ignoreCrossDomainBundles,
+		VerifyTls:                  verifyTLS,
+		Timeout:                    max(timeout, 0),
+		UserAgent:                  userAgent,
+		RequestMethod:              requestMethod,
+		HeadlessConfig:             headlessConfig,
+		BrowserbaseConfig:          browserbaseConfig,
+		Headers:                    headers,
+		Cookies:                    cookies,
 	}
 	return config
 }

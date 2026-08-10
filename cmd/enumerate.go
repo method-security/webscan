@@ -292,7 +292,7 @@ func (a *WebScan) InitEnumerateCommand() {
 	enumerateWebPageJsBundlesCmd := &cobra.Command{
 		Use:   "js-bundles",
 		Short: "Enumerate risky JavaScript bundle functions",
-		Long:  `Fetch external JavaScript bundles referenced by an HTML page and identify risky browser APIs and DOM sinks with source evidence.`,
+		Long:  `Fetch JavaScript bundle URLs and identify risky browser APIs and DOM sinks with source evidence.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			defer a.OutputSignal.PanicHandler(cmd.Context())
 
@@ -377,7 +377,7 @@ func (a *WebScan) InitEnumerateCommand() {
 		},
 	}
 
-	enumerateWebPageJsBundlesCmd.Flags().StringSlice("targets", []string{}, "HTML page URLs whose external JavaScript bundles should be analyzed")
+	enumerateWebPageJsBundlesCmd.Flags().StringSlice("targets", []string{}, "JavaScript bundle URLs to analyze")
 	enumerateWebPageJsBundlesCmd.Flags().Int("max-bundles", 10, "Maximum number of successfully fetched JavaScript bundles to analyze (-1 = unlimited, 0 = disabled)")
 	enumerateWebPageJsBundlesCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
 	enumerateWebPageJsBundlesCmd.Flags().Bool("ignore-cross-domain-redirects", true, "If true, do not follow redirects to a different domain and treat them as errors")
@@ -385,7 +385,7 @@ func (a *WebScan) InitEnumerateCommand() {
 	enumerateWebPageJsBundlesCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
 	enumerateWebPageJsBundlesCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
 	enumerateWebPageJsBundlesCmd.Flags().String("user-agent", "RANDOM", "User-Agent preset (RANDOM, CHROME, FIREFOX, SAFARI, EDGE)")
-	enumerateWebPageJsBundlesCmd.Flags().String("request-method", "HEADLESS", "Request method to use for the HTML page (standard, headless, browserbase)")
+	enumerateWebPageJsBundlesCmd.Flags().String("request-method", "STANDARD", "Request method to use for bundle requests (standard, headless, browserbase)")
 	enumerateWebPageJsBundlesCmd.Flags().String("headless-path", "", "Path to headless browser executable")
 	enumerateWebPageJsBundlesCmd.Flags().Int("min-dom-stabalize-time", 20, "Minimum time to wait for DOM stabilization in seconds")
 	enumerateWebPageJsBundlesCmd.Flags().String("browserbase-token", "", "Browserbase project token")

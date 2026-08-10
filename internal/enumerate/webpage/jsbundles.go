@@ -19,9 +19,6 @@ import (
 	utils "github.com/Method-Security/webscan/utils"
 	request "github.com/Method-Security/webscan/utils/request"
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
-
-	// External
-	goquery "github.com/PuerkitoBio/goquery"
 )
 
 type riskyFunctionRule struct {
@@ -103,8 +100,8 @@ var riskyFunctionRules = []riskyFunctionRule{
 	},
 }
 
-// PerformAppEnumerateWebPageJsBundles fetches an HTML page, extracts external
-// JavaScript bundles, and identifies risky JavaScript APIs and DOM sinks.
+// PerformAppEnumerateWebPageJsBundles fetches JavaScript bundle URLs and
+// identifies risky JavaScript APIs and DOM sinks.
 func PerformAppEnumerateWebPageJsBundles(ctx context.Context, config enumeratewebpagefern.EnumerateWebPageJsBundlesConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) enumeratewebpagefern.EnumerateWebPageJsBundlesReport {
 	report := enumeratewebpagefern.EnumerateWebPageJsBundlesReport{
 		Config: &config,
@@ -128,66 +125,25 @@ func enumerateTarget(ctx context.Context, target string, config enumeratewebpage
 	targetResult := &enumeratewebpagefern.JsBundleTargetDetails{Target: target}
 	errors := []string{}
 
-	pageResponse, err := fetchPage(ctx, target, config, browserbaseSecrets)
+	if config.MaxBundles == 0 {
+		return targetResult, errors
+	}
+
+	bundle, err := fetchBundle(ctx, target, target, config, browserbaseSecrets)
 	if err != nil {
-		errors = append(errors, err.Error())
+		errors = append(errors, fmt.Sprintf("failed to fetch bundle %s: %s", target, err))
 		return targetResult, errors
 	}
-	if pageResponse == nil || pageResponse.Response == nil || pageResponse.Response.ResponseBody == nil {
-		errors = append(errors, "page request returned an empty response body")
-		return targetResult, errors
+	if bundle != nil {
+		targetResult.Bundles = []*enumeratewebpagefern.JsBundleDetails{bundle}
 	}
-	if pageResponse.Response.StatusCode == nil || *pageResponse.Response.StatusCode < 200 || *pageResponse.Response.StatusCode >= 300 {
-		statusCode := 0
-		if pageResponse.Response.StatusCode != nil {
-			statusCode = *pageResponse.Response.StatusCode
-		}
-		errors = append(errors, fmt.Sprintf("page request returned unexpected status code %d", statusCode))
-		return targetResult, errors
-	}
-
-	htmlBody, err := responseBodyBytes(pageResponse.Response.ResponseBody)
-	if err != nil {
-		errors = append(errors, fmt.Sprintf("failed to decode page response body: %s", err))
-		return targetResult, errors
-	}
-
-	pageURL := finalResponseURL(target, pageResponse)
-	bundleURLs, err := extractBundleURLs(string(htmlBody), pageURL, target, config)
-	if err != nil {
-		errors = append(errors, err.Error())
-		return targetResult, errors
-	}
-
-	bundles := make([]*enumeratewebpagefern.JsBundleDetails, 0, len(bundleURLs))
-	successfulBundles := 0
-	for _, bundleURL := range bundleURLs {
-		if config.MaxBundles >= 0 && successfulBundles >= config.MaxBundles {
-			break
-		}
-
-		bundle, err := fetchBundle(ctx, bundleURL, config)
-		if err != nil {
-			errors = append(errors, fmt.Sprintf("failed to fetch bundle %s: %s", bundleURL, err))
-			continue
-		}
-		successfulBundles++
-		bundles = append(bundles, bundle)
-	}
-
-	sort.SliceStable(bundles, func(i, j int) bool {
-		return bundles[i].Url < bundles[j].Url
-	})
-	targetResult.Bundles = bundles
 	return targetResult, errors
 }
 
-func fetchPage(ctx context.Context, target string, config enumeratewebpagefern.EnumerateWebPageJsBundlesConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) (*common.HttpRequestResponse, error) {
-	return fetchResource(ctx, target, config, config.RequestMethod, config.HeadlessConfig, config.BrowserbaseConfig, browserbaseSecrets)
-}
-
-func fetchBundle(ctx context.Context, bundleURL string, config enumeratewebpagefern.EnumerateWebPageJsBundlesConfig) (*enumeratewebpagefern.JsBundleDetails, error) {
-	response, err := fetchResource(ctx, bundleURL, config, common.RequestMethodStandard, nil, nil, nil)
+func fetchBundle(ctx context.Context, target string, bundleURL string, config enumeratewebpagefern.EnumerateWebPageJsBundlesConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) (*enumeratewebpagefern.JsBundleDetails, error) {
+	// Bundle redirects are allowed to resolve independently from page redirects.
+	// Final bundle inclusion is enforced below by IgnoreCrossDomainBundles.
+	response, err := fetchResource(ctx, bundleURL, config, false, config.RequestMethod, config.HeadlessConfig, config.BrowserbaseConfig, browserbaseSecrets)
 	if err != nil {
 		return nil, err
 	}
@@ -203,20 +159,50 @@ func fetchBundle(ctx context.Context, bundleURL string, config enumeratewebpagef
 		return nil, fmt.Errorf("unexpected status code %d", statusCode)
 	}
 
+	finalBundleURL := finalResponseURL(bundleURL, response)
+	if config.IgnoreCrossDomainBundles && !utils.IsHostInScope(target, finalBundleURL) {
+		return nil, nil
+	}
+
 	body, err := responseBodyBytes(response.Response.ResponseBody)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode response body: %w", err)
 	}
+	if !isJavaScriptBundleResponse(finalBundleURL, response.Response, body) {
+		return nil, fmt.Errorf("response did not look like a JavaScript bundle")
+	}
 
 	bundle := &enumeratewebpagefern.JsBundleDetails{
-		Url:       bundleURL,
+		Url:       finalBundleURL,
 		SizeBytes: len(body),
 		Functions: findRiskyFunctions(string(body)),
 	}
 	return bundle, nil
 }
 
-func fetchResource(ctx context.Context, target string, config enumeratewebpagefern.EnumerateWebPageJsBundlesConfig, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) (*common.HttpRequestResponse, error) {
+func isJavaScriptBundleResponse(bundleURL string, response *common.HttpResponse, body []byte) bool {
+	contentType := strings.ToLower(requesthelpers.GetContentTypeFromHeaderMap(response.ResponseHeaders))
+	if strings.Contains(contentType, "html") {
+		return false
+	}
+	if strings.Contains(contentType, "javascript") || strings.Contains(contentType, "ecmascript") {
+		return true
+	}
+
+	detectedContentType := strings.ToLower(requesthelpers.DetectContentTypeFromBytes(body))
+	if strings.Contains(detectedContentType, "html") {
+		return false
+	}
+
+	parsedURL, err := url.Parse(bundleURL)
+	if err != nil {
+		return false
+	}
+	path := strings.ToLower(parsedURL.Path)
+	return strings.HasSuffix(path, ".js") || strings.HasSuffix(path, ".mjs")
+}
+
+func fetchResource(ctx context.Context, target string, config enumeratewebpagefern.EnumerateWebPageJsBundlesConfig, ignoreCrossDomainRedirects bool, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig, browserbaseSecrets *common.BrowserbaseRequestSecrets) (*common.HttpRequestResponse, error) {
 	baseURL, path, queryParams, err := requesthelpers.SplitTargetURL(target)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse URL %s: %w", target, err)
@@ -236,7 +222,7 @@ func fetchResource(ctx context.Context, target string, config enumeratewebpagefe
 		MaxRedirects:               config.MaxRedirects,
 		VerifyTls:                  config.VerifyTls,
 		Timeout:                    config.Timeout,
-		IgnoreCrossDomainRedirects: config.IgnoreCrossDomainRedirects,
+		IgnoreCrossDomainRedirects: ignoreCrossDomainRedirects,
 		UserAgent:                  config.UserAgent,
 		RequestMethod:              requestMethod,
 		HeadlessConfig:             headlessConfig,
@@ -245,52 +231,6 @@ func fetchResource(ctx context.Context, target string, config enumeratewebpagefe
 	}
 	requesthelpers.ApplyProxySettings(ctx, &sendConfig)
 	return request.SendRequest(ctx, sendConfig)
-}
-
-func extractBundleURLs(htmlContent string, pageURL string, target string, config enumeratewebpagefern.EnumerateWebPageJsBundlesConfig) ([]string, error) {
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlContent))
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse HTML page: %w", err)
-	}
-
-	baseURL, err := url.Parse(pageURL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse page URL %s: %w", pageURL, err)
-	}
-
-	seen := make(map[string]struct{})
-	bundleURLs := []string{}
-	doc.Find("script[src]").Each(func(_ int, selection *goquery.Selection) {
-		src, exists := selection.Attr("src")
-		if !exists {
-			return
-		}
-		src = strings.TrimSpace(src)
-		if src == "" {
-			return
-		}
-
-		parsedSrc, err := url.Parse(src)
-		if err != nil {
-			return
-		}
-		resolved := baseURL.ResolveReference(parsedSrc)
-		if resolved.Scheme != "http" && resolved.Scheme != "https" {
-			return
-		}
-		resolved.Fragment = ""
-		fullURL := resolved.String()
-		if config.IgnoreCrossDomainBundles && !utils.IsHostInScope(target, fullURL) {
-			return
-		}
-		if _, ok := seen[fullURL]; ok {
-			return
-		}
-		seen[fullURL] = struct{}{}
-		bundleURLs = append(bundleURLs, fullURL)
-	})
-
-	return bundleURLs, nil
 }
 
 func finalResponseURL(fallback string, response *common.HttpRequestResponse) string {

@@ -107,6 +107,8 @@ func addWordPronounLookup() {
 		Description: "Word used in place of a noun to avoid repetition",
 		Example:     "me",
 		Output:      "string",
+		Aliases:     []string{"noun substitute", "word replacement", "grammar element", "reference word"},
+		Keywords:    []string{"noun", "replacement", "grammar", "repetition", "substitute", "reference", "avoidance"},
 		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
 			return pronoun(f), nil
 		},
@@ -118,6 +120,8 @@ func addWordPronounLookup() {
 		Description: "Pronoun referring to a specific persons or things",
 		Example:     "it",
 		Output:      "string",
+		Aliases:     []string{"personal reference", "specific entity", "individual pronoun", "grammar element"},
+		Keywords:    []string{"pronoun", "personal", "specific", "person", "thing", "grammar", "referring", "individual", "entity", "identity"},
 		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
 			return pronounPersonal(f), nil
 		},
@@ -129,6 +133,8 @@ func addWordPronounLookup() {
 		Description: "Pronoun used as the object of a verb or preposition",
 		Example:     "it",
 		Output:      "string",
+		Aliases:     []string{"object reference", "verb object", "preposition object", "grammar function"},
+		Keywords:    []string{"pronoun", "verb", "preposition", "grammar", "used", "objective", "case", "receiver"},
 		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
 			return pronounObject(f), nil
 		},
@@ -140,6 +146,8 @@ func addWordPronounLookup() {
 		Description: "Pronoun indicating ownership or belonging",
 		Example:     "mine",
 		Output:      "string",
+		Aliases:     []string{"ownership indicator", "belonging reference", "possession word", "grammar element"},
+		Keywords:    []string{"pronoun", "possessive", "ownership", "belonging", "grammar", "indicating", "possession", "property"},
 		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
 			return pronounPossessive(f), nil
 		},
@@ -151,6 +159,8 @@ func addWordPronounLookup() {
 		Description: "Pronoun referring back to the subject of the sentence",
 		Example:     "myself",
 		Output:      "string",
+		Aliases:     []string{"self reference", "subject reflection", "backward reference", "grammar element"},
+		Keywords:    []string{"pronoun", "reflective", "subject", "sentence", "grammar", "referring", "reflexive", "self", "mirror"},
 		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
 			return pronounReflective(f), nil
 		},
@@ -162,6 +172,8 @@ func addWordPronounLookup() {
 		Description: "Pronoun that does not refer to a specific person or thing",
 		Example:     "few",
 		Output:      "string",
+		Aliases:     []string{"vague reference", "general pronoun", "unspecific word", "grammar element"},
+		Keywords:    []string{"pronoun", "indefinite", "specific", "person", "grammar", "refer", "vague", "general", "unspecified"},
 		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
 			return pronounIndefinite(f), nil
 		},
@@ -173,6 +185,8 @@ func addWordPronounLookup() {
 		Description: "Pronoun that points out specific people or things",
 		Example:     "this",
 		Output:      "string",
+		Aliases:     []string{"pointing reference", "specific indicator", "demonstration word", "grammar element"},
+		Keywords:    []string{"pronoun", "demonstrative", "specific", "people", "grammar", "points", "indicate", "reference", "pointing"},
 		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
 			return pronounDemonstrative(f), nil
 		},
@@ -184,6 +198,8 @@ func addWordPronounLookup() {
 		Description: "Pronoun used to ask questions",
 		Example:     "what",
 		Output:      "string",
+		Aliases:     []string{"question word", "inquiry reference", "interrogation element", "grammar function"},
+		Keywords:    []string{"pronoun", "interrogative", "question", "ask", "grammar", "used", "inquiry", "wh-word", "questioning"},
 		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
 			return pronounInterrogative(f), nil
 		},
@@ -195,6 +211,8 @@ func addWordPronounLookup() {
 		Description: "Pronoun that introduces a clause, referring back to a noun or pronoun",
 		Example:     "as",
 		Output:      "string",
+		Aliases:     []string{"backward reference", "linking pronoun", "grammar element"},
+		Keywords:    []string{"pronoun", "relative", "clause", "noun", "grammar", "introduces", "referring", "connector", "link"},
 		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
 			return pronounRelative(f), nil
 		},

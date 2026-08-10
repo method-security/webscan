@@ -3,28 +3,37 @@
 package components
 
 type SearchQueryHit struct {
-	CertificateV1 *CertificateAsset `json:"certificate_v1,omitempty"`
-	HostV1        *HostAsset        `json:"host_v1,omitempty"`
-	WebpropertyV1 *WebpropertyAsset `json:"webproperty_v1,omitempty"`
+	CertificateV1 *CertificateAsset             `json:"certificate_v1,omitempty"`
+	HostV1        *HostAssetWithMatchedServices `json:"host_v1,omitempty"`
+	// Tags applied to this asset.
+	Tags          []SearchQueryTagInfo `json:"tags,omitempty"`
+	WebpropertyV1 *WebpropertyAsset    `json:"webproperty_v1,omitempty"`
 }
 
-func (o *SearchQueryHit) GetCertificateV1() *CertificateAsset {
-	if o == nil {
+func (s *SearchQueryHit) GetCertificateV1() *CertificateAsset {
+	if s == nil {
 		return nil
 	}
-	return o.CertificateV1
+	return s.CertificateV1
 }
 
-func (o *SearchQueryHit) GetHostV1() *HostAsset {
-	if o == nil {
+func (s *SearchQueryHit) GetHostV1() *HostAssetWithMatchedServices {
+	if s == nil {
 		return nil
 	}
-	return o.HostV1
+	return s.HostV1
 }
 
-func (o *SearchQueryHit) GetWebpropertyV1() *WebpropertyAsset {
-	if o == nil {
+func (s *SearchQueryHit) GetTags() []SearchQueryTagInfo {
+	if s == nil {
 		return nil
 	}
-	return o.WebpropertyV1
+	return s.Tags
+}
+
+func (s *SearchQueryHit) GetWebpropertyV1() *WebpropertyAsset {
+	if s == nil {
+		return nil
+	}
+	return s.WebpropertyV1
 }

@@ -46,6 +46,10 @@ func (this EvaluableExpression) findNextSQLString(stream *tokenStream, transacti
 	var token ExpressionToken
 	var ret string
 
+	if !stream.hasNext() {
+		return "", errors.New("Unexpected end of SQL token stream")
+	}
+
 	token = stream.next()
 
 	switch token.Kind {
@@ -53,34 +57,64 @@ func (this EvaluableExpression) findNextSQLString(stream *tokenStream, transacti
 	case STRING:
 		ret = fmt.Sprintf("'%v'", token.Value)
 	case PATTERN:
-		ret = fmt.Sprintf("'%s'", token.Value.(*regexp.Regexp).String())
+		pattern, ok := token.Value.(*regexp.Regexp)
+		if !ok || pattern == nil {
+			return "", fmt.Errorf("Unable to convert PATTERN token with value type %T to SQL", token.Value)
+		}
+		ret = fmt.Sprintf("'%s'", pattern.String())
 	case TIME:
-		ret = fmt.Sprintf("'%s'", token.Value.(time.Time).Format(this.QueryDateFormat))
+		tokenTime, ok := token.Value.(time.Time)
+		if !ok {
+			return "", fmt.Errorf("Unable to convert TIME token with value type %T to SQL", token.Value)
+		}
+		ret = fmt.Sprintf("'%s'", tokenTime.Format(this.QueryDateFormat))
 
 	case LOGICALOP:
-		switch logicalSymbols[token.Value.(string)] {
+		op, ok := token.Value.(string)
+		if !ok {
+			return "", fmt.Errorf("Unable to convert LOGICALOP token with value type %T to SQL", token.Value)
+		}
+		switch logicalSymbols[op] {
 
 		case AND:
 			ret = "AND"
 		case OR:
 			ret = "OR"
+		default:
+			return "", fmt.Errorf("Unrecognized logical operator '%s'", op)
 		}
 
 	case BOOLEAN:
-		if token.Value.(bool) {
+		boolVal, ok := token.Value.(bool)
+		if !ok {
+			return "", fmt.Errorf("Unable to convert BOOLEAN token with value type %T to SQL", token.Value)
+		}
+		if boolVal {
 			ret = "1"
 		} else {
 			ret = "0"
 		}
 
 	case VARIABLE:
-		ret = fmt.Sprintf("[%s]", token.Value.(string))
+		name, ok := token.Value.(string)
+		if !ok {
+			return "", fmt.Errorf("Unable to convert VARIABLE token with value type %T to SQL", token.Value)
+		}
+		ret = fmt.Sprintf("[%s]", name)
 
 	case NUMERIC:
-		ret = fmt.Sprintf("%g", token.Value.(float64))
+		num, ok := token.Value.(float64)
+		if !ok {
+			return "", fmt.Errorf("Unable to convert NUMERIC token with value type %T to SQL", token.Value)
+		}
+		ret = fmt.Sprintf("%g", num)
 
 	case COMPARATOR:
-		switch comparatorSymbols[token.Value.(string)] {
+		op, ok := token.Value.(string)
+		if !ok {
+			return "", fmt.Errorf("Unable to convert COMPARATOR token with value type %T to SQL", token.Value)
+		}
+		switch comparatorSymbols[op] {
 
 		case EQ:
 			ret = "="
@@ -91,16 +125,23 @@ func (this EvaluableExpression) findNextSQLString(stream *tokenStream, transacti
 		case NREQ:
 			ret = "NOT RLIKE"
 		default:
-			ret = fmt.Sprintf("%s", token.Value.(string))
+			ret = op
 		}
 
 	case TERNARY:
+		op, ok := token.Value.(string)
+		if !ok {
+			return "", fmt.Errorf("Unable to convert TERNARY token with value type %T to SQL", token.Value)
+		}
 
-		switch ternarySymbols[token.Value.(string)] {
+		switch ternarySymbols[op] {
 
 		case COALESCE:
 
-			left := transactions.rollback()
+			left, err := transactions.rollback()
+			if err != nil {
+				return "", err
+			}
 			right, err := this.findNextSQLString(stream, transactions)
 			if err != nil {
 				return "", err
@@ -111,12 +152,18 @@ func (this EvaluableExpression) findNextSQLString(stream *tokenStream, transacti
 			fallthrough
 		case TERNARY_FALSE:
 			return "", errors.New("Ternary operators are unsupported in SQL output")
+		default:
+			return "", fmt.Errorf("Unrecognized ternary operator '%s'", op)
 		}
 	case PREFIX:
-		switch prefixSymbols[token.Value.(string)] {
+		op, ok := token.Value.(string)
+		if !ok {
+			return "", fmt.Errorf("Unable to convert PREFIX token with value type %T to SQL", token.Value)
+		}
+		switch prefixSymbols[op] {
 
 		case INVERT:
-			ret = fmt.Sprintf("NOT")
+			ret = "NOT"
 		default:
 
 			right, err := this.findNextSQLString(stream, transactions)
@@ -124,15 +171,22 @@ func (this EvaluableExpression) findNextSQLString(stream *tokenStream, transacti
 				return "", err
 			}
 
-			ret = fmt.Sprintf("%s%s", token.Value.(string), right)
+			ret = fmt.Sprintf("%s%s", op, right)
 		}
 	case MODIFIER:
+		op, ok := token.Value.(string)
+		if !ok {
+			return "", fmt.Errorf("Unable to convert MODIFIER token with value type %T to SQL", token.Value)
+		}
 
-		switch modifierSymbols[token.Value.(string)] {
+		switch modifierSymbols[op] {
 
 		case EXPONENT:
 
-			left := transactions.rollback()
+			left, err := transactions.rollback()
+			if err != nil {
+				return "", err
+			}
 			right, err := this.findNextSQLString(stream, transactions)
 			if err != nil {
 				return "", err
@@ -141,7 +195,10 @@ func (this EvaluableExpression) findNextSQLString(stream *tokenStream, transacti
 			ret = fmt.Sprintf("POW(%s, %s)", left, right)
 		case MODULUS:
 
-			left := transactions.rollback()
+			left, err := transactions.rollback()
+			if err != nil {
+				return "", err
+			}
 			right, err := this.findNextSQLString(stream, transactions)
 			if err != nil {
 				return "", err
@@ -149,7 +206,7 @@ func (this EvaluableExpression) findNextSQLString(stream *tokenStream, transacti
 
 			ret = fmt.Sprintf("MOD(%s, %s)", left, right)
 		default:
-			ret = fmt.Sprintf("%s", token.Value.(string))
+			ret = op
 		}
 	case CLAUSE:
 		ret = "("

@@ -4,6 +4,8 @@ Bloom filters
 [![Go Report Card](https://goreportcard.com/badge/github.com/bits-and-blooms/bloom)](https://goreportcard.com/report/github.com/bits-and-blooms/bloom)
 [![Go Reference](https://pkg.go.dev/badge/github.com/bits-and-blooms/bloom.svg)](https://pkg.go.dev/github.com/bits-and-blooms/bloom/v3)
 
+This library is used by popular systems such as [Milvus](https://github.com/milvus-io/milvus) and [beego](https://github.com/beego/Beego).
+
 A Bloom filter is a concise/compressed representation of a set, where the main
 requirement is to make membership queries; _i.e._, whether an item is a
 member of a set. A Bloom filter will always correctly report the presence
@@ -49,6 +51,7 @@ For numerical data, we recommend that you look into the encoding/binary library.
 
 Godoc documentation:  https://pkg.go.dev/github.com/bits-and-blooms/bloom/v3 
 
+
 ## Installation
 
 ```bash
@@ -85,6 +88,41 @@ You would expect `ActualfpRate` to be close to the desired false-positive rate `
 The `EstimateFalsePositiveRate` function creates a temporary Bloom filter. It is
 also relatively expensive and only meant for validation.
 
+## Serialization
+
+You can read and write the Bloom filters as follows:
+
+
+```Go
+	f := New(1000, 4)
+	var buf bytes.Buffer
+	bytesWritten, err := f.WriteTo(&buf)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	var g BloomFilter
+	bytesRead, err := g.ReadFrom(&buf)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	if bytesRead != bytesWritten {
+		t.Errorf("read unexpected number of bytes %d != %d", bytesRead, bytesWritten)
+	}
+```
+
+*Performance tip*: 
+When reading and writing to a file or a network connection, you may get better performance by 
+wrapping your streams with `bufio` instances.
+
+E.g., 
+```Go
+	f, err := os.Create("myfile")
+	w := bufio.NewWriter(f)
+```
+```Go
+	f, err := os.Open("myfile")
+	r := bufio.NewReader(f)
+```
 
 ## Contributing
 
@@ -113,3 +151,26 @@ In this implementation, the hashing functions used is [murmurhash](github.com/tw
 
 Given the particular hashing scheme, it's best to be empirical about this. Note
 that estimating the FP rate will clear the Bloom filter.
+
+
+
+
+### Goroutine safety
+
+In general, it not safe to access
+the same filter using different goroutines--they are
+unsynchronized for performance. Should you want to access
+a filter from more than one goroutine, you should
+provide synchronization. Typically this is done by using channels (in Go style; so there is only ever one owner),
+or by using `sync.Mutex` to serialize operations. Exceptionally, you may access the same filter from different
+goroutines if you never modify the content of the filter.
+
+## Stars
+
+
+[![Star History Chart](https://api.star-history.com/svg?repos=bits-and-blooms/bloom&type=Date)](https://www.star-history.com/#bits-and-blooms/bloom&Date)
+
+## Further reading
+
+<p>Mastering Programming: From Testing to Performance in Go</p>
+<div><a href="https://www.amazon.com/dp/B0FMPGSWR5"><img style="margin-left: auto; margin-right: auto;" src="https://m.media-amazon.com/images/I/61feneHS7kL._SL1499_.jpg" alt="" width="250px" /></a></div>

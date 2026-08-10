@@ -5,82 +5,116 @@ package components
 type Host struct {
 	AutonomousSystem *Routing   `json:"autonomous_system,omitempty"`
 	DNS              *HostDNS   `json:"dns,omitempty"`
+	Greynoise        *Greynoise `json:"greynoise,omitempty"`
 	Hardware         *Attribute `json:"hardware,omitempty"`
 	IP               *string    `json:"ip,omitempty"`
 	Labels           []Label    `json:"labels,omitempty"`
 	Location         *Location  `json:"location,omitempty"`
-	OperatingSystem  *Attribute `json:"operating_system,omitempty"`
-	ServiceCount     *int       `json:"service_count,omitempty"`
-	Services         []Service  `json:"services,omitempty"`
-	Whois            *Whois     `json:"whois,omitempty"`
+	// Information about what type of network the host belongs to.
+	Network         []NetworkClassification `json:"network,omitempty"`
+	OperatingSystem *Attribute              `json:"operating_system,omitempty"`
+	// Information about privacy services used by the IP, such as VPNs, Proxies, or Tor.
+	Privacy      []Privacy   `json:"privacy,omitempty"`
+	Reputation   *Reputation `json:"reputation,omitempty"`
+	ServiceCount *int        `json:"service_count,omitempty"`
+	Services     []Service   `json:"services,omitempty"`
+	Whois        *Whois      `json:"whois,omitempty"`
 }
 
-func (o *Host) GetAutonomousSystem() *Routing {
-	if o == nil {
+func (h *Host) GetAutonomousSystem() *Routing {
+	if h == nil {
 		return nil
 	}
-	return o.AutonomousSystem
+	return h.AutonomousSystem
 }
 
-func (o *Host) GetDNS() *HostDNS {
-	if o == nil {
+func (h *Host) GetDNS() *HostDNS {
+	if h == nil {
 		return nil
 	}
-	return o.DNS
+	return h.DNS
 }
 
-func (o *Host) GetHardware() *Attribute {
-	if o == nil {
+func (h *Host) GetGreynoise() *Greynoise {
+	if h == nil {
 		return nil
 	}
-	return o.Hardware
+	return h.Greynoise
 }
 
-func (o *Host) GetIP() *string {
-	if o == nil {
+func (h *Host) GetHardware() *Attribute {
+	if h == nil {
 		return nil
 	}
-	return o.IP
+	return h.Hardware
 }
 
-func (o *Host) GetLabels() []Label {
-	if o == nil {
+func (h *Host) GetIP() *string {
+	if h == nil {
 		return nil
 	}
-	return o.Labels
+	return h.IP
 }
 
-func (o *Host) GetLocation() *Location {
-	if o == nil {
+func (h *Host) GetLabels() []Label {
+	if h == nil {
 		return nil
 	}
-	return o.Location
+	return h.Labels
 }
 
-func (o *Host) GetOperatingSystem() *Attribute {
-	if o == nil {
+func (h *Host) GetLocation() *Location {
+	if h == nil {
 		return nil
 	}
-	return o.OperatingSystem
+	return h.Location
 }
 
-func (o *Host) GetServiceCount() *int {
-	if o == nil {
+func (h *Host) GetNetwork() []NetworkClassification {
+	if h == nil {
 		return nil
 	}
-	return o.ServiceCount
+	return h.Network
 }
 
-func (o *Host) GetServices() []Service {
-	if o == nil {
+func (h *Host) GetOperatingSystem() *Attribute {
+	if h == nil {
 		return nil
 	}
-	return o.Services
+	return h.OperatingSystem
 }
 
-func (o *Host) GetWhois() *Whois {
-	if o == nil {
+func (h *Host) GetPrivacy() []Privacy {
+	if h == nil {
 		return nil
 	}
-	return o.Whois
+	return h.Privacy
+}
+
+func (h *Host) GetReputation() *Reputation {
+	if h == nil {
+		return nil
+	}
+	return h.Reputation
+}
+
+func (h *Host) GetServiceCount() *int {
+	if h == nil {
+		return nil
+	}
+	return h.ServiceCount
+}
+
+func (h *Host) GetServices() []Service {
+	if h == nil {
+		return nil
+	}
+	return h.Services
+}
+
+func (h *Host) GetWhois() *Whois {
+	if h == nil {
+		return nil
+	}
+	return h.Whois
 }

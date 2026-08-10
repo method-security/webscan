@@ -18,6 +18,12 @@ func addSchoolLookup() {
 		Description: "An institution for formal education and learning",
 		Example:     `Harborview State Academy`,
 		Output:      "string",
+		Aliases: []string{
+			"academy", "educational institute", "learning center", "training school", "academic institution",
+		},
+		Keywords: []string{
+			"institution", "education", "learning", "teaching", "university", "college", "campus", "classroom", "study", "pupil", "curriculum", "instruction",
+		},
 		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
 			return school(f), nil
 		},

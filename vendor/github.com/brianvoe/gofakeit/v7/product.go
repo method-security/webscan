@@ -2,7 +2,10 @@ package gofakeit
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
+
+	"github.com/brianvoe/gofakeit/v7/data"
 )
 
 type ProductInfo struct {
@@ -69,38 +72,62 @@ func (f *Faker) ProductName() string { return productName(f) }
 
 func productName(f *Faker) string {
 	name := getRandValue(f, []string{"product", "name"})
-	switch number(f, 0, 9) {
-	case 1:
-		// Name + Adjective + Feature
-		return title(fmt.Sprintf("%s %s %s", name, getRandValue(f, []string{"product", "adjective"}), productFeature(f)))
-	case 2:
-		// Adjective + Material + Name
-		return title(fmt.Sprintf("%s %s %s", getRandValue(f, []string{"product", "adjective"}), productMaterial(f), name))
-	case 3:
-		// Color + Name + Suffix
-		return title(fmt.Sprintf("%s %s %s", safeColor(f), name, getRandValue(f, []string{"product", "suffix"})))
-	case 4:
-		// Feature + Name + Adjective
-		return title(fmt.Sprintf("%s %s %s", productFeature(f), name, getRandValue(f, []string{"product", "adjective"})))
-	case 5:
-		// Material + Color + Name
-		return title(fmt.Sprintf("%s %s %s", productMaterial(f), safeColor(f), name))
-	case 6:
-		// Name + Suffix + Material
-		return title(fmt.Sprintf("%s %s %s", name, getRandValue(f, []string{"product", "suffix"}), productMaterial(f)))
-	case 7:
-		// Adjective + Feature + Name
-		return title(fmt.Sprintf("%s %s %s", getRandValue(f, []string{"product", "adjective"}), productFeature(f), name))
-	case 8:
-		// Color + Material + Name
-		return title(fmt.Sprintf("%s %s %s", safeColor(f), productMaterial(f), name))
-	case 9:
-		// Suffix + Adjective + Name
-		return title(fmt.Sprintf("%s %s %s", getRandValue(f, []string{"product", "suffix"}), getRandValue(f, []string{"product", "adjective"}), name))
+	adj := func() string { return getRandValue(f, []string{"product", "adjective"}) }
+	suf := func() string { return getRandValue(f, []string{"product", "suffix"}) }
+	mat := func() string { return productMaterial(f) }
+	feat := func() string { return productFeature(f) }
+
+	// Small realism helpers: occasional compound/connector without turning into a listing
+	compoundAdj := func() string {
+		// 1 in 5: "adj-adj" (e.g., "Ultra-Light", "Quick-Dry")
+		if number(f, 1, 5) == 1 {
+			return fmt.Sprintf("%s-%s", adj(), adj())
+		}
+		return adj()
 	}
 
-	// case: 0 - Adjective + Name + Suffix
-	return title(fmt.Sprintf("%s %s %s", getRandValue(f, []string{"product", "adjective"}), name, getRandValue(f, []string{"product", "suffix"})))
+	// Keep it "product name"-ish: 2–3 chunks, no specs/colors/for-phrases.
+	// Weighted: 2-word names (~70%), 3-word names (~30%)
+	wordCount, _ := weighted(f, []any{"2word", "3word"}, []float32{70, 30})
+
+	switch wordCount {
+	case "2word":
+		// 2-word names (most common in real products)
+		switch number(f, 0, 4) {
+		case 0, 1:
+			// Adjective + Name (most common 2-word pattern)
+			return title(fmt.Sprintf("%s %s", compoundAdj(), name))
+		case 2:
+			// Name + Suffix
+			return title(fmt.Sprintf("%s %s", name, suf()))
+		case 3:
+			// Material + Name
+			return title(fmt.Sprintf("%s %s", mat(), name))
+		case 4:
+			// Feature + Name
+			return title(fmt.Sprintf("%s %s", feat(), name))
+		}
+
+	case "3word":
+		// 3-word names (less common)
+		switch number(f, 0, 4) {
+		case 0, 1:
+			// Adjective + Name + Suffix (most common 3-word pattern)
+			return title(fmt.Sprintf("%s %s %s", compoundAdj(), name, suf()))
+		case 2:
+			// Name + Feature + Suffix
+			return title(fmt.Sprintf("%s %s %s", name, feat(), suf()))
+		case 3:
+			// Adjective + Feature + Name
+			return title(fmt.Sprintf("%s %s %s", compoundAdj(), feat(), name))
+		case 4:
+			// Name + Material + Suffix
+			return title(fmt.Sprintf("%s %s %s", name, mat(), suf()))
+		}
+	}
+
+	// Fallback to 2-word name
+	return title(fmt.Sprintf("%s %s", compoundAdj(), name))
 }
 
 // ProductDescription will generate a random product description
@@ -233,6 +260,87 @@ func productSuffix(f *Faker) string {
 	return getRandValue(f, []string{"product", "suffix"})
 }
 
+// ProductISBN13 will generate a random ISBN-13 string for the product
+func ProductISBN(opts *ISBNOptions) string { return productISBN(GlobalFaker, opts) }
+
+// ProductISBN13 will generate a random ISBN-13 string for the product
+func (f *Faker) ProductISBN(opts *ISBNOptions) string { return productISBN(f, opts) }
+
+type ISBNOptions struct {
+	Version   string // "10" or "13"
+	Separator string // e.g. "-", "" (default: "-")
+}
+
+func productISBN(f *Faker, opts *ISBNOptions) string {
+	if opts == nil {
+		opts = &ISBNOptions{Version: "13", Separator: "-"}
+	}
+
+	sep := opts.Separator
+	if sep == "" {
+		sep = "-"
+	}
+
+	// string of n random digits
+	randomDigits := func(f *Faker, n int) string {
+		digits := make([]byte, n)
+		for i := 0; i < n; i++ {
+			digits[i] = byte('0' + number(f, 0, 9))
+		}
+		return string(digits)
+	}
+
+	switch opts.Version {
+	case "10":
+		// ISBN-10 format: group(1)-registrant(4)-publication(3)-check(1)
+		group := randomDigits(f, 1)
+		registrant := randomDigits(f, 4)
+		publication := randomDigits(f, 3)
+		base := group + registrant + publication
+
+		// checksum
+		sum := 0
+		for i, c := range base {
+			digit := int(c - '0')
+			sum += digit * (10 - i)
+		}
+		remainder := (11 - (sum % 11)) % 11
+		check := "X"
+		if remainder < 10 {
+			check = strconv.Itoa(remainder)
+		}
+
+		return strings.Join([]string{group, registrant, publication, check}, sep)
+
+	case "13":
+		// ISBN-13 format: prefix(3)-group(1)-registrant(4)-publication(4)-check(1)
+		prefix := data.ISBN13Prefix
+		group := randomDigits(f, 1)
+		registrant := randomDigits(f, 4)
+		publication := randomDigits(f, 4)
+		base := prefix + group + registrant + publication
+
+		// checksum
+		sum := 0
+		for i, c := range base {
+			digit := int(c - '0')
+			if i%2 == 0 {
+				sum += digit
+			} else {
+				sum += digit * 3
+			}
+		}
+		remainder := (10 - (sum % 10)) % 10
+		check := strconv.Itoa(remainder)
+
+		return strings.Join([]string{prefix, group, registrant, publication, check}, sep)
+
+	default:
+		// fallback to ISBN-13 if invalid version provided
+		return productISBN(f, &ISBNOptions{Version: "13", Separator: sep})
+	}
+}
+
 func addProductLookup() {
 	AddFuncLookup("product", Info{
 		Display:     "Product",
@@ -262,6 +370,17 @@ func addProductLookup() {
 }`,
 		Output:      "map[string]any",
 		ContentType: "application/json",
+		Aliases: []string{
+			"goods",
+			"merchandise",
+			"retail item",
+			"consumer product",
+			"commercial item",
+		},
+		Keywords: []string{
+			"sale", "use", "trade", "manufactured",
+			"market", "inventory", "supply", "distribution", "commodity",
+		},
 		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
 			return product(f), nil
 		},
@@ -273,6 +392,19 @@ func addProductLookup() {
 		Description: "Distinctive title or label assigned to a product for identification and marketing",
 		Example:     "olive copper monitor",
 		Output:      "string",
+		Aliases: []string{
+			"product title",
+			"product label",
+			"brand name",
+			"item name",
+			"product identifier",
+		},
+		Keywords: []string{
+			"product", "name", "title", "label", "brand",
+			"item", "merchandise", "goods", "article",
+			"identifier", "marketing", "branding",
+			"catalog", "inventory",
+		},
 		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
 			return productName(f), nil
 		},
@@ -284,6 +416,19 @@ func addProductLookup() {
 		Description: "Explanation detailing the features and characteristics of a product",
 		Example:     "Backwards caused quarterly without week it hungry thing someone him regularly. Whomever this revolt hence from his timing as quantity us these yours.",
 		Output:      "string",
+		Aliases: []string{
+			"product details",
+			"product specs",
+			"item description",
+			"feature list",
+			"marketing copy",
+		},
+		Keywords: []string{
+			"product", "description", "details", "features",
+			"specifications", "characteristics", "summary",
+			"overview", "attributes", "benefits",
+			"marketing", "content", "copy", "info", "text",
+		},
 		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
 			return productDescription(f), nil
 		},
@@ -295,6 +440,19 @@ func addProductLookup() {
 		Description: "Classification grouping similar products based on shared characteristics or functions",
 		Example:     "clothing",
 		Output:      "string",
+		Aliases: []string{
+			"product classification",
+			"product type",
+			"item category",
+			"product group",
+			"product segment",
+		},
+		Keywords: []string{
+			"product", "category", "type", "class", "classification",
+			"group", "segment", "line", "collection", "range",
+			"electronics", "furniture", "clothing", "appliances",
+			"food", "toys", "accessories", "goods",
+		},
 		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
 			return productCategory(f), nil
 		},
@@ -306,6 +464,19 @@ func addProductLookup() {
 		Description: "Specific characteristic of a product that distinguishes it from others products",
 		Example:     "ultra-lightweight",
 		Output:      "string",
+		Aliases: []string{
+			"product trait",
+			"product attribute",
+			"key feature",
+			"unique feature",
+			"special characteristic",
+		},
+		Keywords: []string{
+			"feature", "trait", "attribute", "characteristic",
+			"capability", "functionality", "specification",
+			"benefit", "advantage", "highlight",
+			"unique", "differentiator",
+		},
 		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
 			return productFeature(f), nil
 		},
@@ -317,6 +488,19 @@ func addProductLookup() {
 		Description: "The substance from which a product is made, influencing its appearance, durability, and properties",
 		Example:     "brass",
 		Output:      "string",
+		Aliases: []string{
+			"material type",
+			"product substance",
+			"product composition",
+			"item material",
+			"build material",
+		},
+		Keywords: []string{
+			"material", "substance", "composition", "make",
+			"fabric", "textile", "cloth", "leather", "wool",
+			"wood", "metal", "plastic", "glass", "stone",
+			"durability", "properties", "construction",
+		},
 		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
 			return productMaterial(f), nil
 		},
@@ -328,6 +512,20 @@ func addProductLookup() {
 		Description: "Standardized barcode used for product identification and tracking in retail and commerce",
 		Example:     "012780949980",
 		Output:      "string",
+		Aliases: []string{
+			"upc code",
+			"product barcode",
+			"product code",
+			"product sku",
+			"universal product code",
+			"retail barcode",
+		},
+		Keywords: []string{
+			"upc", "barcode", "product", "code", "identifier",
+			"sku", "retail", "commerce", "inventory",
+			"tracking", "scanning", "checkout", "label",
+			"universal", "standard",
+		},
 		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
 			return productUPC(f), nil
 		},
@@ -339,6 +537,20 @@ func addProductLookup() {
 		Description: "The group of people for whom the product is designed or intended",
 		Example:     "adults",
 		Output:      "[]string",
+		Aliases: []string{
+			"target audience",
+			"target market",
+			"customer group",
+			"user base",
+			"demographic group",
+		},
+		Keywords: []string{
+			"audience", "market", "segment", "demographic",
+			"consumer", "customer", "buyer", "user",
+			"group", "target", "population", "adults",
+			"kids", "teens", "families", "professionals",
+		},
+
 		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
 			return productAudience(f), nil
 		},
@@ -350,6 +562,19 @@ func addProductLookup() {
 		Description: "The size or dimension of a product",
 		Example:     "medium",
 		Output:      "string",
+		Aliases: []string{
+			"product size",
+			"product measurement",
+			"item dimensions",
+			"product scale",
+			"size specification",
+		},
+		Keywords: []string{
+			"dimension", "size", "measurement", "proportion",
+			"scale", "specification", "specs", "length",
+			"width", "height", "depth", "volume", "weight",
+			"product", "item",
+		},
 		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
 			return productDimension(f), nil
 		},
@@ -361,6 +586,19 @@ func addProductLookup() {
 		Description: "The scenario or purpose for which a product is typically used",
 		Example:     "home",
 		Output:      "string",
+		Aliases: []string{
+			"use case",
+			"product purpose",
+			"intended use",
+			"product application",
+			"usage scenario",
+		},
+		Keywords: []string{
+			"use", "usecase", "purpose", "usage", "application",
+			"context", "scenario", "situation", "case",
+			"intention", "goal", "objective", "function",
+			"home", "office", "outdoor", "industrial", "commercial",
+		},
 		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
 			return productUseCase(f), nil
 		},
@@ -372,6 +610,17 @@ func addProductLookup() {
 		Description: "The key advantage or value the product provides",
 		Example:     "comfort",
 		Output:      "string",
+		Aliases: []string{
+			"product advantage",
+			"product value",
+			"user benefit",
+			"customer gain",
+			"selling point",
+		},
+		Keywords: []string{
+			"benefit", "advantage", "value", "improvement",
+			"enhancement", "feature", "positive", "outcome",
+		},
 		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
 			return productBenefit(f), nil
 		},
@@ -383,8 +632,39 @@ func addProductLookup() {
 		Description: "A suffix used to differentiate product models or versions",
 		Example:     "pro",
 		Output:      "string",
+		Aliases: []string{
+			"product suffix",
+			"model suffix",
+			"version suffix",
+			"edition suffix",
+			"name suffix",
+		},
+		Keywords: []string{
+			"suffix", "variant", "edition", "version", "model",
+			"series", "line", "tier", "release", "upgrade",
+			"plus", "pro", "max", "lite", "mini",
+		},
 		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
 			return productSuffix(f), nil
+		},
+	})
+
+	AddFuncLookup("productisbn", Info{
+		Display:     "Product ISBN",
+		Category:    "product",
+		Description: "ISBN-10 or ISBN-13 identifier for books",
+		Example:     "978-1-4028-9462-6",
+		Output:      "string",
+		Aliases: []string{
+			"isbn code", "isbn number", "book isbn", "isbn13",
+			"isbn10", "publication code", "book identifier",
+		},
+		Keywords: []string{
+			"identifier", "publication", "library", "catalog",
+			"literature", "reference", "edition", "registration", "publishing",
+		},
+		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
+			return productISBN(f, nil), nil
 		},
 	})
 }

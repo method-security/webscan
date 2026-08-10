@@ -3,13 +3,13 @@
 package components
 
 type CountCondition struct {
-	// Field-value pairs to count matches for. Must target fields from the same nested object.
+	// Field-value pairs to count matches for. Must target fields from the same nested object and may contain at most 5 pairs per group.
 	FieldValuePairs []FieldValuePair `json:"field_value_pairs"`
 }
 
-func (o *CountCondition) GetFieldValuePairs() []FieldValuePair {
-	if o == nil {
+func (c *CountCondition) GetFieldValuePairs() []FieldValuePair {
+	if c == nil {
 		return nil
 	}
-	return o.FieldValuePairs
+	return c.FieldValuePairs
 }

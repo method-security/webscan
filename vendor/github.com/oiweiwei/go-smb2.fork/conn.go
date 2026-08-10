@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha512"
+	"errors"
 	"fmt"
 	"os"
 	"sync"
@@ -481,9 +482,12 @@ func (conn *conn) makeRequestResponse(req Packet, tc *treeConn, ctx context.Cont
 
 func (conn *conn) recv(rr *requestResponse) ([]byte, error) {
 	select {
-	case pkt := <-rr.recv:
+	case pkt, ok := <-rr.recv:
 		if rr.err != nil {
 			return nil, rr.err
+		}
+		if !ok {
+			return nil, errors.New("connection is closed")
 		}
 		return pkt, nil
 	case <-rr.ctx.Done():

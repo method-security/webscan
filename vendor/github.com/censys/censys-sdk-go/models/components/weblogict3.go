@@ -8,23 +8,26 @@ type WeblogicT3 struct {
 	WeblogicVersion *string `json:"weblogic_version,omitempty"`
 }
 
-func (o *WeblogicT3) GetError() *string {
-	if o == nil {
+func (w *WeblogicT3) GetError() *string {
+	if w == nil {
 		return nil
 	}
-	return o.Error
+	return w.Error
 }
 
-func (o *WeblogicT3) GetErrorMessage() *string {
-	if o == nil {
+func (w *WeblogicT3) GetErrorMessage() *string {
+	if w == nil {
 		return nil
 	}
-	return o.ErrorMessage
+	return w.ErrorMessage
 }
 
-func (o *WeblogicT3) GetWeblogicVersion() *string {
-	if o == nil {
+func (w *WeblogicT3) GetWeblogicVersion() *string {
+	if w == nil {
 		return nil
 	}
-	return o.WeblogicVersion
+	return w.WeblogicVersion
 }
+
+// #region class-body-weblogict3
+// #endregion class-body-weblogict3

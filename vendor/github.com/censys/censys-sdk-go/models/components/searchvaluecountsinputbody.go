@@ -3,22 +3,22 @@
 package components
 
 type SearchValueCountsInputBody struct {
-	// Groups of field-value pairs to count matches for.
+	// Groups of field-value pairs to count matches for. Each group may contain up to 5 field-value pairs.
 	AndCountConditions []CountCondition `json:"and_count_conditions"`
 	// CenQL query string to filter documents
 	Query *string `json:"query,omitempty"`
 }
 
-func (o *SearchValueCountsInputBody) GetAndCountConditions() []CountCondition {
-	if o == nil {
+func (s *SearchValueCountsInputBody) GetAndCountConditions() []CountCondition {
+	if s == nil {
 		return nil
 	}
-	return o.AndCountConditions
+	return s.AndCountConditions
 }
 
-func (o *SearchValueCountsInputBody) GetQuery() *string {
-	if o == nil {
+func (s *SearchValueCountsInputBody) GetQuery() *string {
+	if s == nil {
 		return nil
 	}
-	return o.Query
+	return s.Query
 }

@@ -331,9 +331,20 @@ func addNumberLookup() {
 	AddFuncLookup("number", Info{
 		Display:     "Number",
 		Category:    "number",
-		Description: "Mathematical concept used for counting, measuring, and expressing quantities or values",
+		Description: "Integer used for counting or measuring, with optional bounds",
 		Example:     "14866",
 		Output:      "int",
+		Aliases: []string{
+			"integer value",
+			"whole-number output",
+			"bounded result",
+			"range-limited value",
+			"discrete quantity",
+		},
+		Keywords: []string{
+			"integer", "int", "random",
+			"min", "max", "range", "bounded", "between", "inclusive",
+		},
 		Params: []Param{
 			{Field: "min", Display: "Min", Type: "int", Default: "-2147483648", Description: "Minimum integer value"},
 			{Field: "max", Display: "Max", Type: "int", Default: "2147483647", Description: "Maximum integer value"},
@@ -343,12 +354,10 @@ func addNumberLookup() {
 			if err != nil {
 				return nil, err
 			}
-
 			max, err := info.GetInt(m, "max")
 			if err != nil {
 				return nil, err
 			}
-
 			return number(f, min, max), nil
 		},
 	})
@@ -356,29 +365,48 @@ func addNumberLookup() {
 	AddFuncLookup("uint", Info{
 		Display:     "Uint",
 		Category:    "number",
-		Description: "Unsigned integer",
+		Description: "Unsigned integer (nonnegative whole number)",
 		Example:     "14866",
 		Output:      "uint",
-		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
-			return uintFunc(f), nil
+		Aliases: []string{
+			"nonnegative value",
+			"natural-count type",
+			"unsigned whole",
+			"zero-or-greater",
+			"cardinal quantity",
 		},
+		Keywords: []string{
+			"unsigned", "integer", "nonnegative",
+			"natural", "zero", "positive", "whole",
+		},
+		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) { return uintFunc(f), nil },
 	})
 
 	AddFuncLookup("uintn", Info{
 		Display:     "UintN",
 		Category:    "number",
-		Description: "Unsigned integer between 0 and n",
+		Description: "Unsigned integer between 0 (inclusive) and n (exclusive)",
 		Example:     "32783",
 		Output:      "uint",
+		Aliases: []string{
+			"upper-bounded uint",
+			"cap-limited unsigned",
+			"zero-to-n minus one",
+			"exclusive-maximum uint",
+			"limited-range unsigned",
+		},
+		Keywords: []string{
+			"unsigned", "range", "upper",
+			"limit", "bound", "cap", "max", "exclusive",
+		},
 		Params: []Param{
-			{Field: "n", Display: "N", Type: "uint", Default: "4294967295", Description: "Maximum uint value"},
+			{Field: "n", Display: "N", Type: "uint", Default: "4294967295", Description: "Maximum uint value (exclusive)"},
 		},
 		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
 			n, err := info.GetUint(m, "n")
 			if err != nil {
 				return nil, err
 			}
-
 			return uintNFunc(f, n), nil
 		},
 	})
@@ -386,53 +414,89 @@ func addNumberLookup() {
 	AddFuncLookup("uint8", Info{
 		Display:     "Uint8",
 		Category:    "number",
-		Description: "Unsigned 8-bit integer, capable of representing values from 0 to 255",
+		Description: "Unsigned 8-bit integer, range 0–255",
 		Example:     "152",
 		Output:      "uint8",
-		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
-			return uint8Func(f), nil
+		Aliases: []string{
+			"byte-sized unsigned",
+			"octet quantity",
+			"small-range unsigned",
+			"one-byte value",
+			"0-255 whole",
 		},
+		Keywords: []string{
+			"unsigned", "8bit", "byte", "octet", "range", "integer",
+		},
+		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) { return uint8Func(f), nil },
 	})
 
 	AddFuncLookup("uint16", Info{
 		Display:     "Uint16",
 		Category:    "number",
-		Description: "Unsigned 16-bit integer, capable of representing values from 0 to 65,535",
+		Description: "Unsigned 16-bit integer, range 0–65,535",
 		Example:     "34968",
 		Output:      "uint16",
-		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
-			return uint16Func(f), nil
+		Aliases: []string{
+			"two-byte unsigned",
+			"ushort quantity",
+			"medium-range unsigned",
+			"port-sized value",
+			"0-65535 whole",
 		},
+		Keywords: []string{
+			"unsigned", "16bit", "word", "port", "range", "integer",
+		},
+		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) { return uint16Func(f), nil },
 	})
 
 	AddFuncLookup("uint32", Info{
 		Display:     "Uint32",
 		Category:    "number",
-		Description: "Unsigned 32-bit integer, capable of representing values from 0 to 4,294,967,295",
+		Description: "Unsigned 32-bit integer, range 0–4,294,967,295",
 		Example:     "1075055705",
 		Output:      "uint32",
-		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
-			return uint32Func(f), nil
+		Aliases: []string{
+			"four-byte unsigned", "u32 numeric", "ipv4-scale value",
+			"wide-range unsigned", "32-bit whole", "medium unsigned int", "standard unsigned int",
 		},
+		Keywords: []string{
+			"unsigned", "32bit", "range", "ipv4", "integer", "binary", "numeric",
+		},
+		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) { return uint32Func(f), nil },
 	})
 
 	AddFuncLookup("uint64", Info{
 		Display:     "Uint64",
 		Category:    "number",
-		Description: "Unsigned 64-bit integer, capable of representing values from 0 to 18,446,744,073,709,551,615",
+		Description: "Unsigned 64-bit integer, range 0–18,446,744,073,709,551,615",
 		Example:     "843730692693298265",
 		Output:      "uint64",
-		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
-			return f.Uint64(), nil
+		Aliases: []string{
+			"eight-byte unsigned", "u64 numeric", "very-large unsigned", "wide whole count", "extended-range value", "large uint", "unsigned bigint",
 		},
+		Keywords: []string{
+			"unsigned", "64bit", "range", "bigint", "integer", "numeric", "arithmetic",
+		},
+		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) { return f.Uint64(), nil },
 	})
 
 	AddFuncLookup("uintrange", Info{
-		Display:     "UintRange",
+		Display:     "Uint Range",
 		Category:    "number",
-		Description: "Non-negative integer value between given range",
+		Description: "Unsigned integer value within a given range",
 		Example:     "1075055705",
 		Output:      "uint",
+		Aliases: []string{
+			"unsigned span",
+			"nonnegative interval",
+			"ranged cardinal",
+			"bounded unsigned result",
+			"constrained uint output",
+		},
+		Keywords: []string{
+			"uintrange", "unsigned", "range", "min", "max",
+			"bounds", "limits", "interval", "span",
+		},
 		Params: []Param{
 			{Field: "min", Display: "Min", Type: "uint", Default: "0", Description: "Minimum uint value"},
 			{Field: "max", Display: "Max", Type: "uint", Default: "4294967295", Description: "Maximum uint value"},
@@ -442,12 +506,10 @@ func addNumberLookup() {
 			if err != nil {
 				return nil, err
 			}
-
 			max, err := info.GetUint(m, "max")
 			if err != nil {
 				return nil, err
 			}
-
 			return uintRangeFunc(f, min, max), nil
 		},
 	})
@@ -458,26 +520,45 @@ func addNumberLookup() {
 		Description: "Signed integer",
 		Example:     "14866",
 		Output:      "int",
-		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
-			return intFunc(f), nil
+		Aliases: []string{
+			"signed whole",
+			"two-sided count",
+			"negative-or-positive value",
+			"zero-inclusive whole",
+			"general int type",
 		},
+		Keywords: []string{
+			"signed", "integer",
+			"positive", "negative", "zero", "counting",
+		},
+		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) { return intFunc(f), nil },
 	})
 
 	AddFuncLookup("intn", Info{
 		Display:     "IntN",
 		Category:    "number",
-		Description: "Integer value between 0 and n",
+		Description: "Integer between 0 (inclusive) and n (exclusive)",
 		Example:     "32783",
 		Output:      "int",
+		Aliases: []string{
+			"upper-bounded int",
+			"exclusive-maximum int",
+			"zero-through-n minus one",
+			"limited-range int",
+			"cap-limited integer",
+		},
+		Keywords: []string{
+			"range", "upper", "limit", "bound",
+			"cap", "max", "exclusive", "integer",
+		},
 		Params: []Param{
-			{Field: "n", Display: "N", Type: "int", Default: "2147483647", Description: "Maximum int value"},
+			{Field: "n", Display: "N", Type: "int", Default: "2147483647", Description: "Maximum int value (exclusive)"},
 		},
 		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
 			n, err := info.GetInt(m, "n")
 			if err != nil {
 				return nil, err
 			}
-
 			return intNFunc(f, n), nil
 		},
 	})
@@ -485,53 +566,84 @@ func addNumberLookup() {
 	AddFuncLookup("int8", Info{
 		Display:     "Int8",
 		Category:    "number",
-		Description: "Signed 8-bit integer, capable of representing values from -128 to 127",
+		Description: "Signed 8-bit integer, range −128–127",
 		Example:     "24",
 		Output:      "int8",
-		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
-			return int8Func(f), nil
+		Aliases: []string{
+			"byte-sized signed", "small signed range", "one-byte integer", "8-bit whole signed", "narrow signed value", "tiny int", "signed byte",
 		},
+		Keywords: []string{
+			"signed", "8bit", "range", "twoscomplement", "integer", "arithmetic", "numeric", "binary", "storage",
+		},
+		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) { return int8Func(f), nil },
 	})
 
 	AddFuncLookup("int16", Info{
 		Display:     "Int16",
 		Category:    "number",
-		Description: "Signed 16-bit integer, capable of representing values from 32,768 to 32,767",
+		Description: "Signed 16-bit integer, range −32,768–32,767",
 		Example:     "2200",
 		Output:      "int16",
-		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
-			return int16Func(f), nil
+		Aliases: []string{
+			"two-byte signed", "short integer signed", "16-bit whole signed", "narrow-mid signed", "twobyte int", "short int", "halfword signed",
 		},
+		Keywords: []string{
+			"signed", "16bit", "range", "word", "numeric", "arithmetic", "binary", "integer",
+		},
+		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) { return int16Func(f), nil },
 	})
 
 	AddFuncLookup("int32", Info{
 		Display:     "Int32",
 		Category:    "number",
-		Description: "Signed 32-bit integer, capable of representing values from -2,147,483,648 to 2,147,483,647",
+		Description: "Signed 32-bit integer, range −2,147,483,648–2,147,483,647",
 		Example:     "-1072427943",
 		Output:      "int32",
-		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
-			return int32Func(f), nil
+		Aliases: []string{
+			"four-byte signed", "standard-width signed", "32-bit whole signed", "midrange integer", "int32 value", "long int", "standard signed int",
 		},
+		Keywords: []string{
+			"signed", "32bit", "range", "ipv4", "numeric", "arithmetic", "binary", "integer",
+		},
+		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) { return int32Func(f), nil },
 	})
 
 	AddFuncLookup("int64", Info{
 		Display:     "Int64",
 		Category:    "number",
-		Description: "Signed 64-bit integer, capable of representing values from -9,223,372,036,854,775,808 to -9,223,372,036,854,775,807",
+		Description: "Signed 64-bit integer, range −9,223,372,036,854,775,808–9,223,372,036,854,775,807",
 		Example:     "-8379641344161477543",
 		Output:      "int64",
-		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
-			return int64Func(f), nil
+		Aliases: []string{
+			"eight-byte signed",
+			"long-width integer",
+			"64-bit whole signed",
+			"large signed value",
+			"extended signed range",
 		},
+		Keywords: []string{
+			"signed", "64bit", "bigint", "range", "timestamp", "nanosecond",
+		},
+		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) { return int64Func(f), nil },
 	})
 
 	AddFuncLookup("intrange", Info{
-		Display:     "IntRange",
+		Display:     "Int Range",
 		Category:    "number",
-		Description: "Integer value between given range",
+		Description: "Signed integer value within a given range",
 		Example:     "-8379477543",
 		Output:      "int",
+		Aliases: []string{
+			"signed span",
+			"bounded integer result",
+			"constrained int output",
+			"limited signed interval",
+			"ranged whole value",
+		},
+		Keywords: []string{
+			"int", "range", "min", "max",
+			"bounds", "limits", "interval", "span",
+		},
 		Params: []Param{
 			{Field: "min", Display: "Min", Type: "int", Description: "Minimum int value"},
 			{Field: "max", Display: "Max", Type: "int", Description: "Maximum int value"},
@@ -541,12 +653,10 @@ func addNumberLookup() {
 			if err != nil {
 				return nil, err
 			}
-
 			max, err := info.GetInt(m, "max")
 			if err != nil {
 				return nil, err
 			}
-
 			return intRangeFunc(f, min, max), nil
 		},
 	})
@@ -554,20 +664,40 @@ func addNumberLookup() {
 	AddFuncLookup("float32", Info{
 		Display:     "Float32",
 		Category:    "number",
-		Description: "Data type representing floating-point numbers with 32 bits of precision in computing",
+		Description: "Floating-point number with 32-bit single precision (IEEE 754)",
 		Example:     "3.1128167e+37",
 		Output:      "float32",
-		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
-			return float32Func(f), nil
+		Aliases: []string{
+			"single-precision float",
+			"fp32 numeric",
+			"32-bit real",
+			"float single",
+			"reduced-precision real",
 		},
+		Keywords: []string{
+			"single-precision", "ieee754",
+			"fp32", "mantissa", "exponent", "decimal",
+		},
+		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) { return float32Func(f), nil },
 	})
 
 	AddFuncLookup("float32range", Info{
 		Display:     "Float32 Range",
 		Category:    "number",
-		Description: "Float32 value between given range",
+		Description: "Float32 value within a given range",
 		Example:     "914774.6",
 		Output:      "float32",
+		Aliases: []string{
+			"single-precision span",
+			"bounded fp32",
+			"limited float32 output",
+			"constrained 32-bit real",
+			"float single interval",
+		},
+		Keywords: []string{
+			"float32", "range",
+			"min", "max", "bounds", "limits", "interval",
+		},
 		Params: []Param{
 			{Field: "min", Display: "Min", Type: "float", Description: "Minimum float32 value"},
 			{Field: "max", Display: "Max", Type: "float", Description: "Maximum float32 value"},
@@ -577,12 +707,10 @@ func addNumberLookup() {
 			if err != nil {
 				return nil, err
 			}
-
 			max, err := info.GetFloat32(m, "max")
 			if err != nil {
 				return nil, err
 			}
-
 			return float32Range(f, min, max), nil
 		},
 	})
@@ -590,20 +718,41 @@ func addNumberLookup() {
 	AddFuncLookup("float64", Info{
 		Display:     "Float64",
 		Category:    "number",
-		Description: "Data type representing floating-point numbers with 64 bits of precision in computing",
+		Description: "Floating-point number with 64-bit double precision (IEEE 754)",
 		Example:     "1.644484108270445e+307",
 		Output:      "float64",
-		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
-			return float64Func(f), nil
+		Aliases: []string{
+			"double-precision float",
+			"fp64 numeric",
+			"64-bit real",
+			"float double",
+			"high-precision real",
 		},
+		Keywords: []string{
+			"double-precision", "ieee754",
+			"fp64", "mantissa", "exponent", "decimal",
+			"precision", "scientific", "number",
+		},
+		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) { return float64Func(f), nil },
 	})
 
 	AddFuncLookup("float64range", Info{
 		Display:     "Float64 Range",
 		Category:    "number",
-		Description: "Float64 value between given range",
+		Description: "Float64 value within a given range",
 		Example:     "914774.5585333086",
 		Output:      "float64",
+		Aliases: []string{
+			"double-precision span",
+			"bounded fp64",
+			"limited float64 output",
+			"constrained 64-bit real",
+			"float double interval",
+		},
+		Keywords: []string{
+			"float64", "range",
+			"min", "max", "bounds", "limits", "interval",
+		},
 		Params: []Param{
 			{Field: "min", Display: "Min", Type: "float", Description: "Minimum float64 value"},
 			{Field: "max", Display: "Max", Type: "float", Description: "Maximum float64 value"},
@@ -613,12 +762,10 @@ func addNumberLookup() {
 			if err != nil {
 				return nil, err
 			}
-
 			max, err := info.GetFloat64(m, "max")
 			if err != nil {
 				return nil, err
 			}
-
 			return float64Range(f, min, max), nil
 		},
 	})
@@ -629,6 +776,17 @@ func addNumberLookup() {
 		Description: "Shuffles an array of ints",
 		Example:     "1,2,3,4 => 3,1,4,2",
 		Output:      "[]int",
+		Aliases: []string{
+			"reorder integers",
+			"scramble int slice",
+			"random permutation ints",
+			"reshuffle numbers",
+			"jumbled int output",
+		},
+		Keywords: []string{
+			"shuffle", "permute", "randomize",
+			"ints", "slice", "array", "permutation",
+		},
 		Params: []Param{
 			{Field: "ints", Display: "Integers", Type: "[]int", Description: "Delimited separated integers"},
 		},
@@ -637,9 +795,7 @@ func addNumberLookup() {
 			if err != nil {
 				return nil, err
 			}
-
 			shuffleInts(f, ints)
-
 			return ints, nil
 		},
 	})
@@ -650,6 +806,17 @@ func addNumberLookup() {
 		Description: "Randomly selected value from a slice of int",
 		Example:     "-1,2,-3,4 => -3",
 		Output:      "int",
+		Aliases: []string{
+			"draw one integer",
+			"sample an int",
+			"pick from ints",
+			"select a number",
+			"choose single int",
+		},
+		Keywords: []string{
+			"random", "pick", "choose",
+			"select", "ints", "slice", "list",
+		},
 		Params: []Param{
 			{Field: "ints", Display: "Integers", Type: "[]int", Description: "Delimited separated integers"},
 		},
@@ -658,7 +825,6 @@ func addNumberLookup() {
 			if err != nil {
 				return nil, err
 			}
-
 			return randomInt(f, ints), nil
 		},
 	})
@@ -669,6 +835,17 @@ func addNumberLookup() {
 		Description: "Randomly selected value from a slice of uint",
 		Example:     "1,2,3,4 => 4",
 		Output:      "uint",
+		Aliases: []string{
+			"draw one unsigned",
+			"sample a uint",
+			"pick from uints",
+			"select an unsigned",
+			"choose single uint",
+		},
+		Keywords: []string{
+			"random", "pick", "choose",
+			"select", "uints", "slice", "list", "nonnegative",
+		},
 		Params: []Param{
 			{Field: "uints", Display: "Unsigned Integers", Type: "[]uint", Description: "Delimited separated unsigned integers"},
 		},
@@ -677,7 +854,6 @@ func addNumberLookup() {
 			if err != nil {
 				return nil, err
 			}
-
 			return randomUint(f, uints), nil
 		},
 	})
@@ -688,6 +864,17 @@ func addNumberLookup() {
 		Description: "Hexadecimal representation of an unsigned integer",
 		Example:     "0x87",
 		Output:      "string",
+		Aliases: []string{
+			"hex-encoded unsigned",
+			"base-16 uint string",
+			"prefixed 0x value",
+			"hex view of uint",
+			"formatted unsigned hex",
+		},
+		Keywords: []string{
+			"hex", "base16", "uint", "0x",
+			"bits", "width", "format",
+		},
 		Params: []Param{
 			{Field: "bitSize", Display: "Bit Size", Type: "int", Default: "8", Description: "Bit size of the unsigned integer"},
 		},
@@ -696,8 +883,8 @@ func addNumberLookup() {
 			if err != nil {
 				return nil, err
 			}
-
 			return hexUint(f, bitSize), nil
 		},
 	})
+
 }

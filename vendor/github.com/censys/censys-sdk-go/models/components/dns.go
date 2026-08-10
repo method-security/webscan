@@ -2,11 +2,6 @@
 
 package components
 
-import (
-	"encoding/json"
-	"fmt"
-)
-
 // RCode - A enumerated field indicating the result of the request. The most common values are defined in RFC 1035.
 type RCode string
 
@@ -36,56 +31,16 @@ const (
 func (e RCode) ToPointer() *RCode {
 	return &e
 }
-func (e *RCode) UnmarshalJSON(data []byte) error {
-	var v string
-	if err := json.Unmarshal(data, &v); err != nil {
-		return err
+
+// IsExact returns true if the value matches a known enum value, false otherwise.
+func (e *RCode) IsExact() bool {
+	if e != nil {
+		switch *e {
+		case "", "success", "format_error", "server_failure", "name_error", "not_implemented", "refused", "yx_domain", "yx_rrset", "nx_rrset", "not_auth", "not_zone", "bad_sig", "bad_key", "bad_time", "bad_mode", "bad_name", "bad_alg", "bad_trunc", "bad_cookie":
+			return true
+		}
 	}
-	switch v {
-	case "":
-		fallthrough
-	case "success":
-		fallthrough
-	case "format_error":
-		fallthrough
-	case "server_failure":
-		fallthrough
-	case "name_error":
-		fallthrough
-	case "not_implemented":
-		fallthrough
-	case "refused":
-		fallthrough
-	case "yx_domain":
-		fallthrough
-	case "yx_rrset":
-		fallthrough
-	case "nx_rrset":
-		fallthrough
-	case "not_auth":
-		fallthrough
-	case "not_zone":
-		fallthrough
-	case "bad_sig":
-		fallthrough
-	case "bad_key":
-		fallthrough
-	case "bad_time":
-		fallthrough
-	case "bad_mode":
-		fallthrough
-	case "bad_name":
-		fallthrough
-	case "bad_alg":
-		fallthrough
-	case "bad_trunc":
-		fallthrough
-	case "bad_cookie":
-		*e = RCode(v)
-		return nil
-	default:
-		return fmt.Errorf("invalid value for RCode: %v", v)
-	}
+	return false
 }
 
 // ServerType - An enumerated value indicating the behavior of the server. An AUTHORITATIVE server fulfills requests for domain names it controls, which are not listed by the server. FORWARDING and RECURSIVE_RESOLVER servers fulfill requests indirectly for domain names they do not control. A RECURSIVE_RESOLVER will query ip.parrotdns.com itself, resulting in its own IP address being present in the dns.answers.response field.
@@ -102,26 +57,16 @@ const (
 func (e ServerType) ToPointer() *ServerType {
 	return &e
 }
-func (e *ServerType) UnmarshalJSON(data []byte) error {
-	var v string
-	if err := json.Unmarshal(data, &v); err != nil {
-		return err
+
+// IsExact returns true if the value matches a known enum value, false otherwise.
+func (e *ServerType) IsExact() bool {
+	if e != nil {
+		switch *e {
+		case "", "recursive_resolver", "authoritative", "forwarding", "redirecting":
+			return true
+		}
 	}
-	switch v {
-	case "":
-		fallthrough
-	case "recursive_resolver":
-		fallthrough
-	case "authoritative":
-		fallthrough
-	case "forwarding":
-		fallthrough
-	case "redirecting":
-		*e = ServerType(v)
-		return nil
-	default:
-		return fmt.Errorf("invalid value for ServerType: %v", v)
-	}
+	return false
 }
 
 type DNS struct {
@@ -143,65 +88,65 @@ type DNS struct {
 	Version    *string     `json:"version,omitempty"`
 }
 
-func (o *DNS) GetAdditionals() []DNSResourceRecord {
-	if o == nil {
+func (d *DNS) GetAdditionals() []DNSResourceRecord {
+	if d == nil {
 		return nil
 	}
-	return o.Additionals
+	return d.Additionals
 }
 
-func (o *DNS) GetAnswers() []DNSResourceRecord {
-	if o == nil {
+func (d *DNS) GetAnswers() []DNSResourceRecord {
+	if d == nil {
 		return nil
 	}
-	return o.Answers
+	return d.Answers
 }
 
-func (o *DNS) GetAuthorities() []DNSResourceRecord {
-	if o == nil {
+func (d *DNS) GetAuthorities() []DNSResourceRecord {
+	if d == nil {
 		return nil
 	}
-	return o.Authorities
+	return d.Authorities
 }
 
-func (o *DNS) GetEdns() *DNSEDNS {
-	if o == nil {
+func (d *DNS) GetEdns() *DNSEDNS {
+	if d == nil {
 		return nil
 	}
-	return o.Edns
+	return d.Edns
 }
 
-func (o *DNS) GetQuestions() []DNSResourceRecord {
-	if o == nil {
+func (d *DNS) GetQuestions() []DNSResourceRecord {
+	if d == nil {
 		return nil
 	}
-	return o.Questions
+	return d.Questions
 }
 
-func (o *DNS) GetRCode() *RCode {
-	if o == nil {
+func (d *DNS) GetRCode() *RCode {
+	if d == nil {
 		return nil
 	}
-	return o.RCode
+	return d.RCode
 }
 
-func (o *DNS) GetResolvesCorrectly() *bool {
-	if o == nil {
+func (d *DNS) GetResolvesCorrectly() *bool {
+	if d == nil {
 		return nil
 	}
-	return o.ResolvesCorrectly
+	return d.ResolvesCorrectly
 }
 
-func (o *DNS) GetServerType() *ServerType {
-	if o == nil {
+func (d *DNS) GetServerType() *ServerType {
+	if d == nil {
 		return nil
 	}
-	return o.ServerType
+	return d.ServerType
 }
 
-func (o *DNS) GetVersion() *string {
-	if o == nil {
+func (d *DNS) GetVersion() *string {
+	if d == nil {
 		return nil
 	}
-	return o.Version
+	return d.Version
 }

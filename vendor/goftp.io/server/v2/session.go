@@ -228,6 +228,7 @@ func (sess *Session) parseLine(line string) (string, string) {
 	return params[0], params[1]
 }
 
+// WriteMessage sends a standard FTP response back to the client.
 func (sess *Session) WriteMessage(code int, message string) {
 	sess.writeMessage(code, message)
 }
@@ -242,12 +243,14 @@ func (sess *Session) writeMessage(code int, message string) {
 
 // writeMessage will send a standard FTP response back to the client.
 func (sess *Session) writeMessageMultiline(code int, message string) {
+	message, _ = strings.CutSuffix(message, "\r\n")
 	sess.server.Logger.PrintResponse(sess.id, code, message)
-	line := fmt.Sprintf("%d-%s\r\n%d END\r\n", code, message, code)
+	line := fmt.Sprintf("%d-%s\r\n%d End\r\n", code, message, code)
 	_, _ = sess.controlWriter.WriteString(line)
 	sess.controlWriter.Flush()
 }
 
+// BuildPath generates a safe absolute path for the given filename.
 func (sess *Session) BuildPath(filename string) string {
 	return sess.buildPath(filename)
 }
@@ -255,16 +258,16 @@ func (sess *Session) BuildPath(filename string) string {
 // buildPath takes a client supplied path or filename and generates a safe
 // absolute path within their account sandbox.
 //
-//    buildpath("/")
-//    => "/"
-//    buildpath("one.txt")
-//    => "/one.txt"
-//    buildpath("/files/two.txt")
-//    => "/files/two.txt"
-//    buildpath("files/two.txt")
-//    => "/files/two.txt"
-//    buildpath("/../../../../etc/passwd")
-//    => "/etc/passwd"
+//	buildpath("/")
+//	=> "/"
+//	buildpath("one.txt")
+//	=> "/one.txt"
+//	buildpath("/files/two.txt")
+//	=> "/files/two.txt"
+//	buildpath("files/two.txt")
+//	=> "/files/two.txt"
+//	buildpath("/../../../../etc/passwd")
+//	=> "/etc/passwd"
 //
 // The driver implementation is responsible for deciding how to treat this path.
 // Obviously they MUST NOT just read the path off disk. The probably want to

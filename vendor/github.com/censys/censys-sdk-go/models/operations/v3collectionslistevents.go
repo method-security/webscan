@@ -14,12 +14,15 @@ type V3CollectionsListEventsGlobals struct {
 	OrganizationID *string `queryParam:"style=form,explode=true,name=organization_id"`
 }
 
-func (o *V3CollectionsListEventsGlobals) GetOrganizationID() *string {
-	if o == nil {
+func (v *V3CollectionsListEventsGlobals) GetOrganizationID() *string {
+	if v == nil {
 		return nil
 	}
-	return o.OrganizationID
+	return v.OrganizationID
 }
+
+// #region class-body-v3collectionslisteventsglobals
+// #endregion class-body-v3collectionslisteventsglobals
 
 type ChangeTypes string
 
@@ -106,7 +109,7 @@ func (e *StatusChangeTypes) UnmarshalJSON(data []byte) error {
 }
 
 type V3CollectionsListEventsRequest struct {
-	// The ID of a Censys organization to associate the request with. See the [Getting Started docs](https://docs.censys.com/reference/get-started#step-3-set-your-organization-id) for more information.
+	// The ID of a Censys organization to associate the request with. See the [Getting Started docs](https://docs.censys.com/reference/get-started#step-3-find-and-use-your-organization-id-optional) for more information.
 	OrganizationID *string `queryParam:"style=form,explode=false,name=organization_id"`
 	// The UID for the collection. Obtain the collection ID using the [list collections endpoint](https://docs.censys.com/reference/v3-collections-crud-list#/) or via the collection URL when using the web console.
 	CollectionUID string `pathParam:"style=simple,explode=false,name=collection_uid"`
@@ -131,74 +134,77 @@ func (v V3CollectionsListEventsRequest) MarshalJSON() ([]byte, error) {
 }
 
 func (v *V3CollectionsListEventsRequest) UnmarshalJSON(data []byte) error {
-	if err := utils.UnmarshalJSON(data, &v, "", false, false); err != nil {
+	if err := utils.UnmarshalJSON(data, &v, "", false, nil); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (o *V3CollectionsListEventsRequest) GetOrganizationID() *string {
-	if o == nil {
+func (v *V3CollectionsListEventsRequest) GetOrganizationID() *string {
+	if v == nil {
 		return nil
 	}
-	return o.OrganizationID
+	return v.OrganizationID
 }
 
-func (o *V3CollectionsListEventsRequest) GetCollectionUID() string {
-	if o == nil {
+func (v *V3CollectionsListEventsRequest) GetCollectionUID() string {
+	if v == nil {
 		return ""
 	}
-	return o.CollectionUID
+	return v.CollectionUID
 }
 
-func (o *V3CollectionsListEventsRequest) GetPageSize() *int {
-	if o == nil {
+func (v *V3CollectionsListEventsRequest) GetPageSize() *int {
+	if v == nil {
 		return nil
 	}
-	return o.PageSize
+	return v.PageSize
 }
 
-func (o *V3CollectionsListEventsRequest) GetPageToken() *string {
-	if o == nil {
+func (v *V3CollectionsListEventsRequest) GetPageToken() *string {
+	if v == nil {
 		return nil
 	}
-	return o.PageToken
+	return v.PageToken
 }
 
-func (o *V3CollectionsListEventsRequest) GetChangeTypes() []ChangeTypes {
-	if o == nil {
+func (v *V3CollectionsListEventsRequest) GetChangeTypes() []ChangeTypes {
+	if v == nil {
 		return nil
 	}
-	return o.ChangeTypes
+	return v.ChangeTypes
 }
 
-func (o *V3CollectionsListEventsRequest) GetAssetChangeTypes() []AssetChangeTypes {
-	if o == nil {
+func (v *V3CollectionsListEventsRequest) GetAssetChangeTypes() []AssetChangeTypes {
+	if v == nil {
 		return nil
 	}
-	return o.AssetChangeTypes
+	return v.AssetChangeTypes
 }
 
-func (o *V3CollectionsListEventsRequest) GetStatusChangeTypes() []StatusChangeTypes {
-	if o == nil {
+func (v *V3CollectionsListEventsRequest) GetStatusChangeTypes() []StatusChangeTypes {
+	if v == nil {
 		return nil
 	}
-	return o.StatusChangeTypes
+	return v.StatusChangeTypes
 }
 
-func (o *V3CollectionsListEventsRequest) GetStartTime() *time.Time {
-	if o == nil {
+func (v *V3CollectionsListEventsRequest) GetStartTime() *time.Time {
+	if v == nil {
 		return nil
 	}
-	return o.StartTime
+	return v.StartTime
 }
 
-func (o *V3CollectionsListEventsRequest) GetEndTime() *time.Time {
-	if o == nil {
+func (v *V3CollectionsListEventsRequest) GetEndTime() *time.Time {
+	if v == nil {
 		return nil
 	}
-	return o.EndTime
+	return v.EndTime
 }
+
+// #region class-body-v3collectionslisteventsrequest
+// #endregion class-body-v3collectionslisteventsrequest
 
 type V3CollectionsListEventsResponse struct {
 	HTTPMeta components.HTTPMetadata `json:"-"`
@@ -207,23 +213,26 @@ type V3CollectionsListEventsResponse struct {
 	Headers                                  map[string][]string
 }
 
-func (o *V3CollectionsListEventsResponse) GetHTTPMeta() components.HTTPMetadata {
-	if o == nil {
+func (v *V3CollectionsListEventsResponse) GetHTTPMeta() components.HTTPMetadata {
+	if v == nil {
 		return components.HTTPMetadata{}
 	}
-	return o.HTTPMeta
+	return v.HTTPMeta
 }
 
-func (o *V3CollectionsListEventsResponse) GetResponseEnvelopeCollectionEventsResponse() *components.ResponseEnvelopeCollectionEventsResponse {
-	if o == nil {
+func (v *V3CollectionsListEventsResponse) GetResponseEnvelopeCollectionEventsResponse() *components.ResponseEnvelopeCollectionEventsResponse {
+	if v == nil {
 		return nil
 	}
-	return o.ResponseEnvelopeCollectionEventsResponse
+	return v.ResponseEnvelopeCollectionEventsResponse
 }
 
-func (o *V3CollectionsListEventsResponse) GetHeaders() map[string][]string {
-	if o == nil {
+func (v *V3CollectionsListEventsResponse) GetHeaders() map[string][]string {
+	if v == nil {
 		return map[string][]string{}
 	}
-	return o.Headers
+	return v.Headers
 }
+
+// #region class-body-v3collectionslisteventsresponse
+// #endregion class-body-v3collectionslisteventsresponse

@@ -149,7 +149,7 @@ func xmlFunc(f *Faker, xo *XMLOptions) ([]byte, error) {
 	}
 
 	// Check fields length
-	if xo.Fields == nil || len(xo.Fields) <= 0 {
+	if len(xo.Fields) <= 0 {
 		return nil, errors.New("must pass fields in order to build json object(s)")
 	}
 
@@ -284,6 +284,17 @@ func addFileXMLLookup() {
 </xml>`,
 		Output:      "[]byte",
 		ContentType: "application/xml",
+		Aliases: []string{
+			"xml document",
+			"extensible markup",
+			"tagged data",
+			"hierarchical structure",
+			"serialized tree",
+		},
+		Keywords: []string{
+			"extensible", "markup", "language", "elements", "format",
+			"structured", "generates", "tags", "attributes", "nested",
+		},
 		Params: []Param{
 			{Field: "type", Display: "Type", Type: "string", Default: "single", Options: []string{"single", "array"}, Description: "Type of XML, single or array"},
 			{Field: "rootelement", Display: "Root Element", Type: "string", Default: "xml", Description: "Root element wrapper name"},

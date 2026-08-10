@@ -3,6 +3,7 @@
 package govaluate
 
 import (
+	"reflect"
 	"sync"
 	"weak"
 )
@@ -45,9 +46,11 @@ func getParamFromMap(name string) (*evaluationStage, bool) {
 }
 
 func getConstantStage(value any) (*evaluationStage, error) {
-	stage, ok := getConstantFromMap(value)
-	if ok {
-		return stage, nil
+	cacheable := canCacheConstant(value)
+	if cacheable {
+		if stage, ok := getConstantFromMap(value); ok {
+			return stage, nil
+		}
 	}
 
 	operator := makeLiteralStage(value)
@@ -56,9 +59,23 @@ func getConstantStage(value any) (*evaluationStage, error) {
 		operator: operator,
 	}
 	ret.finalize()
-	storeVal := weak.Make(ret)
-	constMap.Store(value, storeVal)
+	if cacheable {
+		storeVal := weak.Make(ret)
+		constMap.Store(value, storeVal)
+	}
 	return ret, nil
+}
+
+func canCacheConstant(value any) bool {
+	if value == nil {
+		return true
+	}
+	switch reflect.TypeOf(value).Kind() {
+	case reflect.Slice, reflect.Map, reflect.Func:
+		return false
+	default:
+		return true
+	}
 }
 
 func getConstantFromMap(value any) (*evaluationStage, bool) {

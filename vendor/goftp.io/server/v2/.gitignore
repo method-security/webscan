@@ -3,3 +3,4 @@ coverage.txt
 exampleftpd/exampleftpd
 .vscode
 *~
+ftp_server

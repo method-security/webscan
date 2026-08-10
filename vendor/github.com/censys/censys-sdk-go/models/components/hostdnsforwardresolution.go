@@ -2,11 +2,6 @@
 
 package components
 
-import (
-	"encoding/json"
-	"fmt"
-)
-
 type RecordType string
 
 const (
@@ -18,22 +13,16 @@ const (
 func (e RecordType) ToPointer() *RecordType {
 	return &e
 }
-func (e *RecordType) UnmarshalJSON(data []byte) error {
-	var v string
-	if err := json.Unmarshal(data, &v); err != nil {
-		return err
+
+// IsExact returns true if the value matches a known enum value, false otherwise.
+func (e *RecordType) IsExact() bool {
+	if e != nil {
+		switch *e {
+		case "", "a", "aaaa":
+			return true
+		}
 	}
-	switch v {
-	case "":
-		fallthrough
-	case "a":
-		fallthrough
-	case "aaaa":
-		*e = RecordType(v)
-		return nil
-	default:
-		return fmt.Errorf("invalid value for RecordType: %v", v)
-	}
+	return false
 }
 
 type HostDNSForwardResolution struct {
@@ -43,30 +32,30 @@ type HostDNSForwardResolution struct {
 	Server      *string     `json:"server,omitempty"`
 }
 
-func (o *HostDNSForwardResolution) GetName() *string {
-	if o == nil {
+func (h *HostDNSForwardResolution) GetName() *string {
+	if h == nil {
 		return nil
 	}
-	return o.Name
+	return h.Name
 }
 
-func (o *HostDNSForwardResolution) GetRecordType() *RecordType {
-	if o == nil {
+func (h *HostDNSForwardResolution) GetRecordType() *RecordType {
+	if h == nil {
 		return nil
 	}
-	return o.RecordType
+	return h.RecordType
 }
 
-func (o *HostDNSForwardResolution) GetResolveTime() *string {
-	if o == nil {
+func (h *HostDNSForwardResolution) GetResolveTime() *string {
+	if h == nil {
 		return nil
 	}
-	return o.ResolveTime
+	return h.ResolveTime
 }
 
-func (o *HostDNSForwardResolution) GetServer() *string {
-	if o == nil {
+func (h *HostDNSForwardResolution) GetServer() *string {
+	if h == nil {
 		return nil
 	}
-	return o.Server
+	return h.Server
 }

@@ -3,11 +3,10 @@ package openapi2
 import (
 	"encoding/json"
 	"net/url"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/go-openapi/jsonpointer"
-	"github.com/perimeterx/marshmallow"
 )
 
 // SchemaRef represents either a Schema or a $ref to a Schema.
@@ -26,8 +25,6 @@ type SchemaRef struct {
 
 var _ jsonpointer.JSONPointable = (*SchemaRef)(nil)
 
-func (x *SchemaRef) isEmpty() bool { return x == nil || x.Ref == "" && x.Value == nil }
-
 // RefString returns the $ref value.
 func (x *SchemaRef) RefString() string { return x.Ref }
 
@@ -36,16 +33,6 @@ func (x *SchemaRef) CollectionName() string { return "schemas" }
 
 // RefPath returns the path of the $ref relative to the root document.
 func (x *SchemaRef) RefPath() *url.URL { return copyURI(x.refPath) }
-
-func (x *SchemaRef) setRefPath(u *url.URL) {
-	// Once the refPath is set don't override. References can be loaded
-	// multiple times not all with access to the correct path info.
-	if x.refPath != nil {
-		return
-	}
-
-	x.refPath = copyURI(u)
-}
 
 // MarshalYAML returns the YAML encoding of SchemaRef.
 func (x SchemaRef) MarshalYAML() (any, error) {
@@ -67,14 +54,17 @@ func (x SchemaRef) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON sets SchemaRef to a copy of data.
 func (x *SchemaRef) UnmarshalJSON(data []byte) error {
 	var refOnly Ref
-	if extra, err := marshmallow.Unmarshal(data, &refOnly, marshmallow.WithExcludeKnownFieldsFromMap(true)); err == nil && refOnly.Ref != "" {
+	if err := json.Unmarshal(data, &refOnly); err == nil && refOnly.Ref != "" {
+		extra := map[string]any{}
+		_ = json.Unmarshal(data, &extra)
+		delete(extra, "$ref")
 		x.Ref = refOnly.Ref
 		if len(extra) != 0 {
 			x.extra = make([]string, 0, len(extra))
 			for key := range extra {
 				x.extra = append(x.extra, key)
 			}
-			sort.Strings(x.extra)
+			slices.Sort(x.extra)
 			for k := range extra {
 				if !strings.HasPrefix(k, "x-") {
 					delete(extra, k)

@@ -6,9 +6,12 @@ type MoneroP2PPayload struct {
 	Entries []MoneroP2PEntry `json:"entries,omitempty"`
 }
 
-func (o *MoneroP2PPayload) GetEntries() []MoneroP2PEntry {
-	if o == nil {
+func (m *MoneroP2PPayload) GetEntries() []MoneroP2PEntry {
+	if m == nil {
 		return nil
 	}
-	return o.Entries
+	return m.Entries
 }
+
+// #region class-body-monerop2ppayload
+// #endregion class-body-monerop2ppayload

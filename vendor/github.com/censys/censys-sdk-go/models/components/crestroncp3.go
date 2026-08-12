@@ -6,9 +6,12 @@ type CrestronCp3 struct {
 	VersionString *string `json:"version_string,omitempty"`
 }
 
-func (o *CrestronCp3) GetVersionString() *string {
-	if o == nil {
+func (c *CrestronCp3) GetVersionString() *string {
+	if c == nil {
 		return nil
 	}
-	return o.VersionString
+	return c.VersionString
 }
+
+// #region class-body-crestroncp3
+// #endregion class-body-crestroncp3

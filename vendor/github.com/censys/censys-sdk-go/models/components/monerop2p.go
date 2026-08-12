@@ -6,9 +6,12 @@ type MoneroP2P struct {
 	PingResponse *MoneroP2PPingResponse `json:"ping_response,omitempty"`
 }
 
-func (o *MoneroP2P) GetPingResponse() *MoneroP2PPingResponse {
-	if o == nil {
+func (m *MoneroP2P) GetPingResponse() *MoneroP2PPingResponse {
+	if m == nil {
 		return nil
 	}
-	return o.PingResponse
+	return m.PingResponse
 }
+
+// #region class-body-monerop2p
+// #endregion class-body-monerop2p

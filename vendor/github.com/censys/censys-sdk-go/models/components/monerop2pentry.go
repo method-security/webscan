@@ -7,16 +7,19 @@ type MoneroP2PEntry struct {
 	Name *string `json:"name,omitempty"`
 }
 
-func (o *MoneroP2PEntry) GetData() *string {
-	if o == nil {
+func (m *MoneroP2PEntry) GetData() *string {
+	if m == nil {
 		return nil
 	}
-	return o.Data
+	return m.Data
 }
 
-func (o *MoneroP2PEntry) GetName() *string {
-	if o == nil {
+func (m *MoneroP2PEntry) GetName() *string {
+	if m == nil {
 		return nil
 	}
-	return o.Name
+	return m.Name
 }
+
+// #region class-body-monerop2pentry
+// #endregion class-body-monerop2pentry

@@ -14,8 +14,10 @@ const (
 	logicalErrorFormat    string = "Value '%v' cannot be used with the logical operator '%v', it is not a bool"
 	modifierErrorFormat   string = "Value '%v' cannot be used with the modifier '%v', it is not a number"
 	comparatorErrorFormat string = "Value '%v' cannot be used with the comparator '%v', it is not a number"
+	regexErrorFormat      string = "Value '%v' cannot be used with the comparator '%v', it is not a string/pattern"
 	ternaryErrorFormat    string = "Value '%v' cannot be used with the ternary operator '%v', it is not a bool"
 	prefixErrorFormat     string = "Value '%v' cannot be used with the prefix '%v'"
+	arrayErrorFormat      string = "Value '%v' cannot be used with the comparator '%v', it is not an array"
 )
 
 type evaluationOperator func(left interface{}, right interface{}, parameters Parameters) (interface{}, error)
@@ -216,10 +218,20 @@ func regexStage(left interface{}, right interface{}, parameters Parameters) (int
 			return nil, fmt.Errorf("Unable to compile regexp pattern '%v': %v", right, err)
 		}
 	case *regexp.Regexp:
+		if r == nil {
+			return nil, errors.New("Unable to compare with nil regexp pattern")
+		}
 		pattern = r
+	default:
+		return nil, fmt.Errorf("Value '%v' cannot be used with the comparator '=~', it is not a string/pattern", right)
 	}
 
-	return pattern.MatchString(left.(string)), nil
+	leftString, ok := left.(string)
+	if !ok {
+		return nil, fmt.Errorf("Value '%v' cannot be used with the comparator '=~', it is not a string", left)
+	}
+
+	return pattern.MatchString(leftString), nil
 }
 
 func notRegexStage(left interface{}, right interface{}, parameters Parameters) (interface{}, error) {
@@ -268,15 +280,20 @@ func makeLiteralStage(literal interface{}) evaluationOperator {
 
 func makeFunctionStage(function ExpressionFunction) evaluationOperator {
 
-	return func(left interface{}, right interface{}, parameters Parameters) (interface{}, error) {
+	return func(left interface{}, right interface{}, parameters Parameters) (ret interface{}, err error) {
 
-		if right == nil {
+		defer func() {
+			if r := recover(); r != nil {
+				err = fmt.Errorf("Function panic: %v", r)
+				ret = nil
+			}
+		}()
+
+		switch r := right.(type) {
+		case collectedArgs:
+			return function([]interface{}(r)...)
+		case nil:
 			return function()
-		}
-
-		switch right.(type) {
-		case []interface{}:
-			return function(right.([]interface{})...)
 		default:
 			return function(right)
 		}
@@ -401,7 +418,7 @@ func makeAccessorStage(pair []string) evaluationOperator {
 		// therefore every call to an accessor sets up a defer that tries to recover from panics, converting them to errors.
 		defer func() {
 			if r := recover(); r != nil {
-				errorMsg := fmt.Sprintf("Failed to access '%s': %v", reconstructed, r.(string))
+				errorMsg := fmt.Sprintf("Failed to access '%s': %v", reconstructed, r)
 				err = errors.New(errorMsg)
 				ret = nil
 			}
@@ -415,7 +432,7 @@ func makeAccessorStage(pair []string) evaluationOperator {
 			var corePtrType reflect.Type
 
 			// if this is a pointer, resolve it.
-			if coreValue.Kind() == reflect.Ptr {
+			if coreValue.Kind() == reflect.Pointer {
 				corePtrVal = coreValue
 				corePtrType = coreValue.Type()
 				coreValue = coreValue.Elem()
@@ -446,6 +463,15 @@ func makeAccessorStage(pair []string) evaluationOperator {
 			}
 
 			switch r := right.(type) {
+			case collectedArgs:
+				if len(r) <= len(paramsBuf) {
+					params = paramsBuf[:len(r)]
+				} else {
+					params = make([]reflect.Value, len(r))
+				}
+				for idx := range r {
+					params[idx] = reflect.ValueOf(r[idx])
+				}
 			case []interface{}:
 				if len(r) <= len(paramsBuf) {
 					params = paramsBuf[:len(r)]
@@ -511,19 +537,45 @@ func ensureSliceStage(op evaluationOperator) evaluationOperator {
 		if err != nil {
 			return orig, err
 		}
-		return []interface{}{orig}, nil
+		switch orig.(type) {
+		case []interface{}, collectedArgs:
+			return orig, nil
+		default:
+			return []interface{}{orig}, nil
+		}
+	}
+}
+
+// collectedArgs is the planner's representation of function/method argument
+// lists. It lets evaluation distinguish "no args", "one nil arg", and "one
+// slice arg" from a separator-built multi-arg list.
+type collectedArgs []interface{}
+
+func ensureCollectedArgsStage(op evaluationOperator) evaluationOperator {
+	return func(left interface{}, right interface{}, parameters Parameters) (interface{}, error) {
+		orig, err := op(left, right, parameters)
+		if err != nil {
+			return orig, err
+		}
+		if args, ok := orig.(collectedArgs); ok {
+			return args, nil
+		}
+		// A parameter that happens to be a []interface{} is still one argument.
+		return collectedArgs{orig}, nil
 	}
 }
 
 func separatorStage(left interface{}, right interface{}, parameters Parameters) (interface{}, error) {
 
-	var ret []interface{}
+	var ret collectedArgs
 
-	switch left.(type) {
+	switch left := left.(type) {
+	case collectedArgs:
+		ret = append(left, right)
 	case []interface{}:
-		ret = append(left.([]interface{}), right)
+		ret = append(collectedArgs(left), right)
 	default:
-		ret = []interface{}{left, right}
+		ret = collectedArgs{left, right}
 	}
 
 	return ret, nil
@@ -531,8 +583,37 @@ func separatorStage(left interface{}, right interface{}, parameters Parameters) 
 
 func inStage(left interface{}, right interface{}, parameters Parameters) (interface{}, error) {
 
-	for _, value := range right.([]interface{}) {
-		value = castToFloat64(value)
+	if right == nil {
+		return false, nil
+	}
+
+	switch values := right.(type) {
+	case collectedArgs:
+		for _, value := range values {
+			value = castToFloat64(value)
+			if left == value {
+				return true, nil
+			}
+		}
+		return false, nil
+	case []interface{}:
+		for _, value := range values {
+			value = castToFloat64(value)
+			if left == value {
+				return true, nil
+			}
+		}
+		return false, nil
+	}
+
+	rv := reflect.ValueOf(right)
+	kind := rv.Kind()
+	if kind != reflect.Slice && kind != reflect.Array {
+		return nil, fmt.Errorf("Value '%v' cannot be used with the comparator 'in', it is not an array", right)
+	}
+
+	for i := 0; i < rv.Len(); i++ {
+		value := castToFloat64(rv.Index(i).Interface())
 		if left == value {
 			return true, nil
 		}
@@ -553,11 +634,11 @@ func isString(value interface{}) bool {
 
 func isRegexOrString(value interface{}) bool {
 
-	switch value.(type) {
+	switch v := value.(type) {
 	case string:
 		return true
 	case *regexp.Regexp:
-		return true
+		return v != nil
 	}
 	return false
 }
@@ -609,11 +690,15 @@ func comparatorTypeCheck(left interface{}, right interface{}) bool {
 }
 
 func isArray(value interface{}) bool {
+	if value == nil {
+		return false
+	}
 	switch value.(type) {
-	case []interface{}:
+	case []interface{}, collectedArgs:
 		return true
 	}
-	return false
+	kind := reflect.TypeOf(value).Kind()
+	return kind == reflect.Slice || kind == reflect.Array
 }
 
 /*

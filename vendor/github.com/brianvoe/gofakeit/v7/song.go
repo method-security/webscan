@@ -47,6 +47,17 @@ func addSongLookup() {
 }`,
 		Output:      "map[string]string",
 		ContentType: "application/json",
+		Aliases: []string{
+			"musical work",
+			"sound piece",
+			"single release",
+			"record title",
+			"audio selection",
+		},
+		Keywords: []string{
+			"music", "track", "tune", "melody",
+			"artist", "genre", "name", "composition", "recording",
+		},
 		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
 			return song(f), nil
 		},
@@ -58,6 +69,17 @@ func addSongLookup() {
 		Description: "Title or name of a specific song used for identification and reference",
 		Example:     "New Rules",
 		Output:      "string",
+		Aliases: []string{
+			"song title",
+			"track name",
+			"music title",
+			"song label",
+		},
+		Keywords: []string{
+			"song", "title", "name", "track", "music",
+			"single", "hit", "tune", "recording",
+			"composition", "melody",
+		},
 		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
 			return songName(f), nil
 		},
@@ -69,6 +91,17 @@ func addSongLookup() {
 		Description: "The artist of maker of song",
 		Example:     "Dua Lipa",
 		Output:      "string",
+		Aliases: []string{
+			"performer name",
+			"music act",
+			"band name",
+			"recording artist",
+			"song creator",
+		},
+		Keywords: []string{
+			"song", "artist", "singer", "musician", "composer",
+			"band", "producer", "vocalist", "group", "instrumentalist",
+		},
 		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
 			return songArtist(f), nil
 		},
@@ -80,6 +113,17 @@ func addSongLookup() {
 		Description: "Category that classifies song based on common themes, styles, and storytelling approaches",
 		Example:     "Action",
 		Output:      "string",
+		Aliases: []string{
+			"music style",
+			"song category",
+			"musical classification",
+			"sound type",
+			"genre label",
+		},
+		Keywords: []string{
+			"song", "style", "category", "type",
+			"classification", "theme", "musical", "subgenre", "influence",
+		},
 		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
 			return songGenre(f), nil
 		},

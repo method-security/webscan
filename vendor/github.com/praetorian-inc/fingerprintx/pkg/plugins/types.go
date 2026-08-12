@@ -52,6 +52,7 @@ const (
 	ProtoLDAP       = "ldap"
 	ProtoLDAPS      = "ldaps"
 	ProtoModbus     = "modbus"
+	ProtoMongoDB    = "mongodb"
 	ProtoMQTT       = "mqtt"
 	ProtoMSSQL      = "mssql"
 	ProtoMySQL      = "mysql"
@@ -66,12 +67,14 @@ const (
 	ProtoRPC        = "rpc"
 	ProtoRedis      = "redis"
 	ProtoRedisTLS   = "redis"
+	ProtoRMI        = "java-rmi"
 	ProtoRsync      = "rsync"
 	ProtoRtsp       = "rtsp"
 	ProtoSMB        = "smb"
 	ProtoSMTP       = "smtp"
 	ProtoSMTPS      = "smtps"
 	ProtoSNMP       = "snmp"
+	ProtoSNPP       = "snpp"
 	ProtoSSH        = "ssh"
 	ProtoStun       = "stun"
 	ProtoTelnet     = "telnet"
@@ -174,6 +177,10 @@ func (e Service) Metadata() Metadata {
 		var p ServiceModbus
 		_ = json.Unmarshal(e.Raw, &p)
 		return p
+	case ProtoMongoDB:
+		var p ServiceMongoDB
+		_ = json.Unmarshal(e.Raw, &p)
+		return p
 	case ProtoLDAPS:
 		var p ServiceLDAPS
 		_ = json.Unmarshal(e.Raw, &p)
@@ -184,6 +191,10 @@ func (e Service) Metadata() Metadata {
 		return p
 	case ProtoIMAP:
 		var p ServiceIMAP
+		_ = json.Unmarshal(e.Raw, &p)
+		return p
+	case ProtoRMI:
+		var p ServiceRMI
 		_ = json.Unmarshal(e.Raw, &p)
 		return p
 	case ProtoRsync:
@@ -208,6 +219,10 @@ func (e Service) Metadata() Metadata {
 		return p
 	case ProtoPOP3S:
 		var p ServicePOP3S
+		_ = json.Unmarshal(e.Raw, &p)
+		return p
+	case ProtoSNPP:
+		var p ServiceSNPP
 		_ = json.Unmarshal(e.Raw, &p)
 		return p
 	default:
@@ -355,6 +370,12 @@ type ServiceSNMP struct{}
 
 func (e ServiceSNMP) Type() string { return ProtoSNMP }
 
+type ServiceSNPP struct {
+	Banner string `json:"banner"`
+}
+
+func (e ServiceSNPP) Type() string { return ProtoSNPP }
+
 type ServiceNTP struct{}
 
 func (e ServiceNTP) Type() string { return ProtoNTP }
@@ -406,7 +427,9 @@ type ServiceRedis struct {
 func (e ServiceRedis) Type() string { return ProtoRedis }
 
 type ServiceFTP struct {
-	Banner         string `json:"banner"`
+	Banner     string   `json:"banner"`
+	Confidence string   `json:"confidence,omitempty"` // Detection confidence: "high", "medium", or "low"
+	CPEs       []string `json:"cpes,omitempty"`
 }
 
 func (e ServiceFTP) Type() string { return ProtoFTP }
@@ -472,6 +495,15 @@ type ServiceModbus struct{}
 
 func (e ServiceModbus) Type() string { return ProtoModbus }
 
+type ServiceMongoDB struct {
+	MaxWireVersion int      `json:"maxWireVersion,omitempty"` // Wire protocol version (indicates capabilities, NOT precise version; e.g., wire 21 = MongoDB 7.0.x)
+	MinWireVersion int      `json:"minWireVersion,omitempty"` // Minimum wire protocol version supported
+	ServerType     string   `json:"serverType,omitempty"`     // "mongod" or "mongos"
+	CPEs           []string `json:"cpes,omitempty"`
+}
+
+func (e ServiceMongoDB) Type() string { return ProtoMongoDB }
+
 type ServiceRtsp struct {
 	ServerInfo string `json:"serverInfo"`
 }
@@ -509,3 +541,10 @@ type ServiceJDWP struct {
 }
 
 func (e ServiceJDWP) Type() string { return ProtoJDWP }
+
+type ServiceRMI struct {
+	Endpoint string   `json:"endpoint,omitempty"`
+	CPEs     []string `json:"cpes,omitempty"`
+}
+
+func (e ServiceRMI) Type() string { return ProtoRMI }

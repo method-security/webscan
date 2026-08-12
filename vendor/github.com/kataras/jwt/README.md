@@ -2,7 +2,7 @@
 
 [![build status](https://img.shields.io/github/actions/workflow/status/kataras/jwt/ci.yml?style=for-the-badge)](https://github.com/kataras/jwt/actions) [![gocov](https://img.shields.io/badge/Go%20Coverage-92%25-brightgreen.svg?style=for-the-badge)](https://travis-ci.org/github/kataras/jwt/jobs/740739405#L322) [![report card](https://img.shields.io/badge/report%20card-a%2B-ff3333.svg?style=for-the-badge)](https://goreportcard.com/report/github.com/kataras/jwt) [![godocs](https://img.shields.io/badge/go-%20docs-488AC7.svg?style=for-the-badge)](https://pkg.go.dev/github.com/kataras/jwt)
 
-Fast and simple [JWT](https://jwt.io/#libraries-io) implementation written in [Go](https://go.dev/dl/). This package was designed with security, performance and simplicity in mind, it protects your tokens from [critical vulnerabilities that you may find in other libraries](https://auth0.com/blog/critical-vulnerabilities-in-json-web-token-libraries).
+Zero-dependency lighweight, fast and simple [JWT](https://jwt.io/#libraries-io) & JWKS implementation written in [Go](https://go.dev/dl/). This package was designed with security, performance and simplicity in mind, it protects your tokens from [critical vulnerabilities that you may find in other libraries](https://auth0.com/blog/critical-vulnerabilities-in-json-web-token-libraries).
 
 [![Benchmarks Total Repetitions - higher is better](http://iris-go.com/images/jwt/benchmarks.png)](_benchmarks)
 
@@ -37,6 +37,7 @@ Import as `import "github.com/kataras/jwt"` and use it as `jwt.XXX`.
 * [Encryption](#encryption)
 * [Benchmarks](_benchmarks)
 * [Examples](_examples)
+    * [Amazon AWS Cognito Verification](_examples/aws-cognito-verify/main.go) **NEW**
     * [Basic](_examples/basic/main.go)
     * [Custom Header](_examples/custom-header/main.go)
     * [Multiple Key IDs](_examples/multiple-kids/main.go)
@@ -132,7 +133,7 @@ Example Code to manually set all claims using a standard `map`:
 
 ```go
 now := time.Now()
-claims := map[string]interface{}{
+claims := map[string]any{
     "iat": now.Unix(),
     "exp": now.Add(15 * time.Minute).Unix(),
     "foo": "bar",
@@ -158,7 +159,7 @@ standardClaims := jwt.Claims{
 token, err := jwt.Sign(jwt.HS256, sharedKey, customClaims, standardClaims)
 ```
 
-> The `jwt.Map` is just a _type alias_, a _shortcut_, of `map[string]interface{}`.
+> The `jwt.Map` is just a _type alias_, a _shortcut_, of `map[string]any`.
 
 At all cases, the `iat(IssuedAt)` and `exp(Expiry/MaxAge)` (and `nbf(NotBefore)`) values will be validated automatically on the [`Verify`](#verify-a-token) method.
 
@@ -259,7 +260,7 @@ type VerifiedToken struct {
 
 ### Decode custom Claims
 
-To extract any custom claims, given on the `Sign` method, we use the result of the `Verify` method, which is a `VerifiedToken` pointer. This VerifiedToken has a single method, the `Claims(dest interface{}) error` one, which can be used to decode the claims (payload part) to a value of our choice. Again, that value can be a `map` or any `struct`.
+To extract any custom claims, given on the `Sign` method, we use the result of the `Verify` method, which is a `VerifiedToken` pointer. This VerifiedToken has a single method, the `Claims(dest any) error` one, which can be used to decode the claims (payload part) to a value of our choice. Again, that value can be a `map` or any `struct`.
 
 ```go
 var claims = struct {
@@ -562,6 +563,7 @@ Read more about GCM at: https://en.wikipedia.org/wiki/Galois/Counter_Mode
 Here is what helped me to implement JWT in Go:
 
 - The JWT RFC: https://tools.ietf.org/html/rfc7519
+- The JWK RFC: See https://tools.ietf.org/html/rfc7517#section-5
 - The official JWT book, all you need to learn: https://auth0.com/resources/ebooks/jwt-handbook
 - Create Your JWTs From Scratch (PHP): https://dzone.com/articles/create-your-jwts-from-scratch
 - How to make your own JWT (Javascript): https://medium.com/code-wave/how-to-make-your-own-jwt-c1a32b5c3898

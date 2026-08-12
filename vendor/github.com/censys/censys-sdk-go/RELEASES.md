@@ -139,3 +139,353 @@ Based on:
 - [go v0.19.1] .
 ### Releases
 - [Go v0.19.1] https://github.com/censys/censys-sdk-go/releases/tag/v0.19.1 - .
+
+## 2025-09-02 13:53:22
+### Changes
+Based on:
+- OpenAPI Doc  
+- Speakeasy CLI 1.607.0 (2.690.1) https://github.com/speakeasy-api/speakeasy
+### Generated
+- [go v0.20.0] .
+### Releases
+- [Go v0.20.0] https://github.com/censys/censys-sdk-go/releases/tag/v0.20.0 - .
+
+## 2025-09-17 00:13:42
+### Changes
+Based on:
+- OpenAPI Doc  
+- Speakeasy CLI 1.617.1 (2.701.8) https://github.com/speakeasy-api/speakeasy
+### Generated
+- [go v0.21.0] .
+### Releases
+- [Go v0.21.0] https://github.com/censys/censys-sdk-go/releases/tag/v0.21.0 - .
+
+## 2025-09-24 12:22:38
+### Changes
+Based on:
+- OpenAPI Doc  
+- Speakeasy CLI 1.624.0 (2.714.0) https://github.com/speakeasy-api/speakeasy
+### Generated
+- [go v0.22.0] .
+### Releases
+- [Go v0.22.0] https://github.com/censys/censys-sdk-go/releases/tag/v0.22.0 - .
+
+## 2025-09-30 15:14:30
+### Changes
+Based on:
+- OpenAPI Doc  
+- Speakeasy CLI 1.631.5 (2.716.16) https://github.com/speakeasy-api/speakeasy
+### Generated
+- [go v0.22.2] .
+### Releases
+- [Go v0.22.2] https://github.com/censys/censys-sdk-go/releases/tag/v0.22.2 - .
+
+## 2025-10-01 20:57:14
+### Changes
+Based on:
+- OpenAPI Doc  
+- Speakeasy CLI 1.633.1 (2.720.1) https://github.com/speakeasy-api/speakeasy
+### Generated
+- [go v0.22.3] .
+### Releases
+- [Go v0.22.3] https://github.com/censys/censys-sdk-go/releases/tag/v0.22.3 - .
+
+## 2025-10-29 13:07:48
+### Changes
+Based on:
+- OpenAPI Doc  
+- Speakeasy CLI 1.642.2 (2.731.6) https://github.com/speakeasy-api/speakeasy
+### Generated
+- [go v0.23.0] .
+### Releases
+- [Go v0.23.0] https://github.com/censys/censys-sdk-go/releases/tag/v0.23.0 - .
+
+## 2025-11-10 21:56:28
+### Changes
+Based on:
+- OpenAPI Doc  
+- Speakeasy CLI 1.653.0 (2.748.0) https://github.com/speakeasy-api/speakeasy
+### Generated
+- [go v0.24.0] .
+### Releases
+- [Go v0.24.0] https://github.com/censys/censys-sdk-go/releases/tag/v0.24.0 - .
+
+## 2025-12-14 00:17:11
+### Changes
+Based on:
+- OpenAPI Doc  
+- Speakeasy CLI 1.676.1 (2.781.2) https://github.com/speakeasy-api/speakeasy
+### Generated
+- [go v0.25.0] .
+### Releases
+- [Go v0.25.0] https://github.com/censys/censys-sdk-go/releases/tag/v0.25.0 - .
+
+## 2025-12-16 14:39:49
+### Changes
+Based on:
+- OpenAPI Doc  
+- Speakeasy CLI 1.677.0 (2.785.0) https://github.com/speakeasy-api/speakeasy
+### Generated
+- [go v0.25.1] .
+### Releases
+- [Go v0.25.1] https://github.com/censys/censys-sdk-go/releases/tag/v0.25.1 - .
+
+## 2026-01-07 00:15:17
+### Changes
+Based on:
+- OpenAPI Doc  
+- Speakeasy CLI 1.682.0 (2.791.1) https://github.com/speakeasy-api/speakeasy
+### Generated
+- [go v0.25.2] .
+### Releases
+- [Go v0.25.2] https://github.com/censys/censys-sdk-go/releases/tag/v0.25.2 - .
+
+## 2026-01-20 18:28:31
+### Changes
+Based on:
+- OpenAPI Doc  
+- Speakeasy CLI 1.691.0 (2.797.1) https://github.com/speakeasy-api/speakeasy
+### Generated
+- [go v0.25.3] .
+### Releases
+- [Go v0.25.3] https://github.com/censys/censys-sdk-go/releases/tag/v0.25.3 - .
+
+## 2026-01-28 00:17:38
+### Changes
+Based on:
+- OpenAPI Doc  
+- Speakeasy CLI 1.700.1 (2.801.0) https://github.com/speakeasy-api/speakeasy
+### Generated
+- [go v0.25.4] .
+### Releases
+- [Go v0.25.4] https://github.com/censys/censys-sdk-go/releases/tag/v0.25.4 - .
+
+## 2026-01-29 18:43:15
+### Changes
+Based on:
+- OpenAPI Doc  
+- Speakeasy CLI 1.700.2 (2.801.2) https://github.com/speakeasy-api/speakeasy
+### Generated
+- [go v0.25.5] .
+### Releases
+- [Go v0.25.5] https://github.com/censys/censys-sdk-go/releases/tag/v0.25.5 - .
+
+## 2026-02-24 00:21:28
+### Changes
+Based on:
+- OpenAPI Doc  
+- Speakeasy CLI 1.725.0 (2.836.5) https://github.com/speakeasy-api/speakeasy
+### Generated
+- [go v0.25.6] .
+### Releases
+- [Go v0.25.6] https://github.com/censys/censys-sdk-go/releases/tag/v0.25.6 - .
+
+## 2026-03-02 00:20:12
+### Changes
+Based on:
+- OpenAPI Doc  
+- Speakeasy CLI 1.736.3 (2.845.15) https://github.com/speakeasy-api/speakeasy
+### Generated
+- [go v0.25.7] .
+### Releases
+- [Go v0.25.7] https://github.com/censys/censys-sdk-go/releases/tag/v0.25.7 - .
+
+## 2026-03-20 00:22:02
+### Changes
+Based on:
+- OpenAPI Doc  
+- Speakeasy CLI 1.758.0 (2.866.2) https://github.com/speakeasy-api/speakeasy
+### Generated
+- [go v0.25.8] .
+### Releases
+- [Go v0.25.8] https://github.com/censys/censys-sdk-go/releases/tag/v0.25.8 - .
+
+## 2026-03-20 16:45:30
+### Changes
+Based on:
+- OpenAPI Doc  
+- Speakeasy CLI 1.758.0 (2.866.2) https://github.com/speakeasy-api/speakeasy
+### Generated
+- [go v0.25.9] .
+### Releases
+- [Go v0.25.9] https://github.com/censys/censys-sdk-go/releases/tag/v0.25.9 - .
+
+## 2026-03-26 00:24:20
+### Changes
+Based on:
+- OpenAPI Doc  
+- Speakeasy CLI 1.759.3 (2.869.25) https://github.com/speakeasy-api/speakeasy
+### Generated
+- [go v0.25.10] .
+### Releases
+- [Go v0.25.10] https://github.com/censys/censys-sdk-go/releases/tag/v0.25.10 - .
+
+## 2026-04-01 00:27:22
+### Changes
+Based on:
+- OpenAPI Doc  
+- Speakeasy CLI 1.761.0 (2.879.1) https://github.com/speakeasy-api/speakeasy
+### Generated
+- [go v0.25.11] .
+### Releases
+- [Go v0.25.11] https://github.com/censys/censys-sdk-go/releases/tag/v0.25.11 - .
+
+## 2026-04-01 15:05:08
+### Changes
+Based on:
+- OpenAPI Doc  
+- Speakeasy CLI 1.761.0 (2.879.1) https://github.com/speakeasy-api/speakeasy
+### Generated
+- [go v0.25.12] .
+### Releases
+- [Go v0.25.12] https://github.com/censys/censys-sdk-go/releases/tag/v0.25.12 - .
+
+## 2026-04-23 00:32:05
+### Changes
+Based on:
+- OpenAPI Doc  
+- Speakeasy CLI 1.761.9 (2.881.4) https://github.com/speakeasy-api/speakeasy
+### Generated
+- [go v0.25.13] .
+### Releases
+- [Go v0.25.13] https://github.com/censys/censys-sdk-go/releases/tag/v0.25.13 - .
+
+## 2026-04-24 00:31:37
+### Changes
+Based on:
+- OpenAPI Doc  
+- Speakeasy CLI 1.761.9 (2.881.4) https://github.com/speakeasy-api/speakeasy
+### Generated
+- [go v0.25.14] .
+### Releases
+- [Go v0.25.14] https://github.com/censys/censys-sdk-go/releases/tag/v0.25.14 - .
+
+## 2026-05-07 19:32:16
+### Changes
+Based on:
+- OpenAPI Doc  
+- Speakeasy CLI 1.762.0 (2.882.0) https://github.com/speakeasy-api/speakeasy
+### Generated
+- [go v0.25.15] .
+### Releases
+- [Go v0.25.15] https://github.com/censys/censys-sdk-go/releases/tag/v0.25.15 - .
+
+## 2026-05-11 00:36:51
+### Changes
+Based on:
+- OpenAPI Doc  
+- Speakeasy CLI 1.762.0 (2.882.0) https://github.com/speakeasy-api/speakeasy
+### Generated
+- [go v0.25.16] .
+### Releases
+- [Go v0.25.16] https://github.com/censys/censys-sdk-go/releases/tag/v0.25.16 - .
+
+## 2026-05-18 00:39:10
+### Changes
+Based on:
+- OpenAPI Doc  
+- Speakeasy CLI 1.763.1 (2.884.4) https://github.com/speakeasy-api/speakeasy
+### Generated
+- [go v0.25.17] .
+### Releases
+- [Go v0.25.17] https://github.com/censys/censys-sdk-go/releases/tag/v0.25.17 - .
+
+## 2026-06-02 00:46:33
+### Changes
+Based on:
+- OpenAPI Doc  
+- Speakeasy CLI 1.769.2 (2.892.5) https://github.com/speakeasy-api/speakeasy
+### Generated
+- [go v0.25.18] .
+### Releases
+- [Go v0.25.18] https://github.com/censys/censys-sdk-go/releases/tag/v0.25.18 - .
+
+## 2026-06-02 15:46:33
+### Changes
+Based on:
+- OpenAPI Doc  
+- Speakeasy CLI 1.770.0 (2.893.0) https://github.com/speakeasy-api/speakeasy
+### Generated
+- [go v0.25.19] .
+### Releases
+- [Go v0.25.19] https://github.com/censys/censys-sdk-go/releases/tag/v0.25.19 - .
+
+## 2026-06-11 00:45:46
+### Changes
+Based on:
+- OpenAPI Doc  
+- Speakeasy CLI 1.776.0 (2.900.1) https://github.com/speakeasy-api/speakeasy
+### Generated
+- [go v0.25.20] .
+### Releases
+- [Go v0.25.20] https://github.com/censys/censys-sdk-go/releases/tag/v0.25.20 - .
+
+## 2026-06-16 17:13:06
+### Changes
+Based on:
+- OpenAPI Doc  
+- Speakeasy CLI 1.780.0 (2.906.0) https://github.com/speakeasy-api/speakeasy
+### Generated
+- [go v0.25.21] .
+### Releases
+- [Go v0.25.21] https://github.com/censys/censys-sdk-go/releases/tag/v0.25.21 - .
+
+## 2026-06-29 00:43:37
+### Changes
+Based on:
+- OpenAPI Doc  
+- Speakeasy CLI 1.786.1 (2.913.3) https://github.com/speakeasy-api/speakeasy
+### Generated
+- [go v0.25.22] .
+### Releases
+- [Go v0.25.22] https://github.com/censys/censys-sdk-go/releases/tag/v0.25.22 - .
+
+## 2026-07-01 19:26:21
+### Changes
+Based on:
+- OpenAPI Doc  
+- Speakeasy CLI 1.787.0 (2.914.0) https://github.com/speakeasy-api/speakeasy
+### Generated
+- [go v0.25.23] .
+### Releases
+- [Go v0.25.23] https://github.com/censys/censys-sdk-go/releases/tag/v0.25.23 - .
+
+## 2026-07-01 20:26:33
+### Changes
+Based on:
+- OpenAPI Doc  
+- Speakeasy CLI 1.787.0 (2.914.0) https://github.com/speakeasy-api/speakeasy
+### Generated
+- [go v0.25.24] .
+### Releases
+- [Go v0.25.24] https://github.com/censys/censys-sdk-go/releases/tag/v0.25.24 - .
+
+## 2026-07-24 00:27:51
+### Changes
+Based on:
+- OpenAPI Doc  
+- Speakeasy CLI 1.790.3 (2.918.4) https://github.com/speakeasy-api/speakeasy
+### Generated
+- [go v0.25.25] .
+### Releases
+- [Go v0.25.25] https://github.com/censys/censys-sdk-go/releases/tag/v0.25.25 - .
+
+## 2026-07-27 00:32:48
+### Changes
+Based on:
+- OpenAPI Doc  
+- Speakeasy CLI 1.791.0 (2.924.0) https://github.com/speakeasy-api/speakeasy
+### Generated
+- [go v0.25.26] .
+### Releases
+- [Go v0.25.26] https://github.com/censys/censys-sdk-go/releases/tag/v0.25.26 - .
+
+## 2026-08-04 00:31:21
+### Changes
+Based on:
+- OpenAPI Doc  
+- Speakeasy CLI 1.791.1 (2.926.2) https://github.com/speakeasy-api/speakeasy
+### Generated
+- [go v0.25.27] .
+### Releases
+- [Go v0.25.27] https://github.com/censys/censys-sdk-go/releases/tag/v0.25.27 - .

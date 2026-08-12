@@ -29,6 +29,7 @@ Developer-friendly & type-safe Go SDK specifically catered to leverage *openapi*
   * [Server Selection](#server-selection)
   * [Custom HTTP Client](#custom-http-client)
   * [Authentication](#authentication)
+  * [Special Types](#special-types)
 * [Development](#development)
   * [Maturity](#maturity)
   * [Contributions](#contributions)
@@ -73,7 +74,7 @@ func main() {
 			Fields: []string{
 				"host.ip",
 			},
-			PageSize: censyssdkgo.Int64(1),
+			PageSize: censyssdkgo.Pointer[int64](1),
 			Query:    "host.services: (protocol=SSH and not port: 22)",
 		},
 	})
@@ -94,6 +95,29 @@ func main() {
 <details open>
 <summary>Available methods</summary>
 
+### [AccountManagement](docs/sdks/accountmanagement/README.md)
+
+* [GetOrganizationDetails](docs/sdks/accountmanagement/README.md#getorganizationdetails) - Get organization details
+* [GetOrganizationCredits](docs/sdks/accountmanagement/README.md#getorganizationcredits) - Get organization credit balance
+* [GetOrganizationCreditUsage](docs/sdks/accountmanagement/README.md#getorganizationcreditusage) - Get organization credit usage
+* [InviteUserToOrganization](docs/sdks/accountmanagement/README.md#inviteusertoorganization) - Invite user to organization
+* [ListOrganizationMembers](docs/sdks/accountmanagement/README.md#listorganizationmembers) - List organization members
+* [RemoveOrganizationMember](docs/sdks/accountmanagement/README.md#removeorganizationmember) - Remove member from organization
+* [UpdateOrganizationMember](docs/sdks/accountmanagement/README.md#updateorganizationmember) - Update a member's roles in an organization
+* [GetMemberCreditUsage](docs/sdks/accountmanagement/README.md#getmembercreditusage) - Get organization member credit usage
+* [GetUserCredits](docs/sdks/accountmanagement/README.md#getusercredits) - Get Free user credit balance
+* [GetUserCreditsUsage](docs/sdks/accountmanagement/README.md#getusercreditsusage) - Get Free user credit usage
+
+### [AdversaryInvestigation](docs/sdks/adversaryinvestigation/README.md)
+
+* [CreateCenseyeJob](docs/sdks/adversaryinvestigation/README.md#createcenseyejob) - CensEye: Create a pivot analysis job
+* [GetCenseyeJob](docs/sdks/adversaryinvestigation/README.md#getcenseyejob) - CensEye: Get job status
+* [GetCenseyeJobResults](docs/sdks/adversaryinvestigation/README.md#getcenseyejobresults) - CensEye: Get job results
+* [GetHostObservationsWithCertificate](docs/sdks/adversaryinvestigation/README.md#gethostobservationswithcertificate) - Get host history for a certificate
+* [CreateTrackedScan](docs/sdks/adversaryinvestigation/README.md#createtrackedscan) - Live Discovery: Initiate a new scan
+* [ListThreats](docs/sdks/adversaryinvestigation/README.md#listthreats) - List active threats
+* [ValueCounts](docs/sdks/adversaryinvestigation/README.md#valuecounts) - CensEye: Retrieve value counts to discover pivots
+
 ### [Collections](docs/sdks/collections/README.md)
 
 * [List](docs/sdks/collections/README.md#list) - List collections
@@ -107,26 +131,58 @@ func main() {
 
 ### [GlobalData](docs/sdks/globaldata/README.md)
 
-* [GetCertificates](docs/sdks/globaldata/README.md#getcertificates) - Get multiple certificates
+* [GetCertificates](docs/sdks/globaldata/README.md#getcertificates) - Retrieve multiple certificates
+* [GetCertificatesRaw](docs/sdks/globaldata/README.md#getcertificatesraw) - Retrieve multiple certificates in PEM format
 * [GetCertificate](docs/sdks/globaldata/README.md#getcertificate) - Get a certificate
-* [GetHosts](docs/sdks/globaldata/README.md#gethosts) - Get multiple hosts
+* [GetCertificateRaw](docs/sdks/globaldata/README.md#getcertificateraw) - Get a certificate in PEM format
+* [GetHostEnrichment](docs/sdks/globaldata/README.md#gethostenrichment) - Get host enrichment
+* [GetHosts](docs/sdks/globaldata/README.md#gethosts) - Retrieve multiple hosts
 * [GetHost](docs/sdks/globaldata/README.md#gethost) - Get a host
+* [ListServicesOnHost](docs/sdks/globaldata/README.md#listservicesonhost) - Get service history for a host
 * [GetHostTimeline](docs/sdks/globaldata/README.md#gethosttimeline) - Get host event history
-* [GetWebProperties](docs/sdks/globaldata/README.md#getwebproperties) - Get multiple web properties
+* [GetWebProperties](docs/sdks/globaldata/README.md#getwebproperties) - Retrieve multiple web properties
 * [GetWebProperty](docs/sdks/globaldata/README.md#getwebproperty) - Get a web property
-* [CreateTrackedScan](docs/sdks/globaldata/README.md#createtrackedscan) - Create a tracked rescan
-* [GetTrackedScan](docs/sdks/globaldata/README.md#gettrackedscan) - Get tracked scan details
+* [GetWebPropertyTimeline](docs/sdks/globaldata/README.md#getwebpropertytimeline) - Get web property event history
+* [ListDNSIPResolutionBounds](docs/sdks/globaldata/README.md#listdnsipresolutionbounds) - Get DNS names that resolved to an IP (aggregated bounds)
+* [ListDNSIPResolutionRanges](docs/sdks/globaldata/README.md#listdnsipresolutionranges) - Get DNS names that resolved to an IP (ranges)
+* [ListDNSNameResolutionBounds](docs/sdks/globaldata/README.md#listdnsnameresolutionbounds) - Get DNS resolution records for a name (aggregated bounds)
+* [ListDNSNameResolutionRanges](docs/sdks/globaldata/README.md#listdnsnameresolutionranges) - Get DNS resolution records for a name (ranges)
+* [CreateTrackedScan](docs/sdks/globaldata/README.md#createtrackedscan) - Live Rescan: Initiate a new rescan
+* [GetTrackedScan](docs/sdks/globaldata/README.md#gettrackedscan) - Get scan status
 * [Aggregate](docs/sdks/globaldata/README.md#aggregate) - Aggregate results for a search query
+* [ConvertLegacySearchQueries](docs/sdks/globaldata/README.md#convertlegacysearchqueries) - Convert Legacy Search queries to Platform queries
 * [Search](docs/sdks/globaldata/README.md#search) - Run a search query
-* [GetTrackedScanThreatHunting](docs/sdks/globaldata/README.md#gettrackedscanthreathunting) - Get tracked scan details
 
+### [TagsAndComments](docs/sdks/tagsandcomments/README.md)
+
+* [ListComments](docs/sdks/tagsandcomments/README.md#listcomments) - List comments
+* [CreateComment](docs/sdks/tagsandcomments/README.md#createcomment) - Create a comment
+* [DeleteComment](docs/sdks/tagsandcomments/README.md#deletecomment) - Delete a comment
+* [UpdateComment](docs/sdks/tagsandcomments/README.md#updatecomment) - Update a comment
+* [ListTags](docs/sdks/tagsandcomments/README.md#listtags) - List tags
+* [CreateTag](docs/sdks/tagsandcomments/README.md#createtag) - Create a tag
+* [DeleteTag](docs/sdks/tagsandcomments/README.md#deletetag) - Delete a tag
+* [GetTag](docs/sdks/tagsandcomments/README.md#gettag) - Get a tag
+* [UpdateTag](docs/sdks/tagsandcomments/README.md#updatetag) - Update a tag
+* [ListTagAssignments](docs/sdks/tagsandcomments/README.md#listtagassignments) - List tag assignments
+* [CreateTagAssignment](docs/sdks/tagsandcomments/README.md#createtagassignment) - Create a tag assignment
+* [BulkCreateTagAssignments](docs/sdks/tagsandcomments/README.md#bulkcreatetagassignments) - Bulk create tag assignments
+* [BulkDeleteTagAssignments](docs/sdks/tagsandcomments/README.md#bulkdeletetagassignments) - Bulk delete tag assignments
+* [DeleteTagAssignment](docs/sdks/tagsandcomments/README.md#deletetagassignment) - Delete a tag assignment
+* [ListTagOperations](docs/sdks/tagsandcomments/README.md#listtagoperations) - List tag operations
+* [GetTagOperation](docs/sdks/tagsandcomments/README.md#gettagoperation) - Get a tag operation
+* [CancelTagOperation](docs/sdks/tagsandcomments/README.md#canceltagoperation) - Cancel a tag operation
 
 ### [ThreatHunting](docs/sdks/threathunting/README.md)
 
-* [GetTrackedScan](docs/sdks/threathunting/README.md#gettrackedscan) - Get tracked scan details
-* [GetHostObservationsWithCertificate](docs/sdks/threathunting/README.md#gethostobservationswithcertificate) - Get Host Observations With Certificate
-* [CreateTrackedScan](docs/sdks/threathunting/README.md#createtrackedscan) - Create a tracked discovery scan
-* [GetTrackedScanThreatHunting](docs/sdks/threathunting/README.md#gettrackedscanthreathunting) - Get tracked scan details
+* [ListCenseyeJobs](docs/sdks/threathunting/README.md#listcenseyejobs) - CensEye: List jobs
+* [CreateCenseyeJob](docs/sdks/threathunting/README.md#createcenseyejob) - CensEye: Create a pivot analysis job
+* [GetCenseyeJob](docs/sdks/threathunting/README.md#getcenseyejob) - CensEye: Get job status
+* [GetCenseyeJobResults](docs/sdks/threathunting/README.md#getcenseyejobresults) - CensEye: Get job results
+* [GetHostObservationsWithCertificate](docs/sdks/threathunting/README.md#gethostobservationswithcertificate) - Get host history for a certificate
+* [CreateTrackedScan](docs/sdks/threathunting/README.md#createtrackedscan) - Live Discovery: Initiate a new scan
+* [GetTrackedScanThreatHunting](docs/sdks/threathunting/README.md#gettrackedscanthreathunting) - Get scan status
+* [ListThreats](docs/sdks/threathunting/README.md#listthreats) - List active threats
 * [ValueCounts](docs/sdks/threathunting/README.md#valuecounts) - CensEye: Retrieve value counts to discover pivots
 
 </details>
@@ -137,7 +193,7 @@ func main() {
 
 A parameter is configured globally. This parameter may be set on the SDK client instance itself during initialization. When configured as an option during SDK initialization, This global value will be used as the default on the operations that use it. When such operations are called, there is a place in each to override the global value, if needed.
 
-For example, you can set `organization_id` to `"<id>"` at SDK initialization and then you do not have to pass the same value on calls to operations like `List`. But if you want to do so you may, which will locally override the global setting. See the example code below for a demonstration.
+For example, you can set `organization_id` to `"<id>"` at SDK initialization and then you do not have to pass the same value on calls to operations like `GetOrganizationDetails`. But if you want to do so you may, which will locally override the global setting. See the example code below for a demonstration.
 
 
 ### Available Globals
@@ -168,14 +224,13 @@ func main() {
 		censyssdkgo.WithSecurity("<YOUR_BEARER_TOKEN_HERE>"),
 	)
 
-	res, err := s.Collections.List(ctx, operations.V3CollectionsCrudListRequest{
-		PageToken: censyssdkgo.String("<next_page_token>"),
-		PageSize:  censyssdkgo.Int64(1),
+	res, err := s.AccountManagement.GetOrganizationDetails(ctx, operations.V3AccountmanagementOrgDetailsRequest{
+		OrganizationID: "11111111-2222-3333-4444-555555555555",
 	})
 	if err != nil {
 		log.Fatal(err)
 	}
-	if res.ResponseEnvelopeListCollectionsResponseV1 != nil {
+	if res.ResponseEnvelopeOrganizationDetails != nil {
 		// handle response
 	}
 }
@@ -205,13 +260,11 @@ func main() {
 	ctx := context.Background()
 
 	s := censyssdkgo.New(
-		censyssdkgo.WithOrganizationID("11111111-2222-3333-4444-555555555555"),
 		censyssdkgo.WithSecurity("<YOUR_BEARER_TOKEN_HERE>"),
 	)
 
-	res, err := s.Collections.List(ctx, operations.V3CollectionsCrudListRequest{
-		PageToken: censyssdkgo.String("<next_page_token>"),
-		PageSize:  censyssdkgo.Int64(1),
+	res, err := s.AccountManagement.GetOrganizationDetails(ctx, operations.V3AccountmanagementOrgDetailsRequest{
+		OrganizationID: "11111111-2222-3333-4444-555555555555",
 	}, operations.WithRetries(
 		retry.Config{
 			Strategy: "backoff",
@@ -226,7 +279,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if res.ResponseEnvelopeListCollectionsResponseV1 != nil {
+	if res.ResponseEnvelopeOrganizationDetails != nil {
 		// handle response
 	}
 }
@@ -260,18 +313,16 @@ func main() {
 				},
 				RetryConnectionErrors: false,
 			}),
-		censyssdkgo.WithOrganizationID("11111111-2222-3333-4444-555555555555"),
 		censyssdkgo.WithSecurity("<YOUR_BEARER_TOKEN_HERE>"),
 	)
 
-	res, err := s.Collections.List(ctx, operations.V3CollectionsCrudListRequest{
-		PageToken: censyssdkgo.String("<next_page_token>"),
-		PageSize:  censyssdkgo.Int64(1),
+	res, err := s.AccountManagement.GetOrganizationDetails(ctx, operations.V3AccountmanagementOrgDetailsRequest{
+		OrganizationID: "11111111-2222-3333-4444-555555555555",
 	})
 	if err != nil {
 		log.Fatal(err)
 	}
-	if res.ResponseEnvelopeListCollectionsResponseV1 != nil {
+	if res.ResponseEnvelopeOrganizationDetails != nil {
 		// handle response
 	}
 }
@@ -286,12 +337,14 @@ Handling errors in this SDK should largely match your expectations. All operatio
 
 By Default, an API error will return `sdkerrors.SDKError`. When custom error responses are specified for an operation, the SDK may also return their associated error. You can refer to respective *Errors* tables in SDK docs for more details on possible error types for each operation.
 
-For example, the `List` function may return the following errors:
+For example, the `GetOrganizationDetails` function may return the following errors:
 
-| Error Type           | Status Code | Content Type             |
-| -------------------- | ----------- | ------------------------ |
-| sdkerrors.ErrorModel | 401, 403    | application/problem+json |
-| sdkerrors.SDKError   | 4XX, 5XX    | \*/\*                    |
+| Error Type                    | Status Code   | Content Type             |
+| ----------------------------- | ------------- | ------------------------ |
+| sdkerrors.AuthenticationError | 401           | application/json         |
+| sdkerrors.ErrorModel          | 403, 404, 422 | application/problem+json |
+| sdkerrors.ErrorModel          | 500           | application/problem+json |
+| sdkerrors.SDKError            | 4XX, 5XX      | \*/\*                    |
 
 ### Example
 
@@ -311,15 +364,25 @@ func main() {
 	ctx := context.Background()
 
 	s := censyssdkgo.New(
-		censyssdkgo.WithOrganizationID("11111111-2222-3333-4444-555555555555"),
 		censyssdkgo.WithSecurity("<YOUR_BEARER_TOKEN_HERE>"),
 	)
 
-	res, err := s.Collections.List(ctx, operations.V3CollectionsCrudListRequest{
-		PageToken: censyssdkgo.String("<next_page_token>"),
-		PageSize:  censyssdkgo.Int64(1),
+	res, err := s.AccountManagement.GetOrganizationDetails(ctx, operations.V3AccountmanagementOrgDetailsRequest{
+		OrganizationID: "11111111-2222-3333-4444-555555555555",
 	})
 	if err != nil {
+
+		var e *sdkerrors.AuthenticationError
+		if errors.As(err, &e) {
+			// handle error
+			log.Fatal(e.Error())
+		}
+
+		var e *sdkerrors.ErrorModel
+		if errors.As(err, &e) {
+			// handle error
+			log.Fatal(e.Error())
+		}
 
 		var e *sdkerrors.ErrorModel
 		if errors.As(err, &e) {
@@ -359,18 +422,16 @@ func main() {
 
 	s := censyssdkgo.New(
 		censyssdkgo.WithServerURL("https://api.platform.censys.io"),
-		censyssdkgo.WithOrganizationID("11111111-2222-3333-4444-555555555555"),
 		censyssdkgo.WithSecurity("<YOUR_BEARER_TOKEN_HERE>"),
 	)
 
-	res, err := s.Collections.List(ctx, operations.V3CollectionsCrudListRequest{
-		PageToken: censyssdkgo.String("<next_page_token>"),
-		PageSize:  censyssdkgo.Int64(1),
+	res, err := s.AccountManagement.GetOrganizationDetails(ctx, operations.V3AccountmanagementOrgDetailsRequest{
+		OrganizationID: "11111111-2222-3333-4444-555555555555",
 	})
 	if err != nil {
 		log.Fatal(err)
 	}
-	if res.ResponseEnvelopeListCollectionsResponseV1 != nil {
+	if res.ResponseEnvelopeOrganizationDetails != nil {
 		// handle response
 	}
 }
@@ -435,23 +496,47 @@ func main() {
 
 	s := censyssdkgo.New(
 		censyssdkgo.WithSecurity("<YOUR_BEARER_TOKEN_HERE>"),
-		censyssdkgo.WithOrganizationID("11111111-2222-3333-4444-555555555555"),
 	)
 
-	res, err := s.Collections.List(ctx, operations.V3CollectionsCrudListRequest{
-		PageToken: censyssdkgo.String("<next_page_token>"),
-		PageSize:  censyssdkgo.Int64(1),
+	res, err := s.AccountManagement.GetOrganizationDetails(ctx, operations.V3AccountmanagementOrgDetailsRequest{
+		OrganizationID: "11111111-2222-3333-4444-555555555555",
 	})
 	if err != nil {
 		log.Fatal(err)
 	}
-	if res.ResponseEnvelopeListCollectionsResponseV1 != nil {
+	if res.ResponseEnvelopeOrganizationDetails != nil {
 		// handle response
 	}
 }
 
 ```
 <!-- End Authentication [security] -->
+
+<!-- Start Special Types [types] -->
+## Special Types
+
+This SDK defines the following custom types to assist with marshalling and unmarshalling data.
+
+### Date
+
+`types.Date` is a wrapper around time.Time that allows for JSON marshaling a date string formatted as "2006-01-02".
+
+#### Usage
+
+```go
+d1 := types.NewDate(time.Now()) // returns *types.Date
+
+d2 := types.DateFromTime(time.Now()) // returns types.Date
+
+d3, err := types.NewDateFromString("2019-01-01") // returns *types.Date, error
+
+d4, err := types.DateFromString("2019-01-01") // returns types.Date, error
+
+d5 := types.MustNewDateFromString("2019-01-01") // returns *types.Date and panics on error
+
+d6 := types.MustDateFromString("2019-01-01") // returns types.Date and panics on error
+```
+<!-- End Special Types [types] -->
 
 <!-- Placeholder for Future Speakeasy SDK Sections -->
 

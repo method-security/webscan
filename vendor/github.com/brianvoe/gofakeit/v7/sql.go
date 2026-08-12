@@ -21,7 +21,7 @@ func sqlFunc(f *Faker, so *SQLOptions) (string, error) {
 	if so.Table == "" {
 		return "", errors.New("must provide table name to generate SQL")
 	}
-	if so.Fields == nil || len(so.Fields) <= 0 {
+	if len(so.Fields) <= 0 {
 		return "", errors.New(("must pass fields in order to generate SQL queries"))
 	}
 	if so.Count <= 0 {
@@ -112,6 +112,12 @@ VALUES
 	(2, 'Santino', 235.13, 40, '1964-07-07 22:25:40');`,
 		Output:      "string",
 		ContentType: "application/sql",
+		Aliases: []string{
+			"insert command", "database query", "sql statement", "record insert", "data query",
+		},
+		Keywords: []string{
+			"database", "insert", "command", "records", "table", "tuples", "rows", "data", "values", "query",
+		},
 		Params: []Param{
 			{Field: "table", Display: "Table", Type: "string", Description: "Name of the table to insert into"},
 			{Field: "count", Display: "Count", Type: "int", Default: "100", Description: "Number of inserts to generate"},
@@ -153,4 +159,5 @@ VALUES
 			return sqlFunc(f, &so)
 		},
 	})
+
 }

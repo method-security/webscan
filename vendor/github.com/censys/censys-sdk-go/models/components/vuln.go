@@ -2,11 +2,6 @@
 
 package components
 
-import (
-	"encoding/json"
-	"fmt"
-)
-
 type VulnRiskSource string
 
 const (
@@ -18,22 +13,16 @@ const (
 func (e VulnRiskSource) ToPointer() *VulnRiskSource {
 	return &e
 }
-func (e *VulnRiskSource) UnmarshalJSON(data []byte) error {
-	var v string
-	if err := json.Unmarshal(data, &v); err != nil {
-		return err
+
+// IsExact returns true if the value matches a known enum value, false otherwise.
+func (e *VulnRiskSource) IsExact() bool {
+	if e != nil {
+		switch *e {
+		case "", "censys", "cve":
+			return true
+		}
 	}
-	switch v {
-	case "":
-		fallthrough
-	case "censys":
-		fallthrough
-	case "cve":
-		*e = VulnRiskSource(v)
-		return nil
-	default:
-		return fmt.Errorf("invalid value for VulnRiskSource: %v", v)
-	}
+	return false
 }
 
 type VulnSeverity string
@@ -49,61 +38,42 @@ const (
 func (e VulnSeverity) ToPointer() *VulnSeverity {
 	return &e
 }
-func (e *VulnSeverity) UnmarshalJSON(data []byte) error {
-	var v string
-	if err := json.Unmarshal(data, &v); err != nil {
-		return err
+
+// IsExact returns true if the value matches a known enum value, false otherwise.
+func (e *VulnSeverity) IsExact() bool {
+	if e != nil {
+		switch *e {
+		case "", "low", "medium", "high", "critical":
+			return true
+		}
 	}
-	switch v {
-	case "":
-		fallthrough
-	case "low":
-		fallthrough
-	case "medium":
-		fallthrough
-	case "high":
-		fallthrough
-	case "critical":
-		*e = VulnSeverity(v)
-		return nil
-	default:
-		return fmt.Errorf("invalid value for VulnSeverity: %v", v)
-	}
+	return false
 }
 
 type VulnSource string
 
 const (
-	VulnSourceUnknown    VulnSource = ""
-	VulnSourceCensys     VulnSource = "censys"
-	VulnSourceRecog      VulnSource = "recog"
-	VulnSourceWappalyzer VulnSource = "wappalyzer"
-	VulnSourceThirdParty VulnSource = "third_party"
+	VulnSourceUnknown           VulnSource = ""
+	VulnSourceCensys            VulnSource = "censys"
+	VulnSourceRecog             VulnSource = "recog"
+	VulnSourceWappalyzer        VulnSource = "wappalyzer"
+	VulnSourceThirdParty        VulnSource = "third_party"
+	VulnSourceHTMLMetaExtractor VulnSource = "html_meta_extractor"
 )
 
 func (e VulnSource) ToPointer() *VulnSource {
 	return &e
 }
-func (e *VulnSource) UnmarshalJSON(data []byte) error {
-	var v string
-	if err := json.Unmarshal(data, &v); err != nil {
-		return err
+
+// IsExact returns true if the value matches a known enum value, false otherwise.
+func (e *VulnSource) IsExact() bool {
+	if e != nil {
+		switch *e {
+		case "", "censys", "recog", "wappalyzer", "third_party", "html_meta_extractor":
+			return true
+		}
 	}
-	switch v {
-	case "":
-		fallthrough
-	case "censys":
-		fallthrough
-	case "recog":
-		fallthrough
-	case "wappalyzer":
-		fallthrough
-	case "third_party":
-		*e = VulnSource(v)
-		return nil
-	default:
-		return fmt.Errorf("invalid value for VulnSource: %v", v)
-	}
+	return false
 }
 
 type Vuln struct {
@@ -117,82 +87,90 @@ type Vuln struct {
 	RiskSource *VulnRiskSource `json:"risk_source,omitempty"`
 	Severity   *VulnSeverity   `json:"severity,omitempty"`
 	Source     *VulnSource     `json:"source,omitempty"`
+	Type       []string        `json:"type,omitempty"`
 	Year       *int            `json:"year,omitempty"`
 }
 
-func (o *Vuln) GetConfidence() *float64 {
-	if o == nil {
+func (v *Vuln) GetConfidence() *float64 {
+	if v == nil {
 		return nil
 	}
-	return o.Confidence
+	return v.Confidence
 }
 
-func (o *Vuln) GetCwes() []Cwe {
-	if o == nil {
+func (v *Vuln) GetCwes() []Cwe {
+	if v == nil {
 		return nil
 	}
-	return o.Cwes
+	return v.Cwes
 }
 
-func (o *Vuln) GetEvidence() []Evidence {
-	if o == nil {
+func (v *Vuln) GetEvidence() []Evidence {
+	if v == nil {
 		return nil
 	}
-	return o.Evidence
+	return v.Evidence
 }
 
-func (o *Vuln) GetID() *string {
-	if o == nil {
+func (v *Vuln) GetID() *string {
+	if v == nil {
 		return nil
 	}
-	return o.ID
+	return v.ID
 }
 
-func (o *Vuln) GetKev() []Kev {
-	if o == nil {
+func (v *Vuln) GetKev() []Kev {
+	if v == nil {
 		return nil
 	}
-	return o.Kev
+	return v.Kev
 }
 
-func (o *Vuln) GetMetrics() *Metrics {
-	if o == nil {
+func (v *Vuln) GetMetrics() *Metrics {
+	if v == nil {
 		return nil
 	}
-	return o.Metrics
+	return v.Metrics
 }
 
-func (o *Vuln) GetName() *string {
-	if o == nil {
+func (v *Vuln) GetName() *string {
+	if v == nil {
 		return nil
 	}
-	return o.Name
+	return v.Name
 }
 
-func (o *Vuln) GetRiskSource() *VulnRiskSource {
-	if o == nil {
+func (v *Vuln) GetRiskSource() *VulnRiskSource {
+	if v == nil {
 		return nil
 	}
-	return o.RiskSource
+	return v.RiskSource
 }
 
-func (o *Vuln) GetSeverity() *VulnSeverity {
-	if o == nil {
+func (v *Vuln) GetSeverity() *VulnSeverity {
+	if v == nil {
 		return nil
 	}
-	return o.Severity
+	return v.Severity
 }
 
-func (o *Vuln) GetSource() *VulnSource {
-	if o == nil {
+func (v *Vuln) GetSource() *VulnSource {
+	if v == nil {
 		return nil
 	}
-	return o.Source
+	return v.Source
 }
 
-func (o *Vuln) GetYear() *int {
-	if o == nil {
+func (v *Vuln) GetType() []string {
+	if v == nil {
 		return nil
 	}
-	return o.Year
+	return v.Type
+}
+
+func (v *Vuln) GetYear() *int {
+	if v == nil {
+		return nil
+	}
+	return v.Year
 }

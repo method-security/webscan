@@ -351,6 +351,11 @@ func readUntilFalse(stream *lexerStream, includeWhitespace bool, breakWhitespace
 		// Use backslashes to escape anything
 		if allowEscaping && character == '\\' {
 			reuseString = false
+			if !stream.canRead() {
+				// Incomplete escape at EOF — leave conditioned=false so callers
+				// surface this as an unclosed string/bracket rather than panicking.
+				break
+			}
 			character = stream.readCharacter()
 			tokenBuffer.WriteString(string(character))
 			continue
@@ -412,17 +417,30 @@ func optimizeTokens(tokens []ExpressionToken) ([]ExpressionToken, error) {
 			continue
 		}
 
-		symbol = comparatorSymbols[token.Value.(string)]
+		op, ok := token.Value.(string)
+		if !ok {
+			return nil, fmt.Errorf("Unable to optimize COMPARATOR token with value type %T", token.Value)
+		}
+
+		symbol = comparatorSymbols[op]
 		if symbol != REQ && symbol != NREQ {
 			continue
+		}
+
+		if index+1 >= len(tokens) {
+			return nil, errors.New("Unable to optimize regex comparator without a right-hand token")
 		}
 
 		index++
 		token = tokens[index]
 		if token.Kind == STRING {
+			pattern, ok := token.Value.(string)
+			if !ok {
+				return nil, fmt.Errorf("Unable to optimize regex pattern token with value type %T", token.Value)
+			}
 
 			token.Kind = PATTERN
-			token.Value, err = regexp.Compile(token.Value.(string))
+			token.Value, err = regexp.Compile(pattern)
 
 			if err != nil {
 				return tokens, err
@@ -464,10 +482,6 @@ func checkBalance(tokens []ExpressionToken) error {
 		return errors.New("Unbalanced parenthesis")
 	}
 	return nil
-}
-
-func isDigit(character rune) bool {
-	return unicode.IsDigit(character)
 }
 
 func isHexDigit(character rune) bool {

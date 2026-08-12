@@ -122,7 +122,9 @@ type Options struct {
 	Untrusted bool
 	// MisMatched displays if the cert is mismatched
 	MisMatched bool
-	// Revoked displays if the cert is revoked
+	// Revoked enables certificate revocation checks (CRL/OCSP via cfssl).
+	// Off by default: enabling this downloads full CRLs and can consume large
+	// amounts of memory under high concurrency.
 	Revoked bool
 	// HardFail defines Revoke status when there are parse failures or other errors
 	// If HardFail is true then on any error certificate is considered as revoked
@@ -206,6 +208,12 @@ type Response struct {
 	Version string `json:"tls_version,omitempty"`
 	// Cipher is the cipher for the tls request
 	Cipher string `json:"cipher,omitempty"`
+	// KeyExchange is the negotiated key exchange group (e.g. X25519, X25519MLKEM768, CurveP256).
+	// In TLS 1.3 the cipher suite name no longer encodes the key agreement
+	// mechanism; this field exposes ConnectionState.CurveID so security teams
+	// can audit post-quantum readiness and classical-curve usage.
+	// Populated from Go 1.25+ which sets CurveID after the handshake.
+	KeyExchange string `json:"key_exchange,omitempty"`
 	// CertificateResponse is the leaf certificate embedded in json
 	*CertificateResponse `json:",inline"`
 	// TLSConnection is the client used for TLS connection
@@ -428,9 +436,10 @@ func IsMisMatchedCert(host string, alternativeNames []string) bool {
 	return true
 }
 
-// IsTLSRevoked returns true if the certificate has been revoked or failed to parse
+// IsTLSRevoked returns true if the certificate has been revoked or failed to parse.
+// Revocation checks (CRL/OCSP) only run when options.Revoked is enabled.
 func IsTLSRevoked(options *Options, cert *x509.Certificate) bool {
-	if cert == nil {
+	if !options.Revoked || cert == nil {
 		return options.HardFail
 	}
 	// - false, false: an error was encountered while checking revocations.

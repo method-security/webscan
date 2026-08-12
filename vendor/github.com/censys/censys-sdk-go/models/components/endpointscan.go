@@ -2,11 +2,6 @@
 
 package components
 
-import (
-	"encoding/json"
-	"fmt"
-)
-
 type EndpointScanTransportProtocol string
 
 const (
@@ -20,32 +15,24 @@ const (
 func (e EndpointScanTransportProtocol) ToPointer() *EndpointScanTransportProtocol {
 	return &e
 }
-func (e *EndpointScanTransportProtocol) UnmarshalJSON(data []byte) error {
-	var v string
-	if err := json.Unmarshal(data, &v); err != nil {
-		return err
+
+// IsExact returns true if the value matches a known enum value, false otherwise.
+func (e *EndpointScanTransportProtocol) IsExact() bool {
+	if e != nil {
+		switch *e {
+		case "", "tcp", "udp", "icmp", "quic":
+			return true
+		}
 	}
-	switch v {
-	case "":
-		fallthrough
-	case "tcp":
-		fallthrough
-	case "udp":
-		fallthrough
-	case "icmp":
-		fallthrough
-	case "quic":
-		*e = EndpointScanTransportProtocol(v)
-		return nil
-	default:
-		return fmt.Errorf("invalid value for EndpointScanTransportProtocol: %v", v)
-	}
+	return false
 }
 
 type EndpointScan struct {
+	Argocd            *Argocd                        `json:"argocd,omitempty"`
 	Banner            *string                        `json:"banner,omitempty"`
 	BannerHashSha256  *string                        `json:"banner_hash_sha256,omitempty"`
 	ChromeDevtools    *ChromeDevtools                `json:"chrome_devtools,omitempty"`
+	ClickhouseHTTP    *ClickHouseHTTP                `json:"clickhouse_http,omitempty"`
 	CobaltStrike      *CobaltStrike                  `json:"cobalt_strike,omitempty"`
 	Elasticsearch     *ElasticSearch                 `json:"elasticsearch,omitempty"`
 	EndpointType      *string                        `json:"endpoint_type,omitempty"`
@@ -53,10 +40,16 @@ type EndpointScan struct {
 	Graphql           *Graphql                       `json:"graphql,omitempty"`
 	Hostname          *string                        `json:"hostname,omitempty"`
 	HTTP              *HTTP                          `json:"http,omitempty"`
+	Influxdb          *Influxdb                      `json:"influxdb,omitempty"`
 	IP                *string                        `json:"ip,omitempty"`
 	IsSuccess         *bool                          `json:"is_success,omitempty"`
 	IvantiAvalanche   *IvantiAvalanche               `json:"ivanti_avalanche,omitempty"`
+	Jenkins           *Jenkins                       `json:"jenkins,omitempty"`
+	Jupyter           *Jupyter                       `json:"jupyter,omitempty"`
+	Keycloak          *Keycloak                      `json:"keycloak,omitempty"`
 	Kubernetes        *Kubernetes                    `json:"kubernetes,omitempty"`
+	Mcp               *Mcp                           `json:"mcp,omitempty"`
+	NginxProxyManager *NginxProxyManager             `json:"nginx_proxy_manager,omitempty"`
 	Ollama            *Ollama                        `json:"ollama,omitempty"`
 	OpenDirectory     *OpenDirectory                 `json:"open_directory,omitempty"`
 	Path              *string                        `json:"path,omitempty"`
@@ -65,206 +58,294 @@ type EndpointScan struct {
 	Pprof             *Pprof                         `json:"pprof,omitempty"`
 	Prometheus        *Prometheus                    `json:"prometheus,omitempty"`
 	PrometheusTarget  *PrometheusTarget              `json:"prometheus_target,omitempty"`
+	ProxmoxVe         *ProxmoxVe                     `json:"proxmox_ve,omitempty"`
 	RedlionWeb        *RedlionWeb                    `json:"redlion_web,omitempty"`
 	ScadaView         *ScadaView                     `json:"scada_view,omitempty"`
 	ScanTime          *string                        `json:"scan_time,omitempty"`
 	Screenshots       []Screenshot                   `json:"screenshots,omitempty"`
+	SynologyDsm       *SynologyDsm                   `json:"synology_dsm,omitempty"`
 	TLS               *TLS                           `json:"tls,omitempty"`
 	TransportProtocol *EndpointScanTransportProtocol `json:"transport_protocol,omitempty"`
+	Vault             *Vault                         `json:"vault,omitempty"`
+	Wordpress         *Wordpress                     `json:"wordpress,omitempty"`
 }
 
-func (o *EndpointScan) GetBanner() *string {
-	if o == nil {
+func (e *EndpointScan) GetArgocd() *Argocd {
+	if e == nil {
 		return nil
 	}
-	return o.Banner
+	return e.Argocd
 }
 
-func (o *EndpointScan) GetBannerHashSha256() *string {
-	if o == nil {
+func (e *EndpointScan) GetBanner() *string {
+	if e == nil {
 		return nil
 	}
-	return o.BannerHashSha256
+	return e.Banner
 }
 
-func (o *EndpointScan) GetChromeDevtools() *ChromeDevtools {
-	if o == nil {
+func (e *EndpointScan) GetBannerHashSha256() *string {
+	if e == nil {
 		return nil
 	}
-	return o.ChromeDevtools
+	return e.BannerHashSha256
 }
 
-func (o *EndpointScan) GetCobaltStrike() *CobaltStrike {
-	if o == nil {
+func (e *EndpointScan) GetChromeDevtools() *ChromeDevtools {
+	if e == nil {
 		return nil
 	}
-	return o.CobaltStrike
+	return e.ChromeDevtools
 }
 
-func (o *EndpointScan) GetElasticsearch() *ElasticSearch {
-	if o == nil {
+func (e *EndpointScan) GetClickhouseHTTP() *ClickHouseHTTP {
+	if e == nil {
 		return nil
 	}
-	return o.Elasticsearch
+	return e.ClickhouseHTTP
 }
 
-func (o *EndpointScan) GetEndpointType() *string {
-	if o == nil {
+func (e *EndpointScan) GetCobaltStrike() *CobaltStrike {
+	if e == nil {
 		return nil
 	}
-	return o.EndpointType
+	return e.CobaltStrike
 }
 
-func (o *EndpointScan) GetFortigate() *Fortigate {
-	if o == nil {
+func (e *EndpointScan) GetElasticsearch() *ElasticSearch {
+	if e == nil {
 		return nil
 	}
-	return o.Fortigate
+	return e.Elasticsearch
 }
 
-func (o *EndpointScan) GetGraphql() *Graphql {
-	if o == nil {
+func (e *EndpointScan) GetEndpointType() *string {
+	if e == nil {
 		return nil
 	}
-	return o.Graphql
+	return e.EndpointType
 }
 
-func (o *EndpointScan) GetHostname() *string {
-	if o == nil {
+func (e *EndpointScan) GetFortigate() *Fortigate {
+	if e == nil {
 		return nil
 	}
-	return o.Hostname
+	return e.Fortigate
 }
 
-func (o *EndpointScan) GetHTTP() *HTTP {
-	if o == nil {
+func (e *EndpointScan) GetGraphql() *Graphql {
+	if e == nil {
 		return nil
 	}
-	return o.HTTP
+	return e.Graphql
 }
 
-func (o *EndpointScan) GetIP() *string {
-	if o == nil {
+func (e *EndpointScan) GetHostname() *string {
+	if e == nil {
 		return nil
 	}
-	return o.IP
+	return e.Hostname
 }
 
-func (o *EndpointScan) GetIsSuccess() *bool {
-	if o == nil {
+func (e *EndpointScan) GetHTTP() *HTTP {
+	if e == nil {
 		return nil
 	}
-	return o.IsSuccess
+	return e.HTTP
 }
 
-func (o *EndpointScan) GetIvantiAvalanche() *IvantiAvalanche {
-	if o == nil {
+func (e *EndpointScan) GetInfluxdb() *Influxdb {
+	if e == nil {
 		return nil
 	}
-	return o.IvantiAvalanche
+	return e.Influxdb
 }
 
-func (o *EndpointScan) GetKubernetes() *Kubernetes {
-	if o == nil {
+func (e *EndpointScan) GetIP() *string {
+	if e == nil {
 		return nil
 	}
-	return o.Kubernetes
+	return e.IP
 }
 
-func (o *EndpointScan) GetOllama() *Ollama {
-	if o == nil {
+func (e *EndpointScan) GetIsSuccess() *bool {
+	if e == nil {
 		return nil
 	}
-	return o.Ollama
+	return e.IsSuccess
 }
 
-func (o *EndpointScan) GetOpenDirectory() *OpenDirectory {
-	if o == nil {
+func (e *EndpointScan) GetIvantiAvalanche() *IvantiAvalanche {
+	if e == nil {
 		return nil
 	}
-	return o.OpenDirectory
+	return e.IvantiAvalanche
 }
 
-func (o *EndpointScan) GetPath() *string {
-	if o == nil {
+func (e *EndpointScan) GetJenkins() *Jenkins {
+	if e == nil {
 		return nil
 	}
-	return o.Path
+	return e.Jenkins
 }
 
-func (o *EndpointScan) GetPlexMediaServer() *PlexMediaServer {
-	if o == nil {
+func (e *EndpointScan) GetJupyter() *Jupyter {
+	if e == nil {
 		return nil
 	}
-	return o.PlexMediaServer
+	return e.Jupyter
 }
 
-func (o *EndpointScan) GetPort() *int {
-	if o == nil {
+func (e *EndpointScan) GetKeycloak() *Keycloak {
+	if e == nil {
 		return nil
 	}
-	return o.Port
+	return e.Keycloak
 }
 
-func (o *EndpointScan) GetPprof() *Pprof {
-	if o == nil {
+func (e *EndpointScan) GetKubernetes() *Kubernetes {
+	if e == nil {
 		return nil
 	}
-	return o.Pprof
+	return e.Kubernetes
 }
 
-func (o *EndpointScan) GetPrometheus() *Prometheus {
-	if o == nil {
+func (e *EndpointScan) GetMcp() *Mcp {
+	if e == nil {
 		return nil
 	}
-	return o.Prometheus
+	return e.Mcp
 }
 
-func (o *EndpointScan) GetPrometheusTarget() *PrometheusTarget {
-	if o == nil {
+func (e *EndpointScan) GetNginxProxyManager() *NginxProxyManager {
+	if e == nil {
 		return nil
 	}
-	return o.PrometheusTarget
+	return e.NginxProxyManager
 }
 
-func (o *EndpointScan) GetRedlionWeb() *RedlionWeb {
-	if o == nil {
+func (e *EndpointScan) GetOllama() *Ollama {
+	if e == nil {
 		return nil
 	}
-	return o.RedlionWeb
+	return e.Ollama
 }
 
-func (o *EndpointScan) GetScadaView() *ScadaView {
-	if o == nil {
+func (e *EndpointScan) GetOpenDirectory() *OpenDirectory {
+	if e == nil {
 		return nil
 	}
-	return o.ScadaView
+	return e.OpenDirectory
 }
 
-func (o *EndpointScan) GetScanTime() *string {
-	if o == nil {
+func (e *EndpointScan) GetPath() *string {
+	if e == nil {
 		return nil
 	}
-	return o.ScanTime
+	return e.Path
 }
 
-func (o *EndpointScan) GetScreenshots() []Screenshot {
-	if o == nil {
+func (e *EndpointScan) GetPlexMediaServer() *PlexMediaServer {
+	if e == nil {
 		return nil
 	}
-	return o.Screenshots
+	return e.PlexMediaServer
 }
 
-func (o *EndpointScan) GetTLS() *TLS {
-	if o == nil {
+func (e *EndpointScan) GetPort() *int {
+	if e == nil {
 		return nil
 	}
-	return o.TLS
+	return e.Port
 }
 
-func (o *EndpointScan) GetTransportProtocol() *EndpointScanTransportProtocol {
-	if o == nil {
+func (e *EndpointScan) GetPprof() *Pprof {
+	if e == nil {
 		return nil
 	}
-	return o.TransportProtocol
+	return e.Pprof
+}
+
+func (e *EndpointScan) GetPrometheus() *Prometheus {
+	if e == nil {
+		return nil
+	}
+	return e.Prometheus
+}
+
+func (e *EndpointScan) GetPrometheusTarget() *PrometheusTarget {
+	if e == nil {
+		return nil
+	}
+	return e.PrometheusTarget
+}
+
+func (e *EndpointScan) GetProxmoxVe() *ProxmoxVe {
+	if e == nil {
+		return nil
+	}
+	return e.ProxmoxVe
+}
+
+func (e *EndpointScan) GetRedlionWeb() *RedlionWeb {
+	if e == nil {
+		return nil
+	}
+	return e.RedlionWeb
+}
+
+func (e *EndpointScan) GetScadaView() *ScadaView {
+	if e == nil {
+		return nil
+	}
+	return e.ScadaView
+}
+
+func (e *EndpointScan) GetScanTime() *string {
+	if e == nil {
+		return nil
+	}
+	return e.ScanTime
+}
+
+func (e *EndpointScan) GetScreenshots() []Screenshot {
+	if e == nil {
+		return nil
+	}
+	return e.Screenshots
+}
+
+func (e *EndpointScan) GetSynologyDsm() *SynologyDsm {
+	if e == nil {
+		return nil
+	}
+	return e.SynologyDsm
+}
+
+func (e *EndpointScan) GetTLS() *TLS {
+	if e == nil {
+		return nil
+	}
+	return e.TLS
+}
+
+func (e *EndpointScan) GetTransportProtocol() *EndpointScanTransportProtocol {
+	if e == nil {
+		return nil
+	}
+	return e.TransportProtocol
+}
+
+func (e *EndpointScan) GetVault() *Vault {
+	if e == nil {
+		return nil
+	}
+	return e.Vault
+}
+
+func (e *EndpointScan) GetWordpress() *Wordpress {
+	if e == nil {
+		return nil
+	}
+	return e.Wordpress
 }

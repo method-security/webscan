@@ -1,6 +1,6 @@
 module github.com/Method-Security/webscan
 
-go 1.26.4
+go 1.26.5
 
 require (
 	github.com/Method-Security/pkg v0.1.1

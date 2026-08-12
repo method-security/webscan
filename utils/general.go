@@ -71,7 +71,7 @@ func ParseResponseCodes(responseCodes string) (map[int]bool, error) {
 // IsStaticAsset returns true if the URL is a static asset, false otherwise
 func IsStaticAsset(url string) bool {
 	staticExts := []string{
-		".7z", ".avif", ".bmp", ".cjs", ".css", ".csv",
+		".7z", ".assetx", ".avif", ".bmp", ".cjs", ".css", ".csv",
 		".doc", ".docx", ".eot", ".gif", ".gz", ".ico",
 		".ini", ".jpg", ".jpeg", ".js", ".jsx", ".json",
 		".less", ".m4a", ".m4v", ".map", ".markdown", ".md",

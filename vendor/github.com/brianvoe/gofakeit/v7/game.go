@@ -69,6 +69,18 @@ func addGameLookup() {
 		Description: "User-selected online username or alias used for identification in games",
 		Example:     "footinterpret63",
 		Output:      "string",
+		Aliases: []string{
+			"player handle",
+			"gaming nickname",
+			"online tag",
+			"user alias",
+			"profile name",
+		},
+		Keywords: []string{
+			"user-selected", "username",
+			"alias", "identification", "online", "gaming",
+			"video", "games", "player",
+		},
 		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
 			return gamertag(f), nil
 		},
@@ -80,6 +92,18 @@ func addGameLookup() {
 		Description: "Small, cube-shaped objects used in games of chance for random outcomes",
 		Example:     "[5, 2, 3]",
 		Output:      "[]uint",
+		Aliases: []string{
+			"rolling cubes",
+			"chance cubes",
+			"game dice",
+			"random rollers",
+			"luck blocks",
+		},
+		Keywords: []string{
+			"games", "cube-shaped", "chance",
+			"random", "outcomes", "roll", "sides",
+			"objects", "probability",
+		},
 		Params: []Param{
 			{Field: "numdice", Display: "Number of Dice", Type: "uint", Default: "1", Description: "Number of dice to roll"},
 			{Field: "sides", Display: "Number of Sides", Type: "[]uint", Default: "[6]", Description: "Number of sides on each dice"},
@@ -98,4 +122,5 @@ func addGameLookup() {
 			return dice(f, numDice, sides), nil
 		},
 	})
+
 }

@@ -15,18 +15,29 @@ type HostnamePort struct {
 	Port int `json:"port"`
 }
 
-func (o *HostnamePort) GetHostname() string {
-	if o == nil {
-		return ""
-	}
-	return o.Hostname
+func (h HostnamePort) MarshalJSON() ([]byte, error) {
+	return utils.MarshalJSON(h, "", false)
 }
 
-func (o *HostnamePort) GetPort() int {
-	if o == nil {
+func (h *HostnamePort) UnmarshalJSON(data []byte) error {
+	if err := utils.UnmarshalJSON(data, &h, "", false, nil); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (h *HostnamePort) GetHostname() string {
+	if h == nil {
+		return ""
+	}
+	return h.Hostname
+}
+
+func (h *HostnamePort) GetPort() int {
+	if h == nil {
 		return 0
 	}
-	return o.Port
+	return h.Port
 }
 
 // Target2 - Discovery scan against hostname:PORT
@@ -34,12 +45,26 @@ type Target2 struct {
 	HostnamePort HostnamePort `json:"hostname_port"`
 }
 
-func (o *Target2) GetHostnamePort() HostnamePort {
-	if o == nil {
+func (t Target2) MarshalJSON() ([]byte, error) {
+	return utils.MarshalJSON(t, "", false)
+}
+
+func (t *Target2) UnmarshalJSON(data []byte) error {
+	if err := utils.UnmarshalJSON(data, &t, "", false, nil); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (t *Target2) GetHostnamePort() HostnamePort {
+	if t == nil {
 		return HostnamePort{}
 	}
-	return o.HostnamePort
+	return t.HostnamePort
 }
+
+// #region class-body-target2
+// #endregion class-body-target2
 
 type HostPort struct {
 	// IP address to scan
@@ -48,18 +73,29 @@ type HostPort struct {
 	Port int `json:"port"`
 }
 
-func (o *HostPort) GetIP() string {
-	if o == nil {
-		return ""
-	}
-	return o.IP
+func (h HostPort) MarshalJSON() ([]byte, error) {
+	return utils.MarshalJSON(h, "", false)
 }
 
-func (o *HostPort) GetPort() int {
-	if o == nil {
+func (h *HostPort) UnmarshalJSON(data []byte) error {
+	if err := utils.UnmarshalJSON(data, &h, "", false, nil); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (h *HostPort) GetIP() string {
+	if h == nil {
+		return ""
+	}
+	return h.IP
+}
+
+func (h *HostPort) GetPort() int {
+	if h == nil {
 		return 0
 	}
-	return o.Port
+	return h.Port
 }
 
 // Target1 - Discovery scan against IP:PORT
@@ -67,12 +103,26 @@ type Target1 struct {
 	HostPort HostPort `json:"host_port"`
 }
 
-func (o *Target1) GetHostPort() HostPort {
-	if o == nil {
+func (t Target1) MarshalJSON() ([]byte, error) {
+	return utils.MarshalJSON(t, "", false)
+}
+
+func (t *Target1) UnmarshalJSON(data []byte) error {
+	if err := utils.UnmarshalJSON(data, &t, "", false, nil); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (t *Target1) GetHostPort() HostPort {
+	if t == nil {
 		return HostPort{}
 	}
-	return o.HostPort
+	return t.HostPort
 }
+
+// #region class-body-target1
+// #endregion class-body-target1
 
 type ScansDiscoveryInputBodyTargetType string
 
@@ -82,8 +132,8 @@ const (
 )
 
 type ScansDiscoveryInputBodyTarget struct {
-	Target1 *Target1 `queryParam:"inline"`
-	Target2 *Target2 `queryParam:"inline"`
+	Target1 *Target1 `queryParam:"inline" union:"member"`
+	Target2 *Target2 `queryParam:"inline" union:"member"`
 
 	Type ScansDiscoveryInputBodyTargetType
 }
@@ -108,17 +158,43 @@ func CreateScansDiscoveryInputBodyTargetTarget2(target2 Target2) ScansDiscoveryI
 
 func (u *ScansDiscoveryInputBodyTarget) UnmarshalJSON(data []byte) error {
 
+	var candidates []utils.UnionCandidate
+
+	// Collect all valid candidates
 	var target1 Target1 = Target1{}
-	if err := utils.UnmarshalJSON(data, &target1, "", true, true); err == nil {
-		u.Target1 = &target1
-		u.Type = ScansDiscoveryInputBodyTargetTypeTarget1
-		return nil
+	if err := utils.UnmarshalJSON(data, &target1, "", true, nil); err == nil {
+		candidates = append(candidates, utils.UnionCandidate{
+			Type:  ScansDiscoveryInputBodyTargetTypeTarget1,
+			Value: &target1,
+		})
 	}
 
 	var target2 Target2 = Target2{}
-	if err := utils.UnmarshalJSON(data, &target2, "", true, true); err == nil {
-		u.Target2 = &target2
-		u.Type = ScansDiscoveryInputBodyTargetTypeTarget2
+	if err := utils.UnmarshalJSON(data, &target2, "", true, nil); err == nil {
+		candidates = append(candidates, utils.UnionCandidate{
+			Type:  ScansDiscoveryInputBodyTargetTypeTarget2,
+			Value: &target2,
+		})
+	}
+
+	if len(candidates) == 0 {
+		return fmt.Errorf("could not unmarshal `%s` into any supported union types for ScansDiscoveryInputBodyTarget", string(data))
+	}
+
+	// Pick the best candidate using multi-stage filtering
+	best := utils.PickBestUnionCandidate(candidates, data)
+	if best == nil {
+		return fmt.Errorf("could not unmarshal `%s` into any supported union types for ScansDiscoveryInputBodyTarget", string(data))
+	}
+
+	// Set the union type and value based on the best candidate
+	u.Type = best.Type.(ScansDiscoveryInputBodyTargetType)
+	switch best.Type {
+	case ScansDiscoveryInputBodyTargetTypeTarget1:
+		u.Target1 = best.Value.(*Target1)
+		return nil
+	case ScansDiscoveryInputBodyTargetTypeTarget2:
+		u.Target2 = best.Value.(*Target2)
 		return nil
 	}
 
@@ -141,9 +217,9 @@ type ScansDiscoveryInputBody struct {
 	Target ScansDiscoveryInputBodyTarget `json:"target"`
 }
 
-func (o *ScansDiscoveryInputBody) GetTarget() ScansDiscoveryInputBodyTarget {
-	if o == nil {
+func (s *ScansDiscoveryInputBody) GetTarget() ScansDiscoveryInputBodyTarget {
+	if s == nil {
 		return ScansDiscoveryInputBodyTarget{}
 	}
-	return o.Target
+	return s.Target
 }

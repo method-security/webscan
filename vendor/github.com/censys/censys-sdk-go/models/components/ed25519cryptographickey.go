@@ -6,9 +6,12 @@ type Ed25519CryptographicKey struct {
 	PublicBytes *string `json:"public_bytes,omitempty"`
 }
 
-func (o *Ed25519CryptographicKey) GetPublicBytes() *string {
-	if o == nil {
+func (e *Ed25519CryptographicKey) GetPublicBytes() *string {
+	if e == nil {
 		return nil
 	}
-	return o.PublicBytes
+	return e.PublicBytes
 }
+
+// #region class-body-ed25519cryptographickey
+// #endregion class-body-ed25519cryptographickey

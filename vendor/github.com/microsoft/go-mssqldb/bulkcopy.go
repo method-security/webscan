@@ -14,6 +14,7 @@ import (
 
 	"github.com/microsoft/go-mssqldb/internal/decimal"
 	"github.com/microsoft/go-mssqldb/msdsn"
+	shopspring "github.com/shopspring/decimal"
 )
 
 type Bulk struct {
@@ -82,6 +83,13 @@ func (b *Bulk) sendBulkCommand(ctx context.Context) (err error) {
 			}
 		}
 		if bulkCol != nil {
+			// Note that for INSERT BULK operations, XMLTYPE is to be sent as NVARCHAR(N) or NVARCHAR(MAX) data type.
+			// An error is produced if XMLTYPE is specified.
+			//
+			// https://learn.microsoft.com/openspecs/windows_protocols/ms-tds/ab4a7d62-cd1f-4db1-b67d-ecae58f493e3
+			if bulkCol.ti.TypeId == typeXml {
+				bulkCol.ti.TypeId = typeNVarChar
+			}
 
 			if bulkCol.ti.TypeId == typeUdt {
 				//send udt as binary
@@ -98,11 +106,12 @@ func (b *Bulk) sendBulkCommand(ctx context.Context) (err error) {
 
 	//columns definitions
 	var col_defs bytes.Buffer
+	q := TSQLQuoter{}
 	for i, col := range b.bulkColumns {
 		if i != 0 {
 			col_defs.WriteString(", ")
 		}
-		col_defs.WriteString("[" + col.ColName + "] " + makeDecl(col.ti))
+		col_defs.WriteString(q.ID(col.ColName) + " " + makeDecl(col.ti))
 	}
 
 	//options
@@ -140,7 +149,7 @@ func (b *Bulk) sendBulkCommand(ctx context.Context) (err error) {
 	if err != nil {
 		return fmt.Errorf("Prepare failed: %s", err.Error())
 	}
-	b.dlogf(ctx, query)
+	b.dlogf(ctx, "%s", query)
 
 	_, err = stmt.(*Stmt).ExecContext(ctx, nil)
 	if err != nil {
@@ -293,6 +302,30 @@ func (b *Bulk) getMetadata(ctx context.Context) (err error) {
 		return
 	}
 
+	// Ensure we always SET FMTONLY OFF even if the next statement fails
+	resetFmtonly := true
+	defer func() {
+		if !resetFmtonly {
+			return
+		}
+
+		// Don't let resetErr shadow the "real" error, since this should
+		// generally only happen if one of the calls below failed
+		stmt, resetErr := b.cn.prepareContext(ctx, "SET FMTONLY OFF")
+		if resetErr != nil {
+			// This _should_ be infallible as prepareContext doesn't
+			// actually contact the server
+			b.cn.sess.logger.Log(ctx, msdsn.LogErrors, fmt.Sprintf("Could not reset FMTONLY: %v", resetErr))
+			return
+		}
+		// stmt.Close is a no-op so ignore it
+		_, resetErr = stmt.ExecContext(ctx, nil)
+		if resetErr != nil {
+			b.cn.sess.logger.Log(ctx, msdsn.LogErrors, fmt.Sprintf("Could not reset FMTONLY: %v", resetErr))
+			return
+		}
+	}()
+
 	// Get columns info.
 	stmt, err = b.cn.prepareContext(ctx, fmt.Sprintf("select * from %s SET FMTONLY OFF", b.tablename))
 	if err != nil {
@@ -302,6 +335,7 @@ func (b *Bulk) getMetadata(ctx context.Context) (err error) {
 	if err != nil {
 		return fmt.Errorf("get columns info failed: %v", err)
 	}
+	resetFmtonly = false
 	b.metadata = rows.(*Rows).cols
 
 	if b.Debug {
@@ -321,6 +355,10 @@ func (b *Bulk) makeParam(val DataValue, col columnStruct) (res param, err error)
 	loc := getTimezone(b.cn)
 
 	switch valuer := val.(type) {
+	case Money[shopspring.Decimal]:
+		return b.makeParam(valuer.Decimal, col)
+	case Money[shopspring.NullDecimal]:
+		return b.makeParam(valuer.Decimal, col)
 	case driver.Valuer:
 		var e error
 		val, e = driver.DefaultParameterConverter.ConvertValue(valuer)
@@ -536,7 +574,37 @@ func (b *Bulk) makeParam(val DataValue, col columnStruct) (res param, err error)
 			err = fmt.Errorf("mssql: invalid type for time column: %T %s", val, val)
 			return
 		}
-	// case typeMoney, typeMoney4, typeMoneyN:
+	case typeMoney, typeMoney4, typeMoneyN:
+		switch v := val.(type) {
+		case string:
+			money, err := decimal.StringToDecimalScale(v, 4)
+			if err != nil {
+				return res, err
+			}
+
+			buf := make([]byte, col.ti.Size)
+
+			integer0 := money.GetInteger(0)
+			if col.ti.Size == 4 {
+				if money.IsPositive() {
+					binary.LittleEndian.PutUint32(buf, integer0)
+				} else {
+					binary.LittleEndian.PutUint32(buf, ^integer0+1)
+				}
+			} else {
+				integer := (uint64(money.GetInteger(1)) << 32) | uint64(integer0)
+				if !money.IsPositive() {
+					integer = ^integer + 1
+				}
+
+				binary.LittleEndian.PutUint32(buf, uint32(integer>>32))
+				binary.LittleEndian.PutUint32(buf[4:], uint32(integer))
+			}
+
+			res.buffer = buf
+		default:
+			return res, fmt.Errorf("unknown value for money: %T %#v", v, v)
+		}
 	case typeDecimal, typeDecimalN, typeNumeric, typeNumericN:
 		prec := col.ti.Prec
 		scale := col.ti.Scale
@@ -600,7 +668,7 @@ func (b *Bulk) makeParam(val DataValue, col columnStruct) (res param, err error)
 			buf[i] = ub[j]
 		}
 		res.buffer = buf
-	case typeBigVarBin, typeBigBinary:
+	case typeBigVarBin, typeBigBinary, typeImage:
 		switch val := val.(type) {
 		case []byte:
 			res.ti.Size = len(val)
@@ -618,7 +686,6 @@ func (b *Bulk) makeParam(val DataValue, col columnStruct) (res param, err error)
 			err = fmt.Errorf("mssql: invalid type for Guid column: %T %s", val, val)
 			return
 		}
-
 	default:
 		err = fmt.Errorf("mssql: type %x not implemented", col.ti.TypeId)
 	}

@@ -11,7 +11,13 @@ func (f *Faker) Username() string {
 }
 
 func username(f *Faker) string {
-	return getRandValue(f, []string{"person", "last"}) + replaceWithNumbers(f, "####")
+	username := getRandValue(f, []string{"auth", "username"})
+	username, err := generate(f, username)
+	if err != nil {
+		return username // fallback to raw template if generation fails
+	}
+
+	return username
 }
 
 // Password will generate a random password.
@@ -27,74 +33,133 @@ func (f *Faker) Password(lower bool, upper bool, numeric bool, special bool, spa
 }
 
 func password(f *Faker, lower bool, upper bool, numeric bool, special bool, space bool, num int) string {
-	// Make sure the num minimum is at least 5
+	// Minimum length
 	if num < 5 {
 		num = 5
 	}
 
-	// Setup weights
-	items := make([]any, 0)
-	weights := make([]float32, 0)
-	if lower {
-		items = append(items, "l")
-		weights = append(weights, 4)
-	}
-	if upper {
-		items = append(items, "u")
-		weights = append(weights, 4)
-	}
-	if numeric {
-		items = append(items, "n")
-		weights = append(weights, 3)
-	}
-	if special {
-		items = append(items, "e")
-		weights = append(weights, 2)
-	}
-	if space {
-		items = append(items, "a")
-		weights = append(weights, 1)
+	// Character group types and defaults
+	// Each group has a weight for random selection; non-space groups are used for guaranteed slots.
+	type charGroup struct {
+		chars   string
+		weight  int
+		isSpace bool
 	}
 
-	// If no items are selected then default to lower, upper, numeric
-	if len(items) == 0 {
-		items = append(items, "l", "u", "n")
-		weights = append(weights, 4, 4, 3)
+	defaultNonSpace := [...]charGroup{
+		{chars: lowerStr, weight: 4},
+		{chars: upperStr, weight: 4},
+		{chars: numericStr, weight: 3},
 	}
+	const defaultNonSpaceWeight = 4 + 4 + 3
 
-	// Create byte slice
-	b := make([]byte, num)
+	var (
+		activeBuf      [5]charGroup
+		nonSpaceBuf    [5]charGroup
+		active         []charGroup // all enabled groups (used for random fill)
+		totalWeight    int
+		nonSpace       []charGroup // enabled groups excluding space (for guaranteed slots and edge fixes)
+		nonSpaceWeight int
+	)
 
-	for i := 0; i <= num-1; i++ {
-		// Run weighted
-		weight, _ := weighted(f, items, weights)
-
-		switch weight.(string) {
-		case "l":
-			b[i] = lowerStr[f.Int64()%int64(len(lowerStr))]
-		case "u":
-			b[i] = upperStr[f.Int64()%int64(len(upperStr))]
-		case "n":
-			b[i] = numericStr[f.Int64()%int64(len(numericStr))]
-		case "e":
-			b[i] = specialSafeStr[f.Int64()%int64(len(specialSafeStr))]
-		case "a":
-			b[i] = spaceStr[f.Int64()%int64(len(spaceStr))]
+	// Build active character sets from enabled options
+	appendGroup := func(enabled bool, chars string, weight int, isSpace bool) {
+		if !enabled {
+			return
+		}
+		active = append(active, charGroup{chars: chars, weight: weight, isSpace: isSpace})
+		totalWeight += weight
+		if !isSpace {
+			nonSpace = append(nonSpace, charGroup{chars: chars, weight: weight})
+			nonSpaceWeight += weight
 		}
 	}
 
-	// Shuffle bytes
+	active = activeBuf[:0]
+	nonSpace = nonSpaceBuf[:0]
+	appendGroup(lower, lowerStr, 4, false)
+	appendGroup(upper, upperStr, 4, false)
+	appendGroup(numeric, numericStr, 3, false)
+	appendGroup(special, specialSafeStr, 2, false)
+	appendGroup(space, spaceStr, 1, true)
+
+	// Fallbacks when nothing or only space is selected
+	if len(active) == 0 {
+		active = defaultNonSpace[:]
+		totalWeight = defaultNonSpaceWeight
+		nonSpace = active
+		nonSpaceWeight = totalWeight
+	} else if nonSpaceWeight == 0 {
+		nonSpace = defaultNonSpace[:]
+		nonSpaceWeight = defaultNonSpaceWeight
+	}
+
+	// Helper: draw one random character from a weighted set of groups
+	draw := func(groups []charGroup, total int) byte {
+		if total <= 0 {
+			groups = defaultNonSpace[:]
+			total = defaultNonSpaceWeight
+		}
+
+		r := f.IntN(total)
+		for _, g := range groups {
+			if r < g.weight {
+				return g.chars[f.IntN(len(g.chars))]
+			}
+			r -= g.weight
+		}
+
+		// Should never be reached, but fall back to the last group just in case.
+		g := groups[len(groups)-1]
+		return g.chars[f.IntN(len(g.chars))]
+	}
+
+	// Guaranteed slots: one character from each enabled set
+	// First slots: one from each enabled non-space group. Then one space if space is enabled.
+	b := make([]byte, num)
+	end := len(nonSpace)
+	for i, g := range nonSpace {
+		b[i] = g.chars[f.IntN(len(g.chars))]
+	}
+	if space {
+		b[end] = ' '
+		end++
+	}
+
+	// Fill remaining positions randomly from all active groups
+	for i := end; i < num; i++ {
+		b[i] = draw(active, totalWeight)
+	}
+
+	// Shuffle so guaranteed characters are not in fixed positions
 	for i := range b {
 		j := f.IntN(i + 1)
 		b[i], b[j] = b[j], b[i]
 	}
 
-	// Replace first or last character if it's a space, and other options are available
+	// Ensure password does not start or end with a space
+	// Swap with an interior non-space so we keep one space in the password; fallback to overwrite if no interior non-space.
 	if b[0] == ' ' {
-		b[0] = password(f, lower, upper, numeric, special, false, 1)[0]
+		for i := 1; i < len(b)-1; i++ {
+			if b[i] != ' ' {
+				b[0], b[i] = b[i], b[0]
+				break
+			}
+		}
+		if b[0] == ' ' {
+			b[0] = draw(nonSpace, nonSpaceWeight)
+		}
 	}
 	if b[len(b)-1] == ' ' {
-		b[len(b)-1] = password(f, lower, upper, numeric, special, false, 1)[0]
+		for i := len(b) - 2; i >= 1; i-- {
+			if b[i] != ' ' {
+				b[len(b)-1], b[i] = b[i], b[len(b)-1]
+				break
+			}
+		}
+		if b[len(b)-1] == ' ' {
+			b[len(b)-1] = draw(nonSpace, nonSpaceWeight)
+		}
 	}
 
 	return string(b)
@@ -107,6 +172,18 @@ func addAuthLookup() {
 		Description: "Unique identifier assigned to a user for accessing an account or system",
 		Example:     "Daniel1364",
 		Output:      "string",
+		Aliases: []string{
+			"user name",
+			"login name",
+			"account username",
+			"account login",
+			"screen name",
+			"user handle",
+		},
+		Keywords: []string{
+			"login", "handle", "userid", "screenname",
+			"user", "account", "credential", "signin", "alias", "profile", "uid",
+		},
 		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
 			return username(f), nil
 		},
@@ -118,6 +195,19 @@ func addAuthLookup() {
 		Description: "Secret word or phrase used to authenticate access to a system or account",
 		Example:     "EEP+wwpk 4lU-eHNXlJZ4n K9%v&TZ9e",
 		Output:      "string",
+		Aliases: []string{
+			"user password",
+			"account password",
+			"login password",
+			"secret phrase",
+			"auth secret",
+		},
+		Keywords: []string{
+			"passphrase", "pwd", "secret",
+			"credential", "authentication", "auth",
+			"security", "signin", "login",
+			"access", "key", "token", "hash", "encryption",
+		},
 		Params: []Param{
 			{Field: "lower", Display: "Lower", Type: "bool", Default: "true", Description: "Whether or not to add lower case characters"},
 			{Field: "upper", Display: "Upper", Type: "bool", Default: "true", Description: "Whether or not to add upper case characters"},

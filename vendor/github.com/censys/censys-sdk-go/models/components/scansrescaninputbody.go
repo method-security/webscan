@@ -16,18 +16,29 @@ type TargetWebOrigin struct {
 	Port int `json:"port"`
 }
 
-func (o *TargetWebOrigin) GetHostname() string {
-	if o == nil {
-		return ""
-	}
-	return o.Hostname
+func (t TargetWebOrigin) MarshalJSON() ([]byte, error) {
+	return utils.MarshalJSON(t, "", false)
 }
 
-func (o *TargetWebOrigin) GetPort() int {
-	if o == nil {
+func (t *TargetWebOrigin) UnmarshalJSON(data []byte) error {
+	if err := utils.UnmarshalJSON(data, &t, "", false, nil); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (t *TargetWebOrigin) GetHostname() string {
+	if t == nil {
+		return ""
+	}
+	return t.Hostname
+}
+
+func (t *TargetWebOrigin) GetPort() int {
+	if t == nil {
 		return 0
 	}
-	return o.Port
+	return t.Port
 }
 
 // Two - Rescan of known web property
@@ -35,11 +46,22 @@ type Two struct {
 	WebOrigin TargetWebOrigin `json:"web_origin"`
 }
 
-func (o *Two) GetWebOrigin() TargetWebOrigin {
-	if o == nil {
+func (t Two) MarshalJSON() ([]byte, error) {
+	return utils.MarshalJSON(t, "", false)
+}
+
+func (t *Two) UnmarshalJSON(data []byte) error {
+	if err := utils.UnmarshalJSON(data, &t, "", false, nil); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (t *Two) GetWebOrigin() TargetWebOrigin {
+	if t == nil {
 		return TargetWebOrigin{}
 	}
-	return o.WebOrigin
+	return t.WebOrigin
 }
 
 type TargetTransportProtocol string
@@ -87,37 +109,59 @@ type TargetServiceID struct {
 	TransportProtocol TargetTransportProtocol `json:"transport_protocol"`
 }
 
-func (o *TargetServiceID) GetIP() string {
-	if o == nil {
-		return ""
-	}
-	return o.IP
+func (t TargetServiceID) MarshalJSON() ([]byte, error) {
+	return utils.MarshalJSON(t, "", false)
 }
 
-func (o *TargetServiceID) GetPort() int {
-	if o == nil {
+func (t *TargetServiceID) UnmarshalJSON(data []byte) error {
+	if err := utils.UnmarshalJSON(data, &t, "", false, nil); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (t *TargetServiceID) GetIP() string {
+	if t == nil {
+		return ""
+	}
+	return t.IP
+}
+
+func (t *TargetServiceID) GetPort() int {
+	if t == nil {
 		return 0
 	}
-	return o.Port
+	return t.Port
 }
 
-func (o *TargetServiceID) GetProtocol() string {
-	if o == nil {
+func (t *TargetServiceID) GetProtocol() string {
+	if t == nil {
 		return ""
 	}
-	return o.Protocol
+	return t.Protocol
 }
 
-func (o *TargetServiceID) GetTransportProtocol() TargetTransportProtocol {
-	if o == nil {
+func (t *TargetServiceID) GetTransportProtocol() TargetTransportProtocol {
+	if t == nil {
 		return TargetTransportProtocol("")
 	}
-	return o.TransportProtocol
+	return t.TransportProtocol
 }
 
 // One - Rescan of known service
 type One struct {
 	ServiceID TargetServiceID `json:"service_id"`
+}
+
+func (o One) MarshalJSON() ([]byte, error) {
+	return utils.MarshalJSON(o, "", false)
+}
+
+func (o *One) UnmarshalJSON(data []byte) error {
+	if err := utils.UnmarshalJSON(data, &o, "", false, nil); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (o *One) GetServiceID() TargetServiceID {
@@ -135,8 +179,8 @@ const (
 )
 
 type ScansRescanInputBodyTarget struct {
-	One *One `queryParam:"inline"`
-	Two *Two `queryParam:"inline"`
+	One *One `queryParam:"inline" union:"member"`
+	Two *Two `queryParam:"inline" union:"member"`
 
 	Type ScansRescanInputBodyTargetType
 }
@@ -161,17 +205,43 @@ func CreateScansRescanInputBodyTargetTwo(two Two) ScansRescanInputBodyTarget {
 
 func (u *ScansRescanInputBodyTarget) UnmarshalJSON(data []byte) error {
 
+	var candidates []utils.UnionCandidate
+
+	// Collect all valid candidates
 	var one One = One{}
-	if err := utils.UnmarshalJSON(data, &one, "", true, true); err == nil {
-		u.One = &one
-		u.Type = ScansRescanInputBodyTargetTypeOne
-		return nil
+	if err := utils.UnmarshalJSON(data, &one, "", true, nil); err == nil {
+		candidates = append(candidates, utils.UnionCandidate{
+			Type:  ScansRescanInputBodyTargetTypeOne,
+			Value: &one,
+		})
 	}
 
 	var two Two = Two{}
-	if err := utils.UnmarshalJSON(data, &two, "", true, true); err == nil {
-		u.Two = &two
-		u.Type = ScansRescanInputBodyTargetTypeTwo
+	if err := utils.UnmarshalJSON(data, &two, "", true, nil); err == nil {
+		candidates = append(candidates, utils.UnionCandidate{
+			Type:  ScansRescanInputBodyTargetTypeTwo,
+			Value: &two,
+		})
+	}
+
+	if len(candidates) == 0 {
+		return fmt.Errorf("could not unmarshal `%s` into any supported union types for ScansRescanInputBodyTarget", string(data))
+	}
+
+	// Pick the best candidate using multi-stage filtering
+	best := utils.PickBestUnionCandidate(candidates, data)
+	if best == nil {
+		return fmt.Errorf("could not unmarshal `%s` into any supported union types for ScansRescanInputBodyTarget", string(data))
+	}
+
+	// Set the union type and value based on the best candidate
+	u.Type = best.Type.(ScansRescanInputBodyTargetType)
+	switch best.Type {
+	case ScansRescanInputBodyTargetTypeOne:
+		u.One = best.Value.(*One)
+		return nil
+	case ScansRescanInputBodyTargetTypeTwo:
+		u.Two = best.Value.(*Two)
 		return nil
 	}
 
@@ -194,9 +264,9 @@ type ScansRescanInputBody struct {
 	Target ScansRescanInputBodyTarget `json:"target"`
 }
 
-func (o *ScansRescanInputBody) GetTarget() ScansRescanInputBodyTarget {
-	if o == nil {
+func (s *ScansRescanInputBody) GetTarget() ScansRescanInputBodyTarget {
+	if s == nil {
 		return ScansRescanInputBodyTarget{}
 	}
-	return o.Target
+	return s.Target
 }

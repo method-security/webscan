@@ -2,11 +2,6 @@
 
 package components
 
-import (
-	"encoding/json"
-	"fmt"
-)
-
 type RepresentativeInfoReason string
 
 const (
@@ -19,24 +14,16 @@ const (
 func (e RepresentativeInfoReason) ToPointer() *RepresentativeInfoReason {
 	return &e
 }
-func (e *RepresentativeInfoReason) UnmarshalJSON(data []byte) error {
-	var v string
-	if err := json.Unmarshal(data, &v); err != nil {
-		return err
+
+// IsExact returns true if the value matches a known enum value, false otherwise.
+func (e *RepresentativeInfoReason) IsExact() bool {
+	if e != nil {
+		switch *e {
+		case "", "protocol_port_count", "incapsula", "zscaler":
+			return true
+		}
 	}
-	switch v {
-	case "":
-		fallthrough
-	case "protocol_port_count":
-		fallthrough
-	case "incapsula":
-		fallthrough
-	case "zscaler":
-		*e = RepresentativeInfoReason(v)
-		return nil
-	default:
-		return fmt.Errorf("invalid value for RepresentativeInfoReason: %v", v)
-	}
+	return false
 }
 
 type RepresentativeInfo struct {
@@ -46,30 +33,30 @@ type RepresentativeInfo struct {
 	SampledPort      *int                      `json:"sampled_port,omitempty"`
 }
 
-func (o *RepresentativeInfo) GetExcludedPorts() []int {
-	if o == nil {
+func (r *RepresentativeInfo) GetExcludedPorts() []int {
+	if r == nil {
 		return nil
 	}
-	return o.ExcludedPorts
+	return r.ExcludedPorts
 }
 
-func (o *RepresentativeInfo) GetReason() *RepresentativeInfoReason {
-	if o == nil {
+func (r *RepresentativeInfo) GetReason() *RepresentativeInfoReason {
+	if r == nil {
 		return nil
 	}
-	return o.Reason
+	return r.Reason
 }
 
-func (o *RepresentativeInfo) GetRepresentedPorts() []int {
-	if o == nil {
+func (r *RepresentativeInfo) GetRepresentedPorts() []int {
+	if r == nil {
 		return nil
 	}
-	return o.RepresentedPorts
+	return r.RepresentedPorts
 }
 
-func (o *RepresentativeInfo) GetSampledPort() *int {
-	if o == nil {
+func (r *RepresentativeInfo) GetSampledPort() *int {
+	if r == nil {
 		return nil
 	}
-	return o.SampledPort
+	return r.SampledPort
 }

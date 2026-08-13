@@ -3,8 +3,6 @@
 package components
 
 import (
-	"encoding/json"
-	"fmt"
 	"github.com/censys/censys-sdk-go/internal/utils"
 	"time"
 )
@@ -22,26 +20,16 @@ const (
 func (e CollectionStatus) ToPointer() *CollectionStatus {
 	return &e
 }
-func (e *CollectionStatus) UnmarshalJSON(data []byte) error {
-	var v string
-	if err := json.Unmarshal(data, &v); err != nil {
-		return err
+
+// IsExact returns true if the value matches a known enum value, false otherwise.
+func (e *CollectionStatus) IsExact() bool {
+	if e != nil {
+		switch *e {
+		case "unspecified", "populating", "active", "paused", "archived":
+			return true
+		}
 	}
-	switch v {
-	case "unspecified":
-		fallthrough
-	case "populating":
-		fallthrough
-	case "active":
-		fallthrough
-	case "paused":
-		fallthrough
-	case "archived":
-		*e = CollectionStatus(v)
-		return nil
-	default:
-		return fmt.Errorf("invalid value for CollectionStatus: %v", v)
-	}
+	return false
 }
 
 type StatusReason string
@@ -59,35 +47,23 @@ const (
 func (e StatusReason) ToPointer() *StatusReason {
 	return &e
 }
-func (e *StatusReason) UnmarshalJSON(data []byte) error {
-	var v string
-	if err := json.Unmarshal(data, &v); err != nil {
-		return err
+
+// IsExact returns true if the value matches a known enum value, false otherwise.
+func (e *StatusReason) IsExact() bool {
+	if e != nil {
+		switch *e {
+		case "unspecified", "not_enough_credits", "not_entitled", "too_many_assets", "manual", "query_changed", "initial":
+			return true
+		}
 	}
-	switch v {
-	case "unspecified":
-		fallthrough
-	case "not_enough_credits":
-		fallthrough
-	case "not_entitled":
-		fallthrough
-	case "too_many_assets":
-		fallthrough
-	case "manual":
-		fallthrough
-	case "query_changed":
-		fallthrough
-	case "initial":
-		*e = StatusReason(v)
-		return nil
-	default:
-		return fmt.Errorf("invalid value for StatusReason: %v", v)
-	}
+	return false
 }
 
 type Collection struct {
-	AddedAssets24Hours   int64            `json:"added_assets_24_hours"`
-	CreateTime           time.Time        `json:"create_time"`
+	AddedAssets24Hours int64     `json:"added_assets_24_hours"`
+	CreateTime         time.Time `json:"create_time"`
+	// The ID of a Censys user who created the collection.
+	CreatedBy            *string          `json:"created_by,omitempty"`
 	Description          string           `json:"description"`
 	ID                   string           `json:"id"`
 	Name                 string           `json:"name"`
@@ -103,78 +79,85 @@ func (c Collection) MarshalJSON() ([]byte, error) {
 }
 
 func (c *Collection) UnmarshalJSON(data []byte) error {
-	if err := utils.UnmarshalJSON(data, &c, "", false, false); err != nil {
+	if err := utils.UnmarshalJSON(data, &c, "", false, nil); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (o *Collection) GetAddedAssets24Hours() int64 {
-	if o == nil {
+func (c *Collection) GetAddedAssets24Hours() int64 {
+	if c == nil {
 		return 0
 	}
-	return o.AddedAssets24Hours
+	return c.AddedAssets24Hours
 }
 
-func (o *Collection) GetCreateTime() time.Time {
-	if o == nil {
+func (c *Collection) GetCreateTime() time.Time {
+	if c == nil {
 		return time.Time{}
 	}
-	return o.CreateTime
+	return c.CreateTime
 }
 
-func (o *Collection) GetDescription() string {
-	if o == nil {
-		return ""
-	}
-	return o.Description
-}
-
-func (o *Collection) GetID() string {
-	if o == nil {
-		return ""
-	}
-	return o.ID
-}
-
-func (o *Collection) GetName() string {
-	if o == nil {
-		return ""
-	}
-	return o.Name
-}
-
-func (o *Collection) GetQuery() string {
-	if o == nil {
-		return ""
-	}
-	return o.Query
-}
-
-func (o *Collection) GetRemovedAssets24Hours() int64 {
-	if o == nil {
-		return 0
-	}
-	return o.RemovedAssets24Hours
-}
-
-func (o *Collection) GetStatus() CollectionStatus {
-	if o == nil {
-		return CollectionStatus("")
-	}
-	return o.Status
-}
-
-func (o *Collection) GetStatusReason() *StatusReason {
-	if o == nil {
+func (c *Collection) GetCreatedBy() *string {
+	if c == nil {
 		return nil
 	}
-	return o.StatusReason
+	return c.CreatedBy
 }
 
-func (o *Collection) GetTotalAssets() int64 {
-	if o == nil {
+func (c *Collection) GetDescription() string {
+	if c == nil {
+		return ""
+	}
+	return c.Description
+}
+
+func (c *Collection) GetID() string {
+	if c == nil {
+		return ""
+	}
+	return c.ID
+}
+
+func (c *Collection) GetName() string {
+	if c == nil {
+		return ""
+	}
+	return c.Name
+}
+
+func (c *Collection) GetQuery() string {
+	if c == nil {
+		return ""
+	}
+	return c.Query
+}
+
+func (c *Collection) GetRemovedAssets24Hours() int64 {
+	if c == nil {
 		return 0
 	}
-	return o.TotalAssets
+	return c.RemovedAssets24Hours
+}
+
+func (c *Collection) GetStatus() CollectionStatus {
+	if c == nil {
+		return CollectionStatus("")
+	}
+	return c.Status
+}
+
+func (c *Collection) GetStatusReason() *StatusReason {
+	if c == nil {
+		return nil
+	}
+	return c.StatusReason
+}
+
+func (c *Collection) GetTotalAssets() int64 {
+	if c == nil {
+		return 0
+	}
+	return c.TotalAssets
 }

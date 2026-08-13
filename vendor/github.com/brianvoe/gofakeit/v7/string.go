@@ -124,6 +124,12 @@ func addStringLookup() {
 		Description: "Character or symbol from the American Standard Code for Information Interchange (ASCII) character set",
 		Example:     "g",
 		Output:      "string",
+		Aliases: []string{
+			"alphabet", "character", "text symbol", "ascii char", "alphabetical sign",
+		},
+		Keywords: []string{
+			"standard", "code", "information", "interchange", "set", "printable", "typography", "symbolic", "encoding",
+		},
 		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
 			return letter(f), nil
 		},
@@ -135,6 +141,12 @@ func addStringLookup() {
 		Description: "ASCII string with length N",
 		Example:     "gbRMaRxHki",
 		Output:      "string",
+		Aliases: []string{
+			"random letters", "ascii string", "text sequence", "generated letters", "alphabetical string",
+		},
+		Keywords: []string{
+			"sequence", "multiple", "concatenated", "combined", "series", "generated", "batch", "collection",
+		},
 		Params: []Param{
 			{Field: "count", Display: "Count", Type: "uint", Description: "Number of digits to generate"},
 		},
@@ -154,6 +166,12 @@ func addStringLookup() {
 		Description: "Speech sound produced with an open vocal tract",
 		Example:     "a",
 		Output:      "string",
+		Aliases: []string{
+			"vocal sound", "speech letter", "phonetic vowel", "linguistic vowel", "spoken sound",
+		},
+		Keywords: []string{
+			"open", "e", "i", "o", "u", "phonetic", "linguistic", "articulation", "pronunciation", "syllable",
+		},
 		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
 			return vowel(f), nil
 		},
@@ -165,6 +183,12 @@ func addStringLookup() {
 		Description: "Numerical symbol used to represent numbers",
 		Example:     "0",
 		Output:      "string",
+		Aliases: []string{
+			"number symbol", "numeric character", "decimal digit", "ascii number", "numerical sign",
+		},
+		Keywords: []string{
+			"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "decimal", "base10", "notation", "numeric",
+		},
 		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
 			return digit(f), nil
 		},
@@ -173,9 +197,15 @@ func addStringLookup() {
 	AddFuncLookup("digitn", Info{
 		Display:     "DigitN",
 		Category:    "string",
-		Description: "string of length N consisting of ASCII digits",
+		Description: "String of length N consisting of ASCII digits",
 		Example:     "0136459948",
 		Output:      "string",
+		Aliases: []string{
+			"numeric string", "digit sequence", "number series", "generated digits", "ascii digits",
+		},
+		Keywords: []string{
+			"consisting", "multiple", "concatenated", "combined", "series", "numeric", "sequence", "continuous", "string", "digits",
+		},
 		Params: []Param{
 			{Field: "count", Display: "Count", Type: "uint", Description: "Number of digits to generate"},
 		},
@@ -195,6 +225,12 @@ func addStringLookup() {
 		Description: "Replace # with random numerical values",
 		Example:     "(###)###-#### => (555)867-5309",
 		Output:      "string",
+		Aliases: []string{
+			"hash replace", "number substitute", "pattern filler", "digit replacer", "placeholder numbers",
+		},
+		Keywords: []string{
+			"replace", "hash", "pound", "template", "placeholder", "format", "substitute", "pattern", "randomize", "masking",
+		},
 		Params: []Param{
 			{Field: "str", Display: "String", Type: "string", Description: "String value to replace #'s"},
 		},
@@ -214,6 +250,12 @@ func addStringLookup() {
 		Description: "Replace ? with random generated letters",
 		Example:     "?????@??????.com => billy@mister.com",
 		Output:      "string",
+		Aliases: []string{
+			"letter substitute", "pattern letters", "placeholder letters", "random letter filler", "character replacer",
+		},
+		Keywords: []string{
+			"replace", "question", "mark", "template", "placeholder", "format", "substitute", "pattern", "randomize", "masking",
+		},
 		Params: []Param{
 			{Field: "str", Display: "String", Type: "string", Description: "String value to replace ?'s"},
 		},
@@ -234,6 +276,12 @@ func addStringLookup() {
 		Example:     "hello,world,whats,up => whats,world,hello,up",
 		Output:      "[]string",
 		ContentType: "application/json",
+		Aliases: []string{
+			"array shuffle", "list randomize", "string reorder", "string mixer", "sequence shuffle",
+		},
+		Keywords: []string{
+			"collection", "list", "slice", "permutation", "randomized", "scrambled", "jumbled", "unordered",
+		},
 		Params: []Param{
 			{Field: "strs", Display: "Strings", Type: "[]string", Description: "Delimited separated strings"},
 		},
@@ -254,7 +302,13 @@ func addStringLookup() {
 		Category:    "string",
 		Description: "Return a random string from a string array",
 		Example:     "hello,world,whats,up => world",
-		Output:      "[]string",
+		Output:      "string",
+		Aliases: []string{
+			"string picker", "array choice", "string select", "random pick", "string chooser",
+		},
+		Keywords: []string{
+			"selection", "chosen", "picked", "random", "list", "slice", "array", "choice", "element", "option",
+		},
 		Params: []Param{
 			{Field: "strs", Display: "Strings", Type: "[]string", Description: "Delimited separated strings"},
 		},
@@ -267,4 +321,5 @@ func addStringLookup() {
 			return randomString(f, strs), nil
 		},
 	})
+
 }

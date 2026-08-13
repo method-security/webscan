@@ -4,51 +4,51 @@ package components
 
 type ElasticSearchResultsNodeInfoClusterCombinedInfoFilesystem struct {
 	Available        *string `json:"available,omitempty"`
-	AvailableInBytes *int    `json:"available_in_bytes,omitempty"`
+	AvailableInBytes *int64  `json:"available_in_bytes,omitempty"`
 	Free             *string `json:"free,omitempty"`
-	FreeInBytes      *int    `json:"free_in_bytes,omitempty"`
+	FreeInBytes      *int64  `json:"free_in_bytes,omitempty"`
 	Total            *string `json:"total,omitempty"`
-	TotalInBytes     *int    `json:"total_in_bytes,omitempty"`
+	TotalInBytes     *int64  `json:"total_in_bytes,omitempty"`
 }
 
-func (o *ElasticSearchResultsNodeInfoClusterCombinedInfoFilesystem) GetAvailable() *string {
-	if o == nil {
+func (e *ElasticSearchResultsNodeInfoClusterCombinedInfoFilesystem) GetAvailable() *string {
+	if e == nil {
 		return nil
 	}
-	return o.Available
+	return e.Available
 }
 
-func (o *ElasticSearchResultsNodeInfoClusterCombinedInfoFilesystem) GetAvailableInBytes() *int {
-	if o == nil {
+func (e *ElasticSearchResultsNodeInfoClusterCombinedInfoFilesystem) GetAvailableInBytes() *int64 {
+	if e == nil {
 		return nil
 	}
-	return o.AvailableInBytes
+	return e.AvailableInBytes
 }
 
-func (o *ElasticSearchResultsNodeInfoClusterCombinedInfoFilesystem) GetFree() *string {
-	if o == nil {
+func (e *ElasticSearchResultsNodeInfoClusterCombinedInfoFilesystem) GetFree() *string {
+	if e == nil {
 		return nil
 	}
-	return o.Free
+	return e.Free
 }
 
-func (o *ElasticSearchResultsNodeInfoClusterCombinedInfoFilesystem) GetFreeInBytes() *int {
-	if o == nil {
+func (e *ElasticSearchResultsNodeInfoClusterCombinedInfoFilesystem) GetFreeInBytes() *int64 {
+	if e == nil {
 		return nil
 	}
-	return o.FreeInBytes
+	return e.FreeInBytes
 }
 
-func (o *ElasticSearchResultsNodeInfoClusterCombinedInfoFilesystem) GetTotal() *string {
-	if o == nil {
+func (e *ElasticSearchResultsNodeInfoClusterCombinedInfoFilesystem) GetTotal() *string {
+	if e == nil {
 		return nil
 	}
-	return o.Total
+	return e.Total
 }
 
-func (o *ElasticSearchResultsNodeInfoClusterCombinedInfoFilesystem) GetTotalInBytes() *int {
-	if o == nil {
+func (e *ElasticSearchResultsNodeInfoClusterCombinedInfoFilesystem) GetTotalInBytes() *int64 {
+	if e == nil {
 		return nil
 	}
-	return o.TotalInBytes
+	return e.TotalInBytes
 }

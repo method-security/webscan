@@ -79,7 +79,7 @@ func jsonFunc(f *Faker, jo *JSONOptions) ([]byte, error) {
 		return nil, errors.New("invalid type, must be array or object")
 	}
 
-	if jo.Fields == nil || len(jo.Fields) <= 0 {
+	if len(jo.Fields) <= 0 {
 		return nil, errors.New("must pass fields in order to build json object(s)")
 	}
 
@@ -201,6 +201,8 @@ func addFileJSONLookup() {
 		]`,
 		Output:      "[]byte",
 		ContentType: "application/json",
+		Aliases:     []string{"data", "interchange", "structured", "format", "serialization", "api"},
+		Keywords:    []string{"object", "array", "fields", "indent", "rowcount", "type", "serialize", "deserialize", "marshal", "unmarshal"},
 		Params: []Param{
 			{Field: "type", Display: "Type", Type: "string", Default: "object", Options: []string{"object", "array"}, Description: "Type of JSON, object or array"},
 			{Field: "rowcount", Display: "Row Count", Type: "int", Default: "100", Description: "Number of rows in JSON array"},

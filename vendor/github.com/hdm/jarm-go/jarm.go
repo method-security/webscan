@@ -453,7 +453,7 @@ func ExtractExtensionInfo(data []byte, offset int, serverHelloLength int) string
 
 // ExtractExtensionType returns the stringified value of a given extension type
 func ExtractExtensionType(ext []byte, etypes [][]byte, evals [][]byte) string {
-	for i := 0; i < len(etypes); i++ {
+	for i := range etypes {
 		if !bytes.Equal(ext, etypes[i]) {
 			continue
 		}
@@ -482,7 +482,7 @@ func RawHashToFuzzyHash(raw string) string {
 	}
 	fhash := ""
 	alpex := ""
-	for _, handshake := range strings.Split(raw, ",") {
+	for handshake := range strings.SplitSeq(raw, ",") {
 		comp := strings.Split(handshake, "|")
 		if len(comp) != 4 {
 			return ZeroHash

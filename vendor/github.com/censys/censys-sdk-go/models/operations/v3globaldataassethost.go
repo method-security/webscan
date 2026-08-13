@@ -12,15 +12,18 @@ type V3GlobaldataAssetHostGlobals struct {
 	OrganizationID *string `queryParam:"style=form,explode=true,name=organization_id"`
 }
 
-func (o *V3GlobaldataAssetHostGlobals) GetOrganizationID() *string {
-	if o == nil {
+func (v *V3GlobaldataAssetHostGlobals) GetOrganizationID() *string {
+	if v == nil {
 		return nil
 	}
-	return o.OrganizationID
+	return v.OrganizationID
 }
 
+// #region class-body-v3globaldataassethostglobals
+// #endregion class-body-v3globaldataassethostglobals
+
 type V3GlobaldataAssetHostRequest struct {
-	// The ID of a Censys organization to associate the request with. See the [Getting Started docs](https://docs.censys.com/reference/get-started#step-3-set-your-organization-id) for more information.
+	// The ID of a Censys organization to associate the request with. If omitted, the request will be processed using the authenticated user's free wallet where applicable. See the [Getting Started docs](https://docs.censys.com/reference/get-started#step-3-find-and-use-your-organization-id-optional) for more information.
 	OrganizationID *string `queryParam:"style=form,explode=false,name=organization_id"`
 	// The IP address of a host.
 	HostID string `pathParam:"style=simple,explode=false,name=host_id"`
@@ -33,32 +36,35 @@ func (v V3GlobaldataAssetHostRequest) MarshalJSON() ([]byte, error) {
 }
 
 func (v *V3GlobaldataAssetHostRequest) UnmarshalJSON(data []byte) error {
-	if err := utils.UnmarshalJSON(data, &v, "", false, false); err != nil {
+	if err := utils.UnmarshalJSON(data, &v, "", false, nil); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (o *V3GlobaldataAssetHostRequest) GetOrganizationID() *string {
-	if o == nil {
+func (v *V3GlobaldataAssetHostRequest) GetOrganizationID() *string {
+	if v == nil {
 		return nil
 	}
-	return o.OrganizationID
+	return v.OrganizationID
 }
 
-func (o *V3GlobaldataAssetHostRequest) GetHostID() string {
-	if o == nil {
+func (v *V3GlobaldataAssetHostRequest) GetHostID() string {
+	if v == nil {
 		return ""
 	}
-	return o.HostID
+	return v.HostID
 }
 
-func (o *V3GlobaldataAssetHostRequest) GetAtTime() *time.Time {
-	if o == nil {
+func (v *V3GlobaldataAssetHostRequest) GetAtTime() *time.Time {
+	if v == nil {
 		return nil
 	}
-	return o.AtTime
+	return v.AtTime
 }
+
+// #region class-body-v3globaldataassethostrequest
+// #endregion class-body-v3globaldataassethostrequest
 
 type V3GlobaldataAssetHostResponse struct {
 	HTTPMeta components.HTTPMetadata `json:"-"`
@@ -67,23 +73,26 @@ type V3GlobaldataAssetHostResponse struct {
 	Headers                   map[string][]string
 }
 
-func (o *V3GlobaldataAssetHostResponse) GetHTTPMeta() components.HTTPMetadata {
-	if o == nil {
+func (v *V3GlobaldataAssetHostResponse) GetHTTPMeta() components.HTTPMetadata {
+	if v == nil {
 		return components.HTTPMetadata{}
 	}
-	return o.HTTPMeta
+	return v.HTTPMeta
 }
 
-func (o *V3GlobaldataAssetHostResponse) GetResponseEnvelopeHostAsset() *components.ResponseEnvelopeHostAsset {
-	if o == nil {
+func (v *V3GlobaldataAssetHostResponse) GetResponseEnvelopeHostAsset() *components.ResponseEnvelopeHostAsset {
+	if v == nil {
 		return nil
 	}
-	return o.ResponseEnvelopeHostAsset
+	return v.ResponseEnvelopeHostAsset
 }
 
-func (o *V3GlobaldataAssetHostResponse) GetHeaders() map[string][]string {
-	if o == nil {
+func (v *V3GlobaldataAssetHostResponse) GetHeaders() map[string][]string {
+	if v == nil {
 		return map[string][]string{}
 	}
-	return o.Headers
+	return v.Headers
 }
+
+// #region class-body-v3globaldataassethostresponse
+// #endregion class-body-v3globaldataassethostresponse

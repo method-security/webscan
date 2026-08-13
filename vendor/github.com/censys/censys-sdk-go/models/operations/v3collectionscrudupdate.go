@@ -10,41 +10,47 @@ type V3CollectionsCrudUpdateGlobals struct {
 	OrganizationID *string `queryParam:"style=form,explode=true,name=organization_id"`
 }
 
-func (o *V3CollectionsCrudUpdateGlobals) GetOrganizationID() *string {
-	if o == nil {
+func (v *V3CollectionsCrudUpdateGlobals) GetOrganizationID() *string {
+	if v == nil {
 		return nil
 	}
-	return o.OrganizationID
+	return v.OrganizationID
 }
 
+// #region class-body-v3collectionscrudupdateglobals
+// #endregion class-body-v3collectionscrudupdateglobals
+
 type V3CollectionsCrudUpdateRequest struct {
-	// The ID of a Censys organization to associate the request with. See the [Getting Started docs](https://docs.censys.com/reference/get-started#step-3-set-your-organization-id) for more information.
+	// The ID of a Censys organization to associate the request with. See the [Getting Started docs](https://docs.censys.com/reference/get-started#step-3-find-and-use-your-organization-id-optional) for more information.
 	OrganizationID *string `queryParam:"style=form,explode=false,name=organization_id"`
 	// The UID for the collection
 	CollectionUID       string                          `pathParam:"style=simple,explode=false,name=collection_uid"`
 	CrudUpdateInputBody *components.CrudUpdateInputBody `request:"mediaType=application/json"`
 }
 
-func (o *V3CollectionsCrudUpdateRequest) GetOrganizationID() *string {
-	if o == nil {
+func (v *V3CollectionsCrudUpdateRequest) GetOrganizationID() *string {
+	if v == nil {
 		return nil
 	}
-	return o.OrganizationID
+	return v.OrganizationID
 }
 
-func (o *V3CollectionsCrudUpdateRequest) GetCollectionUID() string {
-	if o == nil {
+func (v *V3CollectionsCrudUpdateRequest) GetCollectionUID() string {
+	if v == nil {
 		return ""
 	}
-	return o.CollectionUID
+	return v.CollectionUID
 }
 
-func (o *V3CollectionsCrudUpdateRequest) GetCrudUpdateInputBody() *components.CrudUpdateInputBody {
-	if o == nil {
+func (v *V3CollectionsCrudUpdateRequest) GetCrudUpdateInputBody() *components.CrudUpdateInputBody {
+	if v == nil {
 		return nil
 	}
-	return o.CrudUpdateInputBody
+	return v.CrudUpdateInputBody
 }
+
+// #region class-body-v3collectionscrudupdaterequest
+// #endregion class-body-v3collectionscrudupdaterequest
 
 type V3CollectionsCrudUpdateResponse struct {
 	HTTPMeta components.HTTPMetadata `json:"-"`
@@ -53,23 +59,26 @@ type V3CollectionsCrudUpdateResponse struct {
 	Headers                    map[string][]string
 }
 
-func (o *V3CollectionsCrudUpdateResponse) GetHTTPMeta() components.HTTPMetadata {
-	if o == nil {
+func (v *V3CollectionsCrudUpdateResponse) GetHTTPMeta() components.HTTPMetadata {
+	if v == nil {
 		return components.HTTPMetadata{}
 	}
-	return o.HTTPMeta
+	return v.HTTPMeta
 }
 
-func (o *V3CollectionsCrudUpdateResponse) GetResponseEnvelopeCollection() *components.ResponseEnvelopeCollection {
-	if o == nil {
+func (v *V3CollectionsCrudUpdateResponse) GetResponseEnvelopeCollection() *components.ResponseEnvelopeCollection {
+	if v == nil {
 		return nil
 	}
-	return o.ResponseEnvelopeCollection
+	return v.ResponseEnvelopeCollection
 }
 
-func (o *V3CollectionsCrudUpdateResponse) GetHeaders() map[string][]string {
-	if o == nil {
+func (v *V3CollectionsCrudUpdateResponse) GetHeaders() map[string][]string {
+	if v == nil {
 		return map[string][]string{}
 	}
-	return o.Headers
+	return v.Headers
 }
+
+// #region class-body-v3collectionscrudupdateresponse
+// #endregion class-body-v3collectionscrudupdateresponse

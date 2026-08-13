@@ -10,32 +10,38 @@ type V3ThreathuntingScansDiscoveryGlobals struct {
 	OrganizationID *string `queryParam:"style=form,explode=true,name=organization_id"`
 }
 
-func (o *V3ThreathuntingScansDiscoveryGlobals) GetOrganizationID() *string {
-	if o == nil {
+func (v *V3ThreathuntingScansDiscoveryGlobals) GetOrganizationID() *string {
+	if v == nil {
 		return nil
 	}
-	return o.OrganizationID
+	return v.OrganizationID
 }
 
+// #region class-body-v3threathuntingscansdiscoveryglobals
+// #endregion class-body-v3threathuntingscansdiscoveryglobals
+
 type V3ThreathuntingScansDiscoveryRequest struct {
-	// The ID of a Censys organization to associate the request with. See the [Getting Started docs](https://docs.censys.com/reference/get-started#step-3-set-your-organization-id) for more information.
+	// The ID of a Censys organization to associate the request with. See the [Getting Started docs](https://docs.censys.com/reference/get-started#step-3-find-and-use-your-organization-id-optional) for more information.
 	OrganizationID          *string                            `queryParam:"style=form,explode=false,name=organization_id"`
 	ScansDiscoveryInputBody components.ScansDiscoveryInputBody `request:"mediaType=application/json"`
 }
 
-func (o *V3ThreathuntingScansDiscoveryRequest) GetOrganizationID() *string {
-	if o == nil {
+func (v *V3ThreathuntingScansDiscoveryRequest) GetOrganizationID() *string {
+	if v == nil {
 		return nil
 	}
-	return o.OrganizationID
+	return v.OrganizationID
 }
 
-func (o *V3ThreathuntingScansDiscoveryRequest) GetScansDiscoveryInputBody() components.ScansDiscoveryInputBody {
-	if o == nil {
+func (v *V3ThreathuntingScansDiscoveryRequest) GetScansDiscoveryInputBody() components.ScansDiscoveryInputBody {
+	if v == nil {
 		return components.ScansDiscoveryInputBody{}
 	}
-	return o.ScansDiscoveryInputBody
+	return v.ScansDiscoveryInputBody
 }
+
+// #region class-body-v3threathuntingscansdiscoveryrequest
+// #endregion class-body-v3threathuntingscansdiscoveryrequest
 
 type V3ThreathuntingScansDiscoveryResponse struct {
 	HTTPMeta components.HTTPMetadata `json:"-"`
@@ -44,23 +50,26 @@ type V3ThreathuntingScansDiscoveryResponse struct {
 	Headers                     map[string][]string
 }
 
-func (o *V3ThreathuntingScansDiscoveryResponse) GetHTTPMeta() components.HTTPMetadata {
-	if o == nil {
+func (v *V3ThreathuntingScansDiscoveryResponse) GetHTTPMeta() components.HTTPMetadata {
+	if v == nil {
 		return components.HTTPMetadata{}
 	}
-	return o.HTTPMeta
+	return v.HTTPMeta
 }
 
-func (o *V3ThreathuntingScansDiscoveryResponse) GetResponseEnvelopeTrackedScan() *components.ResponseEnvelopeTrackedScan {
-	if o == nil {
+func (v *V3ThreathuntingScansDiscoveryResponse) GetResponseEnvelopeTrackedScan() *components.ResponseEnvelopeTrackedScan {
+	if v == nil {
 		return nil
 	}
-	return o.ResponseEnvelopeTrackedScan
+	return v.ResponseEnvelopeTrackedScan
 }
 
-func (o *V3ThreathuntingScansDiscoveryResponse) GetHeaders() map[string][]string {
-	if o == nil {
+func (v *V3ThreathuntingScansDiscoveryResponse) GetHeaders() map[string][]string {
+	if v == nil {
 		return map[string][]string{}
 	}
-	return o.Headers
+	return v.Headers
 }
+
+// #region class-body-v3threathuntingscansdiscoveryresponse
+// #endregion class-body-v3threathuntingscansdiscoveryresponse

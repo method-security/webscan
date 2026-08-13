@@ -26,3 +26,13 @@ coverage.out
 manual_test.go
 *.out
 *.err
+
+# Build/test artifacts
+/bin/
+/dist/
+*.coverprofile
+
+# Editor / IDE
+.idea/
+.vscode/
+.DS_Store

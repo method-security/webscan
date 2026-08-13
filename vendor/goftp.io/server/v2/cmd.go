@@ -6,12 +6,12 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"fmt"
 	"log"
 	"os"
 	"path"
-	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -24,58 +24,57 @@ type Command interface {
 	Execute(*Session, string)
 }
 
-var (
-	defaultCommands = map[string]Command{
-		"ADAT": commandAdat{},
-		"ALLO": commandAllo{},
-		"APPE": commandAppe{},
-		"AUTH": commandAuth{},
-		"CDUP": commandCdup{},
-		"CWD":  commandCwd{},
-		"CCC":  commandCcc{},
-		"CONF": commandConf{},
-		"CLNT": commandCLNT{},
-		"DELE": commandDele{},
-		"ENC":  commandEnc{},
-		"EPRT": commandEprt{},
-		"EPSV": commandEpsv{},
-		"FEAT": commandFeat{},
-		"LIST": commandList{},
-		"LPRT": commandLprt{},
-		"NLST": commandNlst{},
-		"MDTM": commandMdtm{},
-		"MIC":  commandMic{},
-		"MLSD": commandMLSD{},
-		"MKD":  commandMkd{},
-		"MODE": commandMode{},
-		"NOOP": commandNoop{},
-		"OPTS": commandOpts{},
-		"PASS": commandPass{},
-		"PASV": commandPasv{},
-		"PBSZ": commandPbsz{},
-		"PORT": commandPort{},
-		"PROT": commandProt{},
-		"PWD":  commandPwd{},
-		"QUIT": commandQuit{},
-		"RETR": commandRetr{},
-		"REST": commandRest{},
-		"RNFR": commandRnfr{},
-		"RNTO": commandRnto{},
-		"RMD":  commandRmd{},
-		"SIZE": commandSize{},
-		"STAT": commandStat{},
-		"STOR": commandStor{},
-		"STRU": commandStru{},
-		"SYST": commandSyst{},
-		"TYPE": commandType{},
-		"USER": commandUser{},
-		"XCUP": commandCdup{},
-		"XCWD": commandCwd{},
-		"XMKD": commandMkd{},
-		"XPWD": commandPwd{},
-		"XRMD": commandXRmd{},
-	}
-)
+var defaultCommands = map[string]Command{
+	"ADAT": commandAdat{},
+	"ALLO": commandAllo{},
+	"APPE": commandAppe{},
+	"AUTH": commandAuth{},
+	"CDUP": commandCdup{},
+	"CWD":  commandCwd{},
+	"CCC":  commandCcc{},
+	"CONF": commandConf{},
+	"CLNT": commandCLNT{},
+	"DELE": commandDele{},
+	"ENC":  commandEnc{},
+	"EPRT": commandEprt{},
+	"EPSV": commandEpsv{},
+	"FEAT": commandFeat{},
+	"LIST": commandList{},
+	"LPRT": commandLprt{},
+	"NLST": commandNlst{},
+	"MDTM": commandMdtm{},
+	"MIC":  commandMic{},
+	"MLSD": commandMLSD{},
+	"MLST": commandMLST{},
+	"MKD":  commandMkd{},
+	"MODE": commandMode{},
+	"NOOP": commandNoop{},
+	"OPTS": commandOpts{},
+	"PASS": commandPass{},
+	"PASV": commandPasv{},
+	"PBSZ": commandPbsz{},
+	"PORT": commandPort{},
+	"PROT": commandProt{},
+	"PWD":  commandPwd{},
+	"QUIT": commandQuit{},
+	"RETR": commandRetr{},
+	"REST": commandRest{},
+	"RNFR": commandRnfr{},
+	"RNTO": commandRnto{},
+	"RMD":  commandRmd{},
+	"SIZE": commandSize{},
+	"STAT": commandStat{},
+	"STOR": commandStor{},
+	"STRU": commandStru{},
+	"SYST": commandSyst{},
+	"TYPE": commandType{},
+	"USER": commandUser{},
+	"XCUP": commandCdup{},
+	"XCWD": commandCwd{},
+	"XMKD": commandMkd{},
+	"XPWD": commandPwd{},
+	"XRMD": commandXRmd{},
+}
 
 // DefaultCommands returns the default commands
 func DefaultCommands() map[string]Command {
@@ -131,15 +130,16 @@ func (cmd commandAppe) Execute(sess *Session, param string) {
 		sess.lastFilePos = -1
 	}()
 
-	var ctx = Context{
-		Sess:  sess,
-		Cmd:   "APPE",
-		Param: param,
-		Data:  make(map[string]interface{}),
-	}
-	sess.server.notifiers.BeforePutFile(&ctx, targetPath)
-	size, err := sess.server.Driver.PutFile(&ctx, targetPath, sess.dataConn, sess.lastFilePos)
-	sess.server.notifiers.AfterFilePut(&ctx, targetPath, size, err)
+	ctx := newContext(
+		context.Background(),
+		sess,
+		"APPE",
+		param,
+		map[string]interface{}{},
+	)
+	sess.server.notifiers.BeforePutFile(ctx, targetPath)
+	size, err := sess.server.Driver.PutFile(ctx, targetPath, sess.dataConn, sess.lastFilePos)
+	sess.server.notifiers.AfterFilePut(ctx, targetPath, size, err)
 	if err == nil {
 		msg := fmt.Sprintf("OK, received %d bytes", size)
 		sess.writeMessage(226, msg)
@@ -257,13 +257,14 @@ func (cmd commandCwd) RequireAuth() bool {
 
 func (cmd commandCwd) Execute(sess *Session, param string) {
 	path := sess.buildPath(param)
-	var ctx = Context{
-		Sess:  sess,
-		Cmd:   "CWD",
-		Param: param,
-		Data:  make(map[string]interface{}),
-	}
-	info, err := sess.server.Driver.Stat(&ctx, path)
+	ctx := newContext(
+		context.Background(),
+		sess,
+		"CWD",
+		param,
+		map[string]interface{}{},
+	)
+	info, err := sess.server.Driver.Stat(ctx, path)
 	if err != nil {
 		sess.logf("%v", err)
 		sess.writeMessage(550, fmt.Sprint("Directory change to ", path, " failed."))
@@ -274,9 +275,9 @@ func (cmd commandCwd) Execute(sess *Session, param string) {
 		return
 	}
 
-	sess.server.notifiers.BeforeChangeCurDir(&ctx, sess.curDir, path)
+	sess.server.notifiers.BeforeChangeCurDir(ctx, sess.curDir, path)
 	err = sess.changeCurDir(path)
-	sess.server.notifiers.AfterCurDirChanged(&ctx, sess.curDir, path, err)
+	sess.server.notifiers.AfterCurDirChanged(ctx, sess.curDir, path, err)
 	if err == nil {
 		sess.writeMessage(250, "Directory changed to "+path)
 	} else {
@@ -303,15 +304,16 @@ func (cmd commandDele) RequireAuth() bool {
 
 func (cmd commandDele) Execute(sess *Session, param string) {
 	path := sess.buildPath(param)
-	var ctx = Context{
-		Sess:  sess,
-		Cmd:   "DELE",
-		Param: param,
-		Data:  make(map[string]interface{}),
-	}
-	sess.server.notifiers.BeforeDeleteFile(&ctx, path)
-	err := sess.server.Driver.DeleteFile(&ctx, path)
-	sess.server.notifiers.AfterFileDeleted(&ctx, path, err)
+	ctx := newContext(
+		context.Background(),
+		sess,
+		"DELE",
+		param,
+		map[string]interface{}{},
+	)
+	sess.server.notifiers.BeforeDeleteFile(ctx, path)
+	err := sess.server.Driver.DeleteFile(ctx, path)
+	sess.server.notifiers.AfterFileDeleted(ctx, path, err)
 	if err == nil {
 		sess.writeMessage(250, "File deleted")
 	} else {
@@ -510,12 +512,13 @@ func convertFileInfo(sess *Session, f os.FileInfo, p string) (FileInfo, error) {
 }
 
 func list(sess *Session, cmd, p, param string) ([]FileInfo, error) {
-	var ctx = &Context{
-		Sess:  sess,
-		Cmd:   cmd,
-		Param: param,
-		Data:  make(map[string]interface{}),
-	}
+	ctx := newContext(
+		context.Background(),
+		sess,
+		cmd,
+		param,
+		map[string]interface{}{},
+	)
 	info, err := sess.server.Driver.Stat(ctx, p)
 	if err != nil {
 		return nil, err
@@ -574,7 +577,7 @@ func parseListParam(param string) (path string) {
 			}
 			i = strings.LastIndex(param, " "+field) + len(field) + 1
 		}
-		path = strings.TrimLeft(param[i:], " ") //Get all the path even with space inside
+		path = strings.TrimLeft(param[i:], " ") // Get all the path even with space inside
 	}
 	return path
 }
@@ -596,12 +599,13 @@ func (cmd commandNlst) RequireAuth() bool {
 }
 
 func (cmd commandNlst) Execute(sess *Session, param string) {
-	var ctx = &Context{
-		Sess:  sess,
-		Cmd:   "NLST",
-		Param: param,
-		Data:  make(map[string]interface{}),
-	}
+	ctx := newContext(
+		context.Background(),
+		sess,
+		"NLST",
+		param,
+		map[string]interface{}{},
+	)
 	path := sess.buildPath(parseListParam(param))
 	info, err := sess.server.Driver.Stat(ctx, path)
 	if err != nil {
@@ -647,7 +651,7 @@ func (cmd commandNlst) Execute(sess *Session, param string) {
 }
 
 // commandMdtm responds to the MDTM FTP command. It allows the client to
-// retreive the last modified time of a file.
+// retrieve the last modified time of a file.
 type commandMdtm struct{}
 
 func (cmd commandMdtm) IsExtend() bool {
@@ -664,12 +668,13 @@ func (cmd commandMdtm) RequireAuth() bool {
 
 func (cmd commandMdtm) Execute(sess *Session, param string) {
 	path := sess.buildPath(param)
-	stat, err := sess.server.Driver.Stat(&Context{
-		Sess:  sess,
-		Cmd:   "MDTM",
-		Param: param,
-		Data:  make(map[string]interface{}),
-	}, path)
+	stat, err := sess.server.Driver.Stat(newContext(
+		context.Background(),
+		sess,
+		"MDTM",
+		param,
+		map[string]interface{}{},
+	), path)
 	if err == nil {
 		sess.writeMessage(213, stat.ModTime().Format("20060102150405"))
 	} else {
@@ -695,15 +700,16 @@ func (cmd commandMkd) RequireAuth() bool {
 
 func (cmd commandMkd) Execute(sess *Session, param string) {
 	path := sess.buildPath(param)
-	var ctx = Context{
-		Sess:  sess,
-		Cmd:   "MKD",
-		Param: param,
-		Data:  make(map[string]interface{}),
-	}
-	sess.server.notifiers.BeforeCreateDir(&ctx, path)
-	err := sess.server.Driver.MakeDir(&ctx, path)
-	sess.server.notifiers.AfterDirCreated(&ctx, path, err)
+	ctx := newContext(
+		context.Background(),
+		sess,
+		"MKD",
+		param,
+		map[string]interface{}{},
+	)
+	sess.server.notifiers.BeforeCreateDir(ctx, path)
+	err := sess.server.Driver.MakeDir(ctx, path)
+	sess.server.notifiers.AfterDirCreated(ctx, path, err)
 	if err == nil {
 		sess.writeMessage(257, "Directory created")
 	} else {
@@ -783,14 +789,15 @@ func (cmd commandPass) Execute(sess *Session, param string) {
 	if driverAuth, found := sess.server.Driver.(Auth); found {
 		auth = driverAuth
 	}
-	var ctx = Context{
-		Sess:  sess,
-		Cmd:   "PASS",
-		Param: param,
-		Data:  make(map[string]interface{}),
-	}
-	ok, err := auth.CheckPasswd(&ctx, sess.reqUser, param)
-	sess.server.notifiers.AfterUserLogin(&ctx, sess.reqUser, param, ok, err)
+	ctx := newContext(
+		context.Background(),
+		sess,
+		"PASS",
+		param,
+		map[string]interface{}{},
+	)
+	ok, err := auth.CheckPasswd(ctx, sess.reqUser, param)
+	sess.server.notifiers.AfterUserLogin(ctx, sess.reqUser, param, ok, err)
 	if err != nil {
 		sess.writeMessage(550, "Checking password error")
 		return
@@ -946,28 +953,29 @@ func (cmd commandRetr) Execute(sess *Session, param string) {
 	defer func() {
 		sess.lastFilePos = -1
 	}()
-	var ctx = Context{
-		Sess:  sess,
-		Cmd:   "RETR",
-		Param: param,
-		Data:  make(map[string]interface{}),
-	}
-	sess.server.notifiers.BeforeDownloadFile(&ctx, path)
-	var readPos = sess.lastFilePos
+	ctx := newContext(
+		context.Background(),
+		sess,
+		"RETR",
+		param,
+		map[string]interface{}{},
+	)
+	sess.server.notifiers.BeforeDownloadFile(ctx, path)
+	readPos := sess.lastFilePos
 	if readPos < 0 {
 		readPos = 0
 	}
-	size, data, err := sess.server.Driver.GetFile(&ctx, path, readPos)
+	size, data, err := sess.server.Driver.GetFile(ctx, path, readPos)
 	if err == nil {
 		defer data.Close()
 		sess.writeMessage(150, fmt.Sprintf("Data transfer starting %d bytes", size))
 		err = sess.sendOutofBandDataWriter(data)
-		sess.server.notifiers.AfterFileDownloaded(&ctx, path, size, err)
+		sess.server.notifiers.AfterFileDownloaded(ctx, path, size, err)
 		if err != nil {
 			sess.writeMessage(551, "Error reading file")
 		}
 	} else {
-		sess.server.notifiers.AfterFileDownloaded(&ctx, path, size, err)
+		sess.server.notifiers.AfterFileDownloaded(ctx, path, size, err)
 		sess.writeMessage(551, "File not available")
 	}
 }
@@ -1016,12 +1024,13 @@ func (cmd commandRnfr) RequireAuth() bool {
 func (cmd commandRnfr) Execute(sess *Session, param string) {
 	sess.renameFrom = ""
 	p := sess.buildPath(param)
-	if _, err := sess.server.Driver.Stat(&Context{
-		Sess:  sess,
-		Cmd:   "RNFR",
-		Param: param,
-		Data:  make(map[string]interface{}),
-	}, p); err != nil {
+	if _, err := sess.server.Driver.Stat(newContext(
+		context.Background(),
+		sess,
+		"RNFR",
+		param,
+		map[string]interface{}{},
+	), p); err != nil {
 		sess.writeMessage(550, fmt.Sprint("Action not taken: ", err))
 		return
 	}
@@ -1047,12 +1056,13 @@ func (cmd commandRnto) RequireAuth() bool {
 
 func (cmd commandRnto) Execute(sess *Session, param string) {
 	toPath := sess.buildPath(param)
-	err := sess.server.Driver.Rename(&Context{
-		Sess:  sess,
-		Cmd:   "RNTO",
-		Param: param,
-		Data:  make(map[string]interface{}),
-	}, sess.renameFrom, toPath)
+	err := sess.server.Driver.Rename(newContext(
+		context.Background(),
+		sess,
+		"RNTO",
+		param,
+		map[string]interface{}{},
+	), sess.renameFrom, toPath)
 	defer func() {
 		sess.renameFrom = ""
 	}()
@@ -1106,25 +1116,26 @@ func (cmd commandXRmd) Execute(sess *Session, param string) {
 
 func executeRmd(cmd string, sess *Session, param string) {
 	p := sess.buildPath(param)
-	var ctx = Context{
-		Sess:  sess,
-		Cmd:   cmd,
-		Param: param,
-		Data:  make(map[string]interface{}),
-	}
+	ctx := newContext(
+		context.Background(),
+		sess,
+		cmd,
+		param,
+		map[string]interface{}{},
+	)
 	if param == "/" || param == "" {
 		sess.writeMessage(550, "Directory / cannot be deleted")
 		return
 	}
 
-	var needChangeCurDir = strings.HasPrefix(param, sess.curDir)
+	needChangeCurDir := strings.HasPrefix(param, sess.curDir)
 
-	sess.server.notifiers.BeforeDeleteDir(&ctx, p)
-	err := sess.server.Driver.DeleteDir(&ctx, p)
+	sess.server.notifiers.BeforeDeleteDir(ctx, p)
+	err := sess.server.Driver.DeleteDir(ctx, p)
 	if needChangeCurDir {
 		sess.curDir = path.Dir(param)
 	}
-	sess.server.notifiers.AfterDirDeleted(&ctx, p, err)
+	sess.server.notifiers.AfterDirDeleted(ctx, p, err)
 	if err == nil {
 		sess.writeMessage(250, "Directory deleted")
 	} else {
@@ -1233,7 +1244,7 @@ func (cmd commandMic) Execute(sess *Session, param string) {
 type commandMLSD struct{}
 
 func (cmd commandMLSD) IsExtend() bool {
-	return true
+	return false
 }
 
 func (cmd commandMLSD) RequireParam() bool {
@@ -1244,26 +1255,34 @@ func (cmd commandMLSD) RequireAuth() bool {
 	return true
 }
 
+// mlsxFacts is the list of facts advertised in the FEAT response for MLST/MLSD.
+const mlsxFacts = "Type*;Modify*;Size*;"
+
+// formatMLSxEntry formats a single file entry in MLST/MLSD format.
+func formatMLSxEntry(file os.FileInfo) string {
+	/*Possible facts "Size" / "Modify" / "Create" /
+			  "Type" / "Unique" / "Perm" /
+			  "Lang" / "Media-Type" / "CharSet"
+			  TODO: Perm pvals        = "a" / "c" / "d" / "e" / "f" /
+	                     "l" / "m" / "p" / "r" / "w"
+	*/
+	fileType := "file"
+	if file.IsDir() {
+		fileType = "dir"
+	}
+	return fmt.Sprintf("Type=%s;Modify=%s;Size=%d; %s",
+		fileType,
+		file.ModTime().Format("20060102150405"),
+		file.Size(),
+		file.Name(),
+	)
+}
+
 func toMLSDFormat(files []FileInfo) []byte {
 	var buf bytes.Buffer
 	for _, file := range files {
-		var fileType = "file"
-		if file.IsDir() {
-			fileType = "dir"
-		}
-		/*Possible facts "Size" / "Modify" / "Create" /
-				  "Type" / "Unique" / "Perm" /
-				  "Lang" / "Media-Type" / "CharSet"
-				  TODO: Perm pvals        = "a" / "c" / "d" / "e" / "f" /
-		                     "l" / "m" / "p" / "r" / "w"
-		*/
-		fmt.Fprintf(&buf,
-			"Type=%s;Modify=%s;Size=%d; %s\n",
-			fileType,
-			file.ModTime().Format("20060102150405"),
-			file.Size(),
-			file.Name(),
-		)
+		buf.WriteString(formatMLSxEntry(file))
+		buf.WriteByte('\n')
 	}
 	return buf.Bytes()
 }
@@ -1282,6 +1301,46 @@ func (cmd commandMLSD) Execute(sess *Session, param string) {
 
 	sess.writeMessage(150, "Opening ASCII mode data connection for file list")
 	sess.sendOutofbandData(toMLSDFormat(files))
+}
+
+type commandMLST struct{}
+
+func (cmd commandMLST) IsExtend() bool {
+	return true
+}
+
+func (cmd commandMLST) RequireParam() bool {
+	return false
+}
+
+func (cmd commandMLST) RequireAuth() bool {
+	return true
+}
+
+func (cmd commandMLST) Execute(sess *Session, param string) {
+	if param == "" {
+		param = sess.curDir
+	}
+	p := sess.buildPath(param)
+
+	ctx := newContext(
+		context.Background(),
+		sess,
+		"MLST",
+		param,
+		map[string]interface{}{},
+	)
+	info, err := sess.server.Driver.Stat(ctx, p)
+	if err != nil {
+		sess.writeMessage(550, err.Error())
+		return
+	}
+	if info == nil {
+		sess.writeMessage(550, "No such file or directory")
+		return
+	}
+
+	sess.writeMessageMultiline(250, fmt.Sprintf("Start\n %s", formatMLSxEntry(info)))
 }
 
 type commandPbsz struct{}
@@ -1366,12 +1425,13 @@ func (cmd commandSize) RequireAuth() bool {
 
 func (cmd commandSize) Execute(sess *Session, param string) {
 	path := sess.buildPath(param)
-	stat, err := sess.server.Driver.Stat(&Context{
-		Sess:  sess,
-		Cmd:   "SIZE",
-		Param: param,
-		Data:  make(map[string]interface{}),
-	}, path)
+	stat, err := sess.server.Driver.Stat(newContext(
+		context.Background(),
+		sess,
+		"SIZE",
+		param,
+		map[string]interface{}{},
+	), path)
 	if err != nil {
 		log.Printf("Size: error(%s)", err)
 		sess.writeMessage(450, fmt.Sprintf("path %s not found", param))
@@ -1399,56 +1459,27 @@ func (cmd commandStat) RequireAuth() bool {
 func (cmd commandStat) Execute(sess *Session, param string) {
 	// system stat
 	if param == "" {
-		sess.writeMessage(211, fmt.Sprintf("%s FTP server status:\nVersion %s"+
+		sess.writeMessageMultiline(211, fmt.Sprintf("%s FTP server status:\n"+
+			"Version %s\n"+
 			"Connected to %s (%s)\n"+
 			"Logged in %s\n"+
 			"TYPE: ASCII, FORM: Nonprint; STRUcture: File; transfer MODE: Stream\n"+
-			"No data connection", sess.PublicIP(), version, sess.PublicIP(),
+			"No data connection", sess.server.Name, version, sess.PublicIP(),
 			version, sess.LoginUser()))
-		sess.writeMessage(211, "End of status")
 		return
 	}
 
-	var ctx = Context{
-		Sess:  sess,
-		Cmd:   "STAT",
-		Param: param,
-		Data:  make(map[string]interface{}),
+	// file or directory stat
+	p := sess.buildPath(param)
+	files, err := list(sess, "STAT", p, param)
+	if err != nil {
+		log.Printf("Stat: error(%s)", err)
+		sess.writeMessage(450, fmt.Sprintf("path %s not found", p))
+		return
 	}
 
-	// file or directory stat
-	path := sess.buildPath(param)
-	stat, err := sess.server.Driver.Stat(&ctx, path)
-	if err != nil {
-		log.Printf("Size: error(%s)", err)
-		sess.writeMessage(450, fmt.Sprintf("path %s not found", path))
-	} else {
-		var files []FileInfo
-		if stat.IsDir() {
-			err = sess.server.Driver.ListDir(&ctx, path, func(f os.FileInfo) error {
-				info, err := convertFileInfo(sess, f, filepath.Join(path, f.Name()))
-				if err != nil {
-					return err
-				}
-				files = append(files, info)
-				return nil
-			})
-			if err != nil {
-				sess.writeMessage(550, err.Error())
-				return
-			}
-			sess.writeMessage(213, "Opening ASCII mode data connection for file list")
-		} else {
-			info, err := convertFileInfo(sess, stat, path)
-			if err != nil {
-				sess.writeMessage(550, err.Error())
-				return
-			}
-			files = append(files, info)
-			sess.writeMessage(212, "Opening ASCII mode data connection for file list")
-		}
-		sess.sendOutofbandData(listFormatter(files).Detailed())
-	}
+	listing := string(listFormatter(files).Detailed())
+	sess.writeMessageMultiline(213, fmt.Sprintf("Status of %s:\r\n%s", p, listing))
 }
 
 // commandStor responds to the STOR FTP command. It allows the user to upload a
@@ -1479,15 +1510,16 @@ func (cmd commandStor) Execute(sess *Session, param string) {
 		sess.lastFilePos = -1
 	}()
 
-	var ctx = Context{
-		Sess:  sess,
-		Cmd:   "STOR",
-		Param: param,
-		Data:  make(map[string]interface{}),
-	}
-	sess.server.notifiers.BeforePutFile(&ctx, targetPath)
-	size, err := sess.server.Driver.PutFile(&ctx, targetPath, sess.dataConn, sess.lastFilePos)
-	sess.server.notifiers.AfterFilePut(&ctx, targetPath, size, err)
+	ctx := newContext(
+		context.Background(),
+		sess,
+		"STOR",
+		param,
+		map[string]interface{}{},
+	)
+	sess.server.notifiers.BeforePutFile(ctx, targetPath)
+	size, err := sess.server.Driver.PutFile(ctx, targetPath, sess.dataConn, sess.lastFilePos)
+	sess.server.notifiers.AfterFilePut(ctx, targetPath, size, err)
 	if err == nil {
 		msg := fmt.Sprintf("OK, received %d bytes", size)
 		sess.writeMessage(226, msg)
@@ -1548,14 +1580,14 @@ func (cmd commandSyst) Execute(sess *Session, param string) {
 
 // commandType responds to the TYPE FTP command.
 //
-//  like the MODE and STRU commands, TYPE dates back to a time when the FTP
-//  protocol was more aware of the content of the files it was transferring, and
-//  would sometimes be expected to translate things like EOL markers on the fly.
+//	like the MODE and STRU commands, TYPE dates back to a time when the FTP
+//	protocol was more aware of the content of the files it was transferring, and
+//	would sometimes be expected to translate things like EOL markers on the fly.
 //
-//  Valid options were A(SCII), I(mage), E(BCDIC) or LN (for local type). Since
-//  we plan to just accept bytes from the client unchanged, I think Image mode is
-//  adequate. The RFC requires we accept ASCII mode however, so accept it, but
-//  ignore it.
+//	Valid options were A(SCII), I(mage), E(BCDIC) or LN (for local type). Since
+//	we plan to just accept bytes from the client unchanged, I think Image mode is
+//	adequate. The RFC requires we accept ASCII mode however, so accept it, but
+//	ignore it.
 type commandType struct{}
 
 func (cmd commandType) IsExtend() bool {
@@ -1597,11 +1629,12 @@ func (cmd commandUser) RequireAuth() bool {
 
 func (cmd commandUser) Execute(sess *Session, param string) {
 	sess.reqUser = param
-	sess.server.notifiers.BeforeLoginUser(&Context{
-		Sess:  sess,
-		Cmd:   "USER",
-		Param: param,
-		Data:  make(map[string]interface{}),
-	}, sess.reqUser)
+	sess.server.notifiers.BeforeLoginUser(newContext(
+		context.Background(),
+		sess,
+		"USER",
+		param,
+		map[string]interface{}{},
+	), sess.reqUser)
 	sess.writeMessage(331, "User name ok, password required")
 }

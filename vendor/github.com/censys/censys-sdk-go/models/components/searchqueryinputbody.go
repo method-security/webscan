@@ -3,9 +3,9 @@
 package components
 
 type SearchQueryInputBody struct {
-	// specify fields to return in response and ignore others
+	// Specify fields to only return in the response. If you provide fields and omit `host.services.port`, `host.services.transport_protocol`, and `host.services.protocol`, then `matched_services` will not be returned in the response.
 	Fields []string `json:"fields,omitempty"`
-	// amount of results to return per page
+	// Number of results to return to per page. The default and maximum is 100.
 	PageSize *int64 `json:"page_size,omitempty"`
 	// page token for the requested page of search results
 	PageToken *string `json:"page_token,omitempty"`
@@ -13,30 +13,30 @@ type SearchQueryInputBody struct {
 	Query string `json:"query"`
 }
 
-func (o *SearchQueryInputBody) GetFields() []string {
-	if o == nil {
+func (s *SearchQueryInputBody) GetFields() []string {
+	if s == nil {
 		return nil
 	}
-	return o.Fields
+	return s.Fields
 }
 
-func (o *SearchQueryInputBody) GetPageSize() *int64 {
-	if o == nil {
+func (s *SearchQueryInputBody) GetPageSize() *int64 {
+	if s == nil {
 		return nil
 	}
-	return o.PageSize
+	return s.PageSize
 }
 
-func (o *SearchQueryInputBody) GetPageToken() *string {
-	if o == nil {
+func (s *SearchQueryInputBody) GetPageToken() *string {
+	if s == nil {
 		return nil
 	}
-	return o.PageToken
+	return s.PageToken
 }
 
-func (o *SearchQueryInputBody) GetQuery() string {
-	if o == nil {
+func (s *SearchQueryInputBody) GetQuery() string {
+	if s == nil {
 		return ""
 	}
-	return o.Query
+	return s.Query
 }

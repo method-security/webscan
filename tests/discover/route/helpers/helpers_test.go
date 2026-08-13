@@ -80,7 +80,7 @@ func TestNormalizeDeclaredTemplateRejectsCatchAllParams(t *testing.T) {
 	// A catch-all matches one or more segments. Normalizing it to a single placeholder would make
 	// a root-level `/{slug}` swallow every top-level page while never folding the multi-segment
 	// paths it actually serves, so it is not treated as a declaration at all.
-	for _, path := range []string{"/[...slug]", "/docs/[...slug]", "/docs/[[...slug]]"} {
+	for _, path := range []string{"/[...slug]", "/docs/[...slug]", "/docs/[[...slug]]", "/[locale]/[...slug]"} {
 		if template, _, ok := discoverroute.NormalizeDeclaredTemplate(path); ok {
 			t.Errorf("%q: expected no declaration, got template %q", path, template)
 		}

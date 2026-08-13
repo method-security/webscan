@@ -66,6 +66,17 @@ func NormalizeDeclaredTemplate(path string) (string, []*discover.RoutePathParam,
 	if len(params) == 0 {
 		return path, nil, false
 	}
+	// A segment still carrying parameter syntax was not convertible — a Next.js catch-all, say —
+	// so the template is malformed no matter what else it holds, and would also let the catch-all
+	// exclusion be bypassed by any sibling segment that did convert.
+	for _, segment := range segments {
+		if segment == "" || strings.HasPrefix(segment, "{") {
+			continue
+		}
+		if HasDeclaredParamSyntax("/" + segment) {
+			return path, nil, false
+		}
+	}
 	// A template with no literal segment discriminates on nothing but segment count, so `/{slug}`
 	// swallows every top-level page and `/{locale}/{page}` every two-segment one. Sibling literals
 	// from the same route table are not recorded, so nothing can outrank it the way a declared

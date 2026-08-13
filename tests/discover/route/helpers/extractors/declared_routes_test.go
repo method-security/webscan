@@ -75,6 +75,16 @@ func TestExtractDeclaredRouteTemplatesIgnoresNonRouterReceivers(t *testing.T) {
 	}
 }
 
+func TestExtractDeclaredRouteTemplatesNeverEmitsRefusedTemplateAsLiteral(t *testing.T) {
+	// <Route> contributes literals, but a path that looks parameterized is not a fetchable URL:
+	// emitting `/:id` verbatim would send a literal colon segment to the server.
+	routes := extractors.ExtractDeclaredRouteTemplates(`<Route path="/:id" element={<X/>} />`, bundleURL)
+
+	for _, route := range routes {
+		t.Errorf("expected no route, got %q", route.Path)
+	}
+}
+
 func TestExtractDeclaredRouteTemplatesIgnoresHttpClientCallSites(t *testing.T) {
 	// `api` and `app` are also the usual names for an axios/fetch client. A concrete call site
 	// recorded as a declared literal would outrank a matching template and block folding.

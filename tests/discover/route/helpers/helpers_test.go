@@ -87,12 +87,43 @@ func TestNormalizeDeclaredTemplateRejectsCatchAllParams(t *testing.T) {
 	}
 }
 
-func TestNormalizeDeclaredTemplateRejectsRootLevelParams(t *testing.T) {
-	// A parameter in the first segment matches every single-segment URL. Sibling literals from the
-	// same route table are not recorded, so nothing could outrank it and `/about` would vanish.
-	for _, path := range []string{"/:slug", "/[id]", "/{id}"} {
+func TestNormalizeDeclaredTemplateRejectsUnanchoredTemplates(t *testing.T) {
+	// With no literal segment a template discriminates on nothing but segment count, so it
+	// swallows every path of that length. Sibling literals are not recorded, so nothing could
+	// outrank it and `/about` would vanish.
+	for _, path := range []string{"/:slug", "/[id]", "/{id}", "/[locale]/[page]"} {
 		if template, _, ok := discoverroute.NormalizeDeclaredTemplate(path); ok {
 			t.Errorf("%q: expected no declaration, got template %q", path, template)
+		}
+	}
+}
+
+func TestNormalizeDeclaredTemplateKeepsAnchoredMultiSegmentTemplates(t *testing.T) {
+	// One literal segment is enough: exact segment-count matching plus a fixed `products` means
+	// this can never match an unrelated top-level page.
+	template, params, ok := discoverroute.NormalizeDeclaredTemplate("/[locale]/products/[id]")
+
+	if !ok {
+		t.Fatalf("expected a usable declaration")
+	}
+	if template != "/{locale}/products/{id}" {
+		t.Errorf("template = %q", template)
+	}
+	if len(params) != 2 {
+		t.Errorf("expected two params, got %v", params)
+	}
+}
+
+func TestHasDeclaredParamSyntaxSpansUnusableForms(t *testing.T) {
+	// Used to stop a refused template falling through as a fetchable literal.
+	for _, path := range []string{"/:id", "/[id]", "/{id}", "/docs/[...slug]", "/:locale/:page"} {
+		if !discoverroute.HasDeclaredParamSyntax(path) {
+			t.Errorf("%q: expected parameter syntax to be recognized", path)
+		}
+	}
+	for _, path := range []string{"/about", "/api/v2/users", "/assets/app.js"} {
+		if discoverroute.HasDeclaredParamSyntax(path) {
+			t.Errorf("%q: expected no parameter syntax", path)
 		}
 	}
 }

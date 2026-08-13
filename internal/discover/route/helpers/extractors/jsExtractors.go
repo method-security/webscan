@@ -229,8 +229,13 @@ func ExtractDeclaredRouteTemplates(content string, sourceURL string) []*discover
 				continue
 			}
 			template, params, ok := discoverroutehelpers.NormalizeDeclaredTemplate(declared)
-			if !ok && !routePattern.declaresLiterals {
-				continue
+			if !ok {
+				// A path that looks parameterized but yielded no usable template must not fall
+				// through as a literal: `/:id` is not a fetchable URL, and nothing downstream would
+				// recognize it as a template either.
+				if !routePattern.declaresLiterals || discoverroutehelpers.HasDeclaredParamSyntax(declared) {
+					continue
+				}
 			}
 
 			method := common.HttpMethodGet

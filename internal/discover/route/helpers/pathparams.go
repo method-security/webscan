@@ -66,14 +66,40 @@ func NormalizeDeclaredTemplate(path string) (string, []*discover.RoutePathParam,
 	if len(params) == 0 {
 		return path, nil, false
 	}
-	// A parameter in the first segment makes the template match every single-segment URL, so an
-	// unrelated `/about` folds into `/{slug}` and disappears. Sibling literals from the same route
-	// table are not recorded, so nothing can outrank it the way a declared literal would. This is
-	// the collapse that also rules out Next.js catch-alls.
-	if len(segments) > 1 && strings.HasPrefix(segments[1], "{") {
+	// A template with no literal segment discriminates on nothing but segment count, so `/{slug}`
+	// swallows every top-level page and `/{locale}/{page}` every two-segment one. Sibling literals
+	// from the same route table are not recorded, so nothing can outrank it the way a declared
+	// literal would. One literal segment is enough to anchor it: `/{locale}/products/{id}` only
+	// ever matches paths with `products` in that position.
+	if !hasLiteralSegment(segments) {
 		return path, nil, false
 	}
 	return strings.Join(segments, "/"), params, true
+}
+
+// hasLiteralSegment reports whether any non-empty segment is a fixed string rather than a
+// placeholder.
+func hasLiteralSegment(segments []string) bool {
+	for _, segment := range segments {
+		if segment == "" {
+			continue
+		}
+		if !strings.HasPrefix(segment, "{") {
+			return true
+		}
+	}
+	return false
+}
+
+// declaredParamSyntaxPattern matches a segment that looks like a route parameter in any convention,
+// including forms that do not yield a usable template such as a catch-all.
+var declaredParamSyntaxPattern = regexp.MustCompile(`(?:^|/)(?::[^/]+|\[[^/]*\]|\{[^/]*\})(?:/|$)`)
+
+// HasDeclaredParamSyntax reports whether a path contains route-parameter syntax at all, regardless
+// of whether NormalizeDeclaredTemplate can turn it into a usable template. A path that looks
+// parameterized is never a fetchable literal, so callers must not fall back to emitting it as one.
+func HasDeclaredParamSyntax(path string) bool {
+	return declaredParamSyntaxPattern.MatchString(path)
 }
 
 // templateMatchesLiteral reports whether a literal path is an instance of a normalized template,

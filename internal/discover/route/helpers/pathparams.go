@@ -66,6 +66,13 @@ func NormalizeDeclaredTemplate(path string) (string, []*discover.RoutePathParam,
 	if len(params) == 0 {
 		return path, nil, false
 	}
+	// A parameter in the first segment makes the template match every single-segment URL, so an
+	// unrelated `/about` folds into `/{slug}` and disappears. Sibling literals from the same route
+	// table are not recorded, so nothing can outrank it the way a declared literal would. This is
+	// the collapse that also rules out Next.js catch-alls.
+	if len(segments) > 1 && strings.HasPrefix(segments[1], "{") {
+		return path, nil, false
+	}
 	return strings.Join(segments, "/"), params, true
 }
 
@@ -81,19 +88,61 @@ func templateMatchesLiteral(template string, literal string) (map[string]string,
 
 	values := map[string]string{}
 	for i, templateSegment := range templateSegments {
-		name, isParam := DeclaredParamName(templateSegment)
-		if !isParam {
-			if templateSegment != literalSegments[i] {
-				return nil, false
-			}
-			continue
-		}
-		if literalSegments[i] == "" {
+		if !matchTemplateSegment(templateSegment, literalSegments[i], values) {
 			return nil, false
 		}
-		values[name] = literalSegments[i]
 	}
 	return values, true
+}
+
+// embeddedPlaceholderPattern matches a `{name}` placeholder anywhere within a segment.
+var embeddedPlaceholderPattern = regexp.MustCompile(`\{([A-Za-z_][A-Za-z0-9_]*)\}`)
+
+// matchTemplateSegment matches one template segment against a literal segment, recording any
+// placeholder values it captures.
+//
+// A placeholder need not span the whole segment: interpolated templates such as
+// `order_{orderId}.pdf` embed one, and ConstructURL substitutes those the same way, so folding has
+// to understand them or the observed values are never captured.
+func matchTemplateSegment(templateSegment string, literalSegment string, values map[string]string) bool {
+	if name, isParam := DeclaredParamName(templateSegment); isParam {
+		if literalSegment == "" {
+			return false
+		}
+		values[name] = literalSegment
+		return true
+	}
+
+	locations := embeddedPlaceholderPattern.FindAllStringSubmatchIndex(templateSegment, -1)
+	if len(locations) == 0 {
+		return templateSegment == literalSegment
+	}
+
+	var names []string
+	var pattern strings.Builder
+	pattern.WriteString("^")
+	previous := 0
+	for _, location := range locations {
+		pattern.WriteString(regexp.QuoteMeta(templateSegment[previous:location[0]]))
+		pattern.WriteString("(.+?)")
+		names = append(names, templateSegment[location[2]:location[3]])
+		previous = location[1]
+	}
+	pattern.WriteString(regexp.QuoteMeta(templateSegment[previous:]))
+	pattern.WriteString("$")
+
+	matcher, err := regexp.Compile(pattern.String())
+	if err != nil {
+		return false
+	}
+	match := matcher.FindStringSubmatch(literalSegment)
+	if match == nil {
+		return false
+	}
+	for i, name := range names {
+		values[name] = match[i+1]
+	}
+	return true
 }
 
 // ApplyDeclaredRouteTemplates folds observed literal routes into the templates the application

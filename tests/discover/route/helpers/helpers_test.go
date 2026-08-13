@@ -87,6 +87,56 @@ func TestNormalizeDeclaredTemplateRejectsCatchAllParams(t *testing.T) {
 	}
 }
 
+func TestNormalizeDeclaredTemplateRejectsRootLevelParams(t *testing.T) {
+	// A parameter in the first segment matches every single-segment URL. Sibling literals from the
+	// same route table are not recorded, so nothing could outrank it and `/about` would vanish.
+	for _, path := range []string{"/:slug", "/[id]", "/{id}"} {
+		if template, _, ok := discoverroute.NormalizeDeclaredTemplate(path); ok {
+			t.Errorf("%q: expected no declaration, got template %q", path, template)
+		}
+	}
+}
+
+func TestApplyDeclaredRouteTemplatesFoldsPartialSegmentPlaceholders(t *testing.T) {
+	// Interpolated templates embed a placeholder inside a segment. ConstructURL substitutes those,
+	// so folding has to match them or the observed values are never captured.
+	template := "/ftp/order_{orderId}.pdf"
+	declared := routeAt(template)
+	declared.PathParams = []*discover.RoutePathParam{{Name: "orderId"}}
+	declared.PathTemplate = &template
+
+	routes := discoverroute.ApplyDeclaredRouteTemplates([]*discover.RouteDetails{
+		declared,
+		routeAt("/ftp/order_1042.pdf"),
+		routeAt("/ftp/order_3517.pdf"),
+	})
+
+	if len(routes) != 1 {
+		t.Fatalf("expected the literals to fold, got %v", pathsOf(routes))
+	}
+	route := findRoute(t, routes, template)
+	sort.Strings(route.PathParams[0].ExampleValues)
+	got := route.PathParams[0].ExampleValues
+	if len(got) != 2 || got[0] != "1042" || got[1] != "3517" {
+		t.Errorf("example values = %v, want [1042 3517]", got)
+	}
+}
+
+func TestApplyDeclaredRouteTemplatesRejectsPartialSegmentMismatch(t *testing.T) {
+	template := "/ftp/order_{orderId}.pdf"
+	declared := routeAt(template)
+	declared.PathParams = []*discover.RoutePathParam{{Name: "orderId"}}
+	declared.PathTemplate = &template
+
+	routes := discoverroute.ApplyDeclaredRouteTemplates([]*discover.RouteDetails{
+		declared,
+		routeAt("/ftp/invoice_1042.pdf"),
+	})
+
+	// The literal prefix differs, so this is a different file, not an instance of the template.
+	findRoute(t, routes, "/ftp/invoice_1042.pdf")
+}
+
 func TestApplyDeclaredRouteTemplatesNormalizesOriginForFolding(t *testing.T) {
 	// MergeWebRoutes and buildWebApplications compare origins via NormalizeBaseURLForIdentity, so
 	// an explicit default port must not split one application in two here either.

@@ -47,7 +47,7 @@ func GetEnumerateDrupalModuleEmbeddedPath(modulesFileSize enumeratecmsdrupalfern
 	return wordlistPaths[modulesFileSize]
 }
 
-func createDrupalSendHTTPRequestConfig(baseURL, path string, method common.HttpMethod, config *enumeratecmsdrupalfern.EnumerateDrupalModulesConfig) common.SendHttpRequestConfig {
+func createDrupalSendHTTPRequestConfig(baseURL, path string, method common.HttpMethod, maxRedirects int, config *enumeratecmsdrupalfern.EnumerateDrupalModulesConfig) common.SendHttpRequestConfig {
 	request := common.HttpRequest{
 		BaseUrl: baseURL,
 		Path:    path,
@@ -55,15 +55,16 @@ func createDrupalSendHTTPRequestConfig(baseURL, path string, method common.HttpM
 		Params:  &common.HttpRequestParams{},
 	}
 	return common.SendHttpRequestConfig{
-		Request:            &request,
-		MaxRedirects:       0,
-		VerifyTls:          config.VerifyTls,
-		Timeout:            config.Timeout,
-		UserAgent:          config.UserAgent,
-		RequestMethod:      common.RequestMethodStandard,
-		HeadlessConfig:     nil,
-		BrowserbaseConfig:  nil,
-		BrowserbaseSecrets: nil,
+		Request:                    &request,
+		MaxRedirects:               maxRedirects,
+		VerifyTls:                  config.VerifyTls,
+		Timeout:                    config.Timeout,
+		IgnoreCrossDomainRedirects: true,
+		UserAgent:                  config.UserAgent,
+		RequestMethod:              common.RequestMethodStandard,
+		HeadlessConfig:             nil,
+		BrowserbaseConfig:          nil,
+		BrowserbaseSecrets:         nil,
 	}
 }
 
@@ -143,7 +144,7 @@ func scanDrupalTarget(ctx context.Context, url string, config *enumeratecmsdrupa
 		return result, errors
 	}
 
-	requestConfig := createDrupalSendHTTPRequestConfig(baseURL, path, common.HttpMethodGet, config)
+	requestConfig := createDrupalSendHTTPRequestConfig(baseURL, path, common.HttpMethodGet, cmsInitialMaxRedirects, config)
 	accessRequest, err := request.SendRequest(ctx, requestConfig)
 	if err != nil {
 		errors = append(errors, err.Error())
@@ -152,6 +153,12 @@ func scanDrupalTarget(ctx context.Context, url string, config *enumeratecmsdrupa
 
 	if statusCode := getResponseStatusCode(accessRequest); statusCode != 200 {
 		return result, []string{fmt.Sprintf("non-200 status code from site: %d", statusCode)}
+	}
+	canonicalURL := canonicalTargetURL(url, accessRequest)
+	baseURL, path, _, err = requesthelpers.SplitTargetURL(canonicalURL)
+	if err != nil {
+		errors = append(errors, err.Error())
+		return result, errors
 	}
 
 	// Detect Drupal core version from response headers and body
@@ -272,7 +279,7 @@ func checkDrupalModuleInfoYml(ctx context.Context, baseURL, basePath string, con
 		}
 		for _, modulePath := range drupalModulePaths {
 			infoYmlPath := fmt.Sprintf("%s%s%s/%s.info.yml", basePath, modulePath, module, module)
-			requestConfig := createDrupalSendHTTPRequestConfig(baseURL, infoYmlPath, common.HttpMethodHead, config)
+			requestConfig := createDrupalSendHTTPRequestConfig(baseURL, infoYmlPath, common.HttpMethodHead, 0, config)
 			resp, err := request.SendRequest(ctx, requestConfig)
 			if err != nil {
 				errors = append(errors, err.Error())
@@ -312,7 +319,7 @@ func checkDrupalModuleChangelogs(ctx context.Context, baseURL, basePath string, 
 	for _, module := range discoveredModules {
 		for _, modulePath := range drupalModulePaths {
 			changelogPath := fmt.Sprintf("%s%s%s/CHANGELOG.txt", basePath, modulePath, module.Name)
-			requestConfig := createDrupalSendHTTPRequestConfig(baseURL, changelogPath, common.HttpMethodGet, config)
+			requestConfig := createDrupalSendHTTPRequestConfig(baseURL, changelogPath, common.HttpMethodGet, 0, config)
 			resp, err := request.SendRequest(ctx, requestConfig)
 			if err != nil {
 				errors = append(errors, err.Error())
@@ -365,7 +372,7 @@ func checkDrupalModuleLicense(ctx context.Context, baseURL, basePath string, con
 		}
 		for _, modulePath := range drupalModulePaths {
 			licensePath := fmt.Sprintf("%s%s%s/LICENSE.txt", basePath, modulePath, module)
-			requestConfig := createDrupalSendHTTPRequestConfig(baseURL, licensePath, common.HttpMethodHead, config)
+			requestConfig := createDrupalSendHTTPRequestConfig(baseURL, licensePath, common.HttpMethodHead, 0, config)
 			resp, err := request.SendRequest(ctx, requestConfig)
 			if err != nil {
 				errors = append(errors, err.Error())
@@ -415,7 +422,7 @@ func checkDrupalModuleReadme(ctx context.Context, baseURL, basePath string, conf
 			}
 			for _, readmeFile := range readmeFiles {
 				readmePath := fmt.Sprintf("%s%s%s/%s", basePath, modulePath, module, readmeFile)
-				requestConfig := createDrupalSendHTTPRequestConfig(baseURL, readmePath, common.HttpMethodGet, config)
+				requestConfig := createDrupalSendHTTPRequestConfig(baseURL, readmePath, common.HttpMethodGet, 0, config)
 				resp, err := request.SendRequest(ctx, requestConfig)
 				if err != nil {
 					errors = append(errors, err.Error())

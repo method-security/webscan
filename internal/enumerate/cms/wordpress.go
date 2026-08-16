@@ -31,7 +31,7 @@ func GetEnumerateWordpressPluginEmbeddedPath(PluginsFileSize enumeratecmswordpre
 	return wordlistPaths[PluginsFileSize]
 }
 
-func createSendHTTPRequestConfig(baseURL, path string, config *enumeratecmswordpressfern.EnumerateWordpressPluginsConfig) common.SendHttpRequestConfig {
+func createSendHTTPRequestConfig(baseURL, path string, maxRedirects int, config *enumeratecmswordpressfern.EnumerateWordpressPluginsConfig) common.SendHttpRequestConfig {
 	request := common.HttpRequest{
 		BaseUrl: baseURL,
 		Path:    path,
@@ -39,15 +39,16 @@ func createSendHTTPRequestConfig(baseURL, path string, config *enumeratecmswordp
 		Params:  &common.HttpRequestParams{},
 	}
 	return common.SendHttpRequestConfig{
-		Request:            &request,
-		MaxRedirects:       0,
-		VerifyTls:          config.VerifyTls,
-		Timeout:            config.Timeout,
-		UserAgent:          config.UserAgent,
-		RequestMethod:      common.RequestMethodStandard,
-		HeadlessConfig:     nil,
-		BrowserbaseConfig:  nil,
-		BrowserbaseSecrets: nil,
+		Request:                    &request,
+		MaxRedirects:               maxRedirects,
+		VerifyTls:                  config.VerifyTls,
+		Timeout:                    config.Timeout,
+		IgnoreCrossDomainRedirects: true,
+		UserAgent:                  config.UserAgent,
+		RequestMethod:              common.RequestMethodStandard,
+		HeadlessConfig:             nil,
+		BrowserbaseConfig:          nil,
+		BrowserbaseSecrets:         nil,
 	}
 }
 
@@ -130,7 +131,7 @@ func scanTarget(ctx context.Context, url string, config *enumeratecmswordpressfe
 		return result, errors
 	}
 
-	requestConfig := createSendHTTPRequestConfig(baseURL, path, config)
+	requestConfig := createSendHTTPRequestConfig(baseURL, path, cmsInitialMaxRedirects, config)
 	accessRequest, err := request.SendRequest(ctx, requestConfig)
 	if err != nil {
 		errors = append(errors, err.Error())
@@ -140,14 +141,15 @@ func scanTarget(ctx context.Context, url string, config *enumeratecmswordpressfe
 	if accessRequest.Response != nil && accessRequest.Response.StatusCode != nil && *accessRequest.Response.StatusCode != 200 {
 		return result, []string{fmt.Sprintf("non-200 status code from site: %d", *accessRequest.Response.StatusCode)}
 	}
+	canonicalURL := canonicalTargetURL(url, accessRequest)
 
 	// Run different detection methods
 	// Path based + Bruteforce Plugin Detection
-	apiPlugins, errs := checkWordPressAPI(ctx, url, config)
+	apiPlugins, errs := checkWordPressAPI(ctx, canonicalURL, config)
 	if len(errs) > 0 {
 		errors = append(errors, errs...)
 	}
-	readmePlugins, errs := checkReadmeFiles(ctx, url, config)
+	readmePlugins, errs := checkReadmeFiles(ctx, canonicalURL, config)
 	if len(errs) > 0 {
 		errors = append(errors, errs...)
 	}
@@ -243,7 +245,7 @@ func checkWordPressAPI(ctx context.Context, url string, config *enumeratecmsword
 		return pluginsList, errors
 	}
 	apiPath := fmt.Sprintf("%s/wp-json", path)
-	requestConfig := createSendHTTPRequestConfig(baseURL, apiPath, config)
+	requestConfig := createSendHTTPRequestConfig(baseURL, apiPath, 0, config)
 	apiRequest, err := request.SendRequest(ctx, requestConfig)
 	if err != nil {
 		errors = append(errors, err.Error())
@@ -312,12 +314,17 @@ func checkWordPressAPI(ctx context.Context, url string, config *enumeratecmsword
 }
 
 // fetchPluginsFromAPI tries to get plugin info directly from the API
-func fetchPluginsFromAPI(ctx context.Context, baseURL string, path string, config *enumeratecmswordpressfern.EnumerateWordpressPluginsConfig) []*enumeratecmswordpressfern.WordpressPluginDetails {
+func fetchPluginsFromAPI(ctx context.Context, targetURL string, path string, config *enumeratecmswordpressfern.EnumerateWordpressPluginsConfig) []*enumeratecmswordpressfern.WordpressPluginDetails {
 	// Initialize Plugin List
 	plugins := []*enumeratecmswordpressfern.WordpressPluginDetails{}
 
+	baseURL, targetPath, _, err := requesthelpers.SplitTargetURL(targetURL)
+	if err != nil {
+		return plugins
+	}
+
 	// Send Request
-	apiRequestConfig := createSendHTTPRequestConfig(baseURL, path, config)
+	apiRequestConfig := createSendHTTPRequestConfig(baseURL, fmt.Sprintf("%s%s", targetPath, path), 0, config)
 	apiRequest, err := request.SendRequest(ctx, apiRequestConfig)
 	if err != nil || apiRequest.Response != nil && apiRequest.Response.StatusCode != nil && *apiRequest.Response.StatusCode != 200 {
 		return plugins
@@ -380,6 +387,9 @@ func checkHTMLForPlugins(baseResponseBody *string) []*enumeratecmswordpressfern.
 			if len(match) > pattern.nameGroup {
 				// Extract plugin name
 				name := match[pattern.nameGroup]
+				if !isValidWordPressPluginSlug(name) {
+					continue
+				}
 
 				// Extract version if available
 				var version *string
@@ -410,14 +420,14 @@ func checkReadmeFiles(ctx context.Context, url string, config *enumeratecmswordp
 	errors := []string{}
 
 	// Loop through plugins and check for readme.txt
+	baseURL, path, _, err := requesthelpers.SplitTargetURL(url)
+	if err != nil {
+		return pluginsList, []string{err.Error()}
+	}
+
 	for i, plugin := range config.Plugins {
-		baseURL, path, _, err := requesthelpers.SplitTargetURL(url)
-		if err != nil {
-			errors = append(errors, err.Error())
-			continue
-		}
 		readmePath := fmt.Sprintf("%s/wp-content/plugins/%s/readme.txt", path, plugin)
-		requestConfig := createSendHTTPRequestConfig(baseURL, readmePath, config)
+		requestConfig := createSendHTTPRequestConfig(baseURL, readmePath, 0, config)
 		readmeRequest, err := request.SendRequest(ctx, requestConfig)
 		if err != nil {
 			errors = append(errors, err.Error())
@@ -486,6 +496,9 @@ func checkRegisteredPlugins(baseResponseBody *string) []*enumeratecmswordpressfe
 	// match[1] = plugin name
 	for _, match := range matches {
 		if len(match) > 1 {
+			if !isValidWordPressPluginSlug(match[1]) {
+				continue
+			}
 			plugins = append(plugins, &enumeratecmswordpressfern.WordpressPluginDetails{
 				Name:   match[1],
 				Source: []enumeratecmswordpressfern.DetectionSource{enumeratecmswordpressfern.DetectionSourceRegisteredScript},
@@ -513,6 +526,9 @@ func checkCSSReferences(baseResponseBody *string) []*enumeratecmswordpressfern.W
 		if len(match) > 2 {
 			cssPath := match[1]
 			pluginName := match[2]
+			if !isValidWordPressPluginSlug(pluginName) {
+				continue
+			}
 
 			// Extract version if available
 			var version *string
@@ -538,6 +554,12 @@ func checkCSSReferences(baseResponseBody *string) []*enumeratecmswordpressfern.W
 	}
 
 	return plugins
+}
+
+var wordpressPluginSlugRegex = regexp.MustCompile(`^[A-Za-z0-9_-][A-Za-z0-9._-]*$`)
+
+func isValidWordPressPluginSlug(slug string) bool {
+	return wordpressPluginSlugRegex.MatchString(slug)
 }
 
 // detectWordPressVersion attempts to identify the WordPress core version running on the target

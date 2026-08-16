@@ -141,19 +141,15 @@ func scanTarget(ctx context.Context, url string, config *enumeratecmswordpressfe
 	if accessRequest.Response != nil && accessRequest.Response.StatusCode != nil && *accessRequest.Response.StatusCode != 200 {
 		return result, []string{fmt.Sprintf("non-200 status code from site: %d", *accessRequest.Response.StatusCode)}
 	}
-	probeURLs := cmsProbeTargetURLs(url, accessRequest)
+	probeBaseURL := cmsProbeBaseURL(url, accessRequest)
 
-	// Run path-based detection against each plausible CMS root. Redirect targets
-	// can be either a mounted install root or just a landing page.
-	apiPlugins := []*enumeratecmswordpressfern.WordpressPluginDetails{}
-	readmePlugins := []*enumeratecmswordpressfern.WordpressPluginDetails{}
-	for _, probeURL := range probeURLs {
-		plugins, errs := checkWordPressAPI(ctx, probeURL, config)
-		apiPlugins = append(apiPlugins, plugins...)
+	// Run path-based detection from the canonical base URL only.
+	apiPlugins, errs := checkWordPressAPI(ctx, probeBaseURL, config)
+	if len(errs) > 0 {
 		errors = append(errors, errs...)
-
-		plugins, errs = checkReadmeFiles(ctx, probeURL, config)
-		readmePlugins = append(readmePlugins, plugins...)
+	}
+	readmePlugins, errs := checkReadmeFiles(ctx, probeBaseURL, config)
+	if len(errs) > 0 {
 		errors = append(errors, errs...)
 	}
 	// Base response body detection methods

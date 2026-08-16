@@ -157,48 +157,37 @@ func scanDrupalTarget(ctx context.Context, url string, config *enumeratecmsdrupa
 	// Detect Drupal core version from response headers and body
 	result.DrupalVersion = checkDrupalVersion(accessRequest)
 
-	licenseModules := []*enumeratecmsdrupalfern.DrupalModuleDetails{}
-	readmeModules := []*enumeratecmsdrupalfern.DrupalModuleDetails{}
-	infoYmlModules := []*enumeratecmsdrupalfern.DrupalModuleDetails{}
-	changelogModules := []*enumeratecmsdrupalfern.DrupalModuleDetails{}
-
-	for _, probeURL := range cmsProbeTargetURLs(url, accessRequest) {
-		probeBaseURL, probePath, _, splitErr := requesthelpers.SplitTargetURL(probeURL)
-		if splitErr != nil {
-			errors = append(errors, splitErr.Error())
-			continue
-		}
-
-		// 1. Brute-force module existence via LICENSE.txt (HEAD, full wordlist)
-		probeLicenseModules, errs := checkDrupalModuleLicense(ctx, probeBaseURL, probePath, config)
-		errors = append(errors, errs...)
-		licenseModules = append(licenseModules, probeLicenseModules...)
-
-		// 2. Brute-force module existence via README.md/README.txt (GET, full wordlist)
-		probeReadmeModules, errs := checkDrupalModuleReadme(ctx, probeBaseURL, probePath, config)
-		errors = append(errors, errs...)
-		readmeModules = append(readmeModules, probeReadmeModules...)
-
-		// 3. Brute-force module existence via info.yml (HEAD, full wordlist)
-		probeInfoYmlModules, errs := checkDrupalModuleInfoYml(ctx, probeBaseURL, probePath, config)
-		errors = append(errors, errs...)
-		infoYmlModules = append(infoYmlModules, probeInfoYmlModules...)
-
-		// Merge this root's brute-force results to get the set for changelog enrichment.
-		discoveredMap := make(map[string]*enumeratecmsdrupalfern.DrupalModuleDetails)
-		mergeDrupalModules(discoveredMap, probeLicenseModules)
-		mergeDrupalModules(discoveredMap, probeReadmeModules)
-		mergeDrupalModules(discoveredMap, probeInfoYmlModules)
-		discoveredModules := make([]*enumeratecmsdrupalfern.DrupalModuleDetails, 0, len(discoveredMap))
-		for _, module := range discoveredMap {
-			discoveredModules = append(discoveredModules, module)
-		}
-
-		// 4. Check CHANGELOG.txt for version info on discovered modules (GET, discovered only)
-		probeChangelogModules, errs := checkDrupalModuleChangelogs(ctx, probeBaseURL, probePath, config, discoveredModules)
-		errors = append(errors, errs...)
-		changelogModules = append(changelogModules, probeChangelogModules...)
+	probeBaseURL, probePath, _, err := requesthelpers.SplitTargetURL(cmsProbeBaseURL(url, accessRequest))
+	if err != nil {
+		errors = append(errors, err.Error())
+		return result, errors
 	}
+
+	// 1. Brute-force module existence via LICENSE.txt (HEAD, full wordlist)
+	licenseModules, errs := checkDrupalModuleLicense(ctx, probeBaseURL, probePath, config)
+	errors = append(errors, errs...)
+
+	// 2. Brute-force module existence via README.md/README.txt (GET, full wordlist)
+	readmeModules, errs := checkDrupalModuleReadme(ctx, probeBaseURL, probePath, config)
+	errors = append(errors, errs...)
+
+	// 3. Brute-force module existence via info.yml (HEAD, full wordlist)
+	infoYmlModules, errs := checkDrupalModuleInfoYml(ctx, probeBaseURL, probePath, config)
+	errors = append(errors, errs...)
+
+	// Merge brute-force results to get full discovered set for changelog enrichment
+	discoveredMap := make(map[string]*enumeratecmsdrupalfern.DrupalModuleDetails)
+	mergeDrupalModules(discoveredMap, licenseModules)
+	mergeDrupalModules(discoveredMap, readmeModules)
+	mergeDrupalModules(discoveredMap, infoYmlModules)
+	discoveredModules := make([]*enumeratecmsdrupalfern.DrupalModuleDetails, 0, len(discoveredMap))
+	for _, module := range discoveredMap {
+		discoveredModules = append(discoveredModules, module)
+	}
+
+	// 4. Check CHANGELOG.txt for version info on discovered modules (GET, discovered only)
+	changelogModules, errs := checkDrupalModuleChangelogs(ctx, probeBaseURL, probePath, config, discoveredModules)
+	errors = append(errors, errs...)
 
 	// 5. Passive detection from homepage HTML
 	// Merge priority: changelog > readme > license > info.yml > passive

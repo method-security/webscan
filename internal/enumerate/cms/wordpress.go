@@ -141,15 +141,15 @@ func scanTarget(ctx context.Context, url string, config *enumeratecmswordpressfe
 	if accessRequest.Response != nil && accessRequest.Response.StatusCode != nil && *accessRequest.Response.StatusCode != 200 {
 		return result, []string{fmt.Sprintf("non-200 status code from site: %d", *accessRequest.Response.StatusCode)}
 	}
-	canonicalURL := canonicalTargetURL(url, accessRequest)
+	probeURL := cmsProbeTargetURL(url, accessRequest)
 
 	// Run different detection methods
 	// Path based + Bruteforce Plugin Detection
-	apiPlugins, errs := checkWordPressAPI(ctx, canonicalURL, config)
+	apiPlugins, errs := checkWordPressAPI(ctx, probeURL, config)
 	if len(errs) > 0 {
 		errors = append(errors, errs...)
 	}
-	readmePlugins, errs := checkReadmeFiles(ctx, canonicalURL, config)
+	readmePlugins, errs := checkReadmeFiles(ctx, probeURL, config)
 	if len(errs) > 0 {
 		errors = append(errors, errs...)
 	}

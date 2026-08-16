@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/url"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -92,6 +93,7 @@ var specExtensions = []string{"", ".json", ".yaml", ".yml"}
 const (
 	swaggerInitialMaxRedirects = 10
 	swaggerProbeMaxRedirects   = 0
+	swaggerSpecURLMaxRedirects = 1
 )
 
 // generateSpecPaths creates all possible spec paths by combining base paths with extensions
@@ -152,9 +154,12 @@ func joinSwaggerProbePath(basePath, childPath string) string {
 }
 
 func swaggerProbeBasePaths(originalPath, canonicalPath string) []string {
-	paths := []string{canonicalPath}
-	if originalPath != canonicalPath {
-		paths = append(paths, originalPath)
+	var paths []string
+	for _, path := range []string{canonicalPath, originalPath, ""} {
+		if slices.Contains(paths, path) {
+			continue
+		}
+		paths = append(paths, path)
 	}
 	return paths
 }
@@ -164,11 +169,22 @@ func resolveSpecURL(reference, documentURL string) string {
 	if err != nil {
 		return reference
 	}
+	if shouldTreatSwaggerDocumentAsDirectory(parsedDocumentURL) {
+		parsedDocumentURL.Path += "/"
+	}
 	parsedReference, err := url.Parse(reference)
 	if err != nil {
 		return reference
 	}
 	return parsedDocumentURL.ResolveReference(parsedReference).String()
+}
+
+func shouldTreatSwaggerDocumentAsDirectory(documentURL *url.URL) bool {
+	if documentURL == nil || documentURL.Path == "" || strings.HasSuffix(documentURL.Path, "/") {
+		return false
+	}
+	lastSegment := documentURL.Path[strings.LastIndex(documentURL.Path, "/")+1:]
+	return !strings.Contains(lastSegment, ".")
 }
 
 // extractSpecURLFromRenderedContent looks for spec URLs in the rendered HTML content
@@ -447,7 +463,7 @@ func PerformAppEnumerateSwagger(ctx context.Context, config enumerateapiapplicat
 			report.Errors = append(report.Errors, fmt.Sprintf("invalid specUrl: %v", err))
 			return report
 		}
-		requestConfig := createSendHTTPRequestConfig(baseURL, specPath, swaggerProbeMaxRedirects, false, config.Timeout, config.VerifyTls, config.UserAgent, common.RequestMethodStandard, nil, headers)
+		requestConfig := createSendHTTPRequestConfig(baseURL, specPath, swaggerSpecURLMaxRedirects, false, config.Timeout, config.VerifyTls, config.UserAgent, common.RequestMethodStandard, nil, headers)
 		// Preserve query parameters from specUrl (e.g., ?format=openapi) — SplitTargetURL strips them.
 		if len(queryParams) > 0 {
 			if requestConfig.Request.Params == nil {

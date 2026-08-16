@@ -154,8 +154,8 @@ func scanDrupalTarget(ctx context.Context, url string, config *enumeratecmsdrupa
 	if statusCode := getResponseStatusCode(accessRequest); statusCode != 200 {
 		return result, []string{fmt.Sprintf("non-200 status code from site: %d", statusCode)}
 	}
-	canonicalURL := canonicalTargetURL(url, accessRequest)
-	baseURL, path, _, err = requesthelpers.SplitTargetURL(canonicalURL)
+	probeURL := cmsProbeTargetURL(url, accessRequest)
+	baseURL, path, _, err = requesthelpers.SplitTargetURL(probeURL)
 	if err != nil {
 		errors = append(errors, err.Error())
 		return result, errors

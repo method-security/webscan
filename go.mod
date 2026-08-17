@@ -16,7 +16,7 @@ require (
 	github.com/projectdiscovery/gologger v1.1.72
 	github.com/projectdiscovery/nuclei/v3 v3.11.1
 	github.com/projectdiscovery/useragent v0.0.108
-	github.com/projectdiscovery/wappalyzergo v0.2.93
+	github.com/projectdiscovery/wappalyzergo v0.2.94
 	github.com/robertkrimen/otto v0.5.1
 	github.com/spaolacci/murmur3 v1.1.0
 	github.com/spf13/cobra v1.10.2

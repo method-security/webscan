@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"regexp"
 	"strings"
 
 	// Generated
@@ -15,6 +16,8 @@ import (
 	// Utils
 	utils "github.com/Method-Security/webscan/utils"
 )
+
+var akamaiPixelPathRegex = regexp.MustCompile(`(?i)^/akam/\d+/pixel_[a-z0-9_-]+$`)
 
 // SetToListString converts a set of strings to a list of strings.
 func SetToListString(set map[string]struct{}) []string {
@@ -51,6 +54,10 @@ func MergeWebRoutes(routes []*discover.RouteDetails) []*discover.RouteDetails {
 	routeMap := make(map[string]*discover.RouteDetails)
 
 	for _, route := range routes {
+		if route == nil || IsKnownBotChallengeRoute(route) {
+			continue
+		}
+
 		// Create a unique key based on method and URL
 		method := route.Method
 		if method == "" {
@@ -391,11 +398,78 @@ func NormalizeURLForIdentity(rawURL string) string {
 // endpoints discovered inside a bundle are still filtered through IsURLAllowed
 // against the target host.
 func IsURLAllowed(scopeURL string, targetURL string, ignoreCrossDomain bool, captureStaticAssets bool) bool {
+	if IsKnownBotChallengeURL(targetURL) {
+		return false
+	}
 	if !captureStaticAssets && utils.IsStaticAsset(targetURL) {
 		return false
 	}
 	if ignoreCrossDomain {
 		return utils.IsHostInScope(scopeURL, targetURL)
+	}
+	return true
+}
+
+// IsKnownBotChallengeURL reports URL-only anti-bot telemetry endpoints that
+// should never be returned as application routes.
+func IsKnownBotChallengeURL(rawURL string) bool {
+	parsedURL, err := url.Parse(rawURL)
+	if err != nil {
+		return false
+	}
+	return akamaiPixelPathRegex.MatchString(parsedURL.EscapedPath())
+}
+
+// IsKnownBotChallengeRoute reports anti-bot network routes that need request
+// context beyond the URL itself to identify safely.
+func IsKnownBotChallengeRoute(route *discover.RouteDetails) bool {
+	if route == nil {
+		return false
+	}
+	if IsKnownBotChallengeURL(route.BaseUrl + route.Path) {
+		return true
+	}
+	if route.Method != common.HttpMethodPost || !hasRouteBodyParam(route.BodyParams, "sensor_data") {
+		return false
+	}
+	return isAkamaiSensorPath(route.Path)
+}
+
+func hasRouteBodyParam(params []*discover.RouteBodyParam, name string) bool {
+	for _, param := range params {
+		if param != nil && param.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+func isAkamaiSensorPath(routePath string) bool {
+	segments := strings.Split(strings.Trim(routePath, "/"), "/")
+	if len(segments) < 4 {
+		return false
+	}
+
+	totalLength := 0
+	for _, segment := range segments {
+		if len(segment) < 4 || !isOpaquePathSegment(segment) {
+			return false
+		}
+		totalLength += len(segment)
+	}
+	return totalLength >= 40
+}
+
+func isOpaquePathSegment(segment string) bool {
+	for _, r := range segment {
+		switch {
+		case r >= 'a' && r <= 'z':
+		case r >= 'A' && r <= 'Z':
+		case r >= '0' && r <= '9':
+		case r == '-', r == '_':
+		default:
+			return false
+		}
 	}
 	return true
 }

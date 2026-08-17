@@ -28,5 +28,5 @@ http:
       - type: dsl
         dsl:
           - 'contains(tolower(body), "citrix storefront")'
-          - 'contains(tolower(body), "receiver/images/common") && (contains(tolower(body), "ctxs.") || contains(tolower(body), "_ctxstxt"))'
-          - 'contains(tolower(body), "citrix workspace") && contains(tolower(body), "receiver/images/common") && contains(tolower(body), "ctxs")'
+          - 'contains(tolower(body), "/citrix/storeweb")'
+          - 'contains(tolower(body), "/citrix/store/discovery")'

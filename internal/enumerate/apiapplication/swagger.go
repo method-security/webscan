@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/url"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -89,6 +90,12 @@ var baseSpecPaths = []string{
 // Spec file extensions to try (in order of preference)
 var specExtensions = []string{"", ".json", ".yaml", ".yml"}
 
+const (
+	swaggerInitialMaxRedirects = 10
+	swaggerProbeMaxRedirects   = 0
+	swaggerSpecURLMaxRedirects = 1
+)
+
 // generateSpecPaths creates all possible spec paths by combining base paths with extensions
 func generateSpecPaths() []string {
 	var paths []string
@@ -109,7 +116,7 @@ func generateSpecPaths() []string {
 	return paths
 }
 
-func createSendHTTPRequestConfig(baseURL, path string, timeout int, verifyTls bool, userAgent common.UserAgentPreset, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, headers map[string][]string) common.SendHttpRequestConfig {
+func createSendHTTPRequestConfig(baseURL, path string, maxRedirects int, ignoreCrossDomainRedirects bool, timeout int, verifyTls bool, userAgent common.UserAgentPreset, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, headers map[string][]string) common.SendHttpRequestConfig {
 	request := common.HttpRequest{
 		BaseUrl: baseURL,
 		Path:    path,
@@ -117,20 +124,71 @@ func createSendHTTPRequestConfig(baseURL, path string, timeout int, verifyTls bo
 		Params:  &common.HttpRequestParams{Headers: headers},
 	}
 	return common.SendHttpRequestConfig{
-		Request:            &request,
-		MaxRedirects:       1,
-		VerifyTls:          verifyTls,
-		Timeout:            timeout,
-		UserAgent:          userAgent,
-		RequestMethod:      requestMethod,
-		HeadlessConfig:     headlessConfig,
-		BrowserbaseConfig:  nil,
-		BrowserbaseSecrets: nil,
+		Request:                    &request,
+		MaxRedirects:               maxRedirects,
+		VerifyTls:                  verifyTls,
+		Timeout:                    timeout,
+		IgnoreCrossDomainRedirects: ignoreCrossDomainRedirects,
+		UserAgent:                  userAgent,
+		RequestMethod:              requestMethod,
+		HeadlessConfig:             headlessConfig,
+		BrowserbaseConfig:          nil,
+		BrowserbaseSecrets:         nil,
 	}
 }
 
+func canonicalSwaggerTargetURL(original string, response *common.HttpRequestResponse) string {
+	if response == nil || response.Response == nil || len(response.Response.RedirectChain) == 0 {
+		return original
+	}
+	return response.Response.RedirectChain[len(response.Response.RedirectChain)-1]
+}
+
+func joinSwaggerProbePath(basePath, childPath string) string {
+	basePath = strings.TrimRight(basePath, "/")
+	childPath = "/" + strings.TrimLeft(childPath, "/")
+	if basePath == "" {
+		return childPath
+	}
+	return basePath + childPath
+}
+
+func swaggerProbeBasePaths(originalPath, canonicalPath string) []string {
+	var paths []string
+	for _, path := range []string{canonicalPath, originalPath, ""} {
+		if slices.Contains(paths, path) {
+			continue
+		}
+		paths = append(paths, path)
+	}
+	return paths
+}
+
+func resolveSpecURL(reference, documentURL string) string {
+	parsedDocumentURL, err := url.Parse(documentURL)
+	if err != nil {
+		return reference
+	}
+	if shouldTreatSwaggerDocumentAsDirectory(parsedDocumentURL) {
+		parsedDocumentURL.Path += "/"
+	}
+	parsedReference, err := url.Parse(reference)
+	if err != nil {
+		return reference
+	}
+	return parsedDocumentURL.ResolveReference(parsedReference).String()
+}
+
+func shouldTreatSwaggerDocumentAsDirectory(documentURL *url.URL) bool {
+	if documentURL == nil || documentURL.Path == "" || strings.HasSuffix(documentURL.Path, "/") {
+		return false
+	}
+	lastSegment := documentURL.Path[strings.LastIndex(documentURL.Path, "/")+1:]
+	return !strings.Contains(lastSegment, ".")
+}
+
 // extractSpecURLFromRenderedContent looks for spec URLs in the rendered HTML content
-func extractSpecURLFromRenderedContent(htmlContent, baseURL string) []string {
+func extractSpecURLFromRenderedContent(htmlContent, documentURL string) []string {
 	var specURLs []string
 
 	// Use regex to find anchor tags with href attributes that point to spec files
@@ -144,13 +202,7 @@ func extractSpecURLFromRenderedContent(htmlContent, baseURL string) []string {
 
 			// Check if it looks like a spec URL
 			if isLikelySpecURL(url) {
-				// Convert relative URLs to absolute
-				if strings.HasPrefix(url, "/") {
-					url = baseURL + url
-				} else if !strings.HasPrefix(url, "http") {
-					url = baseURL + "/" + url
-				}
-				specURLs = append(specURLs, url)
+				specURLs = append(specURLs, resolveSpecURL(url, documentURL))
 			}
 		}
 	}
@@ -166,13 +218,7 @@ func extractSpecURLFromRenderedContent(htmlContent, baseURL string) []string {
 
 			// Check if it looks like a spec URL
 			if isLikelySpecURL(url) {
-				// Convert relative URLs to absolute
-				if strings.HasPrefix(url, "/") {
-					url = baseURL + url
-				} else if !strings.HasPrefix(url, "http") {
-					url = baseURL + "/" + url
-				}
-				specURLs = append(specURLs, url)
+				specURLs = append(specURLs, resolveSpecURL(url, documentURL))
 			}
 		}
 	}
@@ -215,6 +261,7 @@ func findOpenAPISpec(ctx context.Context, target string, timeout int, verifyTls 
 	if err != nil {
 		return "", nil, nil, fmt.Errorf("failed to split target URL: %w", err)
 	}
+	originalTargetPath := parsedTargetPath
 
 	// Caller-supplied candidate paths are probed before the built-in spec paths.
 	specPaths := append(append([]string{}, candidatePaths...), generateSpecPaths()...)
@@ -224,8 +271,18 @@ func findOpenAPISpec(ctx context.Context, target string, timeout int, verifyTls 
 	}
 
 	// STEP 1: Make a standard request to check if target is a Swagger UI page
-	requestConfig := createSendHTTPRequestConfig(baseURL, parsedTargetPath, timeout, verifyTls, userAgent, common.RequestMethodStandard, nil, headers)
+	requestConfig := createSendHTTPRequestConfig(baseURL, parsedTargetPath, swaggerInitialMaxRedirects, true, timeout, verifyTls, userAgent, common.RequestMethodStandard, nil, headers)
 	response, err := request.SendRequest(ctx, requestConfig)
+	canonicalTarget := target
+	if err == nil {
+		canonicalTarget = canonicalSwaggerTargetURL(target, response)
+		canonicalBaseURL, canonicalPath, _, splitErr := requesthelpers.SplitTargetURL(canonicalTarget)
+		if splitErr == nil {
+			baseURL = canonicalBaseURL
+			parsedTargetPath = canonicalPath
+		}
+	}
+	probeBasePaths := swaggerProbeBasePaths(originalTargetPath, parsedTargetPath)
 
 	if err == nil && response.Response != nil && response.Response.StatusCode != nil &&
 		*response.Response.StatusCode == 200 && response.Response.ResponseBody != nil {
@@ -240,7 +297,7 @@ func findOpenAPISpec(ctx context.Context, target string, timeout int, verifyTls 
 					MinDomStabalizeTime: 5,
 				}
 
-				headlessRequestConfig := createSendHTTPRequestConfig(baseURL, parsedTargetPath, timeout, verifyTls, userAgent, common.RequestMethodHeadless, headlessConfig, headers)
+				headlessRequestConfig := createSendHTTPRequestConfig(baseURL, parsedTargetPath, swaggerProbeMaxRedirects, true, timeout, verifyTls, userAgent, common.RequestMethodHeadless, headlessConfig, headers)
 				headlessResponse, err := request.SendRequest(ctx, headlessRequestConfig)
 
 				if err == nil && headlessResponse.Response != nil && headlessResponse.Response.StatusCode != nil &&
@@ -249,7 +306,7 @@ func findOpenAPISpec(ctx context.Context, target string, timeout int, verifyTls 
 					headlessBody := requesthelpers.GetResponseBodyStringFromBodyStruct(headlessResponse.Response.ResponseBody)
 					if headlessBody != nil {
 						// Extract spec URLs from the rendered content
-						specURLs := extractSpecURLFromRenderedContent(*headlessBody, baseURL)
+						specURLs := extractSpecURLFromRenderedContent(*headlessBody, canonicalTarget)
 
 						// Try each extracted spec URL
 						for _, specURL := range specURLs {
@@ -265,7 +322,7 @@ func findOpenAPISpec(ctx context.Context, target string, timeout int, verifyTls 
 							}
 
 							// Make request to the extracted spec URL
-							specRequestConfig := createSendHTTPRequestConfig(baseURL, specPath, timeout, verifyTls, userAgent, common.RequestMethodStandard, nil, headers)
+							specRequestConfig := createSendHTTPRequestConfig(baseURL, specPath, swaggerProbeMaxRedirects, true, timeout, verifyTls, userAgent, common.RequestMethodStandard, nil, headers)
 							specResponse, err := request.SendRequest(ctx, specRequestConfig)
 							if err != nil {
 								continue
@@ -290,27 +347,30 @@ func findOpenAPISpec(ctx context.Context, target string, timeout int, verifyTls 
 
 						// If no extracted URLs worked, try common paths as fallback
 						for _, path := range specPaths {
-							specRequestConfig := createSendHTTPRequestConfig(baseURL, path, timeout, verifyTls, userAgent, common.RequestMethodStandard, nil, headers)
-							specResponse, err := request.SendRequest(ctx, specRequestConfig)
-							if err != nil {
-								continue
-							}
+							for _, probeBasePath := range probeBasePaths {
+								probePath := joinSwaggerProbePath(probeBasePath, path)
+								specRequestConfig := createSendHTTPRequestConfig(baseURL, probePath, swaggerProbeMaxRedirects, true, timeout, verifyTls, userAgent, common.RequestMethodStandard, nil, headers)
+								specResponse, err := request.SendRequest(ctx, specRequestConfig)
+								if err != nil {
+									continue
+								}
 
-							if specResponse.Response == nil || specResponse.Response.StatusCode == nil ||
-								*specResponse.Response.StatusCode != 200 || specResponse.Response.ResponseBody == nil {
-								continue
-							}
+								if specResponse.Response == nil || specResponse.Response.StatusCode == nil ||
+									*specResponse.Response.StatusCode != 200 || specResponse.Response.ResponseBody == nil {
+									continue
+								}
 
-							specBody := requesthelpers.GetResponseBodyStringFromBodyStruct(specResponse.Response.ResponseBody)
-							if specBody == nil {
-								continue
-							}
+								specBody := requesthelpers.GetResponseBodyStringFromBodyStruct(specResponse.Response.ResponseBody)
+								if specBody == nil {
+									continue
+								}
 
-							docType, isValidSpec := detectOpenAPISpec(*specBody)
-							if isValidSpec {
-								swaggerURL := baseURL + path
-								bodyBytes := []byte(*specBody)
-								return swaggerURL, bodyBytes, docType, nil
+								docType, isValidSpec := detectOpenAPISpec(*specBody)
+								if isValidSpec {
+									swaggerURL := baseURL + probePath
+									bodyBytes := []byte(*specBody)
+									return swaggerURL, bodyBytes, docType, nil
+								}
 							}
 						}
 					}
@@ -326,28 +386,31 @@ func findOpenAPISpec(ctx context.Context, target string, timeout int, verifyTls 
 		}
 
 		// Create a request config for the Swagger/OpenAPI spec and send the request
-		requestConfig := createSendHTTPRequestConfig(baseURL, fmt.Sprintf("%s%s", parsedTargetPath, path), timeout, verifyTls, userAgent, common.RequestMethodStandard, nil, headers)
-		request, err := request.SendRequest(ctx, requestConfig)
-		if err != nil {
-			continue // Try next path on request failure
-		}
+		for _, probeBasePath := range probeBasePaths {
+			probePath := joinSwaggerProbePath(probeBasePath, path)
+			requestConfig := createSendHTTPRequestConfig(baseURL, probePath, swaggerProbeMaxRedirects, true, timeout, verifyTls, userAgent, common.RequestMethodStandard, nil, headers)
+			request, err := request.SendRequest(ctx, requestConfig)
+			if err != nil {
+				continue // Try next path on request failure
+			}
 
-		// Check if the request was successful
-		if request.Response == nil || request.Response.StatusCode == nil || *request.Response.StatusCode != 200 || request.Response.ResponseBody == nil {
-			continue
-		}
+			// Check if the request was successful
+			if request.Response == nil || request.Response.StatusCode == nil || *request.Response.StatusCode != 200 || request.Response.ResponseBody == nil {
+				continue
+			}
 
-		// Check if the response body contains a valid OpenAPI/Swagger spec
-		responseBody := requesthelpers.GetResponseBodyStringFromBodyStruct(request.Response.ResponseBody)
-		if responseBody == nil {
-			continue
-		}
+			// Check if the response body contains a valid OpenAPI/Swagger spec
+			responseBody := requesthelpers.GetResponseBodyStringFromBodyStruct(request.Response.ResponseBody)
+			if responseBody == nil {
+				continue
+			}
 
-		docType, isValidSpec := detectOpenAPISpec(*responseBody)
-		if isValidSpec {
-			swaggerURL := target + path // full URL for the report
-			bodyBytes := []byte(*responseBody)
-			return swaggerURL, bodyBytes, docType, nil
+			docType, isValidSpec := detectOpenAPISpec(*responseBody)
+			if isValidSpec {
+				swaggerURL := baseURL + probePath
+				bodyBytes := []byte(*responseBody)
+				return swaggerURL, bodyBytes, docType, nil
+			}
 		}
 	}
 
@@ -400,7 +463,7 @@ func PerformAppEnumerateSwagger(ctx context.Context, config enumerateapiapplicat
 			report.Errors = append(report.Errors, fmt.Sprintf("invalid specUrl: %v", err))
 			return report
 		}
-		requestConfig := createSendHTTPRequestConfig(baseURL, specPath, config.Timeout, config.VerifyTls, config.UserAgent, common.RequestMethodStandard, nil, headers)
+		requestConfig := createSendHTTPRequestConfig(baseURL, specPath, swaggerSpecURLMaxRedirects, false, config.Timeout, config.VerifyTls, config.UserAgent, common.RequestMethodStandard, nil, headers)
 		// Preserve query parameters from specUrl (e.g., ?format=openapi) — SplitTargetURL strips them.
 		if len(queryParams) > 0 {
 			if requestConfig.Request.Params == nil {

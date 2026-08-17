@@ -127,7 +127,9 @@ func IsHostInScope(baseURL string, targetURL string) bool {
 	return targetHost == baseHost || strings.HasSuffix(targetHost, "."+baseHost)
 }
 
-// IsTrailingSlashRedirect checks if the redirect is just adding a trailing slash
+// IsTrailingSlashRedirect checks if the redirect is just adding a trailing slash.
+// Default ports are normalized so https://host:443/path and https://host/path/
+// are treated as the same origin.
 func IsTrailingSlashRedirect(from, to string) bool {
 	fromURL, err := url.Parse(from)
 	if err != nil {
@@ -137,8 +139,9 @@ func IsTrailingSlashRedirect(from, to string) bool {
 	if err != nil {
 		return false
 	}
-	// Must be same scheme and host
-	if fromURL.Scheme != toURL.Scheme || fromURL.Host != toURL.Host {
+	// Must be same origin. url.Host cannot be compared directly because an
+	// explicit default port is equivalent to an omitted port.
+	if !sameURLOrigin(fromURL, toURL) {
 		return false
 	}
 
@@ -164,4 +167,34 @@ func IsTrailingSlashRedirect(from, to string) bool {
 	return fromPathNormalized == toPathNormalized &&
 		!strings.HasSuffix(fromPath, "/") &&
 		strings.HasSuffix(toPath, "/")
+}
+
+func sameURLOrigin(left, right *url.URL) bool {
+	if left == nil || right == nil {
+		return false
+	}
+	if !strings.EqualFold(left.Scheme, right.Scheme) {
+		return false
+	}
+	if !strings.EqualFold(left.Hostname(), right.Hostname()) {
+		return false
+	}
+	return effectiveURLPort(left) == effectiveURLPort(right)
+}
+
+func effectiveURLPort(parsedURL *url.URL) string {
+	if parsedURL == nil {
+		return ""
+	}
+	if port := parsedURL.Port(); port != "" {
+		return port
+	}
+	switch strings.ToLower(parsedURL.Scheme) {
+	case "http":
+		return "80"
+	case "https":
+		return "443"
+	default:
+		return ""
+	}
 }

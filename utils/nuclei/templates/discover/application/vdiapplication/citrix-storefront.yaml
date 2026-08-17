@@ -29,4 +29,3 @@ http:
         dsl:
           - 'contains(tolower(body), "_ctxstxt_appstore") && contains(tolower(body), "receiver/images/common") && contains(tolower(body), "receiver/js/ctxs.")'
           - 'contains(tolower(body), "<discovery") && contains(tolower(body), "citrix.com/servicerecord") && contains(tolower(body), "<service type=\"store\">")'
-        condition: or

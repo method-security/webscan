@@ -300,7 +300,7 @@ func findOpenAPISpec(ctx context.Context, target string, timeout int, verifyTls 
 					MinDomStabalizeTime: 5,
 				}
 
-				headlessRequestConfig := createSendHTTPRequestConfig(baseURL, parsedTargetPath, swaggerProbeMaxRedirects, true, timeout, verifyTls, userAgent, common.RequestMethodHeadless, headlessConfig, headers)
+				headlessRequestConfig := createSendHTTPRequestConfig(baseURL, parsedTargetPath, swaggerInitialMaxRedirects, true, timeout, verifyTls, userAgent, common.RequestMethodHeadless, headlessConfig, headers)
 				headlessResponse, err := request.SendRequest(ctx, headlessRequestConfig)
 
 				if err == nil && headlessResponse.Response != nil && headlessResponse.Response.StatusCode != nil &&

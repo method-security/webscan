@@ -3,6 +3,7 @@ package discoverroute
 import (
 	// Standard
 	"net/url"
+	"regexp"
 	"strings"
 
 	// Generated
@@ -14,6 +15,8 @@ import (
 	// External
 	goquery "github.com/PuerkitoBio/goquery"
 )
+
+var windowOpenLiteralRegex = regexp.MustCompile(`(?i)\bwindow\.open\s*\(\s*(?:"([^"]+)"|'([^']+)')`)
 
 // ExtractFormRoutes extracts WebRoutes from form elements in the HTML document
 // It returns a slice of WebRoutes, a slice of URLs and a slice of errors
@@ -112,64 +115,80 @@ func ExtractAnchorRoutes(doc *goquery.Document, baseURL string, routeCaptureConf
 	urls := make(map[string]struct{})
 	errors := []string{}
 
-	doc.Find("a[href]").Each(func(i int, s *goquery.Selection) {
-		href, exists := s.Attr("href")
-		if exists && href != "" {
-			fullURL := discoverroutehelpers.ResolveURL(baseURL, href)
-
-			// Static assets are diverted to the StaticAssets output rather than
-			// recorded as routes. Scope is anchored on the original target, not the
-			// per-page (post-redirect) base URL.
-			if discoverroutehelpers.CaptureStaticAssetReference(urls, routeCaptureConfig.Target, fullURL, routeCaptureConfig.IgnoreCrossDomainStaticAssets, routeCaptureConfig.CollectStaticAssets) {
-				return
-			}
-
-			// Parse the full URL to extract query parameters before removing them
-			parsedFullURL, err := url.Parse(fullURL)
-			if err != nil {
-				errors = append(errors, err.Error())
-				return
-			}
-
-			// Extract query parameters from the original URL
-			var queryParams []*discover.RouteQueryParam
-			if parsedFullURL.RawQuery != "" {
-				queryParams = discoverroutehelpers.ParseQueryParams(parsedFullURL)
-			}
-
-			// The route URL should not have query params, those are stored in QueryParams
-			urlNoQuery, err := discoverroutehelpers.URLRemoveQueryParams(fullURL)
-			if err != nil {
-				errors = append(errors, err.Error())
-				return
-			}
-
-			// Check if the URL is allowed
-			if !discoverroutehelpers.IsURLAllowed(routeCaptureConfig.Target, fullURL, routeCaptureConfig.IgnoreCrossDomainRoutes, routeCaptureConfig.CollectStaticAssets) {
-				return
-			}
-			urls[urlNoQuery] = struct{}{}
-
-			// Get the origin and path from the full URL without query params
-			routeBaseURL, routePath, err := discoverroutehelpers.SplitURLBaseAndPath(urlNoQuery)
-			if err != nil {
-				errors = append(errors, err.Error())
-				return
-			}
-
-			routeVar := &discover.RouteDetails{
-				BaseUrl: routeBaseURL,
-				Path:    routePath,
-				Method:  common.HttpMethodGet, // Anchor links are accessed via GET
-			}
-
-			// Add query parameters if any were found
-			if len(queryParams) > 0 {
-				routeVar.QueryParams = queryParams
-			}
-
-			routes = append(routes, routeVar)
+	appendAnchorRoute := func(rawReference string) {
+		if rawReference == "" {
+			return
 		}
+
+		fullURL := discoverroutehelpers.ResolveURL(baseURL, rawReference)
+
+		// Static assets are diverted to the StaticAssets output rather than
+		// recorded as routes. Scope is anchored on the original target, not the
+		// per-page (post-redirect) base URL.
+		if discoverroutehelpers.CaptureStaticAssetReference(urls, routeCaptureConfig.Target, fullURL, routeCaptureConfig.IgnoreCrossDomainStaticAssets, routeCaptureConfig.CollectStaticAssets) {
+			return
+		}
+
+		// Parse the full URL to extract query parameters before removing them.
+		parsedFullURL, err := url.Parse(fullURL)
+		if err != nil {
+			errors = append(errors, err.Error())
+			return
+		}
+
+		var queryParams []*discover.RouteQueryParam
+		if parsedFullURL.RawQuery != "" {
+			queryParams = discoverroutehelpers.ParseQueryParams(parsedFullURL)
+		}
+
+		// The route URL should not have query params, those are stored in QueryParams.
+		urlNoQuery, err := discoverroutehelpers.URLRemoveQueryParams(fullURL)
+		if err != nil {
+			errors = append(errors, err.Error())
+			return
+		}
+
+		if !discoverroutehelpers.IsURLAllowed(routeCaptureConfig.Target, fullURL, routeCaptureConfig.IgnoreCrossDomainRoutes, routeCaptureConfig.CollectStaticAssets) {
+			return
+		}
+		urls[urlNoQuery] = struct{}{}
+
+		routeBaseURL, routePath, err := discoverroutehelpers.SplitURLBaseAndPath(urlNoQuery)
+		if err != nil {
+			errors = append(errors, err.Error())
+			return
+		}
+
+		routeVar := &discover.RouteDetails{
+			BaseUrl: routeBaseURL,
+			Path:    routePath,
+			Method:  common.HttpMethodGet,
+		}
+		if len(queryParams) > 0 {
+			routeVar.QueryParams = queryParams
+		}
+
+		routes = append(routes, routeVar)
+	}
+
+	doc.Find("a").Each(func(i int, s *goquery.Selection) {
+		if href, exists := s.Attr("href"); exists {
+			appendAnchorRoute(href)
+		}
+
+		onclick, exists := s.Attr("onclick")
+		if !exists || onclick == "" {
+			return
+		}
+		match := windowOpenLiteralRegex.FindStringSubmatch(onclick)
+		if len(match) == 0 {
+			return
+		}
+		if match[1] != "" {
+			appendAnchorRoute(match[1])
+			return
+		}
+		appendAnchorRoute(match[2])
 	})
 
 	return discoverroutehelpers.MergeWebRoutes(routes), discoverroutehelpers.SetToListString(urls), errors

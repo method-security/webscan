@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"regexp"
 	"strings"
 
 	// Generated
@@ -15,6 +16,31 @@ import (
 	// Utils
 	utils "github.com/Method-Security/webscan/utils"
 )
+
+type providerRouteNoiseSignature struct {
+	pathRegex         *regexp.Regexp
+	pathMatcher       func(string) bool
+	method            common.HttpMethod
+	requiredBodyParam string
+}
+
+// knownProviderRouteNoiseSignatures centralizes provider-generated paths that
+// should not be surfaced as application routes.
+var knownProviderRouteNoiseSignatures = []providerRouteNoiseSignature{
+	{
+		pathRegex: regexp.MustCompile(`(?i)^/akam/\d+/pixel_[a-z0-9_-]+$`),
+	},
+	{
+		pathRegex: regexp.MustCompile(`(?i)^/cdn-cgi(?:/|$)`),
+	},
+	{
+		method:            common.HttpMethodPost,
+		requiredBodyParam: "sensor_data",
+		pathMatcher: func(routePath string) bool {
+			return isOpaqueMultiSegmentPath(routePath, 4, 4, 40)
+		},
+	},
+}
 
 // SetToListString converts a set of strings to a list of strings.
 func SetToListString(set map[string]struct{}) []string {
@@ -51,6 +77,10 @@ func MergeWebRoutes(routes []*discover.RouteDetails) []*discover.RouteDetails {
 	routeMap := make(map[string]*discover.RouteDetails)
 
 	for _, route := range routes {
+		if route == nil || IsKnownProviderRouteNoise(route) {
+			continue
+		}
+
 		// Create a unique key based on method and URL
 		method := route.Method
 		if method == "" {
@@ -393,11 +423,109 @@ func NormalizeURLForIdentity(rawURL string) string {
 // endpoints discovered inside a bundle are still filtered through IsURLAllowed
 // against the target host.
 func IsURLAllowed(scopeURL string, targetURL string, ignoreCrossDomain bool, captureStaticAssets bool) bool {
+	if IsKnownProviderNoiseURL(targetURL) {
+		return false
+	}
 	if !captureStaticAssets && utils.IsStaticAsset(targetURL) {
 		return false
 	}
 	if ignoreCrossDomain {
 		return utils.IsHostInScope(scopeURL, targetURL)
+	}
+	return true
+}
+
+// IsKnownProviderNoiseURL reports URL-only provider infrastructure endpoints
+// that should never be returned as application routes.
+func IsKnownProviderNoiseURL(rawURL string) bool {
+	parsedURL, err := url.Parse(rawURL)
+	if err != nil {
+		return false
+	}
+	for _, signature := range knownProviderRouteNoiseSignatures {
+		if signature.requiresRouteContext() {
+			continue
+		}
+		if signature.matchesPath(parsedURL.EscapedPath()) {
+			return true
+		}
+	}
+	return false
+}
+
+// IsKnownProviderRouteNoise reports provider-generated routes that may need
+// request context beyond the URL itself to identify safely.
+func IsKnownProviderRouteNoise(route *discover.RouteDetails) bool {
+	if route == nil {
+		return false
+	}
+	for _, signature := range knownProviderRouteNoiseSignatures {
+		if signature.matchesRoute(route) {
+			return true
+		}
+	}
+	return false
+}
+
+func (signature providerRouteNoiseSignature) requiresRouteContext() bool {
+	return signature.method != "" || signature.requiredBodyParam != ""
+}
+
+func (signature providerRouteNoiseSignature) matchesPath(routePath string) bool {
+	if signature.pathRegex != nil && signature.pathRegex.MatchString(routePath) {
+		return true
+	}
+	return signature.pathMatcher != nil && signature.pathMatcher(routePath)
+}
+
+func (signature providerRouteNoiseSignature) matchesRoute(route *discover.RouteDetails) bool {
+	if !signature.matchesPath(route.Path) {
+		return false
+	}
+	if signature.method != "" && route.Method != signature.method {
+		return false
+	}
+	if signature.requiredBodyParam != "" && !hasRouteBodyParam(route.BodyParams, signature.requiredBodyParam) {
+		return false
+	}
+	return true
+}
+
+func hasRouteBodyParam(params []*discover.RouteBodyParam, name string) bool {
+	for _, param := range params {
+		if param != nil && param.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+func isOpaqueMultiSegmentPath(routePath string, minSegments int, minSegmentLength int, minTotalLength int) bool {
+	segments := strings.Split(strings.Trim(routePath, "/"), "/")
+	if len(segments) < minSegments {
+		return false
+	}
+
+	totalLength := 0
+	for _, segment := range segments {
+		if len(segment) < minSegmentLength || !isOpaquePathSegment(segment) {
+			return false
+		}
+		totalLength += len(segment)
+	}
+	return totalLength >= minTotalLength
+}
+
+func isOpaquePathSegment(segment string) bool {
+	for _, r := range segment {
+		switch {
+		case r >= 'a' && r <= 'z':
+		case r >= 'A' && r <= 'Z':
+		case r >= '0' && r <= '9':
+		case r == '-', r == '_':
+		default:
+			return false
+		}
 	}
 	return true
 }

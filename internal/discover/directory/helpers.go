@@ -391,25 +391,32 @@ func newDirectoryFrontier(current frontier) *discover.DirectoryFrontier {
 	return result
 }
 
-// Appends findings that survived the full filter pipeline as frontier candidates.
-func appendFindingCandidates(outcome *frontierOutcome, attempts []*common.HttpRequestResponse, recursionCodes map[int]bool, noisyStatuses map[int]bool) {
+// No noise floor here: surviving the response filters already proved this response is not calibration noise.
+func appendFindingCandidates(outcome *frontierOutcome, attempts []*common.HttpRequestResponse, recursionCodes map[int]bool) {
 	for _, attempt := range attempts {
-		if isRecursionCandidate(attempt, recursionCodes, noisyStatuses) {
+		if isRecursionCandidate(attempt, recursionCodes) {
 			outcome.recursionCandidates = append(outcome.recursionCandidates, attempt)
 		}
 	}
 }
 
 // A path already carrying an extension is treated as a file and never descended into.
-func isRecursionCandidate(attempt *common.HttpRequestResponse, recursionCodes map[int]bool, noisyStatuses map[int]bool) bool {
+func isRecursionCandidate(attempt *common.HttpRequestResponse, recursionCodes map[int]bool) bool {
 	if attempt == nil || attempt.Request == nil || attempt.Response == nil || attempt.Response.StatusCode == nil {
 		return false
 	}
-	statusCode := *attempt.Response.StatusCode
-	if !recursionCodes[statusCode] || noisyStatuses[statusCode] {
+	if !recursionCodes[*attempt.Response.StatusCode] {
 		return false
 	}
 	return !pathLooksLikeFile(attempt.Request.Path)
+}
+
+// The noise floor only applies to responses the filters never evaluated.
+func isUnfilteredRecursionCandidate(attempt *common.HttpRequestResponse, recursionCodes map[int]bool, noisyStatuses map[int]bool) bool {
+	if !isRecursionCandidate(attempt, recursionCodes) {
+		return false
+	}
+	return !noisyStatuses[*attempt.Response.StatusCode]
 }
 
 // A status is only noise when every directory-shaped calibration probe returned it; one

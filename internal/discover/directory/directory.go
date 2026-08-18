@@ -265,7 +265,7 @@ func sweepFrontier(ctx context.Context, baseURL string, current frontier, allPat
 					}
 					logDirectoryFindings(ctx, attempts)
 					outcome.attempts = attempts
-					appendFindingCandidates(&outcome, attempts, recursionCodes, noisyStatuses)
+					appendFindingCandidates(&outcome, attempts, recursionCodes)
 					outcome.timedOutPhase = "request processing"
 					return outcome
 				}
@@ -350,7 +350,7 @@ func sweepFrontier(ctx context.Context, baseURL string, current frontier, allPat
 					isValid, disallowedStatus, baselineMatch, standardResponseMatch := AnalyzeResponse(ctx, *httpRequest, validCodes, config.EnableCommonResponseFilters, baselineSizeInt, baselineWordsInt, config.Threshold)
 
 					// Statuses outside response-codes never reach the findings pipeline, so judge them here.
-					if disallowedStatus != 0 && isRecursionCandidate(httpRequest, recursionCodes, noisyStatuses) {
+					if disallowedStatus != 0 && isUnfilteredRecursionCandidate(httpRequest, recursionCodes, noisyStatuses) {
 						attemptsMutex.Lock()
 						outcome.recursionCandidates = append(outcome.recursionCandidates, httpRequest)
 						attemptsMutex.Unlock()
@@ -411,7 +411,7 @@ func sweepFrontier(ctx context.Context, baseURL string, current frontier, allPat
 		svc1log.SafeParam("sendFailures", outcome.metrics.sendFailureCount))
 
 	outcome.attempts = attempts
-	appendFindingCandidates(&outcome, attempts, recursionCodes, noisyStatuses)
+	appendFindingCandidates(&outcome, attempts, recursionCodes)
 	if ctx.Err() != nil {
 		outcome.timedOutPhase = "processing"
 	}

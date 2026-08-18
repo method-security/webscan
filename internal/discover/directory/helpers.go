@@ -391,6 +391,15 @@ func newDirectoryFrontier(current frontier) *discover.DirectoryFrontier {
 	return result
 }
 
+// Appends findings that survived the full filter pipeline as frontier candidates.
+func appendFindingCandidates(outcome *frontierOutcome, attempts []*common.HttpRequestResponse, recursionCodes map[int]bool, noisyStatuses map[int]bool) {
+	for _, attempt := range attempts {
+		if isRecursionCandidate(attempt, recursionCodes, noisyStatuses) {
+			outcome.recursionCandidates = append(outcome.recursionCandidates, attempt)
+		}
+	}
+}
+
 // A path already carrying an extension is treated as a file and never descended into.
 func isRecursionCandidate(attempt *common.HttpRequestResponse, recursionCodes map[int]bool, noisyStatuses map[int]bool) bool {
 	if attempt == nil || attempt.Request == nil || attempt.Response == nil || attempt.Response.StatusCode == nil {
@@ -403,16 +412,32 @@ func isRecursionCandidate(attempt *common.HttpRequestResponse, recursionCodes ma
 	return !pathLooksLikeFile(attempt.Request.Path)
 }
 
-// statusCodesOf collects the distinct status codes observed across calibration probes.
-func statusCodesOf(attempts []*common.HttpRequestResponse) map[int]bool {
-	codes := map[int]bool{}
+// A status is only noise when every directory-shaped calibration probe returned it; one
+// divergent probe must not suppress descent into real directories answering that code.
+func unanimousDirectoryStatuses(attempts []*common.HttpRequestResponse) map[int]bool {
+	counts := map[int]int{}
+	var considered int
 	for _, attempt := range attempts {
-		if attempt == nil || attempt.Response == nil || attempt.Response.StatusCode == nil {
+		if attempt == nil || attempt.Request == nil || attempt.Response == nil || attempt.Response.StatusCode == nil {
 			continue
 		}
-		codes[*attempt.Response.StatusCode] = true
+		if pathLooksLikeFile(attempt.Request.Path) {
+			continue
+		}
+		considered++
+		counts[*attempt.Response.StatusCode]++
 	}
-	return codes
+
+	unanimous := map[int]bool{}
+	if considered < 2 {
+		return unanimous
+	}
+	for code, count := range counts {
+		if count == considered {
+			unanimous[code] = true
+		}
+	}
+	return unanimous
 }
 
 // pathLooksLikeFile reports whether the last path segment carries a file extension.

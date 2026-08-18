@@ -120,13 +120,49 @@ func TestIsRecursionCandidate(t *testing.T) {
 	}
 }
 
-func TestStatusCodesOf(t *testing.T) {
-	status := func(code int) *common.HttpRequestResponse {
-		return &common.HttpRequestResponse{Response: &common.HttpResponse{StatusCode: &code}}
+func TestUnanimousDirectoryStatuses(t *testing.T) {
+	probe := func(path string, code int) *common.HttpRequestResponse {
+		return &common.HttpRequestResponse{
+			Request:  &common.HttpRequest{Path: path},
+			Response: &common.HttpResponse{StatusCode: &code},
+		}
 	}
-	got := statusCodesOf([]*common.HttpRequestResponse{status(404), status(404), status(403), nil, {}})
-	want := map[int]bool{404: true, 403: true}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("statusCodesOf() = %v, want %v", got, want)
+
+	for _, tc := range []struct {
+		name string
+		in   []*common.HttpRequestResponse
+		want map[int]bool
+	}{
+		{
+			name: "a status every directory probe returns is noise",
+			in:   []*common.HttpRequestResponse{probe("/cal-1", 404), probe("/cal-2/", 404)},
+			want: map[int]bool{404: true},
+		},
+		{
+			name: "one divergent probe must not suppress a real directory status",
+			in:   []*common.HttpRequestResponse{probe("/cal-1", 403), probe("/cal-2/", 404)},
+			want: map[int]bool{},
+		},
+		{
+			name: "the file-shaped probe does not inform directory noise",
+			in:   []*common.HttpRequestResponse{probe("/cal-1", 404), probe("/cal-2/", 404), probe("/cal-3.txt", 403)},
+			want: map[int]bool{404: true},
+		},
+		{
+			name: "too little evidence yields no noise floor",
+			in:   []*common.HttpRequestResponse{probe("/cal-1", 403)},
+			want: map[int]bool{},
+		},
+		{
+			name: "malformed probes are ignored",
+			in:   []*common.HttpRequestResponse{probe("/cal-1", 404), probe("/cal-2/", 404), nil, {}},
+			want: map[int]bool{404: true},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := unanimousDirectoryStatuses(tc.in); !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("unanimousDirectoryStatuses() = %v, want %v", got, tc.want)
+			}
+		})
 	}
 }

@@ -88,6 +88,7 @@ types:
     properties:
       path: string
       queryParams: optional<list<string>>
+      pathParams: optional<list<string>>
       security: optional<SecurityRequirement>
       method: string
       type: ApiType

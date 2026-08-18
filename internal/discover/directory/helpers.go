@@ -296,7 +296,7 @@ func appendDirectoryPath(basePath, childPath string) string {
 }
 
 // gatherPaths gathers all paths from the config
-func gatherPaths(paths []string, wordlistType *discover.WordlistType, wordlistSize *discover.WordlistSize) ([]string, error) {
+func gatherPaths(paths []string, wordlistType *discover.WordlistType, wordlistSize *discover.WordlistSize, extensions []string) ([]string, error) {
 	var allPaths []string
 
 	// Add manual paths
@@ -313,7 +313,102 @@ func gatherPaths(paths []string, wordlistType *discover.WordlistType, wordlistSi
 		allPaths = append(allPaths, wordlistPaths...)
 	}
 
-	return allPaths, nil
+	return applyExtensions(allPaths, extensions), nil
+}
+
+// Bare word plus one variant per extension, so a directories wordlist can reach app.js.
+func applyExtensions(paths []string, extensions []string) []string {
+	normalized := normalizeExtensions(extensions)
+	if len(normalized) == 0 {
+		return paths
+	}
+
+	expanded := make([]string, 0, len(paths)*(len(normalized)+1))
+	for _, path := range paths {
+		expanded = append(expanded, path)
+		trimmed := strings.Trim(path, "/")
+		if trimmed == "" {
+			continue
+		}
+		for _, extension := range normalized {
+			expanded = append(expanded, trimmed+extension)
+		}
+	}
+	return expanded
+}
+
+// normalizeExtensions lowercases, de-duplicates and leading-dots the configured extensions.
+func normalizeExtensions(extensions []string) []string {
+	seen := map[string]bool{}
+	normalized := make([]string, 0, len(extensions))
+	for _, extension := range extensions {
+		trimmed := strings.ToLower(strings.TrimSpace(extension))
+		if trimmed == "" || trimmed == "." {
+			continue
+		}
+		if !strings.HasPrefix(trimmed, ".") {
+			trimmed = "." + trimmed
+		}
+		if seen[trimmed] {
+			continue
+		}
+		seen[trimmed] = true
+		normalized = append(normalized, trimmed)
+	}
+	return normalized
+}
+
+// recursionDepth returns how many levels below the target may be swept; 0 disables recursion.
+func recursionDepth(config *discover.DiscoverDirectoryConfig) int {
+	if config.RecursionDepth == nil || *config.RecursionDepth < 0 {
+		return 0
+	}
+	return *config.RecursionDepth
+}
+
+// recursionStatusCodes returns the configured frontier-opening codes, or the default set.
+func recursionStatusCodes(config *discover.DiscoverDirectoryConfig) string {
+	if config.RecursionStatusCodes == nil || strings.TrimSpace(*config.RecursionStatusCodes) == "" {
+		return defaultRecursionStatusCodes
+	}
+	return *config.RecursionStatusCodes
+}
+
+// normalizeFrontierPath collapses the trailing-slash variants of one directory to a single key.
+func normalizeFrontierPath(path string) string {
+	trimmed := strings.TrimRight(path, "/")
+	if trimmed == "" {
+		return "/"
+	}
+	return trimmed
+}
+
+func newDirectoryFrontier(current frontier) *discover.DirectoryFrontier {
+	result := &discover.DirectoryFrontier{BasePath: current.basePath, Depth: current.depth}
+	if current.discoveredFrom != "" {
+		result.DiscoveredFrom = &current.discoveredFrom
+	}
+	return result
+}
+
+// A path already carrying an extension is treated as a file and never descended into.
+func isRecursionCandidate(attempt *common.HttpRequestResponse, recursionCodes map[int]bool) bool {
+	if attempt == nil || attempt.Request == nil || attempt.Response == nil || attempt.Response.StatusCode == nil {
+		return false
+	}
+	if !recursionCodes[*attempt.Response.StatusCode] {
+		return false
+	}
+	return !pathLooksLikeFile(attempt.Request.Path)
+}
+
+// pathLooksLikeFile reports whether the last path segment carries a file extension.
+func pathLooksLikeFile(path string) bool {
+	segment := path
+	if index := strings.LastIndex(segment, "/"); index >= 0 {
+		segment = segment[index+1:]
+	}
+	return strings.Contains(segment, ".")
 }
 
 // getWordlistEmbeddedPath returns the embedded config path for a directory wordlist.

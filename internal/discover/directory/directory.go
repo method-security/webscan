@@ -26,6 +26,9 @@ import (
 // 401/403 are included: a protected directory still proves the directory exists.
 const defaultRecursionStatusCodes = "200,301,302,307,308,401,403"
 
+// Safety valve against a server that answers every path with a recursion status.
+const maxFrontiersPerTarget = 64
+
 // frontier is a base path queued for its own sweep.
 type frontier struct {
 	basePath       string
@@ -37,9 +40,11 @@ type frontier struct {
 type frontierOutcome struct {
 	baselineAttempts []*common.HttpRequestResponse
 	attempts         []*common.HttpRequestResponse
-	metrics          directoryScanMetrics
-	skipReason       string
-	timedOutPhase    string
+	// Judged on the raw response, because a directory's 403 is not a finding under the default response codes.
+	recursionCandidates []*common.HttpRequestResponse
+	metrics             directoryScanMetrics
+	skipReason          string
+	timedOutPhase       string
 }
 
 // RunDirectoryDiscovery launches the directory discovery engine with multi-threading support
@@ -124,7 +129,7 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 			current := queue[0]
 			queue = queue[1:]
 
-			outcome := sweepFrontier(ctx, baseURL, current, allPaths, validCodes, &config, limiter)
+			outcome := sweepFrontier(ctx, baseURL, current, allPaths, validCodes, recursionCodes, &config, limiter)
 			targetInfo.BaselineAttempts = append(targetInfo.BaselineAttempts, outcome.baselineAttempts...)
 			targetInfo.Attempts = append(targetInfo.Attempts, outcome.attempts...)
 			targetInfo.Frontiers = append(targetInfo.Frontiers, newDirectoryFrontier(current))
@@ -141,11 +146,14 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 			if current.depth >= maxDepth {
 				continue
 			}
-			for _, attempt := range outcome.attempts {
-				if !isRecursionCandidate(attempt, recursionCodes) {
-					continue
+			for _, candidate := range outcome.recursionCandidates {
+				if len(queued) >= maxFrontiersPerTarget {
+					log.Warn("Frontier cap reached, not descending further",
+						svc1log.SafeParam("target", target),
+						svc1log.SafeParam("cap", maxFrontiersPerTarget))
+					break
 				}
-				childPath := attempt.Request.Path
+				childPath := candidate.Request.Path
 				if queued[normalizeFrontierPath(childPath)] {
 					continue
 				}
@@ -183,12 +191,14 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 }
 
 // Baseline and calibration re-run per frontier: a subdirectory's 403 profile is not the root's 404 profile.
-func sweepFrontier(ctx context.Context, baseURL string, current frontier, allPaths []string, validCodes map[int]bool, config *discover.DiscoverDirectoryConfig, limiter *rate.Limiter) frontierOutcome {
+func sweepFrontier(ctx context.Context, baseURL string, current frontier, allPaths []string, validCodes map[int]bool, recursionCodes map[int]bool, config *discover.DiscoverDirectoryConfig, limiter *rate.Limiter) frontierOutcome {
 	log := svc1log.FromContext(ctx)
 	outcome := frontierOutcome{metrics: directoryScanMetrics{disallowedStatusCounts: map[int]int{}}}
 
 	var baselineSizeInt int
 	var baselineWordsInt int
+	// A status a random path also returns carries no information at this frontier.
+	noisyStatuses := map[int]bool{}
 	detector := newCommonResponseDetector(config.Threshold)
 	if config.EnableCommonResponseFilters {
 		// Follow redirects to get the correct baseline size and word count.
@@ -204,6 +214,7 @@ func sweepFrontier(ctx context.Context, baseURL string, current frontier, allPat
 
 		calibrationAttempts, failureCount, failureSample := calibrateCommonResponses(ctx, baseURL, current.basePath, config, detector, limiter)
 		outcome.baselineAttempts = append(outcome.baselineAttempts, calibrationAttempts...)
+		noisyStatuses = statusCodesOf(calibrationAttempts)
 		outcome.metrics.calibrationFailureCount = failureCount
 		outcome.metrics.calibrationFailureSample = failureSample
 		log.Info("Common response calibration complete",
@@ -332,6 +343,12 @@ func sweepFrontier(ctx context.Context, baseURL string, current frontier, allPat
 					// Check if context has expired after request
 					if ctx.Err() != nil {
 						return
+					}
+
+					if isRecursionCandidate(httpRequest, recursionCodes, noisyStatuses) {
+						attemptsMutex.Lock()
+						outcome.recursionCandidates = append(outcome.recursionCandidates, httpRequest)
+						attemptsMutex.Unlock()
 					}
 
 					// Analyze response

@@ -392,14 +392,27 @@ func newDirectoryFrontier(current frontier) *discover.DirectoryFrontier {
 }
 
 // A path already carrying an extension is treated as a file and never descended into.
-func isRecursionCandidate(attempt *common.HttpRequestResponse, recursionCodes map[int]bool) bool {
+func isRecursionCandidate(attempt *common.HttpRequestResponse, recursionCodes map[int]bool, noisyStatuses map[int]bool) bool {
 	if attempt == nil || attempt.Request == nil || attempt.Response == nil || attempt.Response.StatusCode == nil {
 		return false
 	}
-	if !recursionCodes[*attempt.Response.StatusCode] {
+	statusCode := *attempt.Response.StatusCode
+	if !recursionCodes[statusCode] || noisyStatuses[statusCode] {
 		return false
 	}
 	return !pathLooksLikeFile(attempt.Request.Path)
+}
+
+// statusCodesOf collects the distinct status codes observed across calibration probes.
+func statusCodesOf(attempts []*common.HttpRequestResponse) map[int]bool {
+	codes := map[int]bool{}
+	for _, attempt := range attempts {
+		if attempt == nil || attempt.Response == nil || attempt.Response.StatusCode == nil {
+			continue
+		}
+		codes[*attempt.Response.StatusCode] = true
+	}
+	return codes
 }
 
 // pathLooksLikeFile reports whether the last path segment carries a file extension.

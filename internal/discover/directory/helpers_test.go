@@ -85,7 +85,7 @@ func TestNormalizeFrontierPath(t *testing.T) {
 }
 
 func TestIsRecursionCandidate(t *testing.T) {
-	codes := map[int]bool{200: true, 403: true}
+	codes := map[int]bool{200: true, 301: true, 403: true}
 	attempt := func(path string, status int) *common.HttpRequestResponse {
 		return &common.HttpRequestResponse{
 			Request:  &common.HttpRequest{Path: path},
@@ -94,20 +94,39 @@ func TestIsRecursionCandidate(t *testing.T) {
 	}
 
 	for _, tc := range []struct {
-		name string
-		in   *common.HttpRequestResponse
-		want bool
+		name  string
+		in    *common.HttpRequestResponse
+		noisy map[int]bool
+		want  bool
 	}{
 		{name: "forbidden directory still proves the directory exists", in: attempt("/static", 403), want: true},
 		{name: "status outside the recursion set", in: attempt("/static", 404), want: false},
 		{name: "a file is never descended into", in: attempt("/static/app.js", 200), want: false},
+		{name: "redirect with no body is still a candidate", in: attempt("/static", 301), want: true},
+		{name: "status outside the recursion set is skipped", in: attempt("/static", 500), want: false},
+		{name: "status a random path also returns is noise", in: attempt("/static", 403), noisy: map[int]bool{403: true}, want: false},
 		{name: "missing response", in: &common.HttpRequestResponse{Request: &common.HttpRequest{Path: "/static"}}, want: false},
 		{name: "nil attempt", in: nil, want: false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := isRecursionCandidate(tc.in, codes); got != tc.want {
+			noisy := tc.noisy
+			if noisy == nil {
+				noisy = map[int]bool{}
+			}
+			if got := isRecursionCandidate(tc.in, codes, noisy); got != tc.want {
 				t.Errorf("isRecursionCandidate() = %v, want %v", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestStatusCodesOf(t *testing.T) {
+	status := func(code int) *common.HttpRequestResponse {
+		return &common.HttpRequestResponse{Response: &common.HttpResponse{StatusCode: &code}}
+	}
+	got := statusCodesOf([]*common.HttpRequestResponse{status(404), status(404), status(403), nil, {}})
+	want := map[int]bool{404: true, 403: true}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("statusCodesOf() = %v, want %v", got, want)
 	}
 }

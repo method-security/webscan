@@ -819,8 +819,7 @@ func pathParamNamesFromTemplate(path string) []string {
 	return names
 }
 
-// mergePathParamNames unions declared `in: path` parameter names with the placeholders present in
-// the path template. Specs routinely omit one or the other, so neither source alone is complete.
+// Specs routinely declare one source and not the other, so union both.
 func mergePathParamNames(declared []string, path string) []string {
 	seen := make(map[string]struct{}, len(declared))
 	merged := make([]string, 0, len(declared))
@@ -840,8 +839,7 @@ func mergePathParamNames(declared []string, path string) []string {
 	return merged
 }
 
-// getPathParamsV2 extracts path parameters from the path item and operation parameters for Swagger
-// (OpenAPI 2.0), unioned with any placeholders in the path itself.
+// getPathParamsV2 extracts path parameters for Swagger (OpenAPI 2.0).
 func getPathParamsV2(pathItemParams []*v2.Parameter, operationParams []*v2.Parameter, path string) []string {
 	var declared []string
 	for _, param := range append(pathItemParams, operationParams...) {
@@ -852,8 +850,7 @@ func getPathParamsV2(pathItemParams []*v2.Parameter, operationParams []*v2.Param
 	return mergePathParamNames(declared, path)
 }
 
-// getPathParamsV3 extracts path parameters from the path item and operation parameters for OpenAPI
-// 3.0+, unioned with any placeholders in the path itself.
+// getPathParamsV3 extracts path parameters for OpenAPI 3.0+.
 func getPathParamsV3(pathItemParams []*v3.Parameter, operationParams []*v3.Parameter, path string) []string {
 	var declared []string
 	for _, param := range append(pathItemParams, operationParams...) {

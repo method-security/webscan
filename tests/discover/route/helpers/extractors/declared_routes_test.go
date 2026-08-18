@@ -26,8 +26,7 @@ func findDeclared(t *testing.T, routes []*discover.RouteDetails, path string) *d
 }
 
 func TestExtractDeclaredRouteTemplatesUsesOriginNotBundleURL(t *testing.T) {
-	// The bundle is served from a deep path, but a declared route is relative to the application.
-	// Folding observed literals requires exact BaseUrl equality, so anything but the origin breaks it.
+	// Folding requires exact BaseUrl equality, so anything but the origin breaks it.
 	routes := extractors.ExtractDeclaredRouteTemplates(`{ path: "/documents/:id", component: Doc }`, bundleURL)
 
 	route := findDeclared(t, routes, "/documents/{id}")
@@ -64,8 +63,7 @@ func TestExtractDeclaredRouteTemplatesSeparatesVerbsOnOnePath(t *testing.T) {
 }
 
 func TestExtractDeclaredRouteTemplatesIgnoresNonRouterReceivers(t *testing.T) {
-	// The Cache API and storage wrappers share the HTTP verb names. Without a router-like receiver
-	// these would surface as declared destructive endpoints.
+	// The Cache API shares the HTTP verb names.
 	serviceWorker := `caches.open('v1').then(function(cache){ cache.delete('/offline.html'); cache.put('/index.html', res); });`
 
 	routes := extractors.ExtractDeclaredRouteTemplates(serviceWorker, bundleURL)
@@ -76,8 +74,7 @@ func TestExtractDeclaredRouteTemplatesIgnoresNonRouterReceivers(t *testing.T) {
 }
 
 func TestExtractDeclaredRouteTemplatesNeverEmitsRefusedTemplateAsLiteral(t *testing.T) {
-	// <Route> contributes literals, but a path that looks parameterized is not a fetchable URL:
-	// emitting `/:id` verbatim would send a literal colon segment to the server.
+	// Emitting `/:id` verbatim would send a literal colon segment to the server.
 	routes := extractors.ExtractDeclaredRouteTemplates(`<Route path="/:id" element={<X/>} />`, bundleURL)
 
 	for _, route := range routes {
@@ -86,8 +83,7 @@ func TestExtractDeclaredRouteTemplatesNeverEmitsRefusedTemplateAsLiteral(t *test
 }
 
 func TestExtractDeclaredRouteTemplatesIgnoresHttpClientCallSites(t *testing.T) {
-	// `api` and `app` are also the usual names for an axios/fetch client. A concrete call site
-	// recorded as a declared literal would outrank a matching template and block folding.
+	// A call site recorded as a declared literal would outrank a template and block folding.
 	routes := extractors.ExtractDeclaredRouteTemplates(`api.get('/documents/1042').then(r => r.data)`, bundleURL)
 
 	for _, route := range routes {
@@ -121,8 +117,7 @@ func TestExtractDeclaredRouteTemplatesReadsNextJsManifestEntries(t *testing.T) {
 	routes := extractors.ExtractDeclaredRouteTemplates(`{"/documents/[id]":["static/chunks/doc.js"],"/docs/[...slug]":["x.js"]}`, bundleURL)
 
 	findDeclared(t, routes, "/documents/{id}")
-	// The catch-all entry is not a declaration, since one placeholder cannot stand for the one-or-
-	// more segments it matches.
+	// One placeholder cannot stand for the many segments a catch-all matches.
 	for _, route := range routes {
 		if route.Path == "/docs/{slug}" {
 			t.Errorf("expected the catch-all entry to be skipped")
@@ -131,8 +126,7 @@ func TestExtractDeclaredRouteTemplatesReadsNextJsManifestEntries(t *testing.T) {
 }
 
 func TestExtractDeclaredRouteTemplatesTakesLiteralsOnlyFromRouteTables(t *testing.T) {
-	// <Route> delimits a route table, so its literal is a real declaration. A bare `path:` key
-	// appears in ordinary config objects, so its literal is not.
+	// A bare `path:` key also appears in ordinary config objects.
 	routes := extractors.ExtractDeclaredRouteTemplates(
 		`<Route path="/settings" element={<S/>} /> ; { path: "/tmp/cache", ttl: 30 }`, bundleURL)
 

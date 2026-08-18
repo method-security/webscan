@@ -25,8 +25,7 @@ func onlyRoute(t *testing.T, routes []*discover.RouteDetails) *discover.RouteDet
 }
 
 func TestExtractInterpolatedRoutesStripsInterpolatedOrigin(t *testing.T) {
-	// The dominant shape in shipped bundles: the API base is itself interpolated, so a plain
-	// leading-slash rule would match nothing.
+	// The API base is itself interpolated, so a leading-slash rule matches nothing.
 	route := onlyRoute(t, interpolated(t, "const u = `${this.hostServer}/rest/basket/${basketId}`"))
 
 	if route.Path != "/rest/basket/{basketId}" {
@@ -46,8 +45,7 @@ func TestExtractInterpolatedRoutesNamesFromExpressionWhenMeaningful(t *testing.T
 }
 
 func TestExtractInterpolatedRoutesFallsBackWhenExpressionIsMinified(t *testing.T) {
-	// Bundles collapse locals to one or two characters, which carry no meaning; the preceding
-	// segment is the better evidence.
+	// Minified locals carry no meaning, so the preceding segment is better evidence.
 	route := onlyRoute(t, interpolated(t, "fetch(`/rest/baskets/${e}`)"))
 
 	if len(route.PathParams) != 1 || route.PathParams[0].Name != "basketId" {
@@ -70,8 +68,7 @@ func TestExtractInterpolatedRoutesHandlesMultipleParameters(t *testing.T) {
 }
 
 func TestExtractInterpolatedRoutesHandlesPartialSegmentInterpolation(t *testing.T) {
-	// ConstructURL substitutes {name} anywhere in the path, so a placeholder embedded in a
-	// filename is still executable.
+	// ConstructURL substitutes {name} anywhere, so an embedded placeholder is executable.
 	route := onlyRoute(t, interpolated(t, "fetch(`${h}/ftp/order_${e}.pdf`)"))
 
 	if route.Path != "/ftp/order_{orderId}.pdf" {
@@ -80,9 +77,7 @@ func TestExtractInterpolatedRoutesHandlesPartialSegmentInterpolation(t *testing.
 }
 
 func TestExtractInterpolatedRoutesAcceptsWrappedExpressions(t *testing.T) {
-	// Wrapping an id in encodeURIComponent is standard practice, and whitespace inside an
-	// interpolation says nothing about whether the literal is a URL. Validation therefore runs on
-	// the substituted template rather than the raw literal.
+	// Validation runs on the substituted template, not the raw literal.
 	for declaration, want := range map[string]string{
 		"fetch(`/api/user/${encodeURIComponent(id)}`)": "/api/user/{userId}",
 		"fetch(`/api/item/${ id }`)":                   "/api/item/{itemId}",
@@ -116,8 +111,7 @@ func TestExtractInterpolatedRoutesRejectsNonPathInterpolations(t *testing.T) {
 }
 
 func TestExtractInterpolatedRoutesTagsProvenance(t *testing.T) {
-	// An interpolation proves a parameter exists but does not reliably name it, so it must be
-	// distinguishable from a route-table declaration downstream.
+	// Must stay distinguishable from a route-table declaration downstream.
 	route := onlyRoute(t, interpolated(t, "fetch(`${h}/rest/basket/${e}`)"))
 
 	if route.Evidence == nil || *route.Evidence != "interpolated" {

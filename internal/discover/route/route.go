@@ -588,8 +588,7 @@ func PerformRouteCapture(ctx context.Context, config discover.DiscoverRouteConfi
 					if route == nil {
 						continue
 					}
-					// A declared template is not a fetchable URL — requesting it literally would
-					// send `{id}` to the server.
+					// A template is not fetchable: requesting it would send `{id}` to the server.
 					if discoverroutehelpers.IsTemplatedPath(route.Path) {
 						continue
 					}

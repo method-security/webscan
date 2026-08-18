@@ -11,24 +11,13 @@ import (
 	"github.com/Method-Security/webscan/generated/go/discover"
 )
 
-// DeclaredRouteEvidence tags routes that came from an application's own route table rather than
-// from an observed request, so precedence between a declared literal and a declared template can be
-// resolved the way a router would resolve it.
+// DeclaredRouteEvidence marks a route the application itself declares, not one merely observed.
 const DeclaredRouteEvidence = "route-table"
 
-// declaredParamPattern matches a parameter placeholder in a client-side route declaration.
-// Covers the three conventions that appear in shipped bundles: `:id` (React Router, Vue Router,
-// Angular, Express), `[id]` (Next.js file-based routing), and `{id}` (already normalized, and the
-// form ConstructURL substitutes).
-//
-// Next.js rest parameters (`[...slug]`) are deliberately excluded. A catch-all matches one or more
-// segments, which a single placeholder cannot express: a root-level `/{slug}` would swallow every
-// unrelated top-level page while never folding the multi-segment paths the route actually serves.
+// Catch-alls are excluded: one placeholder cannot stand for the many segments they match.
 var declaredParamPattern = regexp.MustCompile(`^(?::([A-Za-z_][A-Za-z0-9_]*)\??|\[([A-Za-z_][A-Za-z0-9_.]*)\]|\{([A-Za-z_][A-Za-z0-9_]*)\})$`)
 
-// DeclaredParamName returns the parameter name a route-declaration segment names, and whether the
-// segment is a placeholder at all. The name is authoritative — it comes from the application's own
-// route table rather than being synthesized from surrounding path text.
+// DeclaredParamName returns the parameter a declaration segment names, if it names one.
 func DeclaredParamName(segment string) (string, bool) {
 	match := declaredParamPattern.FindStringSubmatch(segment)
 	if match == nil {
@@ -42,9 +31,7 @@ func DeclaredParamName(segment string) (string, bool) {
 	return "", false
 }
 
-// NormalizeDeclaredTemplate rewrites a declared route template into the `{name}` form that
-// ConstructURL substitutes, and returns the parameters it declares. Returns ok=false when the path
-// declares no parameters, so callers can leave ordinary routes untouched.
+// NormalizeDeclaredTemplate rewrites a declaration into the `{name}` form ConstructURL substitutes.
 func NormalizeDeclaredTemplate(path string) (string, []*discover.RoutePathParam, bool) {
 	segments := strings.Split(path, "/")
 	params := make([]*discover.RoutePathParam, 0, len(segments))
@@ -66,9 +53,7 @@ func NormalizeDeclaredTemplate(path string) (string, []*discover.RoutePathParam,
 	if len(params) == 0 {
 		return path, nil, false
 	}
-	// A segment still carrying parameter syntax was not convertible — a Next.js catch-all, say —
-	// so the template is malformed no matter what else it holds, and would also let the catch-all
-	// exclusion be bypassed by any sibling segment that did convert.
+	// Residual syntax means a segment was unconvertible, so the template is malformed.
 	for _, segment := range segments {
 		if segment == "" || strings.HasPrefix(segment, "{") {
 			continue
@@ -77,19 +62,14 @@ func NormalizeDeclaredTemplate(path string) (string, []*discover.RoutePathParam,
 			return path, nil, false
 		}
 	}
-	// A template with no literal segment discriminates on nothing but segment count, so `/{slug}`
-	// swallows every top-level page and `/{locale}/{page}` every two-segment one. Sibling literals
-	// from the same route table are not recorded, so nothing can outrank it the way a declared
-	// literal would. One literal segment is enough to anchor it: `/{locale}/products/{id}` only
-	// ever matches paths with `products` in that position.
+	// Without a literal segment the template discriminates on segment count alone.
 	if !hasLiteralSegment(segments) {
 		return path, nil, false
 	}
 	return strings.Join(segments, "/"), params, true
 }
 
-// hasLiteralSegment reports whether any non-empty segment is a fixed string rather than a
-// placeholder.
+// hasLiteralSegment reports whether any segment is fixed rather than a placeholder.
 func hasLiteralSegment(segments []string) bool {
 	for _, segment := range segments {
 		if segment == "" {
@@ -102,20 +82,14 @@ func hasLiteralSegment(segments []string) bool {
 	return false
 }
 
-// declaredParamSyntaxPattern matches a segment that looks like a route parameter in any convention,
-// including forms that do not yield a usable template such as a catch-all.
 var declaredParamSyntaxPattern = regexp.MustCompile(`(?:^|/)(?::[^/]+|\[[^/]*\]|\{[^/]*\})(?:/|$)`)
 
-// HasDeclaredParamSyntax reports whether a path contains route-parameter syntax at all, regardless
-// of whether NormalizeDeclaredTemplate can turn it into a usable template. A path that looks
-// parameterized is never a fetchable literal, so callers must not fall back to emitting it as one.
+// HasDeclaredParamSyntax reports parameter syntax even in forms that yield no usable template.
 func HasDeclaredParamSyntax(path string) bool {
 	return declaredParamSyntaxPattern.MatchString(path)
 }
 
-// templateMatchesLiteral reports whether a literal path is an instance of a normalized template,
-// and returns the value each placeholder took. Matching is exact on segment count and on every
-// non-placeholder segment, so this is a decision about the declared route rather than a guess.
+// templateMatchesLiteral reports whether a literal instantiates a template, with its values.
 func templateMatchesLiteral(template string, literal string) (map[string]string, bool) {
 	templateSegments := strings.Split(template, "/")
 	literalSegments := strings.Split(literal, "/")
@@ -135,12 +109,7 @@ func templateMatchesLiteral(template string, literal string) (map[string]string,
 // embeddedPlaceholderPattern matches a `{name}` placeholder anywhere within a segment.
 var embeddedPlaceholderPattern = regexp.MustCompile(`\{([A-Za-z_][A-Za-z0-9_]*)\}`)
 
-// matchTemplateSegment matches one template segment against a literal segment, recording any
-// placeholder values it captures.
-//
-// A placeholder need not span the whole segment: interpolated templates such as
-// `order_{orderId}.pdf` embed one, and ConstructURL substitutes those the same way, so folding has
-// to understand them or the observed values are never captured.
+// A placeholder need not span the segment: `order_{orderId}.pdf` embeds one.
 func matchTemplateSegment(templateSegment string, literalSegment string, values map[string]string) bool {
 	if name, isParam := DeclaredParamName(templateSegment); isParam {
 		if literalSegment == "" {
@@ -182,10 +151,7 @@ func matchTemplateSegment(templateSegment string, literalSegment string, values 
 	return true
 }
 
-// ApplyDeclaredRouteTemplates folds observed literal routes into the templates the application
-// declares, so `/documents/1042` becomes an example of a declared `/documents/{id}` rather than a
-// separate endpoint. Nothing is inferred: a literal is only folded when the application's own route
-// table says that template exists, and an exact literal declaration always wins over a template.
+// ApplyDeclaredRouteTemplates folds observed literals into templates the application declares.
 func ApplyDeclaredRouteTemplates(routes []*discover.RouteDetails) []*discover.RouteDetails {
 	type templateRoute struct {
 		route    *discover.RouteDetails
@@ -199,8 +165,7 @@ func ApplyDeclaredRouteTemplates(routes []*discover.RouteDetails) []*discover.Ro
 			templates = append(templates, templateRoute{route: route, template: *route.PathTemplate})
 			continue
 		}
-		// Only a literal the route table itself declares outranks a matching template. An observed
-		// crawl hit carries no such claim and is free to fold.
+		// Only a declared literal outranks a template; an observed hit is free to fold.
 		if route.Evidence != nil && *route.Evidence == DeclaredRouteEvidence {
 			declaredLiterals[routeKey(route.Method, route.BaseUrl, route.Path)] = struct{}{}
 		}
@@ -248,8 +213,7 @@ func ApplyDeclaredRouteTemplates(routes []*discover.RouteDetails) []*discover.Ro
 	return MergeWebRoutes(folded)
 }
 
-// routeKey builds the identity a route is deduplicated on. The origin is normalized so an explicit
-// default port or differing case does not split one application in two, matching MergeWebRoutes.
+// routeKey builds the identity a route is deduplicated on, matching MergeWebRoutes.
 func routeKey(method common.HttpMethod, baseURL string, path string) string {
 	return fmt.Sprintf("%s:%s%s", method, NormalizeBaseURLForIdentity(baseURL), path)
 }
@@ -264,8 +228,7 @@ func appendUniqueValue(values []string, value string) []string {
 	return append(values, value)
 }
 
-// IsTemplatedPath reports whether a path carries an unresolved `{name}` placeholder, and is
-// therefore a route declaration rather than a URL that can be requested.
+// IsTemplatedPath reports a declaration rather than a URL that can be requested.
 func IsTemplatedPath(path string) bool {
 	return strings.Contains(path, "{") && strings.Contains(path, "}")
 }
@@ -326,20 +289,14 @@ func MergePathParams(params1 []*discover.RoutePathParam, params2 []*discover.Rou
 	return mergedParams
 }
 
-// InterpolatedRouteEvidence tags routes recovered from an interpolated URL in a bundle. The
-// interpolation proves a parameter exists at that position, but unlike a route table it does not
-// reliably name it — bundles are minified and the expression is often a single letter.
+// InterpolatedRouteEvidence marks a route whose parameter is proven but only loosely named.
 const InterpolatedRouteEvidence = "interpolated"
 
-// identifierExpressionPattern matches an interpolation body that is a plain identifier or property
-// access, e.g. `orderId` or `this.orderId`, as opposed to a call or arithmetic expression.
 var identifierExpressionPattern = regexp.MustCompile(`^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*$`)
 
-// trailingWordPattern captures the last alphabetic word in a fragment of literal path text.
 var trailingWordPattern = regexp.MustCompile(`([A-Za-z][A-Za-z0-9]*)[^A-Za-z0-9]*$`)
 
-// singularize strips a naive English plural suffix so `basket` and `products` both read naturally
-// with an `Id` suffix.
+// singularize strips a naive English plural suffix.
 func singularize(word string) string {
 	switch {
 	case strings.HasSuffix(word, "ies") && len(word) > 3:
@@ -363,17 +320,12 @@ func trailingWord(fragment string) string {
 	return match[1]
 }
 
-// InterpolatedParamName picks the most defensible name for a parameter recovered from an
-// interpolated URL, preferring evidence in this order: the interpolated expression itself, the
-// literal text preceding it inside the same segment, then the preceding path segment.
-//
-// Unlike a declared route this name is derived rather than authoritative. The interpolation is what
-// proves the parameter exists; only the label is a best effort.
+// InterpolatedParamName derives a name; unlike a declaration it is a best effort, not authoritative.
 func InterpolatedParamName(expression string, segmentPrefix string, previousSegment string) string {
 	if identifierExpressionPattern.MatchString(expression) {
 		parts := strings.Split(expression, ".")
 		last := parts[len(parts)-1]
-		// Minified bundles collapse locals to one or two characters, which carry no meaning.
+		// Minified locals carry no meaning.
 		if len(last) >= 3 && !strings.EqualFold(last, "this") {
 			return last
 		}
@@ -387,9 +339,7 @@ func InterpolatedParamName(expression string, segmentPrefix string, previousSegm
 	return "param"
 }
 
-// UniqueParamName returns name, or the first numbered variant not already taken. Path parameter
-// names must be unique within a route because the ontology keys a WebEndpointParameter on
-// (parameter_name, parameter_location).
+// Names must be unique per route: the ontology keys on (parameter_name, parameter_location).
 func UniqueParamName(name string, taken map[string]struct{}) string {
 	candidate := name
 	for suffix := 2; ; suffix++ {

@@ -77,9 +77,7 @@ func TestNormalizeDeclaredTemplateHandlesEachConvention(t *testing.T) {
 }
 
 func TestNormalizeDeclaredTemplateRejectsCatchAllParams(t *testing.T) {
-	// A catch-all matches one or more segments. Normalizing it to a single placeholder would make
-	// a root-level `/{slug}` swallow every top-level page while never folding the multi-segment
-	// paths it actually serves, so it is not treated as a declaration at all.
+	// One placeholder cannot stand for the many segments a catch-all matches.
 	for _, path := range []string{"/[...slug]", "/docs/[...slug]", "/docs/[[...slug]]", "/[locale]/[...slug]"} {
 		if template, _, ok := discoverroute.NormalizeDeclaredTemplate(path); ok {
 			t.Errorf("%q: expected no declaration, got template %q", path, template)
@@ -88,9 +86,7 @@ func TestNormalizeDeclaredTemplateRejectsCatchAllParams(t *testing.T) {
 }
 
 func TestNormalizeDeclaredTemplateRejectsUnanchoredTemplates(t *testing.T) {
-	// With no literal segment a template discriminates on nothing but segment count, so it
-	// swallows every path of that length. Sibling literals are not recorded, so nothing could
-	// outrank it and `/about` would vanish.
+	// Without a literal segment the template swallows every path of that length.
 	for _, path := range []string{"/:slug", "/[id]", "/{id}", "/[locale]/[page]"} {
 		if template, _, ok := discoverroute.NormalizeDeclaredTemplate(path); ok {
 			t.Errorf("%q: expected no declaration, got template %q", path, template)
@@ -99,8 +95,7 @@ func TestNormalizeDeclaredTemplateRejectsUnanchoredTemplates(t *testing.T) {
 }
 
 func TestNormalizeDeclaredTemplateKeepsAnchoredMultiSegmentTemplates(t *testing.T) {
-	// One literal segment is enough: exact segment-count matching plus a fixed `products` means
-	// this can never match an unrelated top-level page.
+	// One literal segment plus exact segment-count matching is enough to anchor it.
 	template, params, ok := discoverroute.NormalizeDeclaredTemplate("/[locale]/products/[id]")
 
 	if !ok {
@@ -129,8 +124,7 @@ func TestHasDeclaredParamSyntaxSpansUnusableForms(t *testing.T) {
 }
 
 func TestApplyDeclaredRouteTemplatesFoldsPartialSegmentPlaceholders(t *testing.T) {
-	// Interpolated templates embed a placeholder inside a segment. ConstructURL substitutes those,
-	// so folding has to match them or the observed values are never captured.
+	// Folding must match embedded placeholders or observed values are never captured.
 	template := "/ftp/order_{orderId}.pdf"
 	declared := routeAt(template)
 	declared.PathParams = []*discover.RoutePathParam{{Name: "orderId"}}
@@ -169,8 +163,7 @@ func TestApplyDeclaredRouteTemplatesRejectsPartialSegmentMismatch(t *testing.T) 
 }
 
 func TestApplyDeclaredRouteTemplatesNormalizesOriginForFolding(t *testing.T) {
-	// MergeWebRoutes and buildWebApplications compare origins via NormalizeBaseURLForIdentity, so
-	// an explicit default port must not split one application in two here either.
+	// An explicit default port must not split one application in two.
 	declared := declaredRoute(t, "/documents/:id")
 	literal := routeAt("/documents/1042")
 	literal.BaseUrl = "https://example.com:443"
@@ -254,8 +247,7 @@ func TestApplyDeclaredRouteTemplatesPreservesTopLevelPages(t *testing.T) {
 }
 
 func TestApplyDeclaredRouteTemplatesPrefersExplicitLiteralDeclaration(t *testing.T) {
-	// Router semantics: /documents/new is declared in its own right, so it must not be swallowed
-	// by the /documents/:id template that also matches it.
+	// Router semantics: a declared literal is not swallowed by a matching template.
 	explicit := routeAt("/documents/new")
 	evidence := discoverroute.DeclaredRouteEvidence
 	explicit.Evidence = &evidence

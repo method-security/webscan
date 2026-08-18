@@ -173,42 +173,26 @@ func parseRouteMethod(method string) (common.HttpMethod, bool) {
 	return parsedMethod, true
 }
 
-// routeTablePatterns match client-side route declarations in shipped bundles. Unlike apiPatterns,
-// which capture concrete URLs a caller happened to request, these capture the application's own
-// route table — so the parameter and its name are declared rather than inferred.
+// routeTablePatterns match the application's own route table, not URLs a caller requested.
 var routeTablePatterns = []struct {
 	pattern   *regexp.Regexp
 	pathGroup int
-	// methodGroup is the capture group holding the HTTP verb, or 0 when the pattern does not
-	// declare one and GET should be assumed.
+	// methodGroup is 0 when the pattern declares no verb and GET is assumed.
 	methodGroup int
-	// declaresLiterals marks patterns that unambiguously delimit a route table, so a match without
-	// a parameter is still a declared route. The generic `path:` key is too common in ordinary
-	// config objects to treat that way, so it only contributes parameterized declarations.
+	// declaresLiterals marks patterns unambiguous enough that a parameterless match is still a route.
 	declaresLiterals bool
 }{
-	// Route config objects: { path: "/documents/:id", component: ... }
-	// React Router, Vue Router and Angular all emit this shape.
+	// React Router, Vue Router and Angular route config objects.
 	{regexp.MustCompile(`\bpath\s*:\s*['"]([^'"]+)['"]`), 1, 0, false},
 	// JSX route elements that survived compilation: <Route path="/documents/:id"
 	{regexp.MustCompile(`<Route[^>]*?\spath\s*=\s*['"]([^'"]+)['"]`), 1, 0, true},
-	// Express-style registration bundled into a client or SSR chunk: router.post('/documents/:id'
-	// The receiver must look like a router. Bare `.delete(`/`.put(` also matches the Cache API and
-	// storage wrappers, which would otherwise be reported as declared destructive endpoints.
-	//
-	// Literals are not taken from this pattern: `api` and `app` are also the usual names for an
-	// HTTP client, so `api.get('/documents/1042')` is a call site rather than a declaration. A
-	// parameterized match stays trustworthy because a call site never carries a literal `:id`.
+	// Receiver must look like a router: bare `.delete(` also matches the Cache API.
 	{regexp.MustCompile(`(?:^|[^\w$])[\w$]*(?:[Rr]outer|[Aa]pp|[Ss]erver|[Aa]pi)\.(get|post|put|patch|delete)\(\s*['"](/[^'"]*)['"]`), 2, 1, false},
-	// Next.js build manifest entries: "/documents/[id]" and "/docs/[...slug]". A bracketed string
-	// that declares no parameter is a regex or selector rather than a route, so literals are not
-	// taken from this pattern.
+	// Next.js build manifest entries; a bracketed non-parameter is a regex, not a route.
 	{regexp.MustCompile(`['"](/[^'"]*\[[^'"\]]+\][^'"]*)['"]`), 1, 0, false},
 }
 
-// ExtractDeclaredRouteTemplates pulls route declarations out of bundle content. sourceURL is the
-// URL the bundle was fetched from; only its origin is kept, since a declared route is relative to
-// the application rather than to the script that declares it.
+// A declared route is relative to the application, so only the bundle's origin is kept.
 func ExtractDeclaredRouteTemplates(content string, sourceURL string) []*discover.RouteDetails {
 	origin, _, err := discoverroutehelpers.SplitURLBaseAndPath(sourceURL)
 	if err != nil || origin == "" {
@@ -230,9 +214,7 @@ func ExtractDeclaredRouteTemplates(content string, sourceURL string) []*discover
 			}
 			template, params, ok := discoverroutehelpers.NormalizeDeclaredTemplate(declared)
 			if !ok {
-				// A path that looks parameterized but yielded no usable template must not fall
-				// through as a literal: `/:id` is not a fetchable URL, and nothing downstream would
-				// recognize it as a template either.
+				// A parameterized-looking path is never a fetchable literal.
 				if !routePattern.declaresLiterals || discoverroutehelpers.HasDeclaredParamSyntax(declared) {
 					continue
 				}
@@ -272,23 +254,14 @@ func ExtractDeclaredRouteTemplates(content string, sourceURL string) []*discover
 	return routes
 }
 
-// templateLiteralPattern matches a backtick template literal containing at least one interpolation.
 var templateLiteralPattern = regexp.MustCompile("`([^`\\\\]{0,300}?\\$\\{[^`]{0,300}?)`")
 
-// leadingInterpolationPattern matches an interpolation at the very start of a literal. In practice
-// that is the API base URL (`${this.hostServer}/rest/...`), not a path parameter — the dominant
-// shape in shipped bundles, and the reason a plain leading-slash rule finds nothing.
+// A leading interpolation is the API base URL, not a path parameter.
 var leadingInterpolationPattern = regexp.MustCompile(`^\$\{[^}]*\}`)
 
-// interpolationPattern matches one `${...}` placeholder and captures its expression.
 var interpolationPattern = regexp.MustCompile(`\$\{([^}]*)\}`)
 
-// ExtractInterpolatedRouteTemplates recovers parameterized endpoints from interpolated URLs in
-// bundle content, e.g. `${this.hostServer}/rest/basket/${id}/coupon/${code}`.
-//
-// An interpolation in a URL position is evidence that a parameter exists there — the developer put
-// a variable in the path. That is weaker than a route table, which also names the parameter, but
-// far stronger than inferring an identifier from the shape of an observed path.
+// An interpolation in a URL position is evidence a parameter exists there.
 func ExtractInterpolatedRouteTemplates(content string, sourceURL string) []*discover.RouteDetails {
 	origin, _, err := discoverroutehelpers.SplitURLBaseAndPath(sourceURL)
 	if err != nil || origin == "" {
@@ -323,8 +296,7 @@ func ExtractInterpolatedRouteTemplates(content string, sourceURL string) []*disc
 	return routes
 }
 
-// interpolatedTemplateFrom converts one template literal into a `{name}` path template, or reports
-// ok=false when the literal is not a usable parameterized path.
+// interpolatedTemplateFrom converts a template literal into a `{name}` path template.
 func interpolatedTemplateFrom(literal string) (string, []*discover.RoutePathParam, bool) {
 	path := leadingInterpolationPattern.ReplaceAllString(literal, "")
 	path = strings.SplitN(path, "?", 2)[0]
@@ -372,18 +344,13 @@ func interpolatedTemplateFrom(literal string) (string, []*discover.RoutePathPara
 		return "", nil, false
 	}
 
-	// A leading placeholder means the interpolated base carried the real prefix, which was
-	// discarded — `${this.host}/${id}/reviews` is `/rest/products/{id}/reviews`, not
-	// `/{id}/reviews`. Emitting it would assert an endpoint at the origin root that does not exist.
+	// A leading placeholder means the discarded base carried the real prefix.
 	if len(segments) > 1 && strings.HasPrefix(segments[1], "{") {
 		return "", nil, false
 	}
 
 	template := strings.Join(segments, "/")
-	// Validate the literal text only after substitution, so an expression like
-	// `${encodeURIComponent(id)}` is not mistaken for prose. Markup and spaces in what remains mean
-	// this was never a URL — a closing tag such as `</div>` is slash-prefixed and would otherwise
-	// survive every check above.
+	// Validate after substitution so `${encodeURIComponent(id)}` is not mistaken for prose.
 	if strings.ContainsAny(template, "<> ") {
 		return "", nil, false
 	}
@@ -575,7 +542,7 @@ func extractScriptContentRoutes(ctx context.Context, scriptContent string, baseU
 		return routes, discoverroutehelpers.SetToListString(urls), errors
 	}
 
-	// Declared route tables are independent of whether the bundle parses, so collect them first.
+	// Independent of whether the bundle parses, so collect these first.
 	routes = append(routes, ExtractDeclaredRouteTemplates(scriptContent, baseURL)...)
 	routes = append(routes, ExtractInterpolatedRouteTemplates(scriptContent, baseURL)...)
 
@@ -913,9 +880,7 @@ func fetchSourceMapRoutes(ctx context.Context, sourceMapURL string, baseURL stri
 			if sourceName == "" {
 				continue
 			}
-			// A route-table tag records how the route was declared; the source map only records
-			// where the content came from. Overwriting it would strip the marker that lets a
-			// declared literal outrank a matching template.
+			// Declared provenance outranks source-map provenance; do not overwrite it.
 			if route.Evidence != nil && *route.Evidence == discoverroutehelpers.DeclaredRouteEvidence {
 				continue
 			}

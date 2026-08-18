@@ -36,6 +36,10 @@ types:
     properties:
       name: string
       exampleValues: optional<list<string>>
+  RoutePathParam:
+    properties:
+      name: string
+      exampleValues: optional<list<string>>
   RouteDetails:
     properties:
       baseURL: string
@@ -43,6 +47,7 @@ types:
       method: http.HttpMethod
       queryParams: optional<list<RouteQueryParam>>
       bodyParams: optional<list<RouteBodyParam>>
+      pathParams: optional<list<RoutePathParam>>
       evidence: optional<string>
       pathTemplate: optional<string>
   StaticAssetDetails:

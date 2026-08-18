@@ -320,6 +320,41 @@ func TestApplyDeclaredRouteTemplatesHandlesMultipleParameters(t *testing.T) {
 	}
 }
 
+func TestMergeWebRoutesKeepsDerivationProvenance(t *testing.T) {
+	// A found-location tag arriving first must not displace how the route was derived.
+	found := routeAt("/documents/new")
+	foundEvidence := "CONST:X"
+	found.Evidence = &foundEvidence
+	declared := routeAt("/documents/new")
+	declaredEvidence := discoverroute.DeclaredRouteEvidence
+	declared.Evidence = &declaredEvidence
+
+	merged := discoverroute.MergeWebRoutes([]*discover.RouteDetails{found, declared})
+
+	if len(merged) != 1 {
+		t.Fatalf("expected one merged route, got %d", len(merged))
+	}
+	if merged[0].Evidence == nil || *merged[0].Evidence != discoverroute.DeclaredRouteEvidence {
+		t.Errorf("evidence = %v, want %q", merged[0].Evidence, discoverroute.DeclaredRouteEvidence)
+	}
+}
+
+func TestApplyDeclaredRouteTemplatesKeepsLiteralAfterMergeWithFoundEvidence(t *testing.T) {
+	// The end-to-end shape of the same bug: losing the tag folds the declared literal away.
+	found := routeAt("/documents/new")
+	foundEvidence := "CONST:X"
+	found.Evidence = &foundEvidence
+	declared := routeAt("/documents/new")
+	declaredEvidence := discoverroute.DeclaredRouteEvidence
+	declared.Evidence = &declaredEvidence
+
+	merged := discoverroute.MergeWebRoutes([]*discover.RouteDetails{found, declared})
+	routes := discoverroute.ApplyDeclaredRouteTemplates(append(merged, declaredRoute(t, "/documents/:id")))
+
+	findRoute(t, routes, "/documents/{id}")
+	findRoute(t, routes, "/documents/new")
+}
+
 func TestMergePathParamsUnionsExampleValues(t *testing.T) {
 	merged := discoverroute.MergePathParams(
 		[]*discover.RoutePathParam{{Name: "id", ExampleValues: []string{"1042"}}},

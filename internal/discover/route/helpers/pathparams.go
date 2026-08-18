@@ -228,6 +228,11 @@ func appendUniqueValue(values []string, value string) []string {
 	return append(values, value)
 }
 
+// IsProvenanceEvidence reports evidence recording how a route was derived, not where it was found.
+func IsProvenanceEvidence(evidence string) bool {
+	return evidence == DeclaredRouteEvidence || evidence == InterpolatedRouteEvidence
+}
+
 // IsTemplatedPath reports a declaration rather than a URL that can be requested.
 func IsTemplatedPath(path string) bool {
 	return strings.Contains(path, "{") && strings.Contains(path, "}")

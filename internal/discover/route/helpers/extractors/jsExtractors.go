@@ -880,8 +880,8 @@ func fetchSourceMapRoutes(ctx context.Context, sourceMapURL string, baseURL stri
 			if sourceName == "" {
 				continue
 			}
-			// Declared provenance outranks source-map provenance; do not overwrite it.
-			if route.Evidence != nil && *route.Evidence == discoverroutehelpers.DeclaredRouteEvidence {
+			// Derivation provenance outranks source-map provenance; do not overwrite it.
+			if route.Evidence != nil && discoverroutehelpers.IsProvenanceEvidence(*route.Evidence) {
 				continue
 			}
 			evidence := "sourcemap:" + sourceName

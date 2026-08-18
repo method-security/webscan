@@ -228,9 +228,24 @@ func appendUniqueValue(values []string, value string) []string {
 	return append(values, value)
 }
 
+// EvidenceRank orders a declaration above an interpolation above where the content was found.
+func EvidenceRank(evidence *string) int {
+	if evidence == nil {
+		return 0
+	}
+	switch *evidence {
+	case DeclaredRouteEvidence:
+		return 3
+	case InterpolatedRouteEvidence:
+		return 2
+	default:
+		return 1
+	}
+}
+
 // IsProvenanceEvidence reports evidence recording how a route was derived, not where it was found.
 func IsProvenanceEvidence(evidence string) bool {
-	return evidence == DeclaredRouteEvidence || evidence == InterpolatedRouteEvidence
+	return EvidenceRank(&evidence) >= 2
 }
 
 // IsTemplatedPath reports a declaration rather than a URL that can be requested.

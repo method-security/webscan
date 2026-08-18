@@ -103,12 +103,8 @@ func MergeWebRoutes(routes []*discover.RouteDetails) []*discover.RouteDetails {
 			existingRoute.BodyParams = MergeBodyParams(existingRoute.BodyParams, route.BodyParams)
 			// Merge PathParams
 			existingRoute.PathParams = MergePathParams(existingRoute.PathParams, route.PathParams)
-			// Prefer evidence-tagged fields (sourcemap/CONST beats untagged first-seen)
-			// How a route was derived outranks where it was found, whichever arrived first.
-			switch {
-			case route.Evidence != nil && IsProvenanceEvidence(*route.Evidence):
-				existingRoute.Evidence = route.Evidence
-			case existingRoute.Evidence == nil && route.Evidence != nil:
+			// Ranked so a stronger tag wins regardless of which arrived first.
+			if EvidenceRank(route.Evidence) > EvidenceRank(existingRoute.Evidence) {
 				existingRoute.Evidence = route.Evidence
 			}
 			if existingRoute.PathTemplate == nil && route.PathTemplate != nil {

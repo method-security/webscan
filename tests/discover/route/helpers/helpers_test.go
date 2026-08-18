@@ -339,6 +339,24 @@ func TestMergeWebRoutesKeepsDerivationProvenance(t *testing.T) {
 	}
 }
 
+func TestMergeWebRoutesRanksDeclarationAboveInterpolation(t *testing.T) {
+	// Declared routes are collected first, so order alone must not decide the surviving tag.
+	tagged := func(evidence string) *discover.RouteDetails {
+		route := routeAt("/rest/basket/{basketId}")
+		route.Evidence = &evidence
+		return route
+	}
+	for _, order := range [][]*discover.RouteDetails{
+		{tagged(discoverroute.DeclaredRouteEvidence), tagged(discoverroute.InterpolatedRouteEvidence)},
+		{tagged(discoverroute.InterpolatedRouteEvidence), tagged(discoverroute.DeclaredRouteEvidence)},
+	} {
+		merged := discoverroute.MergeWebRoutes(order)
+		if len(merged) != 1 || *merged[0].Evidence != discoverroute.DeclaredRouteEvidence {
+			t.Errorf("evidence = %v, want %q", merged[0].Evidence, discoverroute.DeclaredRouteEvidence)
+		}
+	}
+}
+
 func TestApplyDeclaredRouteTemplatesKeepsLiteralAfterMergeWithFoundEvidence(t *testing.T) {
 	// The end-to-end shape of the same bug: losing the tag folds the declared literal away.
 	found := routeAt("/documents/new")

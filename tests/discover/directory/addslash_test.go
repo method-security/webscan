@@ -33,6 +33,12 @@ func newAliasServer(t *testing.T) *aliasServer {
 		case "/static/":
 			w.WriteHeader(http.StatusForbidden)
 			_, _ = w.Write([]byte("<html><head><title>403 Forbidden</title></head><body>forbidden</body></html>"))
+		case "/pub/":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("<html><body><h1>Index of /pub</h1><a href=\"docs/\">docs/</a></body></html>"))
+		case "/pub/secret/":
+			w.WriteHeader(http.StatusForbidden)
+			_, _ = w.Write([]byte("<html><head><title>403 Forbidden</title></head><body>nothing here for you</body></html>"))
 		case "/.well-known/":
 			w.WriteHeader(http.StatusForbidden)
 			_, _ = w.Write([]byte("<html><head><title>403 Forbidden</title></head><body>forbidden</body></html>"))
@@ -65,7 +71,7 @@ func intPtr(v int) *int    { return &v }
 func directoryConfig(target string, addSlash bool, recursionDepth int) discover.DiscoverDirectoryConfig {
 	return discover.DiscoverDirectoryConfig{
 		Targets:                     []string{target},
-		Paths:                       []string{"static", "app", ".well-known"},
+		Paths:                       []string{"static", "app", ".well-known", "pub", "secret"},
 		Extensions:                  []string{"js"},
 		AddSlash:                    boolPtr(addSlash),
 		RecursionDepth:              intPtr(recursionDepth),
@@ -220,5 +226,28 @@ func TestDirectoryDiscoveryRecursesDespiteIdenticalForbiddenBodies(t *testing.T)
 		if !contains(frontiers, want) {
 			t.Errorf("expected %q to open a frontier despite the shared 403 body, got %q", want, frontiers)
 		}
+	}
+}
+
+// A 2xx outside response-codes never reaches the findings pipeline, so it has to be judged on
+// status like any other unfiltered response. Restricting findings to 403 must not stop a live
+// 200 directory from opening a frontier.
+func TestDirectoryDiscoveryRecursesIntoSuccessOutsideResponseCodes(t *testing.T) {
+	server := newAliasServer(t)
+
+	config := directoryConfig(server.URL, true, 1)
+	config.ResponseCodes = "403"
+
+	if _, err := discoverdirectory.RunDirectoryDiscovery(context.Background(), config); err != nil {
+		t.Fatalf("RunDirectoryDiscovery returned error: %v", err)
+	}
+
+	// Asserted against the requests the server received rather than the report: with findings
+	// restricted to 403 this target produces none, and a target with no findings is not reported.
+	if !server.saw("/pub/") {
+		t.Fatal("the 200 directory was never probed")
+	}
+	if !server.saw("/pub/secret/") {
+		t.Error("a 200 directory outside response-codes did not open a frontier")
 	}
 }

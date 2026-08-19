@@ -248,8 +248,9 @@ func sweepFrontier(ctx context.Context, baseURL string, current frontier, allPat
 
 	for _, path := range allPaths {
 		// Clean path (ie. /foo/bar/ -> /foo/bar or foo/bar -> /foo/bar)
-		cleanPath := strings.Trim(path, "/")
-		if cleanPath != "" { // If the path is not empty, add a leading slash else leave it as ""
+		// TrimLeft, not Trim: a trailing slash is the directory probe and must survive to the wire.
+		cleanPath := strings.TrimLeft(path, "/")
+		if cleanPath != "" {
 			cleanPath = fmt.Sprintf("/%s", cleanPath)
 		}
 		fullPath := fmt.Sprintf("%s%s", strings.TrimRight(current.basePath, "/"), cleanPath)

@@ -15,6 +15,7 @@ import (
 
 	// Utils
 	utils "github.com/Method-Security/webscan/utils"
+	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
 )
 
 type providerRouteNoiseSignature struct {
@@ -330,8 +331,9 @@ func ResolveURL(base, ref string) string {
 	if err != nil {
 		return ref
 	}
-	// Return with trailing slash removed
-	return strings.TrimRight(baseURL.ResolveReference(refURL).String(), "/")
+	resolved := baseURL.ResolveReference(refURL)
+	resolved.Path = requesthelpers.NormalizeTargetPath(resolved.Path)
+	return resolved.String()
 }
 
 // URLRemoveQueryParams removes query parameters from a URL string.

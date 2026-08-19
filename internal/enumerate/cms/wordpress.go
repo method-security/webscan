@@ -323,7 +323,7 @@ func fetchPluginsFromAPI(ctx context.Context, targetURL string, path string, con
 	}
 
 	// Send Request
-	apiRequestConfig := createSendHTTPRequestConfig(baseURL, fmt.Sprintf("%s%s", targetPath, path), 0, config)
+	apiRequestConfig := createSendHTTPRequestConfig(baseURL, requesthelpers.JoinPath(targetPath, path), 0, config)
 	apiRequest, err := request.SendRequest(ctx, apiRequestConfig)
 	if err != nil || apiRequest.Response != nil && apiRequest.Response.StatusCode != nil && *apiRequest.Response.StatusCode != 200 {
 		return plugins

@@ -7,12 +7,11 @@ import (
 	common "github.com/Method-Security/webscan/generated/go/common"
 )
 
-func TestExpandPaths(t *testing.T) {
+func TestExpandPathsExtensionsOnly(t *testing.T) {
 	for _, tc := range []struct {
 		name       string
 		paths      []string
 		extensions []string
-		addSlash   bool
 		want       []string
 	}{
 		{
@@ -40,25 +39,6 @@ func TestExpandPaths(t *testing.T) {
 			want:       []string{"/static/", "static.js"},
 		},
 		{
-			name:     "add-slash emits the directory form",
-			paths:    []string{"static"},
-			addSlash: true,
-			want:     []string{"static", "static/"},
-		},
-		{
-			name:       "add-slash and extensions compose without /x.js/",
-			paths:      []string{"app"},
-			extensions: []string{"js"},
-			addSlash:   true,
-			want:       []string{"app", "app.js", "app/"},
-		},
-		{
-			name:     "an entry that already names a file takes no slash",
-			paths:    []string{"robots.txt"},
-			addSlash: true,
-			want:     []string{"robots.txt"},
-		},
-		{
 			name:       "root path takes no extension",
 			paths:      []string{""},
 			extensions: []string{"js"},
@@ -66,9 +46,9 @@ func TestExpandPaths(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got := expandPaths(tc.paths, tc.extensions, tc.addSlash)
+			got := expandPaths(tc.paths, tc.extensions, false)
 			if !reflect.DeepEqual(got, tc.want) {
-				t.Errorf("expandPaths(%q, %q, %v) = %q, want %q", tc.paths, tc.extensions, tc.addSlash, got, tc.want)
+				t.Errorf("expandPaths(%q, %q, false) = %q, want %q", tc.paths, tc.extensions, got, tc.want)
 			}
 		})
 	}

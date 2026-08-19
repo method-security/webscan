@@ -1,0 +1,171 @@
+package directory_test
+
+import (
+	"context"
+	"net/http"
+	"net/http/httptest"
+	"sort"
+	"sync"
+	"testing"
+
+	common "github.com/Method-Security/webscan/generated/go/common"
+	"github.com/Method-Security/webscan/generated/go/discover"
+	discoverdirectory "github.com/Method-Security/webscan/internal/discover/directory"
+)
+
+// aliasServer mimics an nginx location with an alias and no autoindex: the bare path falls
+// through to the catch-all and 404s, and only the directory form reveals the directory.
+type aliasServer struct {
+	*httptest.Server
+	mu       sync.Mutex
+	requests []string
+}
+
+func newAliasServer(t *testing.T) *aliasServer {
+	t.Helper()
+	s := &aliasServer{}
+	s.Server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		s.mu.Lock()
+		s.requests = append(s.requests, r.URL.Path)
+		s.mu.Unlock()
+
+		switch r.URL.Path {
+		case "/static/":
+			w.WriteHeader(http.StatusForbidden)
+			_, _ = w.Write([]byte("<html><head><title>403 Forbidden</title></head><body>forbidden</body></html>"))
+		case "/static/app.js":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`var PLATFORM = { token: "seeded-integration-token", base: "/api/v1" };`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = w.Write([]byte("<html><head><title>404 Not Found</title></head><body>the requested url was not found on this server</body></html>"))
+		}
+	}))
+	t.Cleanup(s.Close)
+	return s
+}
+
+func (s *aliasServer) saw(path string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, seen := range s.requests {
+		if seen == path {
+			return true
+		}
+	}
+	return false
+}
+
+func boolPtr(v bool) *bool { return &v }
+func intPtr(v int) *int    { return &v }
+
+func directoryConfig(target string, addSlash bool, recursionDepth int) discover.DiscoverDirectoryConfig {
+	return discover.DiscoverDirectoryConfig{
+		Targets:                     []string{target},
+		Paths:                       []string{"static", "app"},
+		Extensions:                  []string{"js"},
+		AddSlash:                    boolPtr(addSlash),
+		RecursionDepth:              intPtr(recursionDepth),
+		HttpMethods:                 []common.HttpMethod{common.HttpMethodGet},
+		ResponseCodes:               "200-299,403",
+		EnableCommonResponseFilters: true,
+		VerifyTls:                   false,
+		Threshold:                   0.25,
+		Timeout:                     10,
+		GlobalRateLimit:             0,
+		IgnoreCrossDomainRedirects:  true,
+		MaxRedirectsBaselineRequest: 5,
+		GlobalTimeout:               60,
+		Retries:                     0,
+		Sleep:                       0,
+		Jitter:                      0,
+		Threads:                     4,
+		UserAgent:                   common.UserAgentPresetCurl,
+	}
+}
+
+func findingPaths(t *testing.T, report *discover.DiscoverDirectoryReport) []string {
+	t.Helper()
+	var paths []string
+	for _, target := range report.Result.Targets {
+		for _, attempt := range target.Attempts {
+			if attempt.Request != nil {
+				paths = append(paths, attempt.Request.Path)
+			}
+		}
+	}
+	sort.Strings(paths)
+	return paths
+}
+
+func contains(haystack []string, needle string) bool {
+	for _, item := range haystack {
+		if item == needle {
+			return true
+		}
+	}
+	return false
+}
+
+// Without add-slash the directory form is never requested, so the directory and everything
+// under it stay invisible however the sweep is otherwise configured.
+func TestDirectoryDiscoveryWithoutAddSlashMissesTheDirectory(t *testing.T) {
+	server := newAliasServer(t)
+
+	report, err := discoverdirectory.RunDirectoryDiscovery(context.Background(), directoryConfig(server.URL, false, 1))
+	if err != nil {
+		t.Fatalf("RunDirectoryDiscovery returned error: %v", err)
+	}
+
+	if server.saw("/static/") {
+		t.Error("the directory form was requested with add-slash off")
+	}
+	if got := findingPaths(t, report); len(got) != 0 {
+		t.Errorf("expected no findings, got %q", got)
+	}
+}
+
+// With add-slash the 403 on the directory form opens a frontier, and the bundle underneath it
+// becomes reachable. Both wordlist entries are bare words; the .js comes from extensions.
+func TestDirectoryDiscoveryWithAddSlashReachesTheBundle(t *testing.T) {
+	server := newAliasServer(t)
+
+	report, err := discoverdirectory.RunDirectoryDiscovery(context.Background(), directoryConfig(server.URL, true, 1))
+	if err != nil {
+		t.Fatalf("RunDirectoryDiscovery returned error: %v", err)
+	}
+
+	if !server.saw("/static/") {
+		t.Fatal("the directory form was never requested with add-slash on")
+	}
+
+	found := findingPaths(t, report)
+	for _, want := range []string{"/static/", "/static/app.js"} {
+		if !contains(found, want) {
+			t.Errorf("expected %q among findings, got %q", want, found)
+		}
+	}
+
+	var frontiers []string
+	for _, target := range report.Result.Targets {
+		for _, frontier := range target.Frontiers {
+			frontiers = append(frontiers, frontier.BasePath)
+		}
+	}
+	if !contains(frontiers, "/static/") {
+		t.Errorf("expected /static/ to open a frontier, got %q", frontiers)
+	}
+}
+
+// An entry that already names a file takes no slash, so /static/app.js/ is never probed.
+func TestDirectoryDiscoveryDoesNotSlashFileEntries(t *testing.T) {
+	server := newAliasServer(t)
+
+	if _, err := discoverdirectory.RunDirectoryDiscovery(context.Background(), directoryConfig(server.URL, true, 1)); err != nil {
+		t.Fatalf("RunDirectoryDiscovery returned error: %v", err)
+	}
+
+	if server.saw("/static/app.js/") {
+		t.Error("a file-shaped entry was probed with a trailing slash")
+	}
+}

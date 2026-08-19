@@ -296,7 +296,7 @@ func appendDirectoryPath(basePath, childPath string) string {
 }
 
 // gatherPaths gathers all paths from the config
-func gatherPaths(paths []string, wordlistType *discover.WordlistType, wordlistSize *discover.WordlistSize, extensions []string) ([]string, error) {
+func gatherPaths(paths []string, wordlistType *discover.WordlistType, wordlistSize *discover.WordlistSize, extensions []string, addSlash bool) ([]string, error) {
 	var allPaths []string
 
 	// Add manual paths
@@ -313,17 +313,19 @@ func gatherPaths(paths []string, wordlistType *discover.WordlistType, wordlistSi
 		allPaths = append(allPaths, wordlistPaths...)
 	}
 
-	return applyExtensions(allPaths, extensions), nil
+	return expandPaths(allPaths, extensions, addSlash), nil
 }
 
-// Bare word plus one variant per extension, so a directories wordlist can reach app.js.
-func applyExtensions(paths []string, extensions []string) []string {
+// Bare word, plus one variant per extension so a directories wordlist can reach app.js, plus the
+// directory form when addSlash is set. Servers answer /x and /x/ differently and many reveal a
+// directory only through the latter.
+func expandPaths(paths []string, extensions []string, addSlash bool) []string {
 	normalized := normalizeExtensions(extensions)
-	if len(normalized) == 0 {
+	if len(normalized) == 0 && !addSlash {
 		return paths
 	}
 
-	expanded := make([]string, 0, len(paths)*(len(normalized)+1))
+	expanded := make([]string, 0, len(paths)*(len(normalized)+2))
 	for _, path := range paths {
 		expanded = append(expanded, path)
 		trimmed := strings.Trim(path, "/")
@@ -332,6 +334,10 @@ func applyExtensions(paths []string, extensions []string) []string {
 		}
 		for _, extension := range normalized {
 			expanded = append(expanded, trimmed+extension)
+		}
+		// An extension already marks the entry as a file, so /x.js/ is never a useful probe.
+		if addSlash && !pathLooksLikeFile(trimmed) {
+			expanded = append(expanded, trimmed+"/")
 		}
 	}
 	return expanded
@@ -356,6 +362,10 @@ func normalizeExtensions(extensions []string) []string {
 		normalized = append(normalized, trimmed)
 	}
 	return normalized
+}
+
+func addSlashEnabled(config *discover.DiscoverDirectoryConfig) bool {
+	return config.AddSlash != nil && *config.AddSlash
 }
 
 // recursionDepth returns how many levels below the target may be swept; 0 disables recursion.

@@ -67,7 +67,7 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 	limiter := newDirectoryRateLimiter(config.GlobalRateLimit)
 
 	// Gather all paths
-	allPaths, err := gatherPaths(config.Paths, config.WordlistType, config.WordlistSize, config.Extensions)
+	allPaths, err := gatherPaths(config.Paths, config.WordlistType, config.WordlistSize, config.Extensions, addSlashEnabled(&config))
 	if err != nil {
 		report.Errors = append(report.Errors, fmt.Sprintf("directory discovery: failed to gather paths: %v", err))
 		return &report, nil

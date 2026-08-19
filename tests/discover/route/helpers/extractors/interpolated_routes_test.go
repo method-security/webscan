@@ -1,8 +1,10 @@
 package extractors_test
 
 import (
+	"strings"
 	"testing"
 
+	common "github.com/Method-Security/webscan/generated/go/common"
 	"github.com/Method-Security/webscan/generated/go/discover"
 	extractors "github.com/Method-Security/webscan/internal/discover/route/helpers/extractors"
 )
@@ -17,90 +19,170 @@ func onlyRoute(t *testing.T, routes []*discover.RouteDetails) *discover.RouteDet
 	if len(routes) != 1 {
 		paths := make([]string, 0, len(routes))
 		for _, route := range routes {
-			paths = append(paths, route.Path)
+			paths = append(paths, string(route.Method)+" "+route.Path)
 		}
 		t.Fatalf("expected exactly one route, got %v", paths)
 	}
 	return routes[0]
 }
 
-func TestExtractInterpolatedRoutesStripsInterpolatedOrigin(t *testing.T) {
-	// The API base is itself interpolated, so a leading-slash rule matches nothing.
-	route := onlyRoute(t, interpolated(t, "const u = `${this.hostServer}/rest/basket/${basketId}`"))
+func TestExtractInterpolatedRoutesKeepsResolvableBasePrefix(t *testing.T) {
+	// An API base routinely holds a path; treating it as origin-only drops the prefix.
+	route := onlyRoute(t, interpolated(t,
+		"const API=`${this.host}/api/v2`;\nthis.http.get(`${API}/reports/${reportId}`);"))
 
-	if route.Path != "/rest/basket/{basketId}" {
-		t.Errorf("path = %q, want /rest/basket/{basketId}", route.Path)
+	if route.Path != "/api/v2/reports/{reportId}" {
+		t.Errorf("path = %q, want the base prefix retained", route.Path)
 	}
 	if route.BaseUrl != "https://example.com" {
 		t.Errorf("BaseUrl = %q, want the bundle origin", route.BaseUrl)
 	}
 }
 
+func TestExtractInterpolatedRoutesKeepsEnclosingVerb(t *testing.T) {
+	for declaration, want := range map[string]common.HttpMethod{
+		"const A=`${h}/api/v2`;\nthis.http.post(`${A}/sessions/${sessionId}/refresh`, b);": common.HttpMethodPost,
+		"const A=`${h}/api/v2`;\nthis.http.put(`${A}/reports/${reportId}`, b);":            common.HttpMethodPut,
+		"const A=`${h}/api/v2`;\nthis.http.delete(`${A}/reports/${reportId}`);":            common.HttpMethodDelete,
+		"const A=`${h}/api/v2`;\nthis.http.patch(`${A}/users/${userId}`, b);":              common.HttpMethodPatch,
+	} {
+		route := onlyRoute(t, interpolated(t, declaration))
+		if route.Method != want {
+			t.Errorf("method = %q, want %q for %q", route.Method, want, declaration)
+		}
+	}
+}
+
+func TestExtractInterpolatedRoutesReadsFetchOptionsMethod(t *testing.T) {
+	route := onlyRoute(t, interpolated(t, "fetch(`/api/v2/user/${userId}`, { method: 'DELETE' })"))
+
+	if route.Method != common.HttpMethodDelete {
+		t.Errorf("method = %q, want DELETE", route.Method)
+	}
+}
+
+func TestExtractInterpolatedRoutesSkipsUndeterminableMethod(t *testing.T) {
+	// Defaulting to GET reported every POST, PUT and DELETE as a GET.
+	routes := interpolated(t, "const url = `/api/v2/user/${userId}`;")
+
+	for _, route := range routes {
+		t.Errorf("expected no route without a determinable method, got %s %s", route.Method, route.Path)
+	}
+}
+
+func TestExtractInterpolatedRoutesMarksUnresolvableBaseAsUnrooted(t *testing.T) {
+	// The base may carry a path, so rooting is deferred to corroboration rather than guessed.
+	route := onlyRoute(t, interpolated(t, "this.http.get(`${this.hostServer}/rest/basket/${id}`);"))
+
+	if route.Evidence == nil || !strings.HasPrefix(*route.Evidence, "interpolated-unrooted") {
+		t.Errorf("evidence = %v, want an unrooted candidate", route.Evidence)
+	}
+	if route.Path != "/rest/basket/{param3}" {
+		t.Errorf("path = %q, want the tail that followed the base", route.Path)
+	}
+}
+
+func TestExtractInterpolatedRoutesMarksAmbiguousBaseAsUnrooted(t *testing.T) {
+	// Minified bundles reuse short names; conflicting assignments mean the base is unknown.
+	route := onlyRoute(t, interpolated(t,
+		"var A=`${h}/api/v1`;\nvar A=`${h}/api/v2`;\nthis.http.get(`${A}/reports/${id}`);"))
+
+	if route.Evidence == nil || !strings.HasPrefix(*route.Evidence, "interpolated-unrooted") {
+		t.Errorf("evidence = %v, want an unrooted candidate", route.Evidence)
+	}
+	if !strings.HasSuffix(*route.Evidence, ":A") {
+		t.Errorf("evidence = %q, want the base name recorded", *route.Evidence)
+	}
+}
+
+func TestExtractInterpolatedRoutesTreatsNavigationAsGet(t *testing.T) {
+	// window.open is a GET by definition, not an inferred default.
+	route := onlyRoute(t, interpolated(t, "window.open(`/ftp/order_${e}.pdf`)"))
+
+	if route.Method != common.HttpMethodGet {
+		t.Errorf("method = %q, want GET", route.Method)
+	}
+}
+
+func TestExtractInterpolatedRoutesTreatsAssignedNavigationAsGet(t *testing.T) {
+	route := onlyRoute(t, interpolated(t,
+		"openPDF(e){let i=`/ftp/order_${e}.pdf`;window.open(i)}"))
+
+	if route.Method != common.HttpMethodGet {
+		t.Errorf("method = %q, want GET", route.Method)
+	}
+}
+
+func TestExtractInterpolatedRoutesAcceptsRootedLiteralWithoutBase(t *testing.T) {
+	route := onlyRoute(t, interpolated(t, "this.http.get(`/api/v2/reports/${reportId}`);"))
+
+	if route.Path != "/api/v2/reports/{reportId}" {
+		t.Errorf("path = %q", route.Path)
+	}
+}
+
 func TestExtractInterpolatedRoutesNamesFromExpressionWhenMeaningful(t *testing.T) {
-	route := onlyRoute(t, interpolated(t, "fetch(`/rest/track/${this.orderId}`)"))
+	route := onlyRoute(t, interpolated(t, "fetch(`/rest/track/${this.orderId}`, {method:'GET'})"))
 
 	if len(route.PathParams) != 1 || route.PathParams[0].Name != "orderId" {
 		t.Fatalf("expected the expression to name the param, got %v", route.PathParams)
 	}
 }
 
-func TestExtractInterpolatedRoutesFallsBackWhenExpressionIsMinified(t *testing.T) {
-	// Minified locals carry no meaning, so the preceding segment is better evidence.
-	route := onlyRoute(t, interpolated(t, "fetch(`/rest/baskets/${e}`)"))
+func TestExtractInterpolatedRoutesUsesPositionalNameWhenMinified(t *testing.T) {
+	// The preceding segment is as often a verb as a resource, and it varied by call site.
+	first := onlyRoute(t, interpolated(t,
+		"const A=`${h}/api/v2`;\nthis.http.put(`${A}/widgets/archive/${e}/id/${i}`, b);"))
+	second := onlyRoute(t, interpolated(t,
+		"const A=`${h}/api/v2`;\nthis.http.put(`${A}/widgets/archive/${t}/id/${n}`, b);"))
 
-	if len(route.PathParams) != 1 || route.PathParams[0].Name != "basketId" {
-		t.Fatalf("expected a name derived from the preceding segment, got %v", route.PathParams)
+	if first.Path != "/api/v2/widgets/archive/{param5}/id/{param7}" {
+		t.Errorf("path = %q, want positional names", first.Path)
+	}
+	if first.Path != second.Path {
+		t.Errorf("names must not vary by call site: %q vs %q", first.Path, second.Path)
 	}
 }
 
-func TestExtractInterpolatedRoutesHandlesMultipleParameters(t *testing.T) {
-	route := onlyRoute(t, interpolated(t, "fetch(`${h}/rest/basket/${e}/coupon/${i}`)"))
-
-	if route.Path != "/rest/basket/{basketId}/coupon/{couponId}" {
-		t.Errorf("path = %q", route.Path)
-	}
-	if len(route.PathParams) != 2 {
-		t.Fatalf("expected two params, got %v", route.PathParams)
-	}
-	if route.PathParams[0].Name == route.PathParams[1].Name {
-		t.Errorf("param names collided: %q", route.PathParams[0].Name)
-	}
-}
-
-func TestExtractInterpolatedRoutesHandlesPartialSegmentInterpolation(t *testing.T) {
-	// ConstructURL substitutes {name} anywhere, so an embedded placeholder is executable.
-	route := onlyRoute(t, interpolated(t, "fetch(`${h}/ftp/order_${e}.pdf`)"))
+func TestExtractInterpolatedRoutesNamesFromAdjacentLiteralText(t *testing.T) {
+	// Literal text inside the same segment is adjacent evidence, unlike the preceding segment.
+	route := onlyRoute(t, interpolated(t, "fetch(`/ftp/order_${e}.pdf`, {method:'GET'})"))
 
 	if route.Path != "/ftp/order_{orderId}.pdf" {
 		t.Errorf("path = %q, want /ftp/order_{orderId}.pdf", route.Path)
 	}
 }
 
+func TestExtractInterpolatedRoutesHandlesMultipleParameters(t *testing.T) {
+	route := onlyRoute(t, interpolated(t,
+		"const A=`${h}/api/v2`;\nthis.http.put(`${A}/basket/${basketId}/coupon/${couponId}`, b);"))
+
+	if route.Path != "/api/v2/basket/{basketId}/coupon/{couponId}" {
+		t.Errorf("path = %q", route.Path)
+	}
+	if len(route.PathParams) != 2 || route.PathParams[0].Name == route.PathParams[1].Name {
+		t.Fatalf("expected two distinctly named params, got %v", route.PathParams)
+	}
+}
+
 func TestExtractInterpolatedRoutesAcceptsWrappedExpressions(t *testing.T) {
-	// Validation runs on the substituted template, not the raw literal.
-	for declaration, want := range map[string]string{
-		"fetch(`/api/user/${encodeURIComponent(id)}`)": "/api/user/{userId}",
-		"fetch(`/api/item/${ id }`)":                   "/api/item/{itemId}",
-	} {
-		route := onlyRoute(t, interpolated(t, declaration))
-		if route.Path != want {
-			t.Errorf("%s: path = %q, want %q", declaration, route.Path, want)
-		}
+	route := onlyRoute(t, interpolated(t, "this.http.get(`/api/user/${encodeURIComponent(accountId)}`)"))
+
+	if route.Path != "/api/user/{accountId}" {
+		t.Errorf("path = %q, want the unwrapped argument as the name", route.Path)
 	}
 }
 
 func TestExtractInterpolatedRoutesRejectsNonPathInterpolations(t *testing.T) {
 	cases := map[string]string{
-		"markup":              "const h = `<code>${e.data[0].orderId}</code>`",
-		"inline style":        "const s = `scaleX(${this.value/100})`",
-		"protocol relative":   "const u = `//${window.location.host}/rest/x`",
-		"query only":          "const u = `${this.hostServer}/rest/languages?v=${e}`",
-		"leading param":       "const u = `${this.host}/${e}/reviews`",
-		"whole path is param": "const u = `${this.host}/${e}`",
-		"no interpolation":    "const u = `/rest/languages`",
-		// A closing tag is slash-prefixed and survives every other check.
-		"closing tag": "const x = `</div>${y}`",
-		"prose":       "const p = `/5 items ${count}`",
+		"markup":              "this.http.get(`<code>${e.data[0].orderId}</code>`)",
+		"inline style":        "this.http.get(`scaleX(${this.value/100})`)",
+		"protocol relative":   "this.http.get(`//${window.location.host}/rest/x`)",
+		"query only":          "const A=`${h}/api`;\nthis.http.get(`${A}/languages?v=${e}`)",
+		"whole path is param": "this.http.get(`/${e}`)",
+		"no interpolation":    "this.http.get(`/rest/languages`)",
+		"closing tag":         "this.http.get(`</div>${y}`)",
+		"prose":               "this.http.get(`/5 items ${count}`)",
 	}
 
 	for name, content := range cases {
@@ -110,11 +192,66 @@ func TestExtractInterpolatedRoutesRejectsNonPathInterpolations(t *testing.T) {
 	}
 }
 
+func TestExtractInterpolatedRoutesAllowsParamFirstTailUnderResolvedBase(t *testing.T) {
+	// The base is known, so a parameter immediately after it is a real path rather than a guess.
+	route := onlyRoute(t, interpolated(t, "const A=`${h}/api/v2`;\nthis.http.get(`${A}/${e}`)"))
+
+	if route.Path != "/api/v2/{param3}" {
+		t.Errorf("path = %q, want the resolved base to anchor the template", route.Path)
+	}
+}
+
+func TestExtractInterpolatedRoutesRenumbersNamesAgainstFinalPath(t *testing.T) {
+	// The same endpoint written with and without an interpolated base must yield the same names.
+	viaBase := onlyRoute(t, interpolated(t,
+		"const A=`${h}/api/v2`;\nthis.http.put(`${A}/widgets/lock/${e}`, b);"))
+	rooted := onlyRoute(t, interpolated(t, "this.http.put(`/api/v2/widgets/lock/${e}`, b);"))
+
+	if viaBase.Path != rooted.Path {
+		t.Errorf("names split the same endpoint: %q vs %q", viaBase.Path, rooted.Path)
+	}
+}
+
+func TestExtractInterpolatedRoutesNamesSpacedInterpolations(t *testing.T) {
+	compact := onlyRoute(t, interpolated(t, "this.http.get(`/api/v2/track/${this.orderId}`)"))
+	spaced := onlyRoute(t, interpolated(t, "this.http.get(`/api/v2/track/${ this.orderId }`)"))
+
+	if compact.Path != spaced.Path {
+		t.Errorf("spacing split the same endpoint: %q vs %q", compact.Path, spaced.Path)
+	}
+}
+
+func TestExtractInterpolatedRoutesRejectsProtocolRelativeBase(t *testing.T) {
+	// A protocol-relative base is a host, not a path prefix.
+	routes := interpolated(t, "const A=`//cdn.example.com/api`;\nthis.http.get(`${A}/reports/${id}`)")
+
+	for _, route := range routes {
+		if strings.HasPrefix(route.Path, "//") {
+			t.Errorf("a host was treated as a path prefix: %q", route.Path)
+		}
+	}
+}
+
 func TestExtractInterpolatedRoutesTagsProvenance(t *testing.T) {
 	// Must stay distinguishable from a route-table declaration downstream.
-	route := onlyRoute(t, interpolated(t, "fetch(`${h}/rest/basket/${e}`)"))
+	route := onlyRoute(t, interpolated(t, "this.http.get(`/rest/basket/${basketId}`)"))
 
 	if route.Evidence == nil || *route.Evidence != "interpolated" {
 		t.Errorf("evidence = %v, want interpolated", route.Evidence)
+	}
+}
+
+func TestExtractInterpolatedRoutesKeepsCandidatesFromDistinctBases(t *testing.T) {
+	// Two bases sharing a tail must both survive, or a route recoverable from one is lost when the
+	// other never corroborates.
+	routes := interpolated(t,
+		"this.http.get(`${this.apiA}/reports/${id}`);\nthis.http.get(`${this.apiB}/reports/${id}`);")
+
+	if len(routes) != 2 {
+		paths := make([]string, 0, len(routes))
+		for _, route := range routes {
+			paths = append(paths, *route.Evidence)
+		}
+		t.Fatalf("expected a candidate per base, got %v", paths)
 	}
 }

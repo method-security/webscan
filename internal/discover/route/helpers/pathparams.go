@@ -63,14 +63,14 @@ func NormalizeDeclaredTemplate(path string) (string, []*discover.RoutePathParam,
 		}
 	}
 	// Without a literal segment the template discriminates on segment count alone.
-	if !hasLiteralSegment(segments) {
+	if !HasLiteralSegment(segments) {
 		return path, nil, false
 	}
 	return strings.Join(segments, "/"), params, true
 }
 
-// hasLiteralSegment reports whether any segment is fixed rather than a placeholder.
-func hasLiteralSegment(segments []string) bool {
+// HasLiteralSegment reports whether any segment is fixed rather than a placeholder.
+func HasLiteralSegment(segments []string) bool {
 	for _, segment := range segments {
 		if segment == "" {
 			continue
@@ -158,6 +158,16 @@ func ApplyDeclaredRouteTemplates(routes []*discover.RouteDetails) []*discover.Ro
 		template string
 	}
 
+	// An unrooted candidate carries a path resolution never confirmed, so it must not reach output.
+	rooted := make([]*discover.RouteDetails, 0, len(routes))
+	for _, route := range routes {
+		if IsUnrootedEvidence(route.Evidence) {
+			continue
+		}
+		rooted = append(rooted, route)
+	}
+	routes = rooted
+
 	var templates []templateRoute
 	declaredLiterals := map[string]struct{}{}
 	for _, route := range routes {
@@ -233,10 +243,14 @@ func EvidenceRank(evidence *string) int {
 	if evidence == nil {
 		return 0
 	}
-	switch *evidence {
-	case DeclaredRouteEvidence:
+	switch {
+	case *evidence == DeclaredRouteEvidence:
 		return 3
-	case InterpolatedRouteEvidence:
+	case *evidence == InterpolatedRouteEvidence:
+		return 2
+	// An unrooted candidate is derivation provenance too; losing the tag would skip rooting and let
+	// the unprefixed tail reach the report.
+	case IsUnrootedEvidence(evidence):
 		return 2
 	default:
 		return 1
@@ -312,6 +326,9 @@ func MergePathParams(params1 []*discover.RoutePathParam, params2 []*discover.Rou
 // InterpolatedRouteEvidence marks a route whose parameter is proven but only loosely named.
 const InterpolatedRouteEvidence = "interpolated"
 
+// wrapperCallArgumentPattern unwraps a call with one identifier argument, e.g. encodeURIComponent(id).
+var wrapperCallArgumentPattern = regexp.MustCompile(`^[A-Za-z_$][\w$.]*\(\s*([A-Za-z_$][\w$.]*)\s*\)$`)
+
 var identifierExpressionPattern = regexp.MustCompile(`^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*$`)
 
 var trailingWordPattern = regexp.MustCompile(`([A-Za-z][A-Za-z0-9]*)[^A-Za-z0-9]*$`)
@@ -341,7 +358,16 @@ func trailingWord(fragment string) string {
 }
 
 // InterpolatedParamName derives a name; unlike a declaration it is a best effort, not authoritative.
-func InterpolatedParamName(expression string, segmentPrefix string, previousSegment string) string {
+//
+// The preceding path segment is deliberately not used. It is as often a verb or a generic token as
+// a resource, which produced names like lockId and idId, and it varies with the call site so one
+// route family fragments into differently named duplicates. A positional name is stable and does
+// not claim a meaning the bundle never carried.
+func InterpolatedParamName(expression string, segmentPrefix string, segmentIndex int) string {
+	expression = strings.TrimSpace(expression)
+	if unwrapped := wrapperCallArgumentPattern.FindStringSubmatch(expression); unwrapped != nil {
+		expression = strings.TrimSpace(unwrapped[1])
+	}
 	if identifierExpressionPattern.MatchString(expression) {
 		parts := strings.Split(expression, ".")
 		last := parts[len(parts)-1]
@@ -353,10 +379,7 @@ func InterpolatedParamName(expression string, segmentPrefix string, previousSegm
 	if word := trailingWord(segmentPrefix); word != "" {
 		return singularize(word) + "Id"
 	}
-	if word := trailingWord(previousSegment); word != "" {
-		return singularize(word) + "Id"
-	}
-	return "param"
+	return fmt.Sprintf("param%d", segmentIndex)
 }
 
 // Names must be unique per route: the ontology keys on (parameter_name, parameter_location).
@@ -368,4 +391,37 @@ func UniqueParamName(name string, taken map[string]struct{}) string {
 		}
 		candidate = fmt.Sprintf("%s%d", name, suffix)
 	}
+}
+
+// positionalParamPattern matches a synthesized positional name.
+var positionalParamPattern = regexp.MustCompile(`^param\d+$`)
+
+// RenumberPositionalParams renumbers synthesized names against the final path, so the same endpoint
+// written with and without an interpolated base yields the same names instead of splitting in two.
+func RenumberPositionalParams(template string, params []*discover.RoutePathParam) (string, []*discover.RoutePathParam) {
+	segments := strings.Split(template, "/")
+	renamed := map[string]string{}
+
+	for i, segment := range segments {
+		rewritten := segment
+		for _, location := range embeddedPlaceholderPattern.FindAllStringSubmatchIndex(segment, -1) {
+			name := segment[location[2]:location[3]]
+			if !positionalParamPattern.MatchString(name) {
+				continue
+			}
+			renamed[name] = fmt.Sprintf("param%d", i)
+			rewritten = strings.Replace(rewritten, "{"+name+"}", "{"+renamed[name]+"}", 1)
+		}
+		segments[i] = rewritten
+	}
+	if len(renamed) == 0 {
+		return template, params
+	}
+
+	for _, param := range params {
+		if replacement, ok := renamed[param.Name]; ok {
+			param.Name = replacement
+		}
+	}
+	return strings.Join(segments, "/"), params
 }

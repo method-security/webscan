@@ -312,6 +312,9 @@ func MergePathParams(params1 []*discover.RoutePathParam, params2 []*discover.Rou
 // InterpolatedRouteEvidence marks a route whose parameter is proven but only loosely named.
 const InterpolatedRouteEvidence = "interpolated"
 
+// wrapperCallArgumentPattern unwraps a call with one identifier argument, e.g. encodeURIComponent(id).
+var wrapperCallArgumentPattern = regexp.MustCompile(`^[A-Za-z_$][\w$.]*\(\s*([A-Za-z_$][\w$.]*)\s*\)$`)
+
 var identifierExpressionPattern = regexp.MustCompile(`^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*$`)
 
 var trailingWordPattern = regexp.MustCompile(`([A-Za-z][A-Za-z0-9]*)[^A-Za-z0-9]*$`)
@@ -341,7 +344,15 @@ func trailingWord(fragment string) string {
 }
 
 // InterpolatedParamName derives a name; unlike a declaration it is a best effort, not authoritative.
-func InterpolatedParamName(expression string, segmentPrefix string, previousSegment string) string {
+//
+// The preceding path segment is deliberately not used. It is as often a verb or a generic token as
+// a resource, which produced names like lockId and idId, and it varies with the call site so one
+// route family fragments into differently named duplicates. A positional name is stable and does
+// not claim a meaning the bundle never carried.
+func InterpolatedParamName(expression string, segmentPrefix string, segmentIndex int) string {
+	if unwrapped := wrapperCallArgumentPattern.FindStringSubmatch(expression); unwrapped != nil {
+		expression = unwrapped[1]
+	}
 	if identifierExpressionPattern.MatchString(expression) {
 		parts := strings.Split(expression, ".")
 		last := parts[len(parts)-1]
@@ -353,10 +364,7 @@ func InterpolatedParamName(expression string, segmentPrefix string, previousSegm
 	if word := trailingWord(segmentPrefix); word != "" {
 		return singularize(word) + "Id"
 	}
-	if word := trailingWord(previousSegment); word != "" {
-		return singularize(word) + "Id"
-	}
-	return "param"
+	return fmt.Sprintf("param%d", segmentIndex)
 }
 
 // Names must be unique per route: the ontology keys on (parameter_name, parameter_location).

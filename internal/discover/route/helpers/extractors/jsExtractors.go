@@ -261,6 +261,21 @@ var leadingInterpolationPattern = regexp.MustCompile(`^\$\{[^}]*\}`)
 
 var interpolationPattern = regexp.MustCompile(`\$\{([^}]*)\}`)
 
+// enclosingVerbCallPattern matches the HTTP verb of the call the literal sits directly inside.
+var enclosingVerbCallPattern = regexp.MustCompile(`\.(get|post|put|patch|delete|head|options)\s*(?:<[^<>()]*>)?\s*\(\s*$`)
+
+// fetchOptionsMethodPattern matches the method of a fetch-style options object following the URL.
+var fetchOptionsMethodPattern = regexp.MustCompile(`^\s*,\s*\{[^{}]{0,200}?method\s*:\s*['"]([A-Za-z]+)['"]`)
+
+// identifierPattern matches a bare JavaScript identifier.
+var identifierPattern = regexp.MustCompile(`^[A-Za-z_$][\w$]*$`)
+
+// absoluteURLPrefixPattern matches the scheme and host of an absolute URL.
+var absoluteURLPrefixPattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9+.-]*://[^/]*`)
+
+// enclosingVerbLookback bounds how far the verb of the enclosing call may sit from the literal.
+const enclosingVerbLookback = 120
+
 // An interpolation in a URL position is evidence a parameter exists there.
 func ExtractInterpolatedRouteTemplates(content string, sourceURL string) []*discover.RouteDetails {
 	origin, _, err := discoverroutehelpers.SplitURLBaseAndPath(sourceURL)
@@ -268,25 +283,44 @@ func ExtractInterpolatedRouteTemplates(content string, sourceURL string) []*disc
 		return nil
 	}
 
-	seen := map[string]struct{}{}
+	type routeIdentity struct {
+		method   common.HttpMethod
+		template string
+	}
+	seen := map[routeIdentity]struct{}{}
 	var routes []*discover.RouteDetails
 
-	for _, match := range templateLiteralPattern.FindAllStringSubmatch(content, -1) {
-		template, params, ok := interpolatedTemplateFrom(match[1])
+	for _, location := range templateLiteralPattern.FindAllStringSubmatchIndex(content, -1) {
+		literal := content[location[2]:location[3]]
+
+		method, methodOK := enclosingRequestMethod(content, location[0], location[1])
+		if !methodOK {
+			continue
+		}
+
+		prefix, prefixOK := resolveInterpolatedBasePrefix(content, literal)
+		if !prefixOK {
+			continue
+		}
+
+		template, params, ok := interpolatedTemplateFrom(literal)
 		if !ok {
 			continue
 		}
-		if _, exists := seen[template]; exists {
+		template = prefix + template
+
+		identity := routeIdentity{method: method, template: template}
+		if _, exists := seen[identity]; exists {
 			continue
 		}
-		seen[template] = struct{}{}
+		seen[identity] = struct{}{}
 
 		evidence := discoverroutehelpers.InterpolatedRouteEvidence
 		templateValue := template
 		routes = append(routes, &discover.RouteDetails{
 			BaseUrl:      origin,
 			Path:         template,
-			Method:       common.HttpMethodGet,
+			Method:       method,
 			PathParams:   params,
 			PathTemplate: &templateValue,
 			Evidence:     &evidence,
@@ -294,6 +328,69 @@ func ExtractInterpolatedRouteTemplates(content string, sourceURL string) []*disc
 	}
 
 	return routes
+}
+
+// enclosingRequestMethod reads the verb of the call the literal sits in; a default would mislabel
+// every POST, PUT and DELETE as a GET.
+func enclosingRequestMethod(content string, literalStart int, literalEnd int) (common.HttpMethod, bool) {
+	windowStart := literalStart - enclosingVerbLookback
+	if windowStart < 0 {
+		windowStart = 0
+	}
+	if match := enclosingVerbCallPattern.FindStringSubmatch(content[windowStart:literalStart]); match != nil {
+		return parseRouteMethod(match[1])
+	}
+
+	windowEnd := literalEnd + enclosingVerbLookback
+	if windowEnd > len(content) {
+		windowEnd = len(content)
+	}
+	if match := fetchOptionsMethodPattern.FindStringSubmatch(content[literalEnd:windowEnd]); match != nil {
+		return parseRouteMethod(match[1])
+	}
+	return "", false
+}
+
+// resolveInterpolatedBasePrefix returns the path an interpolated base contributes. An API base is
+// routinely a variable holding `${host}/api/v2`, so treating it as origin-only drops the prefix and
+// reports an endpoint that does not exist.
+func resolveInterpolatedBasePrefix(content string, literal string) (string, bool) {
+	leading := leadingInterpolationPattern.FindString(literal)
+	if leading == "" {
+		return "", true
+	}
+
+	expression := strings.TrimSuffix(strings.TrimPrefix(leading, "${"), "}")
+	parts := strings.Split(strings.TrimSpace(expression), ".")
+	name := parts[len(parts)-1]
+	if !identifierPattern.MatchString(name) {
+		return "", false
+	}
+
+	assignments := regexp.MustCompile(
+		`(?:^|[^\w$.])`+regexp.QuoteMeta(name)+`\s*[:=]\s*`+"[`\"']([^`\"']*)[`\"']",
+	).FindAllStringSubmatch(content, -1)
+	distinct := map[string]struct{}{}
+	for _, assignment := range assignments {
+		distinct[assignment[1]] = struct{}{}
+	}
+	// Minified bundles reuse short names, so conflicting assignments mean the base is unknown.
+	if len(distinct) != 1 {
+		return "", false
+	}
+
+	value := assignments[0][1]
+	value = leadingInterpolationPattern.ReplaceAllString(value, "")
+	value = absoluteURLPrefixPattern.ReplaceAllString(value, "")
+	value = strings.TrimSuffix(value, "/")
+	if value == "" {
+		return "", true
+	}
+	// A residual interpolation means part of the prefix is still unknown.
+	if strings.Contains(value, "${") || !strings.HasPrefix(value, "/") {
+		return "", false
+	}
+	return value, true
 }
 
 // interpolatedTemplateFrom converts a template literal into a `{name}` path template.
@@ -318,10 +415,6 @@ func interpolatedTemplateFrom(literal string) (string, []*discover.RoutePathPara
 		if !strings.Contains(segment, "${") {
 			continue
 		}
-		previousSegment := ""
-		if i > 0 {
-			previousSegment = segments[i-1]
-		}
 		rewritten := segment
 		for {
 			location := interpolationPattern.FindStringSubmatchIndex(rewritten)
@@ -330,7 +423,7 @@ func interpolatedTemplateFrom(literal string) (string, []*discover.RoutePathPara
 			}
 			expression := rewritten[location[2]:location[3]]
 			name := discoverroutehelpers.UniqueParamName(
-				discoverroutehelpers.InterpolatedParamName(expression, rewritten[:location[0]], previousSegment),
+				discoverroutehelpers.InterpolatedParamName(expression, rewritten[:location[0]], i),
 				taken,
 			)
 			taken[name] = struct{}{}

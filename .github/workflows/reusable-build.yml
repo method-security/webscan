@@ -13,7 +13,7 @@ on:
         type: string
 
 env:
-  GO_VERSION: "1.26.5"
+  GO_VERSION: "1.26"
 
 jobs:
   prepare-linux-arm:
@@ -32,6 +32,7 @@ jobs:
       - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # ratchet:actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
+          check-latest: true
           cache: true
       - name: Generate Embedded Asset Archives
         run: go generate ./configs
@@ -85,11 +86,18 @@ jobs:
         uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # ratchet:actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
+          check-latest: true
           cache: true
       - name: Generate Embedded Asset Archives
         run: go generate ./configs
+      - name: Resolve Go patch version for builder image
+        id: go-patch
+        run: echo "version=$(go env GOVERSION | sed 's/^go//')" >> "$GITHUB_OUTPUT"
       - name: Build AMD64 Builder Image
-        run: docker buildx build . --platform linux/amd64 --load --tag amdbuilder -f Dockerfile.builder
+        run: >
+          docker buildx build . --platform linux/amd64 --pull --load --tag amdbuilder
+          -f Dockerfile.builder
+          --build-arg GO_VERSION=${{ steps.go-patch.outputs.version }}
       - name: Build AMD64 Image
         run: |
           docker run -v $PWD:/app/webscan \
@@ -150,6 +158,7 @@ jobs:
         uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # ratchet:actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
+          check-latest: true
           cache: true
       - name: Generate Embedded Asset Archives
         run: go generate ./configs
@@ -218,6 +227,7 @@ jobs:
         uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # ratchet:actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
+          check-latest: true
           cache: true
       - name: Generate Embedded Asset Archives
         run: go generate ./configs

@@ -1,11 +1,10 @@
-package directory_test
+package discoverdirectory
 
 import (
 	"reflect"
 	"testing"
 
 	common "github.com/Method-Security/webscan/generated/go/common"
-	discoverdirectory "github.com/Method-Security/webscan/internal/discover/directory"
 )
 
 func TestExpandPathsExtensionsOnly(t *testing.T) {
@@ -47,9 +46,9 @@ func TestExpandPathsExtensionsOnly(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got := discoverdirectory.ExpandPaths(tc.paths, tc.extensions, false)
+			got := expandPaths(tc.paths, tc.extensions, false)
 			if !reflect.DeepEqual(got, tc.want) {
-				t.Errorf("discoverdirectory.ExpandPaths(%q, %q, false) = %q, want %q", tc.paths, tc.extensions, got, tc.want)
+				t.Errorf("expandPaths(%q, %q, false) = %q, want %q", tc.paths, tc.extensions, got, tc.want)
 			}
 		})
 	}
@@ -65,8 +64,8 @@ func TestPathLooksLikeFile(t *testing.T) {
 		"":                false,
 		"/assets/main.js": true,
 	} {
-		if got := discoverdirectory.PathLooksLikeFile(path); got != want {
-			t.Errorf("discoverdirectory.PathLooksLikeFile(%q) = %v, want %v", path, got, want)
+		if got := pathLooksLikeFile(path); got != want {
+			t.Errorf("pathLooksLikeFile(%q) = %v, want %v", path, got, want)
 		}
 	}
 }
@@ -79,8 +78,8 @@ func TestNormalizeFrontierPath(t *testing.T) {
 		"":         "/",
 		"/a/b/":    "/a/b",
 	} {
-		if got := discoverdirectory.NormalizeFrontierPath(path); got != want {
-			t.Errorf("discoverdirectory.NormalizeFrontierPath(%q) = %q, want %q", path, got, want)
+		if got := normalizeFrontierPath(path); got != want {
+			t.Errorf("normalizeFrontierPath(%q) = %q, want %q", path, got, want)
 		}
 	}
 }
@@ -107,8 +106,8 @@ func TestIsRecursionCandidate(t *testing.T) {
 		{name: "nil attempt", in: nil, want: false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := discoverdirectory.IsRecursionCandidate(tc.in, codes); got != tc.want {
-				t.Errorf("discoverdirectory.IsRecursionCandidate() = %v, want %v", got, tc.want)
+			if got := isRecursionCandidate(tc.in, codes); got != tc.want {
+				t.Errorf("isRecursionCandidate() = %v, want %v", got, tc.want)
 			}
 		})
 	}
@@ -123,13 +122,13 @@ func TestIsUnfilteredRecursionCandidate(t *testing.T) {
 		}
 	}
 
-	if !discoverdirectory.IsUnfilteredRecursionCandidate(attempt("/static", 403), codes, map[int]bool{}) {
+	if !isUnfilteredRecursionCandidate(attempt("/static", 403), codes, map[int]bool{}) {
 		t.Error("a 403 directory with a clean noise floor should be a candidate")
 	}
-	if discoverdirectory.IsUnfilteredRecursionCandidate(attempt("/static", 403), codes, map[int]bool{403: true}) {
+	if isUnfilteredRecursionCandidate(attempt("/static", 403), codes, map[int]bool{403: true}) {
 		t.Error("a status every calibration probe returned should not be a candidate")
 	}
-	if discoverdirectory.IsUnfilteredRecursionCandidate(attempt("/static/app.js", 403), codes, map[int]bool{}) {
+	if isUnfilteredRecursionCandidate(attempt("/static/app.js", 403), codes, map[int]bool{}) {
 		t.Error("a file should never be a candidate")
 	}
 }
@@ -174,8 +173,8 @@ func TestUnanimousDirectoryStatuses(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := discoverdirectory.UnanimousDirectoryStatuses(tc.in); !reflect.DeepEqual(got, tc.want) {
-				t.Errorf("discoverdirectory.UnanimousDirectoryStatuses() = %v, want %v", got, tc.want)
+			if got := unanimousDirectoryStatuses(tc.in); !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("unanimousDirectoryStatuses() = %v, want %v", got, tc.want)
 			}
 		})
 	}

@@ -122,7 +122,7 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 
 		queue := []frontier{{basePath: parsedTargetPath, depth: 0}}
 		// Keyed on base path so a directory reachable from two parents is only swept once.
-		queued := map[string]bool{NormalizeFrontierPath(parsedTargetPath): true}
+		queued := map[string]bool{normalizeFrontierPath(parsedTargetPath): true}
 		var timedOutPhase string
 
 		for len(queue) > 0 {
@@ -154,10 +154,10 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 					break
 				}
 				childPath := candidate.Request.Path
-				if queued[NormalizeFrontierPath(childPath)] {
+				if queued[normalizeFrontierPath(childPath)] {
 					continue
 				}
-				queued[NormalizeFrontierPath(childPath)] = true
+				queued[normalizeFrontierPath(childPath)] = true
 				queue = append(queue, frontier{basePath: childPath, depth: current.depth + 1, discoveredFrom: current.basePath})
 			}
 			if maxDepth > 0 {
@@ -214,7 +214,7 @@ func sweepFrontier(ctx context.Context, baseURL string, current frontier, allPat
 
 		calibrationAttempts, failureCount, failureSample := calibrateCommonResponses(ctx, baseURL, current.basePath, config, detector, limiter)
 		outcome.baselineAttempts = append(outcome.baselineAttempts, calibrationAttempts...)
-		noisyStatuses = UnanimousDirectoryStatuses(calibrationAttempts)
+		noisyStatuses = unanimousDirectoryStatuses(calibrationAttempts)
 		outcome.metrics.calibrationFailureCount = failureCount
 		outcome.metrics.calibrationFailureSample = failureSample
 		log.Info("Common response calibration complete",
@@ -353,7 +353,7 @@ func sweepFrontier(ctx context.Context, baseURL string, current frontier, allPat
 					// Judged on status alone when the findings pipeline either never sees this response,
 					// or cannot meaningfully judge it: a non-2xx body is boilerplate, not a soft 404.
 					outsidePipeline := disallowedStatus != 0 || !isSuccessStatus(statusCodeOf(httpRequest))
-					if outsidePipeline && IsUnfilteredRecursionCandidate(httpRequest, recursionCodes, noisyStatuses) {
+					if outsidePipeline && isUnfilteredRecursionCandidate(httpRequest, recursionCodes, noisyStatuses) {
 						attemptsMutex.Lock()
 						outcome.recursionCandidates = append(outcome.recursionCandidates, httpRequest)
 						attemptsMutex.Unlock()

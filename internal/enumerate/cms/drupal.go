@@ -277,7 +277,7 @@ func checkDrupalModuleInfoYml(ctx context.Context, baseURL, basePath string, con
 			continue
 		}
 		for _, modulePath := range drupalModulePaths {
-			infoYmlPath := fmt.Sprintf("%s%s%s/%s.info.yml", basePath, modulePath, module, module)
+			infoYmlPath := fmt.Sprintf("%s%s/%s.info.yml", requesthelpers.JoinPath(basePath, modulePath), module, module)
 			requestConfig := createDrupalSendHTTPRequestConfig(baseURL, infoYmlPath, common.HttpMethodHead, 0, config)
 			resp, err := request.SendRequest(ctx, requestConfig)
 			if err != nil {
@@ -317,7 +317,7 @@ func checkDrupalModuleChangelogs(ctx context.Context, baseURL, basePath string, 
 
 	for _, module := range discoveredModules {
 		for _, modulePath := range drupalModulePaths {
-			changelogPath := fmt.Sprintf("%s%s%s/CHANGELOG.txt", basePath, modulePath, module.Name)
+			changelogPath := fmt.Sprintf("%s%s/CHANGELOG.txt", requesthelpers.JoinPath(basePath, modulePath), module.Name)
 			requestConfig := createDrupalSendHTTPRequestConfig(baseURL, changelogPath, common.HttpMethodGet, 0, config)
 			resp, err := request.SendRequest(ctx, requestConfig)
 			if err != nil {
@@ -370,7 +370,7 @@ func checkDrupalModuleLicense(ctx context.Context, baseURL, basePath string, con
 			continue
 		}
 		for _, modulePath := range drupalModulePaths {
-			licensePath := fmt.Sprintf("%s%s%s/LICENSE.txt", basePath, modulePath, module)
+			licensePath := fmt.Sprintf("%s%s/LICENSE.txt", requesthelpers.JoinPath(basePath, modulePath), module)
 			requestConfig := createDrupalSendHTTPRequestConfig(baseURL, licensePath, common.HttpMethodHead, 0, config)
 			resp, err := request.SendRequest(ctx, requestConfig)
 			if err != nil {
@@ -420,7 +420,7 @@ func checkDrupalModuleReadme(ctx context.Context, baseURL, basePath string, conf
 				break
 			}
 			for _, readmeFile := range readmeFiles {
-				readmePath := fmt.Sprintf("%s%s%s/%s", basePath, modulePath, module, readmeFile)
+				readmePath := fmt.Sprintf("%s%s/%s", requesthelpers.JoinPath(basePath, modulePath), module, readmeFile)
 				requestConfig := createDrupalSendHTTPRequestConfig(baseURL, readmePath, common.HttpMethodGet, 0, config)
 				resp, err := request.SendRequest(ctx, requestConfig)
 				if err != nil {

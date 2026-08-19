@@ -243,7 +243,7 @@ func checkWordPressAPI(ctx context.Context, url string, config *enumeratecmsword
 		errors = append(errors, err.Error())
 		return pluginsList, errors
 	}
-	apiPath := fmt.Sprintf("%s/wp-json", path)
+	apiPath := requesthelpers.JoinPath(path, "wp-json")
 	requestConfig := createSendHTTPRequestConfig(baseURL, apiPath, 0, config)
 	apiRequest, err := request.SendRequest(ctx, requestConfig)
 	if err != nil {
@@ -323,7 +323,7 @@ func fetchPluginsFromAPI(ctx context.Context, targetURL string, path string, con
 	}
 
 	// Send Request
-	apiRequestConfig := createSendHTTPRequestConfig(baseURL, fmt.Sprintf("%s%s", targetPath, path), 0, config)
+	apiRequestConfig := createSendHTTPRequestConfig(baseURL, requesthelpers.JoinPath(targetPath, path), 0, config)
 	apiRequest, err := request.SendRequest(ctx, apiRequestConfig)
 	if err != nil || apiRequest.Response != nil && apiRequest.Response.StatusCode != nil && *apiRequest.Response.StatusCode != 200 {
 		return plugins
@@ -425,7 +425,7 @@ func checkReadmeFiles(ctx context.Context, url string, config *enumeratecmswordp
 	}
 
 	for i, plugin := range config.Plugins {
-		readmePath := fmt.Sprintf("%s/wp-content/plugins/%s/readme.txt", path, plugin)
+		readmePath := requesthelpers.JoinPath(path, fmt.Sprintf("wp-content/plugins/%s/readme.txt", plugin))
 		requestConfig := createSendHTTPRequestConfig(baseURL, readmePath, 0, config)
 		readmeRequest, err := request.SendRequest(ctx, requestConfig)
 		if err != nil {

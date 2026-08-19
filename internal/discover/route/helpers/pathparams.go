@@ -158,6 +158,16 @@ func ApplyDeclaredRouteTemplates(routes []*discover.RouteDetails) []*discover.Ro
 		template string
 	}
 
+	// An unrooted candidate carries a path resolution never confirmed, so it must not reach output.
+	rooted := make([]*discover.RouteDetails, 0, len(routes))
+	for _, route := range routes {
+		if IsUnrootedEvidence(route.Evidence) {
+			continue
+		}
+		rooted = append(rooted, route)
+	}
+	routes = rooted
+
 	var templates []templateRoute
 	declaredLiterals := map[string]struct{}{}
 	for _, route := range routes {

@@ -636,7 +636,9 @@ func PerformRouteCapture(ctx context.Context, config discover.DiscoverRouteConfi
 		currentDepth++
 	}
 
-	mergedRoutes := discoverroutehelpers.MergeWebRoutes(allRoutes)
+	// Root candidates before merging so an unrooted path never merges with a real one.
+	rootedRoutes := discoverroutehelpers.ResolveUnrootedInterpolatedRoutes(allRoutes)
+	mergedRoutes := discoverroutehelpers.MergeWebRoutes(rootedRoutes)
 	mergedRoutes = discoverroutehelpers.ApplyDeclaredRouteTemplates(mergedRoutes)
 	sortRoutes(mergedRoutes)
 	report.Result.WebApplications = buildWebApplications(mergedRoutes, allStaticAssetsByBaseURL)

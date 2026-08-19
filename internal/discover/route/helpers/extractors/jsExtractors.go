@@ -299,15 +299,19 @@ func ExtractInterpolatedRouteTemplates(content string, sourceURL string) []*disc
 		}
 
 		prefix, prefixOK := resolveInterpolatedBasePrefix(content, literal)
-		if !prefixOK {
-			continue
-		}
 
 		template, params, ok := interpolatedTemplateFrom(literal)
 		if !ok {
 			continue
 		}
-		template = prefix + template
+
+		evidence := discoverroutehelpers.InterpolatedRouteEvidence
+		if prefixOK {
+			template = prefix + template
+		} else {
+			// The base may hold a path, so leave rooting to corroboration against observed routes.
+			evidence = discoverroutehelpers.UnrootedEvidenceFor(interpolatedBaseName(literal))
+		}
 
 		identity := routeIdentity{method: method, template: template}
 		if _, exists := seen[identity]; exists {
@@ -315,7 +319,6 @@ func ExtractInterpolatedRouteTemplates(content string, sourceURL string) []*disc
 		}
 		seen[identity] = struct{}{}
 
-		evidence := discoverroutehelpers.InterpolatedRouteEvidence
 		templateValue := template
 		routes = append(routes, &discover.RouteDetails{
 			BaseUrl:      origin,
@@ -348,7 +351,46 @@ func enclosingRequestMethod(content string, literalStart int, literalEnd int) (c
 	if match := fetchOptionsMethodPattern.FindStringSubmatch(content[literalEnd:windowEnd]); match != nil {
 		return parseRouteMethod(match[1])
 	}
+
+	if navigationSinkPattern.MatchString(content[windowStart:literalStart]) {
+		return common.HttpMethodGet, true
+	}
+	if assigned := assignedVariablePattern.FindStringSubmatch(content[windowStart:literalStart]); assigned != nil {
+		if navigationSinkArgumentPattern(assigned[1]).MatchString(content[literalEnd:windowEnd]) {
+			return common.HttpMethodGet, true
+		}
+	}
 	return "", false
+}
+
+// navigationSinkPattern matches a browser navigation taking the literal directly; navigation is a
+// GET by definition rather than an inferred default.
+var navigationSinkPattern = regexp.MustCompile(`(?:window\.open|location\.(?:href|assign|replace))\s*(?:=\s*|\(\s*)$`)
+
+// assignedVariablePattern captures the variable a literal is assigned to.
+var assignedVariablePattern = regexp.MustCompile(`(?:^|[^\w$])([A-Za-z_$][\w$]*)\s*=\s*$`)
+
+// navigationSinkArgumentPattern matches that variable later reaching a navigation sink.
+func navigationSinkArgumentPattern(name string) *regexp.Regexp {
+	return regexp.MustCompile(
+		`(?:window\.open|location\.(?:href|assign|replace))\s*(?:=\s*|\(\s*)` + regexp.QuoteMeta(name) + `\b`,
+	)
+}
+
+// interpolatedBaseName returns the identifier of the leading interpolation, used to share a
+// corroborated prefix between candidates built from the same base.
+func interpolatedBaseName(literal string) string {
+	leading := leadingInterpolationPattern.FindString(literal)
+	if leading == "" {
+		return ""
+	}
+	expression := strings.TrimSuffix(strings.TrimPrefix(leading, "${"), "}")
+	parts := strings.Split(strings.TrimSpace(expression), ".")
+	name := parts[len(parts)-1]
+	if !identifierPattern.MatchString(name) {
+		return ""
+	}
+	return name
 }
 
 // resolveInterpolatedBasePrefix returns the path an interpolated base contributes. An API base is

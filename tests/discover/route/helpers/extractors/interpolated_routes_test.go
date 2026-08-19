@@ -1,6 +1,7 @@
 package extractors_test
 
 import (
+	"strings"
 	"testing"
 
 	common "github.com/Method-Security/webscan/generated/go/common"
@@ -69,22 +70,46 @@ func TestExtractInterpolatedRoutesSkipsUndeterminableMethod(t *testing.T) {
 	}
 }
 
-func TestExtractInterpolatedRoutesSkipsUnresolvableBase(t *testing.T) {
-	// The base may carry a path, so without its value the full path is unknown.
-	routes := interpolated(t, "this.http.get(`${this.hostServer}/rest/basket/${id}`);")
+func TestExtractInterpolatedRoutesMarksUnresolvableBaseAsUnrooted(t *testing.T) {
+	// The base may carry a path, so rooting is deferred to corroboration rather than guessed.
+	route := onlyRoute(t, interpolated(t, "this.http.get(`${this.hostServer}/rest/basket/${id}`);"))
 
-	for _, route := range routes {
-		t.Errorf("expected no route for an unresolvable base, got %q", route.Path)
+	if route.Evidence == nil || !strings.HasPrefix(*route.Evidence, "interpolated-unrooted") {
+		t.Errorf("evidence = %v, want an unrooted candidate", route.Evidence)
+	}
+	if route.Path != "/rest/basket/{param3}" {
+		t.Errorf("path = %q, want the tail that followed the base", route.Path)
 	}
 }
 
-func TestExtractInterpolatedRoutesSkipsAmbiguousBase(t *testing.T) {
+func TestExtractInterpolatedRoutesMarksAmbiguousBaseAsUnrooted(t *testing.T) {
 	// Minified bundles reuse short names; conflicting assignments mean the base is unknown.
-	routes := interpolated(t,
-		"var A=`${h}/api/v1`;\nvar A=`${h}/api/v2`;\nthis.http.get(`${A}/reports/${id}`);")
+	route := onlyRoute(t, interpolated(t,
+		"var A=`${h}/api/v1`;\nvar A=`${h}/api/v2`;\nthis.http.get(`${A}/reports/${id}`);"))
 
-	for _, route := range routes {
-		t.Errorf("expected no route for an ambiguous base, got %q", route.Path)
+	if route.Evidence == nil || !strings.HasPrefix(*route.Evidence, "interpolated-unrooted") {
+		t.Errorf("evidence = %v, want an unrooted candidate", route.Evidence)
+	}
+	if !strings.HasSuffix(*route.Evidence, ":A") {
+		t.Errorf("evidence = %q, want the base name recorded", *route.Evidence)
+	}
+}
+
+func TestExtractInterpolatedRoutesTreatsNavigationAsGet(t *testing.T) {
+	// window.open is a GET by definition, not an inferred default.
+	route := onlyRoute(t, interpolated(t, "window.open(`/ftp/order_${e}.pdf`)"))
+
+	if route.Method != common.HttpMethodGet {
+		t.Errorf("method = %q, want GET", route.Method)
+	}
+}
+
+func TestExtractInterpolatedRoutesTreatsAssignedNavigationAsGet(t *testing.T) {
+	route := onlyRoute(t, interpolated(t,
+		"openPDF(e){let i=`/ftp/order_${e}.pdf`;window.open(i)}"))
+
+	if route.Method != common.HttpMethodGet {
+		t.Errorf("method = %q, want GET", route.Method)
 	}
 }
 

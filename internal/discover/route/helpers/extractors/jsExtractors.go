@@ -270,6 +270,9 @@ var fetchOptionsMethodPattern = regexp.MustCompile(`^\s*,\s*\{[^{}]{0,200}?metho
 // identifierPattern matches a bare JavaScript identifier.
 var identifierPattern = regexp.MustCompile(`^[A-Za-z_$][\w$]*$`)
 
+// protocolRelativePrefixPattern matches the host of a protocol-relative URL.
+var protocolRelativePrefixPattern = regexp.MustCompile(`^//[^/]*`)
+
 // absoluteURLPrefixPattern matches the scheme and host of an absolute URL.
 var absoluteURLPrefixPattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9+.-]*://[^/]*`)
 
@@ -301,7 +304,7 @@ func ExtractInterpolatedRouteTemplates(content string, sourceURL string) []*disc
 
 		prefix, prefixOK := resolveInterpolatedBasePrefix(content, literal)
 
-		template, params, ok := interpolatedTemplateFrom(literal)
+		template, params, ok := interpolatedTemplateFrom(literal, prefixOK)
 		if !ok {
 			continue
 		}
@@ -309,6 +312,11 @@ func ExtractInterpolatedRouteTemplates(content string, sourceURL string) []*disc
 		evidence := discoverroutehelpers.InterpolatedRouteEvidence
 		if prefixOK {
 			template = prefix + template
+			template, params = discoverroutehelpers.RenumberPositionalParams(template, params)
+			// Without a fixed segment the template matches every path of that length.
+			if !discoverroutehelpers.HasLiteralSegment(strings.Split(template, "/")) {
+				continue
+			}
 		} else {
 			// The base may hold a path, so leave rooting to corroboration against observed routes.
 			evidence = discoverroutehelpers.UnrootedEvidenceFor(interpolatedBaseName(literal))
@@ -426,6 +434,7 @@ func resolveInterpolatedBasePrefix(content string, literal string) (string, bool
 	value := assignments[0][1]
 	value = leadingInterpolationPattern.ReplaceAllString(value, "")
 	value = absoluteURLPrefixPattern.ReplaceAllString(value, "")
+	value = protocolRelativePrefixPattern.ReplaceAllString(value, "")
 	value = strings.TrimSuffix(value, "/")
 	if value == "" {
 		return "", true
@@ -438,7 +447,7 @@ func resolveInterpolatedBasePrefix(content string, literal string) (string, bool
 }
 
 // interpolatedTemplateFrom converts a template literal into a `{name}` path template.
-func interpolatedTemplateFrom(literal string) (string, []*discover.RoutePathParam, bool) {
+func interpolatedTemplateFrom(literal string, prefixKnown bool) (string, []*discover.RoutePathParam, bool) {
 	path := leadingInterpolationPattern.ReplaceAllString(literal, "")
 	path = strings.SplitN(path, "?", 2)[0]
 	path = strings.SplitN(path, "#", 2)[0]
@@ -481,8 +490,8 @@ func interpolatedTemplateFrom(literal string) (string, []*discover.RoutePathPara
 		return "", nil, false
 	}
 
-	// A leading placeholder means the discarded base carried the real prefix.
-	if len(segments) > 1 && strings.HasPrefix(segments[1], "{") {
+	// A leading placeholder is only unusable while the base it followed is still unknown.
+	if !prefixKnown && len(segments) > 1 && strings.HasPrefix(segments[1], "{") {
 		return "", nil, false
 	}
 

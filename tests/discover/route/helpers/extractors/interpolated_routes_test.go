@@ -136,7 +136,7 @@ func TestExtractInterpolatedRoutesUsesPositionalNameWhenMinified(t *testing.T) {
 	second := onlyRoute(t, interpolated(t,
 		"const A=`${h}/api/v2`;\nthis.http.put(`${A}/widgets/archive/${t}/id/${n}`, b);"))
 
-	if first.Path != "/api/v2/widgets/archive/{param3}/id/{param5}" {
+	if first.Path != "/api/v2/widgets/archive/{param5}/id/{param7}" {
 		t.Errorf("path = %q, want positional names", first.Path)
 	}
 	if first.Path != second.Path {
@@ -179,7 +179,7 @@ func TestExtractInterpolatedRoutesRejectsNonPathInterpolations(t *testing.T) {
 		"inline style":        "this.http.get(`scaleX(${this.value/100})`)",
 		"protocol relative":   "this.http.get(`//${window.location.host}/rest/x`)",
 		"query only":          "const A=`${h}/api`;\nthis.http.get(`${A}/languages?v=${e}`)",
-		"whole path is param": "const A=`${h}/api`;\nthis.http.get(`${A}/${e}`)",
+		"whole path is param": "this.http.get(`/${e}`)",
 		"no interpolation":    "this.http.get(`/rest/languages`)",
 		"closing tag":         "this.http.get(`</div>${y}`)",
 		"prose":               "this.http.get(`/5 items ${count}`)",
@@ -188,6 +188,46 @@ func TestExtractInterpolatedRoutesRejectsNonPathInterpolations(t *testing.T) {
 	for name, content := range cases {
 		if routes := interpolated(t, content); len(routes) != 0 {
 			t.Errorf("%s: expected no routes, got %q", name, routes[0].Path)
+		}
+	}
+}
+
+func TestExtractInterpolatedRoutesAllowsParamFirstTailUnderResolvedBase(t *testing.T) {
+	// The base is known, so a parameter immediately after it is a real path rather than a guess.
+	route := onlyRoute(t, interpolated(t, "const A=`${h}/api/v2`;\nthis.http.get(`${A}/${e}`)"))
+
+	if route.Path != "/api/v2/{param3}" {
+		t.Errorf("path = %q, want the resolved base to anchor the template", route.Path)
+	}
+}
+
+func TestExtractInterpolatedRoutesRenumbersNamesAgainstFinalPath(t *testing.T) {
+	// The same endpoint written with and without an interpolated base must yield the same names.
+	viaBase := onlyRoute(t, interpolated(t,
+		"const A=`${h}/api/v2`;\nthis.http.put(`${A}/widgets/lock/${e}`, b);"))
+	rooted := onlyRoute(t, interpolated(t, "this.http.put(`/api/v2/widgets/lock/${e}`, b);"))
+
+	if viaBase.Path != rooted.Path {
+		t.Errorf("names split the same endpoint: %q vs %q", viaBase.Path, rooted.Path)
+	}
+}
+
+func TestExtractInterpolatedRoutesNamesSpacedInterpolations(t *testing.T) {
+	compact := onlyRoute(t, interpolated(t, "this.http.get(`/api/v2/track/${this.orderId}`)"))
+	spaced := onlyRoute(t, interpolated(t, "this.http.get(`/api/v2/track/${ this.orderId }`)"))
+
+	if compact.Path != spaced.Path {
+		t.Errorf("spacing split the same endpoint: %q vs %q", compact.Path, spaced.Path)
+	}
+}
+
+func TestExtractInterpolatedRoutesRejectsProtocolRelativeBase(t *testing.T) {
+	// A protocol-relative base is a host, not a path prefix.
+	routes := interpolated(t, "const A=`//cdn.example.com/api`;\nthis.http.get(`${A}/reports/${id}`)")
+
+	for _, route := range routes {
+		if strings.HasPrefix(route.Path, "//") {
+			t.Errorf("a host was treated as a path prefix: %q", route.Path)
 		}
 	}
 }

@@ -151,9 +151,10 @@ func ResolveUnrootedInterpolatedRoutes(routes []*discover.RouteDetails) []*disco
 			}
 		}
 
-		rootedPath := prefix + route.Path
+		rootedPath, params := RenumberPositionalParams(prefix+route.Path, route.PathParams)
 		evidence := InterpolatedRouteEvidence
 		route.Path = rootedPath
+		route.PathParams = params
 		route.PathTemplate = &rootedPath
 		route.Evidence = &evidence
 		resolved = append(resolved, route)

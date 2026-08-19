@@ -63,14 +63,14 @@ func NormalizeDeclaredTemplate(path string) (string, []*discover.RoutePathParam,
 		}
 	}
 	// Without a literal segment the template discriminates on segment count alone.
-	if !hasLiteralSegment(segments) {
+	if !HasLiteralSegment(segments) {
 		return path, nil, false
 	}
 	return strings.Join(segments, "/"), params, true
 }
 
-// hasLiteralSegment reports whether any segment is fixed rather than a placeholder.
-func hasLiteralSegment(segments []string) bool {
+// HasLiteralSegment reports whether any segment is fixed rather than a placeholder.
+func HasLiteralSegment(segments []string) bool {
 	for _, segment := range segments {
 		if segment == "" {
 			continue
@@ -364,8 +364,9 @@ func trailingWord(fragment string) string {
 // route family fragments into differently named duplicates. A positional name is stable and does
 // not claim a meaning the bundle never carried.
 func InterpolatedParamName(expression string, segmentPrefix string, segmentIndex int) string {
+	expression = strings.TrimSpace(expression)
 	if unwrapped := wrapperCallArgumentPattern.FindStringSubmatch(expression); unwrapped != nil {
-		expression = unwrapped[1]
+		expression = strings.TrimSpace(unwrapped[1])
 	}
 	if identifierExpressionPattern.MatchString(expression) {
 		parts := strings.Split(expression, ".")
@@ -390,4 +391,37 @@ func UniqueParamName(name string, taken map[string]struct{}) string {
 		}
 		candidate = fmt.Sprintf("%s%d", name, suffix)
 	}
+}
+
+// positionalParamPattern matches a synthesized positional name.
+var positionalParamPattern = regexp.MustCompile(`^param\d+$`)
+
+// RenumberPositionalParams renumbers synthesized names against the final path, so the same endpoint
+// written with and without an interpolated base yields the same names instead of splitting in two.
+func RenumberPositionalParams(template string, params []*discover.RoutePathParam) (string, []*discover.RoutePathParam) {
+	segments := strings.Split(template, "/")
+	renamed := map[string]string{}
+
+	for i, segment := range segments {
+		rewritten := segment
+		for _, location := range embeddedPlaceholderPattern.FindAllStringSubmatchIndex(segment, -1) {
+			name := segment[location[2]:location[3]]
+			if !positionalParamPattern.MatchString(name) {
+				continue
+			}
+			renamed[name] = fmt.Sprintf("param%d", i)
+			rewritten = strings.Replace(rewritten, "{"+name+"}", "{"+renamed[name]+"}", 1)
+		}
+		segments[i] = rewritten
+	}
+	if len(renamed) == 0 {
+		return template, params
+	}
+
+	for _, param := range params {
+		if replacement, ok := renamed[param.Name]; ok {
+			param.Name = replacement
+		}
+	}
+	return strings.Join(segments, "/"), params
 }

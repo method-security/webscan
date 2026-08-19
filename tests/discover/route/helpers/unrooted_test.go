@@ -1,6 +1,7 @@
 package helpers_test
 
 import (
+	"regexp"
 	"testing"
 
 	common "github.com/Method-Security/webscan/generated/go/common"
@@ -16,20 +17,23 @@ func tagged(path string, evidence string) *discover.RouteDetails {
 	return route
 }
 
-func candidateOf(path string, base string) *discover.RouteDetails {
-	route := tagged(path, discoverroute.UnrootedEvidenceFor(base))
+var placeholderPattern = regexp.MustCompile(`\{([^{}]+)\}`)
+
+func withCandidateShape(route *discover.RouteDetails, path string) *discover.RouteDetails {
 	template := path
 	route.PathTemplate = &template
-	route.PathParams = []*discover.RoutePathParam{{Name: "param2"}}
+	for _, match := range placeholderPattern.FindAllStringSubmatch(path, -1) {
+		route.PathParams = append(route.PathParams, &discover.RoutePathParam{Name: match[1]})
+	}
 	return route
 }
 
+func candidateOf(path string, base string) *discover.RouteDetails {
+	return withCandidateShape(tagged(path, discoverroute.UnrootedEvidenceFor(base)), path)
+}
+
 func candidate(path string) *discover.RouteDetails {
-	route := tagged(path, discoverroute.InterpolatedUnrootedEvidence)
-	template := path
-	route.PathTemplate = &template
-	route.PathParams = []*discover.RoutePathParam{{Name: "param2"}}
-	return route
+	return withCandidateShape(tagged(path, discoverroute.InterpolatedUnrootedEvidence), path)
 }
 
 func TestResolveUnrootedAcceptsCandidateAlreadyRooted(t *testing.T) {
@@ -37,14 +41,14 @@ func TestResolveUnrootedAcceptsCandidateAlreadyRooted(t *testing.T) {
 	routes := discoverroute.ResolveUnrootedInterpolatedRoutes([]*discover.RouteDetails{
 		tagged("/rest/products", ""),
 		tagged("/rest/user", ""),
-		candidate("/rest/basket/{param2}"),
+		candidate("/rest/basket/{param3}"),
 	})
 
-	route := findRoute(t, routes, "/rest/basket/{param2}")
+	route := findRoute(t, routes, "/rest/basket/{param3}")
 	if route.Evidence == nil || *route.Evidence != discoverroute.InterpolatedRouteEvidence {
 		t.Errorf("evidence = %v, want it retagged as resolved", route.Evidence)
 	}
-	if route.PathTemplate == nil || *route.PathTemplate != "/rest/basket/{param2}" {
+	if route.PathTemplate == nil || *route.PathTemplate != "/rest/basket/{param3}" {
 		t.Errorf("PathTemplate = %v, want it to track Path", route.PathTemplate)
 	}
 }
@@ -57,8 +61,8 @@ func TestResolveUnrootedRecoversMissingPrefix(t *testing.T) {
 		candidate("/appmessages/{param2}"),
 	})
 
-	route := findRoute(t, routes, "/api/v2/appmessages/{param2}")
-	if route.PathTemplate == nil || *route.PathTemplate != "/api/v2/appmessages/{param2}" {
+	route := findRoute(t, routes, "/api/v2/appmessages/{param4}")
+	if route.PathTemplate == nil || *route.PathTemplate != "/api/v2/appmessages/{param4}" {
 		t.Errorf("PathTemplate = %v, want the rooted path", route.PathTemplate)
 	}
 }
@@ -107,10 +111,10 @@ func TestResolveUnrootedCorroboratesOnlyOnObservedRoutes(t *testing.T) {
 	for _, evidence := range []string{"CONST:X", "sourcemap:app.ts", discoverroute.DeclaredRouteEvidence} {
 		routes := discoverroute.ResolveUnrootedInterpolatedRoutes([]*discover.RouteDetails{
 			tagged("/rest/products", evidence),
-			candidate("/rest/basket/{param2}"),
+			candidate("/rest/basket/{param3}"),
 		})
 		for _, route := range routes {
-			if route.Path == "/rest/basket/{param2}" {
+			if route.Path == "/rest/basket/{param3}" {
 				t.Errorf("%s must not corroborate a candidate", evidence)
 			}
 		}
@@ -118,9 +122,9 @@ func TestResolveUnrootedCorroboratesOnlyOnObservedRoutes(t *testing.T) {
 
 	routes := discoverroute.ResolveUnrootedInterpolatedRoutes([]*discover.RouteDetails{
 		tagged("/rest/products", ""),
-		candidate("/rest/basket/{param2}"),
+		candidate("/rest/basket/{param3}"),
 	})
-	findRoute(t, routes, "/rest/basket/{param2}")
+	findRoute(t, routes, "/rest/basket/{param3}")
 }
 
 func TestResolveUnrootedIgnoresClientRouteDeclarations(t *testing.T) {
@@ -132,7 +136,7 @@ func TestResolveUnrootedIgnoresClientRouteDeclarations(t *testing.T) {
 		candidate("/reports/{param2}"),
 	})
 
-	findRoute(t, routes, "/api/v2/reports/{param2}")
+	findRoute(t, routes, "/api/v2/reports/{param4}")
 }
 
 func TestResolveUnrootedAnchorsOnFirstLiteralSegment(t *testing.T) {
@@ -142,7 +146,7 @@ func TestResolveUnrootedAnchorsOnFirstLiteralSegment(t *testing.T) {
 		candidate("/{param1}/basket/{param3}"),
 	})
 
-	findRoute(t, routes, "/api/v2/{param1}/basket/{param3}")
+	findRoute(t, routes, "/api/v2/{param3}/basket/{param5}")
 }
 
 func TestResolveUnrootedDropsCandidateWithNoLiteralSegment(t *testing.T) {
@@ -171,7 +175,7 @@ func TestResolveUnrootedLeavesOtherRoutesUntouched(t *testing.T) {
 }
 
 func TestResolveUnrootedKeepsMethodOfCandidate(t *testing.T) {
-	route := candidate("/rest/basket/{param2}")
+	route := candidate("/rest/basket/{param3}")
 	route.Method = common.HttpMethodPut
 
 	routes := discoverroute.ResolveUnrootedInterpolatedRoutes([]*discover.RouteDetails{
@@ -179,7 +183,7 @@ func TestResolveUnrootedKeepsMethodOfCandidate(t *testing.T) {
 		route,
 	})
 
-	if findRoute(t, routes, "/rest/basket/{param2}").Method != common.HttpMethodPut {
+	if findRoute(t, routes, "/rest/basket/{param3}").Method != common.HttpMethodPut {
 		t.Errorf("method was not preserved through rooting")
 	}
 }
@@ -188,11 +192,11 @@ func TestApplyDeclaredRouteTemplatesDropsUnresolvedCandidate(t *testing.T) {
 	// Defence in depth: a candidate that never went through resolution must not reach the report.
 	routes := discoverroute.ApplyDeclaredRouteTemplates([]*discover.RouteDetails{
 		tagged("/rest/products", ""),
-		candidate("/rest/basket/{param2}"),
+		candidate("/rest/basket/{param3}"),
 	})
 
 	for _, route := range routes {
-		if route.Path == "/rest/basket/{param2}" {
+		if route.Path == "/rest/basket/{param3}" {
 			t.Errorf("an unrooted candidate reached the output")
 		}
 	}
@@ -203,11 +207,11 @@ func TestResolveUnrootedInheritsPrefixFromSameBase(t *testing.T) {
 	// own, but the base has been shown to contribute no prefix.
 	routes := discoverroute.ResolveUnrootedInterpolatedRoutes([]*discover.RouteDetails{
 		tagged("/rest/products", ""),
-		candidateOf("/rest/basket/{param2}", "hostServer"),
+		candidateOf("/rest/basket/{param3}", "hostServer"),
 		candidateOf("/ftp/order_{param2}.pdf", "hostServer"),
 	})
 
-	findRoute(t, routes, "/rest/basket/{param2}")
+	findRoute(t, routes, "/rest/basket/{param3}")
 	findRoute(t, routes, "/ftp/order_{param2}.pdf")
 }
 
@@ -218,8 +222,8 @@ func TestResolveUnrootedInheritsNonEmptyPrefixFromSameBase(t *testing.T) {
 		candidateOf("/exports/{param2}", "apiBase"),
 	})
 
-	findRoute(t, routes, "/api/v2/reports/{param2}")
-	findRoute(t, routes, "/api/v2/exports/{param2}")
+	findRoute(t, routes, "/api/v2/reports/{param4}")
+	findRoute(t, routes, "/api/v2/exports/{param4}")
 }
 
 func TestResolveUnrootedDoesNotInheritAcrossDifferentBases(t *testing.T) {
@@ -229,9 +233,9 @@ func TestResolveUnrootedDoesNotInheritAcrossDifferentBases(t *testing.T) {
 		candidateOf("/exports/{param2}", "otherBase"),
 	})
 
-	findRoute(t, routes, "/api/v2/reports/{param2}")
+	findRoute(t, routes, "/api/v2/reports/{param4}")
 	for _, route := range routes {
-		if route.Path == "/api/v2/exports/{param2}" {
+		if route.Path == "/api/v2/exports/{param4}" {
 			t.Errorf("a different base must not inherit the prefix")
 		}
 	}
@@ -242,13 +246,13 @@ func TestResolveUnrootedDoesNotInheritWhenBasePrefixesDisagree(t *testing.T) {
 	routes := discoverroute.ResolveUnrootedInterpolatedRoutes([]*discover.RouteDetails{
 		tagged("/rest/products", ""),
 		tagged("/api/v2/reports", ""),
-		candidateOf("/rest/basket/{param2}", "base"),
+		candidateOf("/rest/basket/{param3}", "base"),
 		candidateOf("/reports/{param2}", "base"),
 		candidateOf("/unseen/{param2}", "base"),
 	})
 
 	for _, route := range routes {
-		if route.Path == "/unseen/{param2}" || route.Path == "/api/v2/unseen/{param2}" {
+		if route.Path == "/unseen/{param2}" || route.Path == "/api/v2/unseen/{param4}" {
 			t.Errorf("expected no inheritance from a base with disagreeing prefixes, got %q", route.Path)
 		}
 	}
@@ -257,11 +261,11 @@ func TestResolveUnrootedDoesNotInheritWhenBasePrefixesDisagree(t *testing.T) {
 func TestResolveUnrootedDoesNotInheritWithoutRecordedBase(t *testing.T) {
 	routes := discoverroute.ResolveUnrootedInterpolatedRoutes([]*discover.RouteDetails{
 		tagged("/rest/products", ""),
-		candidate("/rest/basket/{param2}"),
+		candidate("/rest/basket/{param3}"),
 		candidate("/ftp/order_{param2}.pdf"),
 	})
 
-	findRoute(t, routes, "/rest/basket/{param2}")
+	findRoute(t, routes, "/rest/basket/{param3}")
 	for _, route := range routes {
 		if route.Path == "/ftp/order_{param2}.pdf" {
 			t.Errorf("a candidate with no recorded base must not inherit")
@@ -288,11 +292,11 @@ func TestResolveUnrootedCorroboratesWithinOriginOnly(t *testing.T) {
 
 	routes := discoverroute.ResolveUnrootedInterpolatedRoutes([]*discover.RouteDetails{
 		other,
-		candidate("/rest/basket/{param2}"),
+		candidate("/rest/basket/{param3}"),
 	})
 
 	for _, route := range routes {
-		if route.Path == "/rest/basket/{param2}" {
+		if route.Path == "/rest/basket/{param3}" {
 			t.Errorf("a foreign origin must not corroborate a candidate")
 		}
 	}
@@ -311,7 +315,7 @@ func TestResolveUnrootedDoesNotInheritAcrossOrigins(t *testing.T) {
 	})
 
 	for _, route := range routes {
-		if route.Path == "/api/v2/exports/{param2}" {
+		if route.Path == "/api/v2/exports/{param4}" {
 			t.Errorf("a prefix corroborated on another origin must not be inherited here")
 		}
 	}

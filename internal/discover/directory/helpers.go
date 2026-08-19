@@ -313,13 +313,13 @@ func gatherPaths(paths []string, wordlistType *discover.WordlistType, wordlistSi
 		allPaths = append(allPaths, wordlistPaths...)
 	}
 
-	return expandPaths(allPaths, extensions, addSlash), nil
+	return ExpandPaths(allPaths, extensions, addSlash), nil
 }
 
 // Bare word, plus one variant per extension so a directories wordlist can reach app.js, plus the
 // directory form when addSlash is set. Servers answer /x and /x/ differently and many reveal a
 // directory only through the latter, including dotted ones like .well-known.
-func expandPaths(paths []string, extensions []string, addSlash bool) []string {
+func ExpandPaths(paths []string, extensions []string, addSlash bool) []string {
 	normalized := normalizeExtensions(extensions)
 	if len(normalized) == 0 && !addSlash {
 		return paths
@@ -384,8 +384,8 @@ func recursionStatusCodes(config *discover.DiscoverDirectoryConfig) string {
 	return *config.RecursionStatusCodes
 }
 
-// normalizeFrontierPath collapses the trailing-slash variants of one directory to a single key.
-func normalizeFrontierPath(path string) string {
+// NormalizeFrontierPath collapses the trailing-slash variants of one directory to a single key.
+func NormalizeFrontierPath(path string) string {
 	trimmed := strings.TrimRight(path, "/")
 	if trimmed == "" {
 		return "/"
@@ -421,26 +421,26 @@ func appendFindingCandidates(outcome *frontierOutcome, attempts []*common.HttpRe
 		if !isSuccessStatus(statusCodeOf(attempt)) {
 			continue
 		}
-		if isRecursionCandidate(attempt, recursionCodes) {
+		if IsRecursionCandidate(attempt, recursionCodes) {
 			outcome.recursionCandidates = append(outcome.recursionCandidates, attempt)
 		}
 	}
 }
 
 // A path already carrying an extension is treated as a file and never descended into.
-func isRecursionCandidate(attempt *common.HttpRequestResponse, recursionCodes map[int]bool) bool {
+func IsRecursionCandidate(attempt *common.HttpRequestResponse, recursionCodes map[int]bool) bool {
 	if attempt == nil || attempt.Request == nil || attempt.Response == nil || attempt.Response.StatusCode == nil {
 		return false
 	}
 	if !recursionCodes[*attempt.Response.StatusCode] {
 		return false
 	}
-	return !pathLooksLikeFile(attempt.Request.Path)
+	return !PathLooksLikeFile(attempt.Request.Path)
 }
 
 // The noise floor only applies to responses the filters never evaluated.
-func isUnfilteredRecursionCandidate(attempt *common.HttpRequestResponse, recursionCodes map[int]bool, noisyStatuses map[int]bool) bool {
-	if !isRecursionCandidate(attempt, recursionCodes) {
+func IsUnfilteredRecursionCandidate(attempt *common.HttpRequestResponse, recursionCodes map[int]bool, noisyStatuses map[int]bool) bool {
+	if !IsRecursionCandidate(attempt, recursionCodes) {
 		return false
 	}
 	return !noisyStatuses[*attempt.Response.StatusCode]
@@ -448,14 +448,14 @@ func isUnfilteredRecursionCandidate(attempt *common.HttpRequestResponse, recursi
 
 // A status is only noise when every directory-shaped calibration probe returned it; one
 // divergent probe must not suppress descent into real directories answering that code.
-func unanimousDirectoryStatuses(attempts []*common.HttpRequestResponse) map[int]bool {
+func UnanimousDirectoryStatuses(attempts []*common.HttpRequestResponse) map[int]bool {
 	counts := map[int]int{}
 	var considered int
 	for _, attempt := range attempts {
 		if attempt == nil || attempt.Request == nil || attempt.Response == nil || attempt.Response.StatusCode == nil {
 			continue
 		}
-		if pathLooksLikeFile(attempt.Request.Path) {
+		if PathLooksLikeFile(attempt.Request.Path) {
 			continue
 		}
 		considered++
@@ -474,8 +474,8 @@ func unanimousDirectoryStatuses(attempts []*common.HttpRequestResponse) map[int]
 	return unanimous
 }
 
-// pathLooksLikeFile reports whether the last path segment carries a file extension.
-func pathLooksLikeFile(path string) bool {
+// PathLooksLikeFile reports whether the last path segment carries a file extension.
+func PathLooksLikeFile(path string) bool {
 	segment := path
 	if index := strings.LastIndex(segment, "/"); index >= 0 {
 		segment = segment[index+1:]

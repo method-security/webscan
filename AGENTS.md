@@ -69,7 +69,7 @@ The tool follows the standard CLI Development Conventions with clear separation 
 - **CLI Framework**: Cobra
 - **Type Generation**: Fern
 - **HTTP Client**: Standard Go HTTP client with custom configurations
-- **Testing**: Standard Go testing + web application integration tests
+- **Testing**: Standard Go testing, all under `/tests/` (see Test Layout)
 
 ## Key Web Scanning Capabilities
 
@@ -121,6 +121,23 @@ if err != nil {
     return
 }
 ```
+
+### Test Layout
+
+**All tests live under `/tests/`, never beside the code they exercise.** Mirror the source path and use an external test package:
+
+```
+internal/discover/directory/helpers.go   →  tests/discover/directory/helpers_test.go
+utils/request/helpers/data.go            →  tests/request/helpers/data_test.go
+```
+
+```go
+package directory_test   // external package, not discoverdirectory
+```
+
+An external test package cannot reach unexported identifiers, so anything a test needs must be exported. That is acceptable inside `internal/`, which is already module-private, and it is the trade the layout asks for — do not move a test beside the code to avoid an export.
+
+Prefer driving the package's entry point over its helpers. A test that stands up an `httptest.Server` and asserts on the requests the server actually received catches the seams between components, which is where the defects have been; a test of one pure function in isolation confirms only what you already believed.
 
 ### Fern Type Requirements
 - **MANDATORY**: Every CLI command with output must have a corresponding Fern report structure

@@ -286,6 +286,7 @@ func ExtractInterpolatedRouteTemplates(content string, sourceURL string) []*disc
 	type routeIdentity struct {
 		method   common.HttpMethod
 		template string
+		base     string
 	}
 	seen := map[routeIdentity]struct{}{}
 	var routes []*discover.RouteDetails
@@ -313,7 +314,8 @@ func ExtractInterpolatedRouteTemplates(content string, sourceURL string) []*disc
 			evidence = discoverroutehelpers.UnrootedEvidenceFor(interpolatedBaseName(literal))
 		}
 
-		identity := routeIdentity{method: method, template: template}
+		// Two bases can share a tail; keeping both lets either one corroborate.
+		identity := routeIdentity{method: method, template: template, base: evidence}
 		if _, exists := seen[identity]; exists {
 			continue
 		}

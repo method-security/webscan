@@ -200,3 +200,18 @@ func TestExtractInterpolatedRoutesTagsProvenance(t *testing.T) {
 		t.Errorf("evidence = %v, want interpolated", route.Evidence)
 	}
 }
+
+func TestExtractInterpolatedRoutesKeepsCandidatesFromDistinctBases(t *testing.T) {
+	// Two bases sharing a tail must both survive, or a route recoverable from one is lost when the
+	// other never corroborates.
+	routes := interpolated(t,
+		"this.http.get(`${this.apiA}/reports/${id}`);\nthis.http.get(`${this.apiB}/reports/${id}`);")
+
+	if len(routes) != 2 {
+		paths := make([]string, 0, len(routes))
+		for _, route := range routes {
+			paths = append(paths, *route.Evidence)
+		}
+		t.Fatalf("expected a candidate per base, got %v", paths)
+	}
+}

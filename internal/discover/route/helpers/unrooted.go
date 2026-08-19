@@ -67,31 +67,41 @@ func anchorSegment(path string) (string, bool) {
 // application serves paths under `/basket` the candidate is already rooted, and if it instead serves
 // `/api/v2/basket` the candidate is missing that prefix.
 func ResolveUnrootedInterpolatedRoutes(routes []*discover.RouteDetails) []*discover.RouteDetails {
-	anchorsAtRoot := map[string]struct{}{}
-	prefixesByAnchor := map[string]map[string]struct{}{}
+	type originAnchor struct {
+		origin string
+		anchor string
+	}
+	anchorsAtRoot := map[originAnchor]struct{}{}
+	prefixesByAnchor := map[originAnchor]map[string]struct{}{}
 
 	for _, route := range routes {
 		if !corroboratingEvidence(route) {
 			continue
 		}
+		origin := NormalizeBaseURLForIdentity(route.BaseUrl)
 		segments := strings.Split(route.Path, "/")
 		for i, segment := range segments {
 			if i == 0 || segment == "" || strings.Contains(segment, "{") {
 				continue
 			}
+			key := originAnchor{origin: origin, anchor: segment}
 			if i == 1 {
-				anchorsAtRoot[segment] = struct{}{}
+				anchorsAtRoot[key] = struct{}{}
 				continue
 			}
-			if prefixesByAnchor[segment] == nil {
-				prefixesByAnchor[segment] = map[string]struct{}{}
+			if prefixesByAnchor[key] == nil {
+				prefixesByAnchor[key] = map[string]struct{}{}
 			}
-			prefixesByAnchor[segment][strings.Join(segments[:i], "/")] = struct{}{}
+			prefixesByAnchor[key][strings.Join(segments[:i], "/")] = struct{}{}
 		}
 	}
 
 	// First pass: root every candidate its own anchor corroborates, recording what each base implied.
-	prefixByBase := map[string]map[string]struct{}{}
+	type originBase struct {
+		origin string
+		base   string
+	}
+	prefixByBase := map[originBase]map[string]struct{}{}
 	prefixes := make(map[*discover.RouteDetails]string, len(routes))
 	for _, route := range routes {
 		if !IsUnrootedEvidence(route.Evidence) {
@@ -101,7 +111,8 @@ func ResolveUnrootedInterpolatedRoutes(routes []*discover.RouteDetails) []*disco
 		if !ok {
 			continue
 		}
-		prefix, ok := corroboratedPrefix(anchor, anchorsAtRoot, prefixesByAnchor)
+		key := originAnchor{origin: NormalizeBaseURLForIdentity(route.BaseUrl), anchor: anchor}
+		prefix, ok := corroboratedPrefix(key, anchorsAtRoot, prefixesByAnchor)
 		if !ok {
 			continue
 		}
@@ -110,10 +121,11 @@ func ResolveUnrootedInterpolatedRoutes(routes []*discover.RouteDetails) []*disco
 		if base == "" {
 			continue
 		}
-		if prefixByBase[base] == nil {
-			prefixByBase[base] = map[string]struct{}{}
+		baseKey := originBase{origin: key.origin, base: base}
+		if prefixByBase[baseKey] == nil {
+			prefixByBase[baseKey] = map[string]struct{}{}
 		}
-		prefixByBase[base][prefix] = struct{}{}
+		prefixByBase[baseKey][prefix] = struct{}{}
 	}
 
 	resolved := make([]*discover.RouteDetails, 0, len(routes))
@@ -127,7 +139,10 @@ func ResolveUnrootedInterpolatedRoutes(routes []*discover.RouteDetails) []*disco
 		if !rooted {
 			// Second pass: inherit the prefix corroboration established for the same base, but only
 			// when every corroborated candidate for that base agreed on it.
-			agreed, ok := prefixByBase[unrootedBaseName(route.Evidence)]
+			agreed, ok := prefixByBase[originBase{
+				origin: NormalizeBaseURLForIdentity(route.BaseUrl),
+				base:   unrootedBaseName(route.Evidence),
+			}]
 			if !ok || len(agreed) != 1 {
 				continue
 			}
@@ -148,15 +163,15 @@ func ResolveUnrootedInterpolatedRoutes(routes []*discover.RouteDetails) []*disco
 }
 
 // corroboratedPrefix returns the prefix the application demonstrably serves this anchor under.
-func corroboratedPrefix(
-	anchor string,
-	anchorsAtRoot map[string]struct{},
-	prefixesByAnchor map[string]map[string]struct{},
+func corroboratedPrefix[K comparable](
+	key K,
+	anchorsAtRoot map[K]struct{},
+	prefixesByAnchor map[K]map[string]struct{},
 ) (string, bool) {
-	if _, rooted := anchorsAtRoot[anchor]; rooted {
+	if _, rooted := anchorsAtRoot[key]; rooted {
 		return "", true
 	}
-	candidates := prefixesByAnchor[anchor]
+	candidates := prefixesByAnchor[key]
 	// More than one prefix serves this anchor, so which one applies is unknown.
 	if len(candidates) != 1 {
 		return "", false

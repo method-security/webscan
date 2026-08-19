@@ -243,10 +243,14 @@ func EvidenceRank(evidence *string) int {
 	if evidence == nil {
 		return 0
 	}
-	switch *evidence {
-	case DeclaredRouteEvidence:
+	switch {
+	case *evidence == DeclaredRouteEvidence:
 		return 3
-	case InterpolatedRouteEvidence:
+	case *evidence == InterpolatedRouteEvidence:
+		return 2
+	// An unrooted candidate is derivation provenance too; losing the tag would skip rooting and let
+	// the unprefixed tail reach the report.
+	case IsUnrootedEvidence(evidence):
 		return 2
 	default:
 		return 1

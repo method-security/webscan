@@ -268,3 +268,51 @@ func TestResolveUnrootedDoesNotInheritWithoutRecordedBase(t *testing.T) {
 		}
 	}
 }
+
+func TestUnrootedEvidenceCountsAsDerivationProvenance(t *testing.T) {
+	// Source-map tagging must not strip the marker; losing it skips rooting and lets the
+	// unprefixed tail reach the report.
+	evidence := discoverroute.UnrootedEvidenceFor("hostServer")
+	if discoverroute.EvidenceRank(&evidence) < 2 {
+		t.Errorf("rank = %d, want it protected as derivation provenance", discoverroute.EvidenceRank(&evidence))
+	}
+	if !discoverroute.IsProvenanceEvidence(evidence) {
+		t.Errorf("expected an unrooted candidate to be treated as provenance")
+	}
+}
+
+func TestResolveUnrootedCorroboratesWithinOriginOnly(t *testing.T) {
+	// A path served by another origin says nothing about this one.
+	other := tagged("/rest/products", "")
+	other.BaseUrl = "https://other.example.com"
+
+	routes := discoverroute.ResolveUnrootedInterpolatedRoutes([]*discover.RouteDetails{
+		other,
+		candidate("/rest/basket/{param2}"),
+	})
+
+	for _, route := range routes {
+		if route.Path == "/rest/basket/{param2}" {
+			t.Errorf("a foreign origin must not corroborate a candidate")
+		}
+	}
+}
+
+func TestResolveUnrootedDoesNotInheritAcrossOrigins(t *testing.T) {
+	foreign := candidateOf("/reports/{param2}", "apiBase")
+	foreign.BaseUrl = "https://other.example.com"
+	foreignObserved := tagged("/api/v2/reports", "")
+	foreignObserved.BaseUrl = "https://other.example.com"
+
+	routes := discoverroute.ResolveUnrootedInterpolatedRoutes([]*discover.RouteDetails{
+		foreignObserved,
+		foreign,
+		candidateOf("/exports/{param2}", "apiBase"),
+	})
+
+	for _, route := range routes {
+		if route.Path == "/api/v2/exports/{param2}" {
+			t.Errorf("a prefix corroborated on another origin must not be inherited here")
+		}
+	}
+}

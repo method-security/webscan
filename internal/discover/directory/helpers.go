@@ -318,7 +318,7 @@ func gatherPaths(paths []string, wordlistType *discover.WordlistType, wordlistSi
 
 // Bare word, plus one variant per extension so a directories wordlist can reach app.js, plus the
 // directory form when addSlash is set. Servers answer /x and /x/ differently and many reveal a
-// directory only through the latter.
+// directory only through the latter, including dotted ones like .well-known.
 func expandPaths(paths []string, extensions []string, addSlash bool) []string {
 	normalized := normalizeExtensions(extensions)
 	if len(normalized) == 0 && !addSlash {
@@ -335,8 +335,8 @@ func expandPaths(paths []string, extensions []string, addSlash bool) []string {
 		for _, extension := range normalized {
 			expanded = append(expanded, trimmed+extension)
 		}
-		// An extension already marks the entry as a file, so /x.js/ is never a useful probe.
-		if addSlash && !pathLooksLikeFile(trimmed) {
+		// Only the entry as supplied; the extension variants above are files by construction.
+		if addSlash {
 			expanded = append(expanded, trimmed+"/")
 		}
 	}
@@ -401,9 +401,26 @@ func newDirectoryFrontier(current frontier) *discover.DirectoryFrontier {
 	return result
 }
 
-// No noise floor here: surviving the response filters already proved this response is not calibration noise.
+func statusCodeOf(attempt *common.HttpRequestResponse) int {
+	if attempt == nil || attempt.Response == nil || attempt.Response.StatusCode == nil {
+		return 0
+	}
+	return *attempt.Response.StatusCode
+}
+
+// A 2xx body is the only thing the similarity filters can meaningfully judge; for 401/403 and
+// redirects the status is the signal and the body is boilerplate, often byte-identical across
+// every such path on the host.
+func isSuccessStatus(statusCode int) bool {
+	return statusCode >= 200 && statusCode < 300
+}
+
+// Only 2xx reach here, and surviving the response filters already proved they are not noise.
 func appendFindingCandidates(outcome *frontierOutcome, attempts []*common.HttpRequestResponse, recursionCodes map[int]bool) {
 	for _, attempt := range attempts {
+		if !isSuccessStatus(statusCodeOf(attempt)) {
+			continue
+		}
 		if isRecursionCandidate(attempt, recursionCodes) {
 			outcome.recursionCandidates = append(outcome.recursionCandidates, attempt)
 		}

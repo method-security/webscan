@@ -33,6 +33,9 @@ func newAliasServer(t *testing.T) *aliasServer {
 		case "/static/":
 			w.WriteHeader(http.StatusForbidden)
 			_, _ = w.Write([]byte("<html><head><title>403 Forbidden</title></head><body>forbidden</body></html>"))
+		case "/.well-known/":
+			w.WriteHeader(http.StatusForbidden)
+			_, _ = w.Write([]byte("<html><head><title>403 Forbidden</title></head><body>forbidden</body></html>"))
 		case "/static/app.js":
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`var PLATFORM = { token: "seeded-integration-token", base: "/api/v1" };`))
@@ -62,7 +65,7 @@ func intPtr(v int) *int    { return &v }
 func directoryConfig(target string, addSlash bool, recursionDepth int) discover.DiscoverDirectoryConfig {
 	return discover.DiscoverDirectoryConfig{
 		Targets:                     []string{target},
-		Paths:                       []string{"static", "app"},
+		Paths:                       []string{"static", "app", ".well-known"},
 		Extensions:                  []string{"js"},
 		AddSlash:                    boolPtr(addSlash),
 		RecursionDepth:              intPtr(recursionDepth),
@@ -139,11 +142,10 @@ func TestDirectoryDiscoveryWithAddSlashReachesTheBundle(t *testing.T) {
 		t.Fatal("the directory form was never requested with add-slash on")
 	}
 
-	found := findingPaths(t, report)
-	for _, want := range []string{"/static/", "/static/app.js"} {
-		if !contains(found, want) {
-			t.Errorf("expected %q among findings, got %q", want, found)
-		}
+	// The 403 bodies are identical across both directories, so the common-response detector
+	// collapses them as findings. The frontier they open is the point, not the finding.
+	if found := findingPaths(t, report); !contains(found, "/static/app.js") {
+		t.Errorf("expected /static/app.js among findings, got %q", found)
 	}
 
 	var frontiers []string
@@ -157,15 +159,66 @@ func TestDirectoryDiscoveryWithAddSlashReachesTheBundle(t *testing.T) {
 	}
 }
 
-// An entry that already names a file takes no slash, so /static/app.js/ is never probed.
-func TestDirectoryDiscoveryDoesNotSlashFileEntries(t *testing.T) {
+// The slash is added to the entry as supplied, never to a variant we derived by appending an
+// extension, so /app.js/ is never probed.
+func TestDirectoryDiscoveryDoesNotSlashExtensionVariants(t *testing.T) {
 	server := newAliasServer(t)
 
 	if _, err := discoverdirectory.RunDirectoryDiscovery(context.Background(), directoryConfig(server.URL, true, 1)); err != nil {
 		t.Fatalf("RunDirectoryDiscovery returned error: %v", err)
 	}
 
-	if server.saw("/static/app.js/") {
-		t.Error("a file-shaped entry was probed with a trailing slash")
+	for _, path := range []string{"/app.js/", "/static/app.js/"} {
+		if server.saw(path) {
+			t.Errorf("an extension-derived variant was probed with a trailing slash: %s", path)
+		}
+	}
+}
+
+// A dotted name is a directory as often as it is a file. .well-known, .git and .svn are all
+// commonly served only through the directory form, so they must still get the slash probe.
+func TestDirectoryDiscoverySlashesDottedDirectories(t *testing.T) {
+	server := newAliasServer(t)
+
+	report, err := discoverdirectory.RunDirectoryDiscovery(context.Background(), directoryConfig(server.URL, true, 1))
+	if err != nil {
+		t.Fatalf("RunDirectoryDiscovery returned error: %v", err)
+	}
+
+	if !server.saw("/.well-known/") {
+		t.Fatal("a dotted directory entry never received a trailing-slash probe")
+	}
+	var frontiers []string
+	for _, target := range report.Result.Targets {
+		for _, frontier := range target.Frontiers {
+			frontiers = append(frontiers, frontier.BasePath)
+		}
+	}
+	if !contains(frontiers, "/.well-known/") {
+		t.Errorf("expected /.well-known/ to open a frontier, got %q", frontiers)
+	}
+}
+
+// Every 403 on a host tends to share one boilerplate body, so the common-response detector
+// collapses them. Recursion must still descend, or a second forbidden directory anywhere on the
+// host silently switches the feature off.
+func TestDirectoryDiscoveryRecursesDespiteIdenticalForbiddenBodies(t *testing.T) {
+	server := newAliasServer(t)
+
+	report, err := discoverdirectory.RunDirectoryDiscovery(context.Background(), directoryConfig(server.URL, true, 1))
+	if err != nil {
+		t.Fatalf("RunDirectoryDiscovery returned error: %v", err)
+	}
+
+	var frontiers []string
+	for _, target := range report.Result.Targets {
+		for _, frontier := range target.Frontiers {
+			frontiers = append(frontiers, frontier.BasePath)
+		}
+	}
+	for _, want := range []string{"/static/", "/.well-known/"} {
+		if !contains(frontiers, want) {
+			t.Errorf("expected %q to open a frontier despite the shared 403 body, got %q", want, frontiers)
+		}
 	}
 }

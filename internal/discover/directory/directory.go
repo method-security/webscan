@@ -350,8 +350,9 @@ func sweepFrontier(ctx context.Context, baseURL string, current frontier, allPat
 					// Analyze response
 					isValid, disallowedStatus, baselineMatch, standardResponseMatch := AnalyzeResponse(ctx, *httpRequest, validCodes, config.EnableCommonResponseFilters, baselineSizeInt, baselineWordsInt, config.Threshold)
 
-					// Statuses outside response-codes never reach the findings pipeline, so judge them here.
-					if disallowedStatus != 0 && isUnfilteredRecursionCandidate(httpRequest, recursionCodes, noisyStatuses) {
+					// Judged on status alone: either the findings pipeline never sees this response, or it
+					// is a non-2xx whose body the similarity filters cannot meaningfully judge.
+					if !isSuccessStatus(statusCodeOf(httpRequest)) && isUnfilteredRecursionCandidate(httpRequest, recursionCodes, noisyStatuses) {
 						attemptsMutex.Lock()
 						outcome.recursionCandidates = append(outcome.recursionCandidates, httpRequest)
 						attemptsMutex.Unlock()

@@ -296,7 +296,7 @@ func appendDirectoryPath(basePath, childPath string) string {
 }
 
 // gatherPaths gathers all paths from the config
-func gatherPaths(paths []string, wordlistType *discover.WordlistType, wordlistSize *discover.WordlistSize, extensions []string) ([]string, error) {
+func gatherPaths(paths []string, wordlistType *discover.WordlistType, wordlistSize *discover.WordlistSize, extensions []string, addSlash bool) ([]string, error) {
 	var allPaths []string
 
 	// Add manual paths
@@ -313,17 +313,19 @@ func gatherPaths(paths []string, wordlistType *discover.WordlistType, wordlistSi
 		allPaths = append(allPaths, wordlistPaths...)
 	}
 
-	return applyExtensions(allPaths, extensions), nil
+	return expandPaths(allPaths, extensions, addSlash), nil
 }
 
-// Bare word plus one variant per extension, so a directories wordlist can reach app.js.
-func applyExtensions(paths []string, extensions []string) []string {
+// Bare word, plus one variant per extension so a directories wordlist can reach app.js, plus the
+// directory form when addSlash is set. Servers answer /x and /x/ differently and many reveal a
+// directory only through the latter, including dotted ones like .well-known.
+func expandPaths(paths []string, extensions []string, addSlash bool) []string {
 	normalized := normalizeExtensions(extensions)
-	if len(normalized) == 0 {
+	if len(normalized) == 0 && !addSlash {
 		return paths
 	}
 
-	expanded := make([]string, 0, len(paths)*(len(normalized)+1))
+	expanded := make([]string, 0, len(paths)*(len(normalized)+2))
 	for _, path := range paths {
 		expanded = append(expanded, path)
 		trimmed := strings.Trim(path, "/")
@@ -332,6 +334,10 @@ func applyExtensions(paths []string, extensions []string) []string {
 		}
 		for _, extension := range normalized {
 			expanded = append(expanded, trimmed+extension)
+		}
+		// Only the entry as supplied; the extension variants above are files by construction.
+		if addSlash {
+			expanded = append(expanded, trimmed+"/")
 		}
 	}
 	return expanded
@@ -356,6 +362,10 @@ func normalizeExtensions(extensions []string) []string {
 		normalized = append(normalized, trimmed)
 	}
 	return normalized
+}
+
+func addSlashEnabled(config *discover.DiscoverDirectoryConfig) bool {
+	return config.AddSlash != nil && *config.AddSlash
 }
 
 // recursionDepth returns how many levels below the target may be swept; 0 disables recursion.
@@ -391,9 +401,26 @@ func newDirectoryFrontier(current frontier) *discover.DirectoryFrontier {
 	return result
 }
 
-// No noise floor here: surviving the response filters already proved this response is not calibration noise.
+func statusCodeOf(attempt *common.HttpRequestResponse) int {
+	if attempt == nil || attempt.Response == nil || attempt.Response.StatusCode == nil {
+		return 0
+	}
+	return *attempt.Response.StatusCode
+}
+
+// A 2xx body is the only thing the similarity filters can meaningfully judge; for 401/403 and
+// redirects the status is the signal and the body is boilerplate, often byte-identical across
+// every such path on the host.
+func isSuccessStatus(statusCode int) bool {
+	return statusCode >= 200 && statusCode < 300
+}
+
+// Only 2xx reach here, and surviving the response filters already proved they are not noise.
 func appendFindingCandidates(outcome *frontierOutcome, attempts []*common.HttpRequestResponse, recursionCodes map[int]bool) {
 	for _, attempt := range attempts {
+		if !isSuccessStatus(statusCodeOf(attempt)) {
+			continue
+		}
 		if isRecursionCandidate(attempt, recursionCodes) {
 			outcome.recursionCandidates = append(outcome.recursionCandidates, attempt)
 		}

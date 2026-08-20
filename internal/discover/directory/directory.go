@@ -67,7 +67,7 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 	limiter := newDirectoryRateLimiter(config.GlobalRateLimit)
 
 	// Gather all paths
-	allPaths, err := gatherPaths(config.Paths, config.WordlistType, config.WordlistSize, config.Extensions)
+	allPaths, err := gatherPaths(config.Paths, config.WordlistType, config.WordlistSize, config.Extensions, addSlashEnabled(&config))
 	if err != nil {
 		report.Errors = append(report.Errors, fmt.Sprintf("directory discovery: failed to gather paths: %v", err))
 		return &report, nil
@@ -350,8 +350,10 @@ func sweepFrontier(ctx context.Context, baseURL string, current frontier, allPat
 					// Analyze response
 					isValid, disallowedStatus, baselineMatch, standardResponseMatch := AnalyzeResponse(ctx, *httpRequest, validCodes, config.EnableCommonResponseFilters, baselineSizeInt, baselineWordsInt, config.Threshold)
 
-					// Statuses outside response-codes never reach the findings pipeline, so judge them here.
-					if disallowedStatus != 0 && isUnfilteredRecursionCandidate(httpRequest, recursionCodes, noisyStatuses) {
+					// Judged on status alone when the findings pipeline either never sees this response,
+					// or cannot meaningfully judge it: a non-2xx body is boilerplate, not a soft 404.
+					outsidePipeline := disallowedStatus != 0 || !isSuccessStatus(statusCodeOf(httpRequest))
+					if outsidePipeline && isUnfilteredRecursionCandidate(httpRequest, recursionCodes, noisyStatuses) {
 						attemptsMutex.Lock()
 						outcome.recursionCandidates = append(outcome.recursionCandidates, httpRequest)
 						attemptsMutex.Unlock()

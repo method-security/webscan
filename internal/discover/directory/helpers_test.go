@@ -7,7 +7,7 @@ import (
 	common "github.com/Method-Security/webscan/generated/go/common"
 )
 
-func TestApplyExtensions(t *testing.T) {
+func TestExpandPathsExtensionsOnly(t *testing.T) {
 	for _, tc := range []struct {
 		name       string
 		paths      []string
@@ -46,9 +46,9 @@ func TestApplyExtensions(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got := applyExtensions(tc.paths, tc.extensions)
+			got := expandPaths(tc.paths, tc.extensions, false)
 			if !reflect.DeepEqual(got, tc.want) {
-				t.Errorf("applyExtensions(%q, %q) = %q, want %q", tc.paths, tc.extensions, got, tc.want)
+				t.Errorf("expandPaths(%q, %q, false) = %q, want %q", tc.paths, tc.extensions, got, tc.want)
 			}
 		})
 	}

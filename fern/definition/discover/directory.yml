@@ -27,6 +27,7 @@ types:
       wordlistType: optional<WordlistType>
       wordlistSize: optional<WordlistSize>
       extensions: optional<list<string>>
+      addSlash: optional<boolean>
       recursionDepth: optional<integer>
       recursionStatusCodes: optional<string>
       httpMethods: list<http.HttpMethod>

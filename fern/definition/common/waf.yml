@@ -1,0 +1,31 @@
+types:
+  WafProviderEnum:
+    enum:
+      - AKAMAI
+      - AWS
+      - AZURE
+      - CLOUDFLARE
+      - F5
+      - GCP
+      - INCAPSULA
+      - ORACLE
+      - SUCURI
+      - UNKNOWN
+  WafBody:
+    properties:
+      pattern: string
+      negativeMatch: boolean
+      needsStatusCodeConfirmation: boolean
+  WafFingerprint:
+    properties:
+      provider: WafProviderEnum
+      headers: list<string>
+      serverHeaderValues: list<string>
+      body: list<WafBody>
+  WafDetection:
+    properties:
+      provider: WafProviderEnum
+      fingerprint: optional<WafFingerprint>
+      matchedHeaders: optional<list<string>>
+      matchedServerHeaderValues: optional<list<string>>
+      matchedBodyPatterns: optional<list<string>>

@@ -1,5 +1,6 @@
 imports:
   method: method.yml
+  waf: waf.yml
 types:
   # Web Protocol Enum
   WebProtocol:
@@ -86,6 +87,7 @@ types:
       sizeBytes: optional<integer>
       consoleLogs: optional<list<string>>
       cookies: optional<list<ResponseCookie>>
+      wafDetection: optional<waf.WafDetection>
   # Returned Struct
   HttpRequestResponse:
     properties:

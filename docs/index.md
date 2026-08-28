@@ -12,8 +12,6 @@ webscan is designed as a simple, easy to use web application scanning tool that 
 
 The types of scans that webscan can conduct are constantly growing. For the most up to date listing, please see the documentation [here](./docs/index.md)
 
-To learn more about webscan, please see the [Documentation site](https://method-security.github.io/webscan/) for the most detailed information.
-
 ## Quick Start
 
 ### Get webscan

@@ -121,6 +121,21 @@ func TestFingerprintApplicationFirewallRejectsAmbiguousProviders(t *testing.T) {
 	assert.Nil(t, FingerprintApplicationFirewall(nil, headers, &statusCode))
 }
 
+func TestFingerprintApplicationFirewallReturnsFingerprintCopy(t *testing.T) {
+	statusCode := 403
+	headers := map[string]string{"x-amzn-waf-action": "challenge"}
+
+	fingerprint := FingerprintApplicationFirewall(nil, headers, &statusCode)
+	require.NotNil(t, fingerprint)
+	fingerprint.Headers[0] = "corrupted"
+	fingerprint.Body[0].Pattern = "corrupted"
+
+	nextFingerprint := FingerprintApplicationFirewall(nil, headers, &statusCode)
+	require.NotNil(t, nextFingerprint)
+	assert.Equal(t, []string{"x-amzn-waf-action"}, nextFingerprint.Headers)
+	assert.Equal(t, "request blocked by aws waf", nextFingerprint.Body[0].Pattern)
+}
+
 func TestDetectWafIncludesMatchedEvidence(t *testing.T) {
 	statusCode := 403
 	httpRequestResponse := &wafcommon.HttpRequestResponse{
@@ -137,6 +152,30 @@ func TestDetectWafIncludesMatchedEvidence(t *testing.T) {
 	assert.Equal(t, wafcommon.WafProviderEnumCloudflare, detection.Provider)
 	assert.Equal(t, []string{"cf-mitigated"}, detection.MatchedHeaders)
 	assert.Empty(t, detection.MatchedBodyPatterns)
+}
+
+func TestDetectWafReturnsFingerprintCopy(t *testing.T) {
+	statusCode := 403
+	httpRequestResponse := &wafcommon.HttpRequestResponse{
+		Response: &wafcommon.HttpResponse{
+			StatusCode: &statusCode,
+			ResponseHeaders: map[string][]string{
+				"CF-Mitigated": {"challenge"},
+			},
+		},
+	}
+
+	detection := DetectWaf(httpRequestResponse)
+	require.NotNil(t, detection)
+	detection.Fingerprint.Headers[0] = "corrupted"
+	detection.Fingerprint.Body[0].Pattern = "corrupted"
+	detection.MatchedHeaders[0] = "corrupted"
+
+	nextDetection := DetectWaf(httpRequestResponse)
+	require.NotNil(t, nextDetection)
+	assert.Equal(t, []string{"cf-mitigated"}, nextDetection.Fingerprint.Headers)
+	assert.Equal(t, "attention required! | cloudflare", nextDetection.Fingerprint.Body[0].Pattern)
+	assert.Equal(t, []string{"cf-mitigated"}, nextDetection.MatchedHeaders)
 }
 
 func TestDetectWafIncludesMatchedBodyPattern(t *testing.T) {

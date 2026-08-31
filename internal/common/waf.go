@@ -185,7 +185,7 @@ func FingerprintApplicationFirewall(responseBody *string, responseHeaders map[st
 	if match == nil {
 		return nil
 	}
-	return match.fingerprint
+	return cloneWafFingerprint(match.fingerprint)
 }
 
 func fingerprintApplicationFirewall(responseBody *string, responseHeaders map[string][]string, statusCode *int) *wafMatch {
@@ -219,7 +219,7 @@ func fingerprintApplicationFirewall(responseBody *string, responseHeaders map[st
 }
 
 func matchRule(rule *wafFingerprintRule, responseBody string, responseHeaders map[string][]string, statusCode *int) *wafMatch {
-	match := &wafMatch{fingerprint: &rule.fingerprint}
+	match := &wafMatch{fingerprint: cloneWafFingerprint(&rule.fingerprint)}
 
 	for _, header := range rule.headers {
 		if header.needsStatusCodeConfirmation && !isBlockedStatusCode(statusCode) {
@@ -361,11 +361,33 @@ func detectWafMatch(httpRequestResponse *wafcommon.HttpRequestResponse) *wafMatc
 func wafDetectionFromMatch(match *wafMatch) *wafcommon.WafDetection {
 	return &wafcommon.WafDetection{
 		Provider:                  match.fingerprint.Provider,
-		Fingerprint:               match.fingerprint,
-		MatchedHeaders:            match.matchedHeaders,
-		MatchedServerHeaderValues: match.matchedServerHeaderValues,
-		MatchedBodyPatterns:       match.matchedBodyPatterns,
+		Fingerprint:               cloneWafFingerprint(match.fingerprint),
+		MatchedHeaders:            append([]string(nil), match.matchedHeaders...),
+		MatchedServerHeaderValues: append([]string(nil), match.matchedServerHeaderValues...),
+		MatchedBodyPatterns:       append([]string(nil), match.matchedBodyPatterns...),
 	}
+}
+
+func cloneWafFingerprint(fingerprint *wafcommon.WafFingerprint) *wafcommon.WafFingerprint {
+	if fingerprint == nil {
+		return nil
+	}
+
+	clone := &wafcommon.WafFingerprint{
+		Provider:           fingerprint.Provider,
+		Headers:            append([]string(nil), fingerprint.Headers...),
+		ServerHeaderValues: append([]string(nil), fingerprint.ServerHeaderValues...),
+		Body:               make([]*wafcommon.WafBody, 0, len(fingerprint.Body)),
+	}
+	for _, body := range fingerprint.Body {
+		if body == nil {
+			clone.Body = append(clone.Body, nil)
+			continue
+		}
+		bodyClone := *body
+		clone.Body = append(clone.Body, &bodyClone)
+	}
+	return clone
 }
 
 func mergeWafMatch(destination, source *wafMatch) {

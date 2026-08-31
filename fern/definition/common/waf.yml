@@ -19,8 +19,8 @@ types:
   WafFingerprint:
     properties:
       provider: WafProviderEnum
-      headers: list<string>
-      serverHeaderValues: list<string>
+      headers: optional<list<string>>
+      serverHeaderValues: optional<list<string>>
       body: list<WafBody>
   WafDetection:
     properties:

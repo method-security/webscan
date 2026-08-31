@@ -50,8 +50,8 @@ types:
   DirectoryTargetInfo:
     properties:
       target: string
-      baselineAttempts: list<http.HttpRequestResponse>
-      attempts: list<http.HttpRequestResponse>
+      baselineAttempts: optional<list<http.HttpRequestResponse>>
+      attempts: optional<list<http.HttpRequestResponse>>
       frontiers: optional<list<DirectoryFrontier>>
       wafDetection: optional<waf.WafDetection>
   DiscoverDirectoryResult:

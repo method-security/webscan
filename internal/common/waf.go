@@ -1,4 +1,4 @@
-package waf
+package common
 
 import (
 	"strings"
@@ -290,9 +290,9 @@ func containsHeaderValue(actualValues, expectedValues []string) bool {
 	return false
 }
 
-func PopulateWafDetection(httpRequestResponse *wafcommon.HttpRequestResponse) {
+func DetectWaf(httpRequestResponse *wafcommon.HttpRequestResponse) *wafcommon.WafDetection {
 	if httpRequestResponse == nil || httpRequestResponse.Response == nil {
-		return
+		return nil
 	}
 
 	response := httpRequestResponse.Response
@@ -303,15 +303,88 @@ func PopulateWafDetection(httpRequestResponse *wafcommon.HttpRequestResponse) {
 
 	match := fingerprintApplicationFirewall(responseBody, response.ResponseHeaders, response.StatusCode)
 	if match == nil {
-		response.WafDetection = nil
-		return
+		return nil
 	}
 
-	response.WafDetection = &wafcommon.WafDetection{
+	return wafDetectionFromMatch(match)
+}
+
+func DetectWafFromResponses(httpRequestResponses []*wafcommon.HttpRequestResponse) *wafcommon.WafDetection {
+	var bestMatch *wafMatch
+	ambiguous := false
+	for _, httpRequestResponse := range httpRequestResponses {
+		match := detectWafMatch(httpRequestResponse)
+		if match == nil {
+			continue
+		}
+		if bestMatch == nil {
+			bestMatch = match
+			ambiguous = false
+			continue
+		}
+		if match.fingerprint.Provider == bestMatch.fingerprint.Provider {
+			mergeWafMatch(bestMatch, match)
+			if match.confidence > bestMatch.confidence {
+				bestMatch.confidence = match.confidence
+			}
+			continue
+		}
+		if match.confidence > bestMatch.confidence {
+			bestMatch = match
+			ambiguous = false
+			continue
+		}
+		if match.confidence == bestMatch.confidence {
+			ambiguous = true
+		}
+	}
+
+	if ambiguous || bestMatch == nil {
+		return nil
+	}
+	return wafDetectionFromMatch(bestMatch)
+}
+
+func detectWafMatch(httpRequestResponse *wafcommon.HttpRequestResponse) *wafMatch {
+	if httpRequestResponse == nil || httpRequestResponse.Response == nil {
+		return nil
+	}
+
+	response := httpRequestResponse.Response
+	var responseBody *string
+	if response.ResponseBody != nil {
+		responseBody = requesthelpers.GetResponseBodyStringFromBodyStruct(response.ResponseBody)
+	}
+	return fingerprintApplicationFirewall(responseBody, response.ResponseHeaders, response.StatusCode)
+}
+
+func wafDetectionFromMatch(match *wafMatch) *wafcommon.WafDetection {
+	return &wafcommon.WafDetection{
 		Provider:                  match.fingerprint.Provider,
 		Fingerprint:               match.fingerprint,
 		MatchedHeaders:            match.matchedHeaders,
 		MatchedServerHeaderValues: match.matchedServerHeaderValues,
 		MatchedBodyPatterns:       match.matchedBodyPatterns,
 	}
+}
+
+func mergeWafMatch(destination, source *wafMatch) {
+	destination.matchedHeaders = appendUniqueStrings(destination.matchedHeaders, source.matchedHeaders)
+	destination.matchedServerHeaderValues = appendUniqueStrings(destination.matchedServerHeaderValues, source.matchedServerHeaderValues)
+	destination.matchedBodyPatterns = appendUniqueStrings(destination.matchedBodyPatterns, source.matchedBodyPatterns)
+}
+
+func appendUniqueStrings(destination, source []string) []string {
+	seen := make(map[string]struct{}, len(destination))
+	for _, value := range destination {
+		seen[value] = struct{}{}
+	}
+	for _, value := range source {
+		if _, exists := seen[value]; exists {
+			continue
+		}
+		destination = append(destination, value)
+		seen[value] = struct{}{}
+	}
+	return destination
 }

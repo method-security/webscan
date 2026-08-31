@@ -13,6 +13,8 @@ import (
 	common "github.com/Method-Security/webscan/generated/go/common"
 	discover "github.com/Method-Security/webscan/generated/go/discover"
 
+	// Internal
+	internalcommon "github.com/Method-Security/webscan/internal/common"
 	// Utils
 	utils "github.com/Method-Security/webscan/utils"
 	request "github.com/Method-Security/webscan/utils/request"
@@ -171,6 +173,7 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 		}
 
 		if len(targetInfo.Attempts) > 0 {
+			targetInfo.WafDetection = internalcommon.DetectWafFromResponses(targetInfo.Attempts)
 			targets = append(targets, &targetInfo)
 		}
 

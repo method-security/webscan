@@ -1,4 +1,4 @@
-package waf
+package common
 
 import (
 	"testing"
@@ -121,7 +121,7 @@ func TestFingerprintApplicationFirewallRejectsAmbiguousProviders(t *testing.T) {
 	assert.Nil(t, FingerprintApplicationFirewall(nil, headers, &statusCode))
 }
 
-func TestPopulateWafDetectionIncludesMatchedEvidence(t *testing.T) {
+func TestDetectWafIncludesMatchedEvidence(t *testing.T) {
 	statusCode := 403
 	httpRequestResponse := &wafcommon.HttpRequestResponse{
 		Response: &wafcommon.HttpResponse{
@@ -132,16 +132,14 @@ func TestPopulateWafDetectionIncludesMatchedEvidence(t *testing.T) {
 		},
 	}
 
-	PopulateWafDetection(httpRequestResponse)
-
-	detection := httpRequestResponse.Response.WafDetection
+	detection := DetectWaf(httpRequestResponse)
 	require.NotNil(t, detection)
 	assert.Equal(t, wafcommon.WafProviderEnumCloudflare, detection.Provider)
 	assert.Equal(t, []string{"cf-mitigated"}, detection.MatchedHeaders)
 	assert.Empty(t, detection.MatchedBodyPatterns)
 }
 
-func TestPopulateWafDetectionIncludesMatchedBodyPattern(t *testing.T) {
+func TestDetectWafIncludesMatchedBodyPattern(t *testing.T) {
 	statusCode := 403
 	httpRequestResponse := &wafcommon.HttpRequestResponse{
 		Response: &wafcommon.HttpResponse{
@@ -153,10 +151,70 @@ func TestPopulateWafDetectionIncludesMatchedBodyPattern(t *testing.T) {
 		},
 	}
 
-	PopulateWafDetection(httpRequestResponse)
-
-	detection := httpRequestResponse.Response.WafDetection
+	detection := DetectWaf(httpRequestResponse)
 	require.NotNil(t, detection)
 	assert.Equal(t, wafcommon.WafProviderEnumSucuri, detection.Provider)
 	assert.Equal(t, []string{"access denied - sucuri website firewall"}, detection.MatchedBodyPatterns)
+}
+
+func TestDetectWafFromResponsesReturnsSingleTargetDetection(t *testing.T) {
+	statusCode := 403
+	responses := []*wafcommon.HttpRequestResponse{
+		{
+			Response: &wafcommon.HttpResponse{
+				StatusCode: &statusCode,
+				ResponseHeaders: map[string][]string{
+					"CF-Mitigated": {"challenge"},
+				},
+			},
+		},
+		{
+			Response: &wafcommon.HttpResponse{
+				StatusCode: &statusCode,
+				ResponseBody: &wafcommon.Body{
+					Kind: "text",
+					Text: &wafcommon.TextBody{Value: "Cloudflare's security service blocked this request"},
+				},
+			},
+		},
+	}
+
+	detection := DetectWafFromResponses(responses)
+	require.NotNil(t, detection)
+	assert.Equal(t, wafcommon.WafProviderEnumCloudflare, detection.Provider)
+	assert.Equal(t, []string{"cf-mitigated"}, detection.MatchedHeaders)
+	assert.Equal(t, []string{"cloudflare's security service"}, detection.MatchedBodyPatterns)
+}
+
+func TestDetectWafFromResponsesRejectsAmbiguousTargetProviders(t *testing.T) {
+	statusCode := 403
+	responses := []*wafcommon.HttpRequestResponse{
+		{
+			Response: &wafcommon.HttpResponse{
+				StatusCode: &statusCode,
+				ResponseHeaders: map[string][]string{
+					"CF-Mitigated": {"challenge"},
+				},
+			},
+		},
+		{
+			Response: &wafcommon.HttpResponse{
+				StatusCode: &statusCode,
+				ResponseHeaders: map[string][]string{
+					"X-Amzn-Waf-Action": {"challenge"},
+				},
+			},
+		},
+		{
+			Response: &wafcommon.HttpResponse{
+				StatusCode: &statusCode,
+				ResponseBody: &wafcommon.Body{
+					Kind: "text",
+					Text: &wafcommon.TextBody{Value: "Cloudflare's security service blocked this request"},
+				},
+			},
+		},
+	}
+
+	assert.Nil(t, DetectWafFromResponses(responses))
 }

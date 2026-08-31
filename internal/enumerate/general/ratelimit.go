@@ -15,7 +15,7 @@ import (
 	enumerategeneralfern "github.com/Method-Security/webscan/generated/go/enumerate/general"
 
 	// Internal
-	commonwaf "github.com/Method-Security/webscan/internal/common/waf"
+	commonwaf "github.com/Method-Security/webscan/internal/common"
 	// Utils
 	utils "github.com/Method-Security/webscan/utils"
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"

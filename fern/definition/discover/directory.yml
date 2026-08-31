@@ -1,6 +1,7 @@
 imports:
   http: ../common/http.yml
   method: ../common/method.yml
+  waf: ../common/waf.yml
 types:
   # Wordlist Enums
   WordlistType:
@@ -52,6 +53,7 @@ types:
       baselineAttempts: list<http.HttpRequestResponse>
       attempts: list<http.HttpRequestResponse>
       frontiers: optional<list<DirectoryFrontier>>
+      wafDetection: optional<waf.WafDetection>
   DiscoverDirectoryResult:
     properties:
       targets: optional<list<DirectoryTargetInfo>>

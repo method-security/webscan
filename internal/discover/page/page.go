@@ -12,7 +12,9 @@ import (
 	"github.com/Method-Security/webscan/utils"
 
 	// Internal
+	internalcommon "github.com/Method-Security/webscan/internal/common"
 	discoverpagehelpers "github.com/Method-Security/webscan/internal/discover/page/helpers"
+
 	//Utils
 	headless "github.com/Method-Security/webscan/utils/request/headless"
 	browserbase "github.com/Method-Security/webscan/utils/request/headless/browserbase"
@@ -195,6 +197,7 @@ func PerformPageCapture(
 			errors = append(errors, fmt.Sprintf("page %s returned status code %d which is not in the allowed response codes", config.Target, *httpRequestResponse.Response.StatusCode))
 		} else {
 			result.Request = httpRequestResponse
+			result.WafDetection = internalcommon.DetectWaf(httpRequestResponse)
 		}
 	}
 

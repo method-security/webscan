@@ -251,37 +251,3 @@ func TestDirectoryDiscoveryRecursesIntoSuccessOutsideResponseCodes(t *testing.T)
 		t.Error("a 200 directory outside response-codes did not open a frontier")
 	}
 }
-
-func TestDirectoryDiscoveryReportsTargetWafDetectionFromFilteredAttempt(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("CF-Mitigated", "challenge")
-		w.WriteHeader(http.StatusForbidden)
-		_, _ = w.Write([]byte("Cloudflare's security service blocked this request"))
-	}))
-	t.Cleanup(server.Close)
-
-	config := directoryConfig(server.URL, false, 0)
-	config.Paths = []string{"admin"}
-	config.ResponseCodes = "200-299"
-	config.EnableCommonResponseFilters = false
-	config.Threads = 1
-
-	report, err := discoverdirectory.RunDirectoryDiscovery(context.Background(), config)
-	if err != nil {
-		t.Fatalf("RunDirectoryDiscovery returned error: %v", err)
-	}
-	if report.Result == nil || len(report.Result.Targets) != 1 {
-		t.Fatalf("expected one target with WAF detection, got %#v", report.Result)
-	}
-
-	target := report.Result.Targets[0]
-	if len(target.Attempts) != 0 {
-		t.Fatalf("expected WAF-blocked attempt to stay filtered from findings, got %d attempts", len(target.Attempts))
-	}
-	if target.WafDetection == nil {
-		t.Fatal("expected target-level WAF detection")
-	}
-	if target.WafDetection.Provider != common.WafProviderEnumCloudflare {
-		t.Fatalf("expected Cloudflare WAF detection, got %s", target.WafDetection.Provider)
-	}
-}

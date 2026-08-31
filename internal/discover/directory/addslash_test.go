@@ -1,4 +1,4 @@
-package directory_test
+package discoverdirectory_test
 
 import (
 	"context"

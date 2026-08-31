@@ -100,6 +100,27 @@ func TestFingerprintApplicationFirewallRequiresExpectedHeaderValue(t *testing.T)
 	assert.Nil(t, FingerprintApplicationFirewall(nil, map[string]string{"x-amz-waf-action": "challenge"}, &statusCode))
 }
 
+func TestFingerprintApplicationFirewallRequiresExpectedAwsStatus(t *testing.T) {
+	challengeStatus := 202
+	captchaStatus := 405
+	blockedStatus := 403
+
+	require.NotNil(t, FingerprintApplicationFirewall(nil, map[string]string{"x-amzn-waf-action": "challenge"}, &challengeStatus))
+	require.NotNil(t, FingerprintApplicationFirewall(nil, map[string]string{"x-amzn-waf-action": "captcha"}, &captchaStatus))
+	assert.Nil(t, FingerprintApplicationFirewall(nil, map[string]string{"x-amzn-waf-action": "challenge"}, &blockedStatus))
+	assert.Nil(t, FingerprintApplicationFirewall(nil, map[string]string{"x-amzn-waf-action": "captcha"}, &blockedStatus))
+}
+
+func TestFingerprintApplicationFirewallRequiresSpecificAkamaiBody(t *testing.T) {
+	statusCode := 403
+
+	specificBody := "Access denied. See https://errors.edgesuite.net/18.abc for details."
+	require.NotNil(t, FingerprintApplicationFirewall(&specificBody, nil, &statusCode))
+
+	genericBody := "Refer to the Akamai reference documentation."
+	assert.Nil(t, FingerprintApplicationFirewall(&genericBody, nil, &statusCode))
+}
+
 func TestFingerprintApplicationFirewallRequiresBlockStatusForBody(t *testing.T) {
 	body := "Access Denied - Sucuri Website Firewall"
 	okStatus := 200
@@ -112,7 +133,7 @@ func TestFingerprintApplicationFirewallRequiresBlockStatusForBody(t *testing.T) 
 }
 
 func TestFingerprintApplicationFirewallRejectsAmbiguousProviders(t *testing.T) {
-	statusCode := 403
+	statusCode := 202
 	headers := map[string]string{
 		"x-amzn-waf-action": "challenge",
 		"cf-mitigated":      "challenge",
@@ -122,7 +143,7 @@ func TestFingerprintApplicationFirewallRejectsAmbiguousProviders(t *testing.T) {
 }
 
 func TestFingerprintApplicationFirewallReturnsFingerprintCopy(t *testing.T) {
-	statusCode := 403
+	statusCode := 202
 	headers := map[string]string{"x-amzn-waf-action": "challenge"}
 
 	fingerprint := FingerprintApplicationFirewall(nil, headers, &statusCode)
@@ -226,11 +247,12 @@ func TestDetectWafFromResponsesReturnsSingleTargetDetection(t *testing.T) {
 }
 
 func TestDetectWafFromResponsesRejectsAmbiguousTargetProviders(t *testing.T) {
-	statusCode := 403
+	cloudflareStatus := 403
+	awsStatus := 202
 	responses := []*wafcommon.HttpRequestResponse{
 		{
 			Response: &wafcommon.HttpResponse{
-				StatusCode: &statusCode,
+				StatusCode: &cloudflareStatus,
 				ResponseHeaders: map[string][]string{
 					"CF-Mitigated": {"challenge"},
 				},
@@ -238,7 +260,7 @@ func TestDetectWafFromResponsesRejectsAmbiguousTargetProviders(t *testing.T) {
 		},
 		{
 			Response: &wafcommon.HttpResponse{
-				StatusCode: &statusCode,
+				StatusCode: &awsStatus,
 				ResponseHeaders: map[string][]string{
 					"X-Amzn-Waf-Action": {"challenge"},
 				},
@@ -246,7 +268,7 @@ func TestDetectWafFromResponsesRejectsAmbiguousTargetProviders(t *testing.T) {
 		},
 		{
 			Response: &wafcommon.HttpResponse{
-				StatusCode: &statusCode,
+				StatusCode: &cloudflareStatus,
 				ResponseBody: &wafcommon.Body{
 					Kind: "text",
 					Text: &wafcommon.TextBody{Value: "Cloudflare's security service blocked this request"},

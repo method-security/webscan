@@ -16,6 +16,7 @@ const (
 type headerFingerprint struct {
 	name                        string
 	values                      []string
+	statusCodes                 []int
 	needsStatusCodeConfirmation bool
 	confidence                  int
 }
@@ -43,7 +44,7 @@ var wafFingerprintRules = []wafFingerprintRule{
 			ServerHeaderValues: []string{},
 			Body: []*wafcommon.WafBody{
 				{Pattern: "access denied - akamai", NeedsStatusCodeConfirmation: true},
-				{Pattern: "akamai reference", NeedsStatusCodeConfirmation: true},
+				{Pattern: "errors.edgesuite.net", NeedsStatusCodeConfirmation: true},
 			},
 		},
 	},
@@ -57,7 +58,8 @@ var wafFingerprintRules = []wafFingerprintRule{
 			},
 		},
 		headers: []headerFingerprint{
-			{name: "x-amzn-waf-action", values: []string{"captcha", "challenge"}, confidence: 100},
+			{name: "x-amzn-waf-action", values: []string{"challenge"}, statusCodes: []int{202}, confidence: 100},
+			{name: "x-amzn-waf-action", values: []string{"captcha"}, statusCodes: []int{405}, confidence: 100},
 		},
 	},
 	{
@@ -222,6 +224,9 @@ func matchRule(rule *wafFingerprintRule, responseBody string, responseHeaders ma
 	match := &wafMatch{fingerprint: cloneWafFingerprint(&rule.fingerprint)}
 
 	for _, header := range rule.headers {
+		if !matchesStatusCode(statusCode, header.statusCodes) {
+			continue
+		}
 		if header.needsStatusCodeConfirmation && !isBlockedStatusCode(statusCode) {
 			continue
 		}
@@ -255,6 +260,21 @@ func matchRule(rule *wafFingerprintRule, responseBody string, responseHeaders ma
 		return nil
 	}
 	return match
+}
+
+func matchesStatusCode(statusCode *int, expected []int) bool {
+	if len(expected) == 0 {
+		return true
+	}
+	if statusCode == nil {
+		return false
+	}
+	for _, candidate := range expected {
+		if *statusCode == candidate {
+			return true
+		}
+	}
+	return false
 }
 
 func normalizeHeaders(headers map[string][]string) map[string][]string {

@@ -21,7 +21,7 @@ types:
       provider: WafProviderEnum
       headers: optional<list<string>>
       serverHeaderValues: optional<list<string>>
-      body: list<WafBody>
+      body: optional<list<WafBody>>
   WafDetection:
     properties:
       provider: WafProviderEnum

@@ -310,26 +310,28 @@ func DetectWaf(httpRequestResponse *wafcommon.HttpRequestResponse) *wafcommon.Wa
 }
 
 func DetectWafFromResponses(httpRequestResponses []*wafcommon.HttpRequestResponse) *wafcommon.WafDetection {
-	var bestMatch *wafMatch
-	ambiguous := false
+	matchesByProvider := map[wafcommon.WafProviderEnum]*wafMatch{}
 	for _, httpRequestResponse := range httpRequestResponses {
 		match := detectWafMatch(httpRequestResponse)
 		if match == nil {
 			continue
 		}
-		if bestMatch == nil {
-			bestMatch = match
-			ambiguous = false
-			continue
-		}
-		if match.fingerprint.Provider == bestMatch.fingerprint.Provider {
+
+		provider := match.fingerprint.Provider
+		if bestMatch, exists := matchesByProvider[provider]; exists {
 			mergeWafMatch(bestMatch, match)
 			if match.confidence > bestMatch.confidence {
 				bestMatch.confidence = match.confidence
 			}
 			continue
 		}
-		if match.confidence > bestMatch.confidence {
+		matchesByProvider[provider] = match
+	}
+
+	var bestMatch *wafMatch
+	ambiguous := false
+	for _, match := range matchesByProvider {
+		if bestMatch == nil || match.confidence > bestMatch.confidence {
 			bestMatch = match
 			ambiguous = false
 			continue

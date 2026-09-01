@@ -10,6 +10,8 @@ import (
 	common "github.com/Method-Security/webscan/generated/go/common"
 	"github.com/Method-Security/webscan/generated/go/discover"
 
+	// Internal
+	internalcommon "github.com/Method-Security/webscan/internal/common"
 	// Utils
 	utils "github.com/Method-Security/webscan/utils"
 	request "github.com/Method-Security/webscan/utils/request"
@@ -133,27 +135,34 @@ func PerformWebProbe(ctx context.Context, config *discover.DiscoverProbeConfig, 
 	errors := []string{}
 
 	// Single loop to process all targets
-	allResponses := []*common.HttpRequestResponse{}
+	targets := []*discover.DiscoverProbeTargetInfo{}
 	for i, target := range config.Targets {
 		responses, errs := sendRequests(ctx, target, config, browserbaseSecrets)
 		if len(errs) > 0 {
 			errors = append(errors, errs...)
 		}
-		allResponses = append(allResponses, responses...)
+		if len(responses) > 0 {
+			targetInfo := &discover.DiscoverProbeTargetInfo{
+				Target:   target,
+				Attempts: responses,
+			}
+			targetInfo.WafDetection = internalcommon.DetectWafFromResponses(responses)
+			targets = append(targets, targetInfo)
+		}
 
 		if config.Sleep > 0 && i < len(config.Targets)-1 {
 			delay := utils.CalculateDelayWithJitter(config.Sleep, config.Jitter)
 			select {
 			case <-time.After(delay):
 			case <-ctx.Done():
-				result.Targets = allResponses
+				result.Targets = targets
 				report.Errors = errors
 				return report, nil
 			}
 		}
 	}
 
-	result.Targets = allResponses
+	result.Targets = targets
 	report.Errors = errors
 	return report, nil
 }

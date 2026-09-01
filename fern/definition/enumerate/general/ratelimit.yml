@@ -1,7 +1,7 @@
 imports:
   http: ../../common/http.yml
   method: ../../common/method.yml
-  wafdetect: ../../pentest/waf/detect.yml
+  waf: ../../common/waf.yml
 types:
   # Config Struct
   EnumerateRateLimitConfig:
@@ -19,8 +19,8 @@ types:
     properties:
       requestNumber: integer
       request: http.HttpRequestResponse
-      provider: wafdetect.WafProviderEnum
-      fingerprint: optional<wafdetect.WafFingerprint>
+      provider: waf.WafProviderEnum
+      fingerprint: optional<waf.WafFingerprint>
   RateLimitTarget:
     properties:
       target: string

@@ -1,6 +1,7 @@
 imports:
   http: ../common/http.yml
   method: ../common/method.yml
+  waf: ../common/waf.yml
 types:
   # Config Struct
   DiscoverProbeConfig:
@@ -20,9 +21,14 @@ types:
       webServerIpAddress: optional<string>
       webServerPort: optional<integer>
       webServerApplicationProtocol: optional<http.WebProtocol>
+  DiscoverProbeTargetInfo:
+    properties:
+      target: string
+      attempts: list<http.HttpRequestResponse>
+      wafDetection: optional<waf.WafDetection>
   DiscoverProbeResult:
     properties:
-      targets: optional<list<http.HttpRequestResponse>>
+      targets: optional<list<DiscoverProbeTargetInfo>>
   # Report Struct
   DiscoverProbeReport:
     properties:

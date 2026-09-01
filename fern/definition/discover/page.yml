@@ -1,6 +1,7 @@
 imports:
   http: ../common/http.yml
   method: ../common/method.yml
+  waf: ../common/waf.yml
 types:
   # Function Config Struct
   DiscoverPageConfig:
@@ -26,6 +27,7 @@ types:
       screenshot: optional<base64>
       screenshotPerceptualHash: optional<string>
       htmlTitle: optional<string>
+      wafDetection: optional<waf.WafDetection>
   # Report Struct
   DiscoverPageReport:
     properties:

@@ -1,0 +1,35 @@
+imports:
+  http: http.yml
+
+types:
+  WafProviderEnum:
+    enum:
+      - AKAMAI
+      - AWS
+      - AZURE
+      - CLOUDFLARE
+      - F5
+      - GCP
+      - INCAPSULA
+      - ORACLE
+      - SUCURI
+      - UNKNOWN
+  WafBody:
+    properties:
+      pattern: string
+      negativeMatch: boolean
+      needsStatusCodeConfirmation: boolean
+  WafFingerprint:
+    properties:
+      provider: WafProviderEnum
+      headers: optional<list<string>>
+      serverHeaderValues: optional<list<string>>
+      body: optional<list<WafBody>>
+  WafDetection:
+    properties:
+      provider: WafProviderEnum
+      request: http.HttpRequestResponse
+      fingerprint: optional<WafFingerprint>
+      matchedHeaders: optional<list<string>>
+      matchedServerHeaderValues: optional<list<string>>
+      matchedBodyPatterns: optional<list<string>>

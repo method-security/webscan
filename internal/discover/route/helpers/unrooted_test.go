@@ -1,4 +1,4 @@
-package helpers_test
+package discoverroute_test
 
 import (
 	"regexp"

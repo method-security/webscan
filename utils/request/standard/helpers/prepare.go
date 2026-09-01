@@ -26,20 +26,20 @@ func ConstructURL(ctx context.Context, request *common.HttpRequest) (*string, er
 		return nil, err
 	}
 
-	// Path
-	standardizedPath := strings.TrimRight(request.Path, "/")
+	// Sent verbatim: a trailing slash is part of the request, and servers answer /x and /x/ differently.
+	requestPath := request.Path
 	if request.Params.Path != nil {
 		for k, v := range request.Params.Path {
-			standardizedPath = strings.ReplaceAll(standardizedPath, fmt.Sprintf("{%s}", k), url.PathEscape(v))
+			requestPath = strings.ReplaceAll(requestPath, fmt.Sprintf("{%s}", k), url.PathEscape(v))
 		}
 	}
 	parsedURL.RawPath = ""
-	decodedPath, err := url.PathUnescape(standardizedPath)
-	if err == nil && decodedPath != standardizedPath {
+	decodedPath, err := url.PathUnescape(requestPath)
+	if err == nil && decodedPath != requestPath {
 		parsedURL.Path = decodedPath
-		parsedURL.RawPath = standardizedPath
+		parsedURL.RawPath = requestPath
 	} else {
-		parsedURL.Path = standardizedPath
+		parsedURL.Path = requestPath
 	}
 
 	// Query

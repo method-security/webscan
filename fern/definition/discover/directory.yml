@@ -1,6 +1,7 @@
 imports:
   http: ../common/http.yml
   method: ../common/method.yml
+  waf: ../common/waf.yml
 types:
   # Wordlist Enums
   WordlistType:
@@ -13,6 +14,12 @@ types:
       - SMALL
       - MEDIUM
       - LARGE
+  # Common Objects
+  DirectoryFrontier:
+    properties:
+      basePath: string
+      depth: integer
+      discoveredFrom: optional<string>
   # Config Struct
   DiscoverDirectoryConfig:
     properties:
@@ -20,6 +27,10 @@ types:
       paths: optional<list<string>>
       wordlistType: optional<WordlistType>
       wordlistSize: optional<WordlistSize>
+      extensions: optional<list<string>>
+      addSlash: optional<boolean>
+      recursionDepth: optional<integer>
+      recursionStatusCodes: optional<string>
       httpMethods: list<http.HttpMethod>
       responseCodes: string
       enableCommonResponseFilters: boolean
@@ -39,8 +50,10 @@ types:
   DirectoryTargetInfo:
     properties:
       target: string
-      baselineAttempts: list<http.HttpRequestResponse>
-      attempts: list<http.HttpRequestResponse>
+      baselineAttempts: optional<list<http.HttpRequestResponse>>
+      attempts: optional<list<http.HttpRequestResponse>>
+      frontiers: optional<list<DirectoryFrontier>>
+      wafDetection: optional<waf.WafDetection>
   DiscoverDirectoryResult:
     properties:
       targets: optional<list<DirectoryTargetInfo>>

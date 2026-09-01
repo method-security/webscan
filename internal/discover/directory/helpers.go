@@ -296,7 +296,7 @@ func appendDirectoryPath(basePath, childPath string) string {
 }
 
 // gatherPaths gathers all paths from the config
-func gatherPaths(paths []string, wordlistType *discover.WordlistType, wordlistSize *discover.WordlistSize) ([]string, error) {
+func gatherPaths(paths []string, wordlistType *discover.WordlistType, wordlistSize *discover.WordlistSize, extensions []string, addSlash bool) ([]string, error) {
 	var allPaths []string
 
 	// Add manual paths
@@ -313,7 +313,174 @@ func gatherPaths(paths []string, wordlistType *discover.WordlistType, wordlistSi
 		allPaths = append(allPaths, wordlistPaths...)
 	}
 
-	return allPaths, nil
+	return expandPaths(allPaths, extensions, addSlash), nil
+}
+
+// Bare word, plus one variant per extension so a directories wordlist can reach app.js, plus the
+// directory form when addSlash is set. Servers answer /x and /x/ differently and many reveal a
+// directory only through the latter, including dotted ones like .well-known.
+func expandPaths(paths []string, extensions []string, addSlash bool) []string {
+	normalized := normalizeExtensions(extensions)
+	if len(normalized) == 0 && !addSlash {
+		return paths
+	}
+
+	expanded := make([]string, 0, len(paths)*(len(normalized)+2))
+	for _, path := range paths {
+		expanded = append(expanded, path)
+		trimmed := strings.Trim(path, "/")
+		if trimmed == "" {
+			continue
+		}
+		for _, extension := range normalized {
+			expanded = append(expanded, trimmed+extension)
+		}
+		// Only the entry as supplied; the extension variants above are files by construction.
+		if addSlash {
+			expanded = append(expanded, trimmed+"/")
+		}
+	}
+	return expanded
+}
+
+// normalizeExtensions lowercases, de-duplicates and leading-dots the configured extensions.
+func normalizeExtensions(extensions []string) []string {
+	seen := map[string]bool{}
+	normalized := make([]string, 0, len(extensions))
+	for _, extension := range extensions {
+		trimmed := strings.ToLower(strings.TrimSpace(extension))
+		if trimmed == "" || trimmed == "." {
+			continue
+		}
+		if !strings.HasPrefix(trimmed, ".") {
+			trimmed = "." + trimmed
+		}
+		if seen[trimmed] {
+			continue
+		}
+		seen[trimmed] = true
+		normalized = append(normalized, trimmed)
+	}
+	return normalized
+}
+
+func addSlashEnabled(config *discover.DiscoverDirectoryConfig) bool {
+	return config.AddSlash != nil && *config.AddSlash
+}
+
+// recursionDepth returns how many levels below the target may be swept; 0 disables recursion.
+func recursionDepth(config *discover.DiscoverDirectoryConfig) int {
+	if config.RecursionDepth == nil || *config.RecursionDepth < 0 {
+		return 0
+	}
+	return *config.RecursionDepth
+}
+
+// recursionStatusCodes returns the configured frontier-opening codes, or the default set.
+func recursionStatusCodes(config *discover.DiscoverDirectoryConfig) string {
+	if config.RecursionStatusCodes == nil || strings.TrimSpace(*config.RecursionStatusCodes) == "" {
+		return defaultRecursionStatusCodes
+	}
+	return *config.RecursionStatusCodes
+}
+
+// normalizeFrontierPath collapses the trailing-slash variants of one directory to a single key.
+func normalizeFrontierPath(path string) string {
+	trimmed := strings.TrimRight(path, "/")
+	if trimmed == "" {
+		return "/"
+	}
+	return trimmed
+}
+
+func newDirectoryFrontier(current frontier) *discover.DirectoryFrontier {
+	result := &discover.DirectoryFrontier{BasePath: current.basePath, Depth: current.depth}
+	if current.discoveredFrom != "" {
+		result.DiscoveredFrom = &current.discoveredFrom
+	}
+	return result
+}
+
+func statusCodeOf(attempt *common.HttpRequestResponse) int {
+	if attempt == nil || attempt.Response == nil || attempt.Response.StatusCode == nil {
+		return 0
+	}
+	return *attempt.Response.StatusCode
+}
+
+// A 2xx body is the only thing the similarity filters can meaningfully judge; for 401/403 and
+// redirects the status is the signal and the body is boilerplate, often byte-identical across
+// every such path on the host.
+func isSuccessStatus(statusCode int) bool {
+	return statusCode >= 200 && statusCode < 300
+}
+
+// Only 2xx reach here, and surviving the response filters already proved they are not noise.
+func appendFindingCandidates(outcome *frontierOutcome, attempts []*common.HttpRequestResponse, recursionCodes map[int]bool) {
+	for _, attempt := range attempts {
+		if !isSuccessStatus(statusCodeOf(attempt)) {
+			continue
+		}
+		if isRecursionCandidate(attempt, recursionCodes) {
+			outcome.recursionCandidates = append(outcome.recursionCandidates, attempt)
+		}
+	}
+}
+
+// A path already carrying an extension is treated as a file and never descended into.
+func isRecursionCandidate(attempt *common.HttpRequestResponse, recursionCodes map[int]bool) bool {
+	if attempt == nil || attempt.Request == nil || attempt.Response == nil || attempt.Response.StatusCode == nil {
+		return false
+	}
+	if !recursionCodes[*attempt.Response.StatusCode] {
+		return false
+	}
+	return !pathLooksLikeFile(attempt.Request.Path)
+}
+
+// The noise floor only applies to responses the filters never evaluated.
+func isUnfilteredRecursionCandidate(attempt *common.HttpRequestResponse, recursionCodes map[int]bool, noisyStatuses map[int]bool) bool {
+	if !isRecursionCandidate(attempt, recursionCodes) {
+		return false
+	}
+	return !noisyStatuses[*attempt.Response.StatusCode]
+}
+
+// A status is only noise when every directory-shaped calibration probe returned it; one
+// divergent probe must not suppress descent into real directories answering that code.
+func unanimousDirectoryStatuses(attempts []*common.HttpRequestResponse) map[int]bool {
+	counts := map[int]int{}
+	var considered int
+	for _, attempt := range attempts {
+		if attempt == nil || attempt.Request == nil || attempt.Response == nil || attempt.Response.StatusCode == nil {
+			continue
+		}
+		if pathLooksLikeFile(attempt.Request.Path) {
+			continue
+		}
+		considered++
+		counts[*attempt.Response.StatusCode]++
+	}
+
+	unanimous := map[int]bool{}
+	if considered < 2 {
+		return unanimous
+	}
+	for code, count := range counts {
+		if count == considered {
+			unanimous[code] = true
+		}
+	}
+	return unanimous
+}
+
+// pathLooksLikeFile reports whether the last path segment carries a file extension.
+func pathLooksLikeFile(path string) bool {
+	segment := path
+	if index := strings.LastIndex(segment, "/"); index >= 0 {
+		segment = segment[index+1:]
+	}
+	return strings.Contains(segment, ".")
 }
 
 // getWordlistEmbeddedPath returns the embedded config path for a directory wordlist.

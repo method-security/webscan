@@ -225,12 +225,7 @@ func SplitTargetURL(target string) (string, string, map[string]string, error) {
 	baseURL := fmt.Sprintf("%s://%s", parsedURL.Scheme, parsedURL.Host)
 	baseURL = strings.TrimRight(baseURL, "/")
 
-	// Standardize the path
-	// If the path is empty or '/', set it to "", else trim the trailing slash (ie. "/foo/" -> "/foo")
-	path := strings.Trim(parsedURL.Path, "/")
-	if path != "" {
-		path = fmt.Sprintf("/%s", path)
-	}
+	path := NormalizeTargetPath(parsedURL.Path)
 
 	// Parse query parameters
 	var queryParams map[string]string
@@ -450,4 +445,24 @@ func splitHeaderValue(key, value string) []string {
 // This is a compatibility wrapper that converts string to bytes
 func CreateHTTPResponse(statusCode int, redirectChain []string, headers map[string][]string, responseBody string) common.HttpResponse {
 	return CreateHTTPResponseFromBytes(statusCode, redirectChain, headers, []byte(responseBody))
+}
+
+// NormalizeTargetPath collapses the authority root to "" per RFC 3986 6.2.3 and leaves every
+// other path alone. A trailing slash on a non-empty path is part of the request, not noise.
+func NormalizeTargetPath(path string) string {
+	if strings.Trim(path, "/") == "" {
+		return ""
+	}
+	return "/" + strings.TrimLeft(path, "/")
+}
+
+// JoinPath joins a base path and a child path with exactly one separator, preserving the
+// child's trailing slash.
+func JoinPath(basePath, childPath string) string {
+	base := strings.TrimRight(basePath, "/")
+	child := strings.TrimLeft(childPath, "/")
+	if child == "" {
+		return base + "/"
+	}
+	return base + "/" + child
 }

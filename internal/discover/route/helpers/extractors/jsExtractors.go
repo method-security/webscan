@@ -152,15 +152,6 @@ type sourceMap struct {
 // allCapsVarPattern matches ALL_CAPS variable names (at least two chars).
 var allCapsVarPattern = regexp.MustCompile(`^[A-Z][A-Z0-9_]+$`)
 
-// numericSegmentPattern matches purely numeric path segments.
-var numericSegmentPattern = regexp.MustCompile(`^\d+$`)
-
-// uuidSegmentPattern matches UUID-like segments (8-4-4-4-12 hex).
-var uuidSegmentPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
-
-// longHexSegmentPattern matches long hex strings (16+ hex chars) that are not UUIDs.
-var longHexSegmentPattern = regexp.MustCompile(`^[0-9a-fA-F]{16,}$`)
-
 // unresolvedJSTemplateExpressionPattern matches JavaScript template placeholders
 // that were captured as literal text instead of being resolved by the parser.
 var unresolvedJSTemplateExpressionPattern = regexp.MustCompile(`\$\{[^}]*\}`)
@@ -182,38 +173,334 @@ func parseRouteMethod(method string) (common.HttpMethod, bool) {
 	return parsedMethod, true
 }
 
-// normalizePathTemplate replaces dynamic path segments with placeholder tokens.
-// - Numeric segments become <id>
-// - UUID segments become <uuid>
-// - Long hex strings (16+ chars) become <hash>
-func normalizePathTemplate(path string) string {
-	if path == "" || path == "/" {
-		return path
-	}
-	segments := strings.Split(path, "/")
-	for i, seg := range segments {
-		if uuidSegmentPattern.MatchString(seg) {
-			segments[i] = "<uuid>"
-		} else if longHexSegmentPattern.MatchString(seg) {
-			segments[i] = "<hash>"
-		} else if numericSegmentPattern.MatchString(seg) {
-			segments[i] = "<id>"
-		}
-	}
-	return strings.Join(segments, "/")
+// routeTablePatterns match the application's own route table, not URLs a caller requested.
+var routeTablePatterns = []struct {
+	pattern   *regexp.Regexp
+	pathGroup int
+	// methodGroup is 0 when the pattern declares no verb and GET is assumed.
+	methodGroup int
+	// declaresLiterals marks patterns unambiguous enough that a parameterless match is still a route.
+	declaresLiterals bool
+}{
+	// React Router, Vue Router and Angular route config objects.
+	{regexp.MustCompile(`\bpath\s*:\s*['"]([^'"]+)['"]`), 1, 0, false},
+	// JSX route elements that survived compilation: <Route path="/documents/:id"
+	{regexp.MustCompile(`<Route[^>]*?\spath\s*=\s*['"]([^'"]+)['"]`), 1, 0, true},
+	// Receiver must look like a router: bare `.delete(` also matches the Cache API.
+	{regexp.MustCompile(`(?:^|[^\w$])[\w$]*(?:[Rr]outer|[Aa]pp|[Ss]erver|[Aa]pi)\.(get|post|put|patch|delete)\(\s*['"](/[^'"]*)['"]`), 2, 1, false},
+	// Next.js build manifest entries; a bracketed non-parameter is a regex, not a route.
+	{regexp.MustCompile(`['"](/[^'"]*\[[^'"\]]+\][^'"]*)['"]`), 1, 0, false},
 }
 
-// hasTemplateSegments returns true if any segment in the path is dynamic (numeric/uuid/hex).
-func hasTemplateSegments(path string) bool {
-	if path == "" {
-		return false
+// A declared route is relative to the application, so only the bundle's origin is kept.
+func ExtractDeclaredRouteTemplates(content string, sourceURL string) []*discover.RouteDetails {
+	origin, _, err := discoverroutehelpers.SplitURLBaseAndPath(sourceURL)
+	if err != nil || origin == "" {
+		return nil
 	}
-	for _, seg := range strings.Split(path, "/") {
-		if uuidSegmentPattern.MatchString(seg) || longHexSegmentPattern.MatchString(seg) || numericSegmentPattern.MatchString(seg) {
-			return true
+
+	type routeIdentity struct {
+		method   common.HttpMethod
+		template string
+	}
+	seen := map[routeIdentity]struct{}{}
+	var routes []*discover.RouteDetails
+
+	for _, routePattern := range routeTablePatterns {
+		for _, match := range routePattern.pattern.FindAllStringSubmatch(content, -1) {
+			declared := match[routePattern.pathGroup]
+			if !strings.HasPrefix(declared, "/") || strings.Contains(declared, " ") {
+				continue
+			}
+			template, params, ok := discoverroutehelpers.NormalizeDeclaredTemplate(declared)
+			if !ok {
+				// A parameterized-looking path is never a fetchable literal.
+				if !routePattern.declaresLiterals || discoverroutehelpers.HasDeclaredParamSyntax(declared) {
+					continue
+				}
+			}
+
+			method := common.HttpMethodGet
+			if routePattern.methodGroup > 0 {
+				parsed, valid := parseRouteMethod(match[routePattern.methodGroup])
+				if !valid {
+					continue
+				}
+				method = parsed
+			}
+
+			identity := routeIdentity{method: method, template: template}
+			if _, exists := seen[identity]; exists {
+				continue
+			}
+			seen[identity] = struct{}{}
+
+			evidence := discoverroutehelpers.DeclaredRouteEvidence
+			route := &discover.RouteDetails{
+				BaseUrl:  origin,
+				Path:     template,
+				Method:   method,
+				Evidence: &evidence,
+			}
+			if ok {
+				templateValue := template
+				route.PathParams = params
+				route.PathTemplate = &templateValue
+			}
+			routes = append(routes, route)
 		}
 	}
-	return false
+
+	return routes
+}
+
+var templateLiteralPattern = regexp.MustCompile("`([^`\\\\]{0,300}?\\$\\{[^`]{0,300}?)`")
+
+// A leading interpolation is the API base URL, not a path parameter.
+var leadingInterpolationPattern = regexp.MustCompile(`^\$\{[^}]*\}`)
+
+var interpolationPattern = regexp.MustCompile(`\$\{([^}]*)\}`)
+
+// enclosingVerbCallPattern matches the HTTP verb of the call the literal sits directly inside.
+var enclosingVerbCallPattern = regexp.MustCompile(`\.(get|post|put|patch|delete|head|options)\s*(?:<[^<>()]*>)?\s*\(\s*$`)
+
+// fetchOptionsMethodPattern matches the method of a fetch-style options object following the URL.
+var fetchOptionsMethodPattern = regexp.MustCompile(`^\s*,\s*\{[^{}]{0,200}?method\s*:\s*['"]([A-Za-z]+)['"]`)
+
+// identifierPattern matches a bare JavaScript identifier.
+var identifierPattern = regexp.MustCompile(`^[A-Za-z_$][\w$]*$`)
+
+// protocolRelativePrefixPattern matches the host of a protocol-relative URL.
+var protocolRelativePrefixPattern = regexp.MustCompile(`^//[^/]*`)
+
+// absoluteURLPrefixPattern matches the scheme and host of an absolute URL.
+var absoluteURLPrefixPattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9+.-]*://[^/]*`)
+
+// enclosingVerbLookback bounds how far the verb of the enclosing call may sit from the literal.
+const enclosingVerbLookback = 120
+
+// An interpolation in a URL position is evidence a parameter exists there.
+func ExtractInterpolatedRouteTemplates(content string, sourceURL string) []*discover.RouteDetails {
+	origin, _, err := discoverroutehelpers.SplitURLBaseAndPath(sourceURL)
+	if err != nil || origin == "" {
+		return nil
+	}
+
+	type routeIdentity struct {
+		method   common.HttpMethod
+		template string
+		base     string
+	}
+	seen := map[routeIdentity]struct{}{}
+	var routes []*discover.RouteDetails
+
+	for _, location := range templateLiteralPattern.FindAllStringSubmatchIndex(content, -1) {
+		literal := content[location[2]:location[3]]
+
+		method, methodOK := enclosingRequestMethod(content, location[0], location[1])
+		if !methodOK {
+			continue
+		}
+
+		prefix, prefixOK := resolveInterpolatedBasePrefix(content, literal)
+
+		template, params, ok := interpolatedTemplateFrom(literal, prefixOK)
+		if !ok {
+			continue
+		}
+
+		evidence := discoverroutehelpers.InterpolatedRouteEvidence
+		if prefixOK {
+			template = prefix + template
+			template, params = discoverroutehelpers.RenumberPositionalParams(template, params)
+			// Without a fixed segment the template matches every path of that length.
+			if !discoverroutehelpers.HasLiteralSegment(strings.Split(template, "/")) {
+				continue
+			}
+		} else {
+			// The base may hold a path, so leave rooting to corroboration against observed routes.
+			evidence = discoverroutehelpers.UnrootedEvidenceFor(interpolatedBaseName(literal))
+		}
+
+		// Two bases can share a tail; keeping both lets either one corroborate.
+		identity := routeIdentity{method: method, template: template, base: evidence}
+		if _, exists := seen[identity]; exists {
+			continue
+		}
+		seen[identity] = struct{}{}
+
+		templateValue := template
+		routes = append(routes, &discover.RouteDetails{
+			BaseUrl:      origin,
+			Path:         template,
+			Method:       method,
+			PathParams:   params,
+			PathTemplate: &templateValue,
+			Evidence:     &evidence,
+		})
+	}
+
+	return routes
+}
+
+// enclosingRequestMethod reads the verb of the call the literal sits in; a default would mislabel
+// every POST, PUT and DELETE as a GET.
+func enclosingRequestMethod(content string, literalStart int, literalEnd int) (common.HttpMethod, bool) {
+	windowStart := literalStart - enclosingVerbLookback
+	if windowStart < 0 {
+		windowStart = 0
+	}
+	if match := enclosingVerbCallPattern.FindStringSubmatch(content[windowStart:literalStart]); match != nil {
+		return parseRouteMethod(match[1])
+	}
+
+	windowEnd := literalEnd + enclosingVerbLookback
+	if windowEnd > len(content) {
+		windowEnd = len(content)
+	}
+	if match := fetchOptionsMethodPattern.FindStringSubmatch(content[literalEnd:windowEnd]); match != nil {
+		return parseRouteMethod(match[1])
+	}
+
+	if navigationSinkPattern.MatchString(content[windowStart:literalStart]) {
+		return common.HttpMethodGet, true
+	}
+	if assigned := assignedVariablePattern.FindStringSubmatch(content[windowStart:literalStart]); assigned != nil {
+		if navigationSinkArgumentPattern(assigned[1]).MatchString(content[literalEnd:windowEnd]) {
+			return common.HttpMethodGet, true
+		}
+	}
+	return "", false
+}
+
+// navigationSinkPattern matches a browser navigation taking the literal directly; navigation is a
+// GET by definition rather than an inferred default.
+var navigationSinkPattern = regexp.MustCompile(`(?:window\.open|location\.(?:href|assign|replace))\s*(?:=\s*|\(\s*)$`)
+
+// assignedVariablePattern captures the variable a literal is assigned to.
+var assignedVariablePattern = regexp.MustCompile(`(?:^|[^\w$])([A-Za-z_$][\w$]*)\s*=\s*$`)
+
+// navigationSinkArgumentPattern matches that variable later reaching a navigation sink.
+func navigationSinkArgumentPattern(name string) *regexp.Regexp {
+	return regexp.MustCompile(
+		`(?:window\.open|location\.(?:href|assign|replace))\s*(?:=\s*|\(\s*)` + regexp.QuoteMeta(name) + `\b`,
+	)
+}
+
+// interpolatedBaseName returns the identifier of the leading interpolation, used to share a
+// corroborated prefix between candidates built from the same base.
+func interpolatedBaseName(literal string) string {
+	leading := leadingInterpolationPattern.FindString(literal)
+	if leading == "" {
+		return ""
+	}
+	expression := strings.TrimSuffix(strings.TrimPrefix(leading, "${"), "}")
+	parts := strings.Split(strings.TrimSpace(expression), ".")
+	name := parts[len(parts)-1]
+	if !identifierPattern.MatchString(name) {
+		return ""
+	}
+	return name
+}
+
+// resolveInterpolatedBasePrefix returns the path an interpolated base contributes. An API base is
+// routinely a variable holding `${host}/api/v2`, so treating it as origin-only drops the prefix and
+// reports an endpoint that does not exist.
+func resolveInterpolatedBasePrefix(content string, literal string) (string, bool) {
+	leading := leadingInterpolationPattern.FindString(literal)
+	if leading == "" {
+		return "", true
+	}
+
+	expression := strings.TrimSuffix(strings.TrimPrefix(leading, "${"), "}")
+	parts := strings.Split(strings.TrimSpace(expression), ".")
+	name := parts[len(parts)-1]
+	if !identifierPattern.MatchString(name) {
+		return "", false
+	}
+
+	assignments := regexp.MustCompile(
+		`(?:^|[^\w$.])`+regexp.QuoteMeta(name)+`\s*[:=]\s*`+"[`\"']([^`\"']*)[`\"']",
+	).FindAllStringSubmatch(content, -1)
+	distinct := map[string]struct{}{}
+	for _, assignment := range assignments {
+		distinct[assignment[1]] = struct{}{}
+	}
+	// Minified bundles reuse short names, so conflicting assignments mean the base is unknown.
+	if len(distinct) != 1 {
+		return "", false
+	}
+
+	value := assignments[0][1]
+	value = leadingInterpolationPattern.ReplaceAllString(value, "")
+	value = absoluteURLPrefixPattern.ReplaceAllString(value, "")
+	value = protocolRelativePrefixPattern.ReplaceAllString(value, "")
+	value = strings.TrimSuffix(value, "/")
+	if value == "" {
+		return "", true
+	}
+	// A residual interpolation means part of the prefix is still unknown.
+	if strings.Contains(value, "${") || !strings.HasPrefix(value, "/") {
+		return "", false
+	}
+	return value, true
+}
+
+// interpolatedTemplateFrom converts a template literal into a `{name}` path template.
+func interpolatedTemplateFrom(literal string, prefixKnown bool) (string, []*discover.RoutePathParam, bool) {
+	path := leadingInterpolationPattern.ReplaceAllString(literal, "")
+	path = strings.SplitN(path, "?", 2)[0]
+	path = strings.SplitN(path, "#", 2)[0]
+
+	// A protocol-relative URL interpolates a host, not a path parameter.
+	if !strings.HasPrefix(path, "/") || strings.HasPrefix(path, "//") {
+		return "", nil, false
+	}
+	if !strings.Contains(path, "${") {
+		return "", nil, false
+	}
+
+	segments := strings.Split(path, "/")
+	taken := map[string]struct{}{}
+	var params []*discover.RoutePathParam
+
+	for i, segment := range segments {
+		if !strings.Contains(segment, "${") {
+			continue
+		}
+		rewritten := segment
+		for {
+			location := interpolationPattern.FindStringSubmatchIndex(rewritten)
+			if location == nil {
+				break
+			}
+			expression := rewritten[location[2]:location[3]]
+			name := discoverroutehelpers.UniqueParamName(
+				discoverroutehelpers.InterpolatedParamName(expression, rewritten[:location[0]], i),
+				taken,
+			)
+			taken[name] = struct{}{}
+			params = append(params, &discover.RoutePathParam{Name: name})
+			rewritten = rewritten[:location[0]] + "{" + name + "}" + rewritten[location[1]:]
+		}
+		segments[i] = rewritten
+	}
+
+	if len(params) == 0 {
+		return "", nil, false
+	}
+
+	// A leading placeholder is only unusable while the base it followed is still unknown.
+	if !prefixKnown && len(segments) > 1 && strings.HasPrefix(segments[1], "{") {
+		return "", nil, false
+	}
+
+	template := strings.Join(segments, "/")
+	// Validate after substitution so `${encodeURIComponent(id)}` is not mistaken for prose.
+	if strings.ContainsAny(template, "<> ") {
+		return "", nil, false
+	}
+	return template, params, true
 }
 
 // Common API call patterns in JavaScript
@@ -330,12 +617,6 @@ func extractRoutesFromPatterns(content string, baseURL string, routeCaptureConfi
 				Method:  routeMethod,
 			}
 
-			// Apply path templating if the path has dynamic segments
-			if hasTemplateSegments(routePath) {
-				tmpl := normalizePathTemplate(routePath)
-				route.PathTemplate = &tmpl
-			}
-
 			routes = append(routes, route)
 			urls[fullURL] = struct{}{}
 		}
@@ -406,6 +687,10 @@ func extractScriptContentRoutes(ctx context.Context, scriptContent string, baseU
 			svc1log.SafeParam("reason", reason))
 		return routes, discoverroutehelpers.SetToListString(urls), errors
 	}
+
+	// Independent of whether the bundle parses, so collect these first.
+	routes = append(routes, ExtractDeclaredRouteTemplates(scriptContent, baseURL)...)
+	routes = append(routes, ExtractInterpolatedRouteTemplates(scriptContent, baseURL)...)
 
 	// First try to parse the JavaScript code into an AST
 	program, err := parser.ParseFile(nil, "", scriptContent, parser.IgnoreRegExpErrors)
@@ -560,13 +845,11 @@ func (v *visitor) handleVariableStatement(node *ast.VariableStatement) {
 					routeBaseURL, routePath, err := discoverroutehelpers.SplitURLBaseAndPath(urlNoQuery)
 					if err == nil {
 						evidence := "CONST:" + varName
-						tmpl := normalizePathTemplate(routePath)
 						route := &discover.RouteDetails{
-							BaseUrl:      routeBaseURL,
-							Path:         routePath,
-							Method:       common.HttpMethodGet,
-							Evidence:     &evidence,
-							PathTemplate: &tmpl,
+							BaseUrl:  routeBaseURL,
+							Path:     routePath,
+							Method:   common.HttpMethodGet,
+							Evidence: &evidence,
 						}
 						*v.routes = append(*v.routes, route)
 						v.urls[fullURL] = struct{}{}
@@ -684,12 +967,6 @@ func (v *visitor) addRoute(urlStr, method string, bodyParams []*discover.RouteBo
 		QueryParams: queryParams,
 	}
 
-	// Apply path templating if the path has dynamic segments
-	if hasTemplateSegments(routePath) {
-		tmpl := normalizePathTemplate(routePath)
-		route.PathTemplate = &tmpl
-	}
-
 	*v.routes = append(*v.routes, route)
 	v.urls[urlStr] = struct{}{}
 }
@@ -746,15 +1023,15 @@ func fetchSourceMapRoutes(ctx context.Context, sourceMapURL string, baseURL stri
 		contentRoutes, contentUrls, contentErrors := extractScriptContentRoutes(ctx, content, baseURL, routeCaptureConfig)
 		// Tag each extracted route with source map evidence
 		for _, route := range contentRoutes {
-			if sourceName != "" {
-				evidence := "sourcemap:" + sourceName
-				route.Evidence = &evidence
+			if sourceName == "" {
+				continue
 			}
-			// Apply path templating
-			if route.PathTemplate == nil && hasTemplateSegments(route.Path) {
-				tmpl := normalizePathTemplate(route.Path)
-				route.PathTemplate = &tmpl
+			// Derivation provenance outranks source-map provenance; do not overwrite it.
+			if route.Evidence != nil && discoverroutehelpers.IsProvenanceEvidence(*route.Evidence) {
+				continue
 			}
+			evidence := "sourcemap:" + sourceName
+			route.Evidence = &evidence
 		}
 		routes = append(routes, contentRoutes...)
 		urls = append(urls, contentUrls...)

@@ -206,6 +206,38 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 			wordlistSize = strings.ToUpper(wordlistSize)
 
+			// Extensions flag
+			extensions, err := cmd.Flags().GetStringSlice("extensions")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Add Slash flag
+			addSlash, err := cmd.Flags().GetBool("add-slash")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Recursion Depth flag
+			recursionDepth, err := cmd.Flags().GetInt("recursion-depth")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			if recursionDepth < 0 {
+				a.OutputSignal.AddError(fmt.Errorf("recursion-depth must be zero or greater"))
+				return
+			}
+
+			// Recursion Status Codes flag
+			recursionStatusCodes, err := cmd.Flags().GetString("recursion-status-codes")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
 			// Validation: at least one input method must be specified
 			if len(paths) == 0 && wordlistType == "" {
 				a.OutputSignal.AddError(fmt.Errorf("at least one of flags 'paths' or 'wordlist-type' must be provided"))
@@ -316,7 +348,7 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Set config
-			config := getDiscoverDirectoryConfig(targets, paths, wordlistType, wordlistSize, httpMethods, responseCodes, enableCommonResponseFilters, verifyTLS, threshold, timeout, globalRateLimit, ignoreCrossDomainRedirects, maxRedirectsBaselineRequest, threads, globalTimeout, retries, sleep, jitter, userAgentPreset)
+			config := getDiscoverDirectoryConfig(targets, paths, wordlistType, wordlistSize, extensions, addSlash, recursionDepth, recursionStatusCodes, httpMethods, responseCodes, enableCommonResponseFilters, verifyTLS, threshold, timeout, globalRateLimit, ignoreCrossDomainRedirects, maxRedirectsBaselineRequest, threads, globalTimeout, retries, sleep, jitter, userAgentPreset)
 
 			// Generate a report
 			rep, err := discoverdirectory.RunDirectoryDiscovery(cmd.Context(), config)
@@ -333,6 +365,10 @@ func (a *WebScan) InitDiscoverCommand() {
 	discoverDirectoryCmd.Flags().StringSlice("paths", []string{}, "Paths to scan")
 	discoverDirectoryCmd.Flags().String("wordlist-type", "", "Type of wordlist to use automatically (DIRECTORIES, FILES)")
 	discoverDirectoryCmd.Flags().String("wordlist-size", "", "Size of wordlist to use (TINY, SMALL, MEDIUM, LARGE)")
+	discoverDirectoryCmd.Flags().StringSlice("extensions", []string{}, "Extensions to append to each wordlist entry (e.g. js,map); the bare entry is always probed too")
+	discoverDirectoryCmd.Flags().Bool("add-slash", false, "Also probe the trailing-slash form of each wordlist entry; many servers reveal a directory only through it")
+	discoverDirectoryCmd.Flags().Int("recursion-depth", 0, "Levels below the target to sweep; 0 disables recursion")
+	discoverDirectoryCmd.Flags().String("recursion-status-codes", "", "Response codes that mark a finding as a directory to descend into (default 200,301,302,307,308,401,403)")
 	discoverDirectoryCmd.Flags().StringSlice("http-methods", []string{"GET"}, "HTTP methods to use (e.g. GET,POST,PUT)")
 	// Config Flags
 	discoverDirectoryCmd.Flags().String("response-codes", "200-299", "Response codes to consider as valid responses")
@@ -1743,10 +1779,13 @@ func getDiscoverSaasConfig(orgs []string, saasCompanies []string, ssoCompanies [
 }
 
 // getDiscoverDirectoryConfig builds the config for directory discovery.
-func getDiscoverDirectoryConfig(targets []string, paths []string, wordlistType string, wordlistSize string, httpMethods []common.HttpMethod, responseCodes string, enableCommonResponseFilters bool, verifyTLS bool, threshold float64, timeout int, globalRateLimit int, ignoreCrossDomainRedirects bool, maxRedirectsBaselineRequest int, threads int, globalTimeout int, retries int, sleep int, jitter int, userAgent common.UserAgentPreset) discover.DiscoverDirectoryConfig {
+func getDiscoverDirectoryConfig(targets []string, paths []string, wordlistType string, wordlistSize string, extensions []string, addSlash bool, recursionDepth int, recursionStatusCodes string, httpMethods []common.HttpMethod, responseCodes string, enableCommonResponseFilters bool, verifyTLS bool, threshold float64, timeout int, globalRateLimit int, ignoreCrossDomainRedirects bool, maxRedirectsBaselineRequest int, threads int, globalTimeout int, retries int, sleep int, jitter int, userAgent common.UserAgentPreset) discover.DiscoverDirectoryConfig {
 	config := discover.DiscoverDirectoryConfig{
 		Targets:                     targets,
 		Paths:                       paths,
+		Extensions:                  extensions,
+		AddSlash:                    &addSlash,
+		RecursionDepth:              &recursionDepth,
 		HttpMethods:                 httpMethods,
 		ResponseCodes:               responseCodes,
 		EnableCommonResponseFilters: enableCommonResponseFilters,
@@ -1782,6 +1821,10 @@ func getDiscoverDirectoryConfig(targets []string, paths []string, wordlistType s
 		} else {
 			config.WordlistSize = &wordlistSizeEnum
 		}
+	}
+
+	if recursionStatusCodes != "" {
+		config.RecursionStatusCodes = &recursionStatusCodes
 	}
 
 	return config

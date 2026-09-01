@@ -588,6 +588,10 @@ func PerformRouteCapture(ctx context.Context, config discover.DiscoverRouteConfi
 					if route == nil {
 						continue
 					}
+					// A template is not fetchable: requesting it would send `{id}` to the server.
+					if discoverroutehelpers.IsTemplatedPath(route.Path) {
+						continue
+					}
 					// Visit the base route (without parameters)
 					baseRouteURL := route.BaseUrl + route.Path
 					baseRouteURLIdentity := discoverroutehelpers.NormalizeURLForIdentity(baseRouteURL)
@@ -632,7 +636,10 @@ func PerformRouteCapture(ctx context.Context, config discover.DiscoverRouteConfi
 		currentDepth++
 	}
 
-	mergedRoutes := discoverroutehelpers.MergeWebRoutes(allRoutes)
+	// Root candidates before merging so an unrooted path never merges with a real one.
+	rootedRoutes := discoverroutehelpers.ResolveUnrootedInterpolatedRoutes(allRoutes)
+	mergedRoutes := discoverroutehelpers.MergeWebRoutes(rootedRoutes)
+	mergedRoutes = discoverroutehelpers.ApplyDeclaredRouteTemplates(mergedRoutes)
 	sortRoutes(mergedRoutes)
 	report.Result.WebApplications = buildWebApplications(mergedRoutes, allStaticAssetsByBaseURL)
 	report.Errors = append(report.Errors, errors...)

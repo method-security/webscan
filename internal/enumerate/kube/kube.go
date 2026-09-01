@@ -3,7 +3,6 @@ package kube
 import (
 	// Standard
 	"context"
-	"fmt"
 	"time"
 
 	// Generated
@@ -72,7 +71,7 @@ func PerformAppEnumerateKube(ctx context.Context, config *enumeratekubefern.Enum
 	requests := []*common.HttpRequestResponse{}
 	for i, path := range commonKubepaths {
 		// Create Request Config
-		requestConfig := createSendHTTPRequestConfig(baseURL, fmt.Sprintf("%s%s", parsedTargetPath, path), config.VerifyTls, config.Timeout, config.UserAgent)
+		requestConfig := createSendHTTPRequestConfig(baseURL, requesthelpers.JoinPath(parsedTargetPath, path), config.VerifyTls, config.Timeout, config.UserAgent)
 
 		// Send Request
 		request, err := request.SendRequest(ctx, requestConfig)

@@ -30,15 +30,16 @@ func SendRequest(ctx context.Context, config common.SendHttpRequestConfig) (*com
 	// Get the logger from the context
 	log := svc1log.FromContext(ctx)
 
+	var httpRequestResponse common.HttpRequestResponse
 	switch config.RequestMethod {
 	// Standard capture
 	case common.RequestMethodStandard:
 		log.Debug("Sending standard request")
-		httpRequestResponse, err := standard.SendStandardRequest(requestCtx, config)
+		response, err := standard.SendStandardRequest(requestCtx, config)
 		if err != nil {
 			return nil, fmt.Errorf("standard capture failed: %w", err)
 		}
-		return &httpRequestResponse, nil
+		httpRequestResponse = response
 
 	// Headless capture
 	case common.RequestMethodHeadless:
@@ -52,11 +53,11 @@ func SendRequest(ctx context.Context, config common.SendHttpRequestConfig) (*com
 			headlessRequester = headless.NewRequester(config.Timeout, config.HeadlessConfig)
 		}
 		headlessRequester.SetProxyConfigFromRequest(config)
-		httpRequestResponse, err := headlessRequester.SendRequest(requestCtx, config)
+		response, err := headlessRequester.SendRequest(requestCtx, config)
 		if err != nil {
 			return nil, fmt.Errorf("browser capture failed: %w", err)
 		}
-		return &httpRequestResponse, nil
+		httpRequestResponse = response
 
 	// Browserbase capture
 	case common.RequestMethodBrowserbase:
@@ -74,14 +75,16 @@ func SendRequest(ctx context.Context, config common.SendHttpRequestConfig) (*com
 				log.Warn("Failed to close browserbase session", svc1log.SafeParam("error", closeErr.Error()))
 			}
 		}()
-		httpRequestResponse, err := browserbase.SendRequest(requestCtx, config)
+		response, err := browserbase.SendRequest(requestCtx, config)
 		if err != nil {
 			return nil, fmt.Errorf("browserbase capture failed: %w", err)
 		}
-		return &httpRequestResponse, nil
+		httpRequestResponse = response
 
 	// Unsupported request method
 	default:
 		return nil, fmt.Errorf("invalid request method: %s", config.RequestMethod)
 	}
+
+	return &httpRequestResponse, nil
 }

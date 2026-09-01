@@ -13,6 +13,8 @@ import (
 	common "github.com/Method-Security/webscan/generated/go/common"
 	discover "github.com/Method-Security/webscan/generated/go/discover"
 
+	// Internal
+	internalcommon "github.com/Method-Security/webscan/internal/common"
 	// Utils
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
 	standardhelpers "github.com/Method-Security/webscan/utils/request/standard/helpers"
@@ -270,6 +272,7 @@ func PerformRequest(ctx context.Context, config discover.DiscoverRequestConfig) 
 		Response: &httpResponse,
 	}
 	result.Request = httpRequestResponse
+	result.WafDetection = internalcommon.DetectWaf(httpRequestResponse)
 
 	report.Errors = errors
 	return &report

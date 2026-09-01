@@ -21,6 +21,9 @@ func main() {
 	if err := webscan.RootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
+	if webscan.OutputSignal.Status != 0 {
+		os.Exit(1)
+	}
 
 	os.Exit(0)
 }

@@ -12,7 +12,9 @@ import (
 	"github.com/Method-Security/webscan/utils"
 
 	// Internal
+	internalcommon "github.com/Method-Security/webscan/internal/common"
 	discoverpagehelpers "github.com/Method-Security/webscan/internal/discover/page/helpers"
+
 	//Utils
 	headless "github.com/Method-Security/webscan/utils/request/headless"
 	browserbase "github.com/Method-Security/webscan/utils/request/headless/browserbase"
@@ -176,6 +178,7 @@ func PerformPageCapture(
 			}
 		}
 	}
+	result.WafDetection = internalcommon.DetectWaf(httpRequestResponse)
 
 	// Check if response code is in the allowed list
 	log.Info("Checking response code", svc1log.SafeParam("target", config.Target))
@@ -192,6 +195,7 @@ func PerformPageCapture(
 			log.Info("Page returned a response code not in the allowed list, skipping",
 				svc1log.SafeParam("target", config.Target),
 				svc1log.SafeParam("status_code", *httpRequestResponse.Response.StatusCode))
+			result.HtmlTitle = nil
 			errors = append(errors, fmt.Sprintf("page %s returned status code %d which is not in the allowed response codes", config.Target, *httpRequestResponse.Response.StatusCode))
 		} else {
 			result.Request = httpRequestResponse

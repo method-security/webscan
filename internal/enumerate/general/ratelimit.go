@@ -13,10 +13,9 @@ import (
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
 	enumerategeneralfern "github.com/Method-Security/webscan/generated/go/enumerate/general"
-	waf "github.com/Method-Security/webscan/generated/go/pentest/waf"
 
 	// Internal
-	pentestwafdetect "github.com/Method-Security/webscan/internal/pentest/waf/detect"
+	commonwaf "github.com/Method-Security/webscan/internal/common"
 	// Utils
 	utils "github.com/Method-Security/webscan/utils"
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
@@ -27,7 +26,7 @@ import (
 )
 
 // getWafFingerprint is a helper function that extracts WAF fingerprints from HTTP response data
-func getWafFingerprint(httpResponse *common.HttpResponse) *waf.WafFingerprint {
+func getWafFingerprint(httpResponse *common.HttpResponse) *common.WafFingerprint {
 	if httpResponse == nil {
 		return nil
 	}
@@ -51,7 +50,7 @@ func getWafFingerprint(httpResponse *common.HttpResponse) *waf.WafFingerprint {
 	}
 
 	// Get WAF fingerprint
-	wafFingerprint := pentestwafdetect.FingerprintApplicationFirewall(responseBody, responseHeaders, httpResponse.StatusCode)
+	wafFingerprint := commonwaf.FingerprintApplicationFirewall(responseBody, responseHeaders, httpResponse.StatusCode)
 
 	return wafFingerprint
 }
@@ -164,11 +163,11 @@ requestLoop:
 				// Get WAF fingerprint using helper function
 				wafFingerprint := getWafFingerprint(httpRequestResponse.Response)
 
-				var provider waf.WafProviderEnum
+				var provider common.WafProviderEnum
 				if wafFingerprint != nil {
 					provider = wafFingerprint.Provider
 				} else {
-					provider = waf.WafProviderEnumUnknown
+					provider = common.WafProviderEnumUnknown
 				}
 
 				requestResults <- &enumerategeneralfern.RateLimitAttempt{

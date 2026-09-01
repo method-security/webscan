@@ -1,4 +1,4 @@
-package extractors_test
+package discoverroute_test
 
 import (
 	"strings"

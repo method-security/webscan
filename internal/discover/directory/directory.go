@@ -13,6 +13,8 @@ import (
 	common "github.com/Method-Security/webscan/generated/go/common"
 	discover "github.com/Method-Security/webscan/generated/go/discover"
 
+	// Internal
+	internalcommon "github.com/Method-Security/webscan/internal/common"
 	// Utils
 	utils "github.com/Method-Security/webscan/utils"
 	request "github.com/Method-Security/webscan/utils/request"
@@ -123,13 +125,14 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 		queue := []frontier{{basePath: parsedTargetPath, depth: 0}}
 		// Keyed on base path so a directory reachable from two parents is only swept once.
 		queued := map[string]bool{normalizeFrontierPath(parsedTargetPath): true}
+		wafAccumulator := internalcommon.WafDetectionAccumulator{}
 		var timedOutPhase string
 
 		for len(queue) > 0 {
 			current := queue[0]
 			queue = queue[1:]
 
-			outcome := sweepFrontier(ctx, baseURL, current, allPaths, validCodes, recursionCodes, &config, limiter)
+			outcome := sweepFrontier(ctx, baseURL, current, allPaths, validCodes, recursionCodes, &config, limiter, &wafAccumulator)
 			targetInfo.BaselineAttempts = append(targetInfo.BaselineAttempts, outcome.baselineAttempts...)
 			targetInfo.Attempts = append(targetInfo.Attempts, outcome.attempts...)
 			targetInfo.Frontiers = append(targetInfo.Frontiers, newDirectoryFrontier(current))
@@ -170,7 +173,8 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 			}
 		}
 
-		if len(targetInfo.Attempts) > 0 {
+		targetInfo.WafDetection = wafAccumulator.Detection()
+		if len(targetInfo.Attempts) > 0 || targetInfo.WafDetection != nil {
 			targets = append(targets, &targetInfo)
 		}
 
@@ -191,7 +195,7 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 }
 
 // Baseline and calibration re-run per frontier: a subdirectory's 403 profile is not the root's 404 profile.
-func sweepFrontier(ctx context.Context, baseURL string, current frontier, allPaths []string, validCodes map[int]bool, recursionCodes map[int]bool, config *discover.DiscoverDirectoryConfig, limiter *rate.Limiter) frontierOutcome {
+func sweepFrontier(ctx context.Context, baseURL string, current frontier, allPaths []string, validCodes map[int]bool, recursionCodes map[int]bool, config *discover.DiscoverDirectoryConfig, limiter *rate.Limiter, wafAccumulator *internalcommon.WafDetectionAccumulator) frontierOutcome {
 	log := svc1log.FromContext(ctx)
 	outcome := frontierOutcome{metrics: directoryScanMetrics{disallowedStatusCounts: map[int]int{}}}
 
@@ -346,6 +350,8 @@ func sweepFrontier(ctx context.Context, baseURL string, current frontier, allPat
 					if ctx.Err() != nil {
 						return
 					}
+
+					wafAccumulator.Add(httpRequest)
 
 					// Analyze response
 					isValid, disallowedStatus, baselineMatch, standardResponseMatch := AnalyzeResponse(ctx, *httpRequest, validCodes, config.EnableCommonResponseFilters, baselineSizeInt, baselineWordsInt, config.Threshold)

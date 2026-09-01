@@ -77,7 +77,13 @@ fetch("/api/v1/session", {method: "GET"});
 JS
 
 say "Starting local HTTP server on 127.0.0.1:$PORT"
-(cd "$WORKDIR/site" && python3 -m http.server "$PORT" --bind 127.0.0.1 >"$WORKDIR/httpd.log" 2>&1) &
+# Launch python3 directly rather than wrapping it in a `(cd ... && ...)` subshell:
+# with the subshell, $! is the subshell's pid, and killing it orphans the python
+# process, which keeps holding the port after this script exits. bash on macOS
+# hides that by exec'ing the last command in the subshell, but on Linux (and so
+# in CI and in the container runs) the two are genuinely separate processes.
+# --directory removes the need for the cd, so $! is python itself.
+python3 -m http.server "$PORT" --bind 127.0.0.1 --directory "$WORKDIR/site" >"$WORKDIR/httpd.log" 2>&1 &
 SRV_PID=$!
 # Readiness probe uses python3 rather than curl: python3 is already required
 # to run the server, so this adds no dependency, and curl is absent from some
@@ -180,7 +186,16 @@ jsoncheck "discover directory" \
   "$BIN" discover directory --targets "$TARGET" --paths admin,api,nope-does-not-exist -o json
 
 say "5. Route discovery (JS parsing, route extraction)"
-check "discover route"            0 "$BIN" discover route --target "$TARGET/" -o json
+# --request-method STANDARD is required, not incidental. `discover route` defaults
+# to HEADLESS (cmd/discover.go), which drives rod/Chrome instead of the goquery
+# HTML+JS parsing path this fixture was written to exercise -- and, with no browser
+# on the box, rod tries to download Chromium, which would make this script reach
+# the network. STANDARD keeps the run hermetic and tests the intended surface.
+# Assert on a route that only appears if static/app.js was fetched and parsed,
+# so the check cannot pass on a bare HTML-anchor crawl.
+jsoncheck "discover route" \
+  "'/api/v1/orders' in [r['path'] for w in d['content']['result']['webApplications'] for r in w['routes']]" \
+  "$BIN" discover route --target "$TARGET/" --request-method STANDARD -o json
 
 say "6. Wordlist generation (HTML parsing via goquery)"
 jsoncheck "discover wordlist" \

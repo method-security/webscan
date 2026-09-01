@@ -170,6 +170,7 @@ func TestDetectWafIncludesMatchedEvidence(t *testing.T) {
 
 	detection := DetectWaf(httpRequestResponse)
 	require.NotNil(t, detection)
+	assert.Same(t, httpRequestResponse, detection.Request)
 	assert.Equal(t, wafcommon.WafProviderEnumCloudflare, detection.Provider)
 	assert.Equal(t, []string{"cf-mitigated"}, detection.MatchedHeaders)
 	assert.Empty(t, detection.MatchedBodyPatterns)
@@ -241,6 +242,7 @@ func TestDetectWafFromResponsesReturnsSingleTargetDetection(t *testing.T) {
 
 	detection := DetectWafFromResponses(responses)
 	require.NotNil(t, detection)
+	assert.Same(t, responses[0], detection.Request)
 	assert.Equal(t, wafcommon.WafProviderEnumCloudflare, detection.Provider)
 	assert.Equal(t, []string{"cf-mitigated"}, detection.MatchedHeaders)
 	assert.Equal(t, []string{"cloudflare's security service"}, detection.MatchedBodyPatterns)

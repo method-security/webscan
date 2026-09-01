@@ -28,6 +28,7 @@ type wafFingerprintRule struct {
 
 type wafMatch struct {
 	fingerprint               *wafcommon.WafFingerprint
+	request                   *wafcommon.HttpRequestResponse
 	matchedHeaders            []string
 	matchedServerHeaderValues []string
 	matchedBodyPatterns       []string
@@ -311,17 +312,7 @@ func containsHeaderValue(actualValues, expectedValues []string) bool {
 }
 
 func DetectWaf(httpRequestResponse *wafcommon.HttpRequestResponse) *wafcommon.WafDetection {
-	if httpRequestResponse == nil || httpRequestResponse.Response == nil {
-		return nil
-	}
-
-	response := httpRequestResponse.Response
-	var responseBody *string
-	if response.ResponseBody != nil {
-		responseBody = requesthelpers.GetResponseBodyStringFromBodyStruct(response.ResponseBody)
-	}
-
-	match := fingerprintApplicationFirewall(responseBody, response.ResponseHeaders, response.StatusCode)
+	match := detectWafMatch(httpRequestResponse)
 	if match == nil {
 		return nil
 	}
@@ -339,10 +330,11 @@ func DetectWafFromResponses(httpRequestResponses []*wafcommon.HttpRequestRespons
 
 		provider := match.fingerprint.Provider
 		if bestMatch, exists := matchesByProvider[provider]; exists {
-			mergeWafMatch(bestMatch, match)
 			if match.confidence > bestMatch.confidence {
+				bestMatch.request = match.request
 				bestMatch.confidence = match.confidence
 			}
+			mergeWafMatch(bestMatch, match)
 			continue
 		}
 		matchesByProvider[provider] = match
@@ -377,12 +369,17 @@ func detectWafMatch(httpRequestResponse *wafcommon.HttpRequestResponse) *wafMatc
 	if response.ResponseBody != nil {
 		responseBody = requesthelpers.GetResponseBodyStringFromBodyStruct(response.ResponseBody)
 	}
-	return fingerprintApplicationFirewall(responseBody, response.ResponseHeaders, response.StatusCode)
+	match := fingerprintApplicationFirewall(responseBody, response.ResponseHeaders, response.StatusCode)
+	if match != nil {
+		match.request = httpRequestResponse
+	}
+	return match
 }
 
 func wafDetectionFromMatch(match *wafMatch) *wafcommon.WafDetection {
 	return &wafcommon.WafDetection{
 		Provider:                  match.fingerprint.Provider,
+		Request:                   match.request,
 		Fingerprint:               cloneWafFingerprint(match.fingerprint),
 		MatchedHeaders:            append([]string(nil), match.matchedHeaders...),
 		MatchedServerHeaderValues: append([]string(nil), match.matchedServerHeaderValues...),

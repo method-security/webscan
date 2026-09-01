@@ -13,6 +13,8 @@ import (
 	common "github.com/Method-Security/webscan/generated/go/common"
 	discover "github.com/Method-Security/webscan/generated/go/discover"
 
+	// Internal
+	internalcommon "github.com/Method-Security/webscan/internal/common"
 	// Utils
 	utils "github.com/Method-Security/webscan/utils"
 	request "github.com/Method-Security/webscan/utils/request"
@@ -40,6 +42,7 @@ type frontier struct {
 type frontierOutcome struct {
 	baselineAttempts []*common.HttpRequestResponse
 	attempts         []*common.HttpRequestResponse
+	wafCandidates    []*common.HttpRequestResponse
 	// Judged on the raw response, because a directory's 403 is not a finding under the default response codes.
 	recursionCandidates []*common.HttpRequestResponse
 	metrics             directoryScanMetrics
@@ -123,6 +126,7 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 		queue := []frontier{{basePath: parsedTargetPath, depth: 0}}
 		// Keyed on base path so a directory reachable from two parents is only swept once.
 		queued := map[string]bool{normalizeFrontierPath(parsedTargetPath): true}
+		var targetWafCandidates []*common.HttpRequestResponse
 		var timedOutPhase string
 
 		for len(queue) > 0 {
@@ -132,6 +136,7 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 			outcome := sweepFrontier(ctx, baseURL, current, allPaths, validCodes, recursionCodes, &config, limiter)
 			targetInfo.BaselineAttempts = append(targetInfo.BaselineAttempts, outcome.baselineAttempts...)
 			targetInfo.Attempts = append(targetInfo.Attempts, outcome.attempts...)
+			targetWafCandidates = append(targetWafCandidates, outcome.wafCandidates...)
 			targetInfo.Frontiers = append(targetInfo.Frontiers, newDirectoryFrontier(current))
 			errors = append(errors, groupRequestFailures(target, outcome.metrics)...)
 			if outcome.skipReason != "" {
@@ -170,7 +175,8 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 			}
 		}
 
-		if len(targetInfo.Attempts) > 0 {
+		targetInfo.WafDetection = internalcommon.DetectWafFromResponses(targetWafCandidates)
+		if len(targetInfo.Attempts) > 0 || targetInfo.WafDetection != nil {
 			targets = append(targets, &targetInfo)
 		}
 
@@ -346,6 +352,10 @@ func sweepFrontier(ctx context.Context, baseURL string, current frontier, allPat
 					if ctx.Err() != nil {
 						return
 					}
+
+					attemptsMutex.Lock()
+					outcome.wafCandidates = append(outcome.wafCandidates, httpRequest)
+					attemptsMutex.Unlock()
 
 					// Analyze response
 					isValid, disallowedStatus, baselineMatch, standardResponseMatch := AnalyzeResponse(ctx, *httpRequest, validCodes, config.EnableCommonResponseFilters, baselineSizeInt, baselineWordsInt, config.Threshold)

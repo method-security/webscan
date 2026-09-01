@@ -42,7 +42,6 @@ type frontier struct {
 type frontierOutcome struct {
 	baselineAttempts []*common.HttpRequestResponse
 	attempts         []*common.HttpRequestResponse
-	wafCandidates    []*common.HttpRequestResponse
 	// Judged on the raw response, because a directory's 403 is not a finding under the default response codes.
 	recursionCandidates []*common.HttpRequestResponse
 	metrics             directoryScanMetrics
@@ -126,17 +125,16 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 		queue := []frontier{{basePath: parsedTargetPath, depth: 0}}
 		// Keyed on base path so a directory reachable from two parents is only swept once.
 		queued := map[string]bool{normalizeFrontierPath(parsedTargetPath): true}
-		var targetWafCandidates []*common.HttpRequestResponse
+		wafAccumulator := internalcommon.WafDetectionAccumulator{}
 		var timedOutPhase string
 
 		for len(queue) > 0 {
 			current := queue[0]
 			queue = queue[1:]
 
-			outcome := sweepFrontier(ctx, baseURL, current, allPaths, validCodes, recursionCodes, &config, limiter)
+			outcome := sweepFrontier(ctx, baseURL, current, allPaths, validCodes, recursionCodes, &config, limiter, &wafAccumulator)
 			targetInfo.BaselineAttempts = append(targetInfo.BaselineAttempts, outcome.baselineAttempts...)
 			targetInfo.Attempts = append(targetInfo.Attempts, outcome.attempts...)
-			targetWafCandidates = append(targetWafCandidates, outcome.wafCandidates...)
 			targetInfo.Frontiers = append(targetInfo.Frontiers, newDirectoryFrontier(current))
 			errors = append(errors, groupRequestFailures(target, outcome.metrics)...)
 			if outcome.skipReason != "" {
@@ -175,7 +173,7 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 			}
 		}
 
-		targetInfo.WafDetection = internalcommon.DetectWafFromResponses(targetWafCandidates)
+		targetInfo.WafDetection = wafAccumulator.Detection()
 		if len(targetInfo.Attempts) > 0 || targetInfo.WafDetection != nil {
 			targets = append(targets, &targetInfo)
 		}
@@ -197,7 +195,7 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 }
 
 // Baseline and calibration re-run per frontier: a subdirectory's 403 profile is not the root's 404 profile.
-func sweepFrontier(ctx context.Context, baseURL string, current frontier, allPaths []string, validCodes map[int]bool, recursionCodes map[int]bool, config *discover.DiscoverDirectoryConfig, limiter *rate.Limiter) frontierOutcome {
+func sweepFrontier(ctx context.Context, baseURL string, current frontier, allPaths []string, validCodes map[int]bool, recursionCodes map[int]bool, config *discover.DiscoverDirectoryConfig, limiter *rate.Limiter, wafAccumulator *internalcommon.WafDetectionAccumulator) frontierOutcome {
 	log := svc1log.FromContext(ctx)
 	outcome := frontierOutcome{metrics: directoryScanMetrics{disallowedStatusCounts: map[int]int{}}}
 
@@ -353,9 +351,7 @@ func sweepFrontier(ctx context.Context, baseURL string, current frontier, allPat
 						return
 					}
 
-					attemptsMutex.Lock()
-					outcome.wafCandidates = append(outcome.wafCandidates, httpRequest)
-					attemptsMutex.Unlock()
+					wafAccumulator.Add(httpRequest)
 
 					// Analyze response
 					isValid, disallowedStatus, baselineMatch, standardResponseMatch := AnalyzeResponse(ctx, *httpRequest, validCodes, config.EnableCommonResponseFilters, baselineSizeInt, baselineWordsInt, config.Threshold)

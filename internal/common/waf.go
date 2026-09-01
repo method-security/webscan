@@ -2,6 +2,8 @@ package common
 
 import (
 	"strings"
+	"sync"
+
 	// Generated structs from Fern
 	wafcommon "github.com/Method-Security/webscan/generated/go/common"
 	// Utils
@@ -33,6 +35,13 @@ type wafMatch struct {
 	matchedServerHeaderValues []string
 	matchedBodyPatterns       []string
 	confidence                int
+}
+
+// WafDetectionAccumulator aggregates WAF evidence while retaining at most one
+// representative response per detected provider.
+type WafDetectionAccumulator struct {
+	mu                sync.Mutex
+	matchesByProvider map[wafcommon.WafProviderEnum]*wafMatch
 }
 
 // These rules intentionally favor precision over recall. CDN, cloud-platform,
@@ -321,28 +330,46 @@ func DetectWaf(httpRequestResponse *wafcommon.HttpRequestResponse) *wafcommon.Wa
 }
 
 func DetectWafFromResponses(httpRequestResponses []*wafcommon.HttpRequestResponse) *wafcommon.WafDetection {
-	matchesByProvider := map[wafcommon.WafProviderEnum]*wafMatch{}
+	accumulator := WafDetectionAccumulator{}
 	for _, httpRequestResponse := range httpRequestResponses {
-		match := detectWafMatch(httpRequestResponse)
-		if match == nil {
-			continue
-		}
-
-		provider := match.fingerprint.Provider
-		if bestMatch, exists := matchesByProvider[provider]; exists {
-			if match.confidence > bestMatch.confidence {
-				bestMatch.request = match.request
-				bestMatch.confidence = match.confidence
-			}
-			mergeWafMatch(bestMatch, match)
-			continue
-		}
-		matchesByProvider[provider] = match
+		accumulator.Add(httpRequestResponse)
 	}
+	return accumulator.Detection()
+}
+
+// Add scans one response and merges any detected WAF evidence.
+func (a *WafDetectionAccumulator) Add(httpRequestResponse *wafcommon.HttpRequestResponse) {
+	match := detectWafMatch(httpRequestResponse)
+	if match == nil {
+		return
+	}
+
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.matchesByProvider == nil {
+		a.matchesByProvider = map[wafcommon.WafProviderEnum]*wafMatch{}
+	}
+
+	provider := match.fingerprint.Provider
+	if bestMatch, exists := a.matchesByProvider[provider]; exists {
+		if match.confidence > bestMatch.confidence {
+			bestMatch.request = match.request
+			bestMatch.confidence = match.confidence
+		}
+		mergeWafMatch(bestMatch, match)
+		return
+	}
+	a.matchesByProvider[provider] = match
+}
+
+// Detection returns the highest-confidence unambiguous provider detection.
+func (a *WafDetectionAccumulator) Detection() *wafcommon.WafDetection {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 
 	var bestMatch *wafMatch
 	ambiguous := false
-	for _, match := range matchesByProvider {
+	for _, match := range a.matchesByProvider {
 		if bestMatch == nil || match.confidence > bestMatch.confidence {
 			bestMatch = match
 			ambiguous = false

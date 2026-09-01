@@ -281,3 +281,30 @@ func TestDetectWafFromResponsesRejectsAmbiguousTargetProviders(t *testing.T) {
 
 	assert.Nil(t, DetectWafFromResponses(responses))
 }
+
+func TestWafDetectionAccumulatorRetainsOneResponsePerProvider(t *testing.T) {
+	statusCode := 403
+	accumulator := WafDetectionAccumulator{}
+	accumulator.Add(&wafcommon.HttpRequestResponse{Response: &wafcommon.HttpResponse{StatusCode: &statusCode}})
+	assert.Nil(t, accumulator.matchesByProvider)
+
+	var firstMatch *wafcommon.HttpRequestResponse
+	for i := 0; i < 25; i++ {
+		match := &wafcommon.HttpRequestResponse{
+			Response: &wafcommon.HttpResponse{
+				StatusCode: &statusCode,
+				ResponseBody: &wafcommon.Body{
+					Kind: "text",
+					Text: &wafcommon.TextBody{Value: "Cloudflare's security service blocked this request"},
+				},
+			},
+		}
+		if firstMatch == nil {
+			firstMatch = match
+		}
+		accumulator.Add(match)
+	}
+
+	require.Len(t, accumulator.matchesByProvider, 1)
+	assert.Same(t, firstMatch, accumulator.Detection().Request)
+}

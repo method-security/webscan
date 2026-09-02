@@ -115,8 +115,9 @@ func FetchFavicon(ctx context.Context, faviconURL string, config discover.Discov
 		return nil, "", nil
 	}
 
-	body := faviconResponseBytes(resp.Response.ResponseBody)
-	if len(body) == 0 {
+	responseBody := resp.Response.ResponseBody
+	body := faviconResponseBytes(responseBody)
+	if !isFaviconResponse(body, responseBody) {
 		return nil, "", nil
 	}
 
@@ -126,8 +127,7 @@ func FetchFavicon(ctx context.Context, faviconURL string, config discover.Discov
 
 // faviconResponseBytes returns the raw favicon octets from a captured Body.
 // The standard HTTP capture stores image responses as a base64-encoded binary
-// body, so those are decoded back to their real bytes; text/json kinds (e.g. an
-// SVG favicon served as text) fall through to the literal string content.
+// body, so those are decoded back to their real bytes.
 func faviconResponseBytes(body *common.Body) []byte {
 	if body == nil {
 		return nil
@@ -146,6 +146,15 @@ func faviconResponseBytes(body *common.Body) []byte {
 		return []byte(*str)
 	}
 	return nil
+}
+
+func isFaviconResponse(body []byte, responseBody *common.Body) bool {
+	if len(body) == 0 {
+		return false
+	}
+
+	mediaType := requesthelpers.GetResponseBodyMimeTypeFromBodyStruct(responseBody)
+	return strings.HasPrefix(mediaType, "image/")
 }
 
 // computeFaviconHash computes the Shodan-compatible mmh3-32 hash of a favicon.

@@ -330,6 +330,42 @@ func GetResponseBodyStringFromBodyStruct(body *common.Body) *string {
 	return nil
 }
 
+// GetResponseBodyMimeTypeFromBodyStruct extracts the normalized MIME type from
+// a Body struct, without parameters like charset.
+func GetResponseBodyMimeTypeFromBodyStruct(body *common.Body) string {
+	if body == nil {
+		return ""
+	}
+
+	var mimeType *string
+	switch body.Kind {
+	case "binary":
+		if body.Binary != nil {
+			mimeType = body.Binary.MimeType
+		}
+	case "form":
+		if body.Form != nil {
+			mimeType = body.Form.MimeType
+		}
+	case "json":
+		if body.Json != nil {
+			mimeType = body.Json.MimeType
+		}
+	case "multipart":
+		if body.Multipart != nil {
+			mimeType = body.Multipart.MimeType
+		}
+	case "text":
+		if body.Text != nil {
+			mimeType = body.Text.MimeType
+		}
+	}
+	if mimeType == nil {
+		return ""
+	}
+	return strings.ToLower(strings.TrimSpace(strings.Split(*mimeType, ";")[0]))
+}
+
 // CreateBodyFromBytes creates a Body struct based on content type and body data as bytes
 func CreateBodyFromBytes(contentType string, bodyData []byte) *common.Body {
 	ct := strings.TrimSpace(strings.Split(contentType, ";")[0])

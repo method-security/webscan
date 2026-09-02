@@ -3,6 +3,7 @@ package request_test
 import (
 	"testing"
 
+	common "github.com/Method-Security/webscan/generated/go/common"
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
 )
 
@@ -55,5 +56,35 @@ func TestSplitTargetURLPreservesTrailingSlash(t *testing.T) {
 		if base != tc.wantBase || path != tc.wantPath {
 			t.Errorf("SplitTargetURL(%q) = (%q, %q), want (%q, %q)", tc.target, base, path, tc.wantBase, tc.wantPath)
 		}
+	}
+}
+
+func TestGetResponseBodyMimeTypeFromBodyStruct(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		body *common.Body
+		want string
+	}{
+		{
+			name: "binary",
+			body: requesthelpers.CreateBodyFromBytes("image/x-icon", []byte{0, 0, 1, 0}),
+			want: "image/x-icon",
+		},
+		{
+			name: "text with parameters",
+			body: requesthelpers.CreateBodyFromBytes("Text/HTML; charset=utf-8", []byte("<html></html>")),
+			want: "text/html",
+		},
+		{
+			name: "nil body",
+			body: nil,
+			want: "",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := requesthelpers.GetResponseBodyMimeTypeFromBodyStruct(tc.body); got != tc.want {
+				t.Errorf("GetResponseBodyMimeTypeFromBodyStruct() = %q, want %q", got, tc.want)
+			}
+		})
 	}
 }

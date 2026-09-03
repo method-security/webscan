@@ -1,0 +1,29 @@
+id: azure-application-gateway-detect
+info:
+  name: Azure Application Gateway Detection
+  author: method-security
+  severity: info
+  description: Detects Azure Application Gateway using explicit Azure Application Gateway banners or affinity cookies.
+  metadata:
+    method-application-type: LOAD_BALANCER
+    method-module-name: AZURE_APP_GW
+  tags: discovery,azure,application-gateway,load-balancer
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers-condition: or
+    matchers:
+      - type: regex
+        part: header
+        regex:
+          - "(?i)Microsoft-Azure-Application-Gateway(/v[0-9.]+)?"
+          - "(?i)set-cookie:\\s*(?:ApplicationGatewayAffinity|ApplicationGatewayAffinityCORS)="
+        condition: or
+      - type: regex
+        part: body
+        regex:
+          - "(?i)<center>\\s*Microsoft-Azure-Application-Gateway/v2\\s*</center>"

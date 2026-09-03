@@ -1,0 +1,23 @@
+id: aws-classic-load-balancer-detect
+info:
+  name: AWS Classic Load Balancer Detection
+  author: method-security
+  severity: info
+  description: Detects AWS Classic Load Balancer only when the response contains CLB-generated stickiness cookies.
+  metadata:
+    method-application-type: LOAD_BALANCER
+    method-module-name: AWS_CLB
+  tags: discovery,aws,clb,elb,load-balancer
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+    redirects: true
+    max-redirects: 5
+    stop-at-first-match: true
+    matchers:
+      - type: regex
+        part: header
+        regex:
+          - "(?i)set-cookie:\\s*(?:AWSELB|AWSELBCORS)="
+

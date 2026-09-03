@@ -18,5 +18,4 @@ http:
       - type: regex
         part: header
         regex:
-          - "(?i)set-cookie:\\s*(?:AWSELB|AWSELBCORS)="
-
+          - "(?i)set-cookie:\\s*(?:AWSELB|AWSELBCORS)=[A-F0-9]{80,}"

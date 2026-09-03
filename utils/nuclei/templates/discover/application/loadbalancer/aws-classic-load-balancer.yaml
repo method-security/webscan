@@ -14,7 +14,6 @@ http:
       - "{{BaseURL}}"
     redirects: true
     max-redirects: 5
-    stop-at-first-match: true
     matchers:
       - type: regex
         part: header

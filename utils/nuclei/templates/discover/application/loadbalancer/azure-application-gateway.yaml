@@ -15,14 +15,12 @@ http:
     redirects: true
     max-redirects: 5
     stop-at-first-match: true
-    matchers-condition: or
     matchers:
       - type: regex
         part: header
         regex:
           - "(?i)Microsoft-Azure-Application-Gateway(/v[0-9.]+)?"
           - "(?i)set-cookie:\\s*(?:ApplicationGatewayAffinity|ApplicationGatewayAffinityCORS)="
-        condition: or
       - type: regex
         part: body
         regex:

@@ -1,0 +1,48 @@
+imports:
+  method: ../../common/method.yml
+types:
+  JsBundleRiskCategory:
+    enum:
+      - DYNAMIC_CODE_EXECUTION
+      - DOM_XSS_SINK
+      - URL_NAVIGATION
+      - CROSS_WINDOW_MESSAGING
+  JsBundleFunctionDetails:
+    properties:
+      functionName: string
+      category: JsBundleRiskCategory
+      line: integer
+      column: integer
+      snippet: string
+  JsBundleDetails:
+    properties:
+      url: string
+      sizeBytes: integer
+      functions: optional<list<JsBundleFunctionDetails>>
+  JsBundleTargetDetails:
+    properties:
+      target: string
+      bundles: optional<list<JsBundleDetails>>
+  EnumerateWebPageJsBundlesConfig:
+    properties:
+      targets: list<string>
+      maxBundles: integer
+      maxRedirects: integer
+      ignoreCrossDomainRedirects: boolean
+      ignoreCrossDomainBundles: boolean
+      verifyTls: boolean
+      timeout: integer
+      userAgent: method.UserAgentPreset
+      requestMethod: method.RequestMethod
+      headlessConfig: optional<method.HeadlessRequestConfig>
+      browserbaseConfig: optional<method.BrowserbaseRequestConfig>
+      headers: optional<map<string, string>>
+      cookies: optional<map<string, string>>
+  EnumerateWebPageJsBundlesResult:
+    properties:
+      targets: optional<list<JsBundleTargetDetails>>
+  EnumerateWebPageJsBundlesReport:
+    properties:
+      config: EnumerateWebPageJsBundlesConfig
+      result: EnumerateWebPageJsBundlesResult
+      errors: optional<list<string>>

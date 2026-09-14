@@ -4,26 +4,26 @@ go 1.26.5
 
 require (
 	github.com/Method-Security/pkg v0.1.1
-	github.com/PuerkitoBio/goquery v1.12.0
+	github.com/PuerkitoBio/goquery v1.13.0
 	github.com/corona10/goimagehash v1.1.0
 	github.com/go-rod/rod v0.116.2
 	github.com/gobwas/ws v1.4.0
 	github.com/google/uuid v1.6.0
 	github.com/palantir/pkg/datetime v1.4.0
-	github.com/palantir/pkg/safejson v1.2.0
-	github.com/palantir/witchcraft-go-logging v1.70.0
+	github.com/palantir/pkg/safejson v1.3.0
+	github.com/palantir/witchcraft-go-logging v1.73.0
 	github.com/pb33f/libopenapi v0.38.7
-	github.com/projectdiscovery/gologger v1.1.72
+	github.com/projectdiscovery/gologger v1.1.73
 	github.com/projectdiscovery/nuclei/v3 v3.11.1
-	github.com/projectdiscovery/useragent v0.0.108
-	github.com/projectdiscovery/wappalyzergo v0.2.93
+	github.com/projectdiscovery/useragent v0.0.109
+	github.com/projectdiscovery/wappalyzergo v0.3.1
 	github.com/robertkrimen/otto v0.5.1
 	github.com/spaolacci/murmur3 v1.1.0
 	github.com/spf13/cobra v1.10.2
-	github.com/stretchr/testify v1.11.1
+	github.com/stretchr/testify v1.12.1
 	github.com/ysmood/gson v0.7.3
 	go.yaml.in/yaml/v4 v4.0.0-rc.6
-	golang.org/x/time v0.15.0
+	golang.org/x/time v0.16.0
 )
 
 require (
@@ -121,7 +121,6 @@ require (
 	github.com/containerd/errdefs v1.0.0 // indirect
 	github.com/containerd/errdefs/pkg v0.3.0 // indirect
 	github.com/cyphar/filepath-securejoin v0.7.0 // indirect
-	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/davidmz/go-pageant v1.0.2 // indirect
 	github.com/dimchansky/utfbom v1.1.1 // indirect
 	github.com/distribution/reference v0.6.0 // indirect
@@ -275,9 +274,9 @@ require (
 	github.com/palantir/pkg/safeyaml v1.2.0 // indirect
 	github.com/palantir/pkg/transform v1.2.0 // indirect
 	github.com/palantir/pkg/uuid v1.3.0 // indirect
-	github.com/palantir/witchcraft-go-error v1.47.0 // indirect
-	github.com/palantir/witchcraft-go-params v1.43.0 // indirect
-	github.com/palantir/witchcraft-go-tracing v1.46.0 // indirect
+	github.com/palantir/witchcraft-go-error v1.49.0 // indirect
+	github.com/palantir/witchcraft-go-params v1.47.0 // indirect
+	github.com/palantir/witchcraft-go-tracing v1.48.0 // indirect
 	github.com/pb33f/jsonpath v0.8.3 // indirect
 	github.com/pb33f/ordered-map/v2 v2.3.1 // indirect
 	github.com/pelletier/go-toml/v2 v2.4.3 // indirect
@@ -287,7 +286,6 @@ require (
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect
-	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/power-devops/perfstat v0.0.0-20260805114148-88456608a4f6 // indirect
 	github.com/praetorian-inc/fingerprintx v1.1.19 // indirect
 	github.com/projectdiscovery/asnmap v1.1.1 // indirect
@@ -299,7 +297,7 @@ require (
 	github.com/projectdiscovery/fasttemplate v0.0.2 // indirect
 	github.com/projectdiscovery/freeport v0.0.7 // indirect
 	github.com/projectdiscovery/gcache v0.0.0-20241015120333-12546c6e3f4c // indirect
-	github.com/projectdiscovery/goflags v0.1.75 // indirect
+	github.com/projectdiscovery/goflags v0.1.76 // indirect
 	github.com/projectdiscovery/goja v0.0.0-20260618133720-acb73e419534 // indirect
 	github.com/projectdiscovery/goja_nodejs v0.0.0-20260618132410-8519f75f703d // indirect
 	github.com/projectdiscovery/gostruct v0.0.2 // indirect
@@ -405,18 +403,19 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.28.0 // indirect
 	go.uber.org/zap/exp v0.3.0 // indirect
+	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	go4.org v0.0.0-20260112195520-a5071408f32f // indirect
 	goftp.io/server/v2 v2.0.3 // indirect
 	golang.org/x/arch v0.30.0 // indirect
-	golang.org/x/crypto v0.54.0 // indirect
+	golang.org/x/crypto v0.55.0 // indirect
 	golang.org/x/exp v0.0.0-20260810151157-a8b543ca52da // indirect
 	golang.org/x/mod v0.39.0 // indirect
-	golang.org/x/net v0.57.0 // indirect
+	golang.org/x/net v0.58.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
-	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/term v0.45.0 // indirect
-	golang.org/x/text v0.40.0 // indirect
+	golang.org/x/text v0.41.0 // indirect
 	golang.org/x/tools v0.48.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260810153831-ec0a7760b754 // indirect
 	google.golang.org/grpc v1.83.0 // indirect

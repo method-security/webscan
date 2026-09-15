@@ -5,6 +5,11 @@ import (
 	"regexp"
 	"testing"
 
+	// golang.org/x/mod is listed as a direct requirement in go.mod because of this
+	// import. It was already an indirect requirement before this test existed -- a
+	// number of modules in the dependency graph pull it in -- so importing it here
+	// promotes an existing requirement rather than adding a new dependency. Same
+	// version, same vendored code, no change to the build graph.
 	"golang.org/x/mod/semver"
 )
 

@@ -59,6 +59,21 @@ func TestSplitTargetURLPreservesTrailingSlash(t *testing.T) {
 	}
 }
 
+func TestSplitTargetURLPreservesEncodedPath(t *testing.T) {
+	target := "https://api.example.com/ftp/package.json.bak%2500.md"
+
+	base, path, _, err := requesthelpers.SplitTargetURL(target)
+	if err != nil {
+		t.Fatalf("SplitTargetURL(%q) returned error: %v", target, err)
+	}
+	if base != "https://api.example.com" {
+		t.Errorf("SplitTargetURL(%q) base = %q, want %q", target, base, "https://api.example.com")
+	}
+	if path != "/ftp/package.json.bak%2500.md" {
+		t.Errorf("SplitTargetURL(%q) path = %q, want %q", target, path, "/ftp/package.json.bak%2500.md")
+	}
+}
+
 func TestGetResponseBodyMimeTypeFromBodyStruct(t *testing.T) {
 	for _, tc := range []struct {
 		name string

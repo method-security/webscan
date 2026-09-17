@@ -497,7 +497,10 @@ func (b *Requester) sendRequestWithArtifactsOnce(ctx context.Context, config com
 				responseBody = []byte(htmlContent)
 				responseHeaders = cloneHeadersWithoutContentEncoding(responseHeaders)
 			}
-			if shouldLoadStaticResource(htmlContent, *constructedURL, finalURL) {
+			if jsonBody, ok := extractChromeJSONDocumentViewerBody(htmlContent); ok {
+				responseBody = jsonBody
+				responseHeaders = cloneHeadersWithBodyMetadata(responseHeaders, jsonBody)
+			} else if shouldLoadStaticResource(htmlContent, *constructedURL, finalURL) {
 				resourceURL := finalURL
 				if resourceURL == "" || isInternalBrowserURL(resourceURL) {
 					resourceURL = *constructedURL

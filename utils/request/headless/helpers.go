@@ -526,39 +526,66 @@ func isChromeStaticAssetViewerHTML(htmlContent string) bool {
 }
 
 func isChromeTextDocumentViewerHTML(htmlContent string) bool {
+	_, ok := chromeTextDocumentViewerText(htmlContent)
+	return ok
+}
+
+func extractChromeJSONDocumentViewerBody(htmlContent string) ([]byte, bool) {
+	text, ok := chromeTextDocumentViewerText(htmlContent)
+	if !ok {
+		return nil, false
+	}
+
+	body := []byte(strings.TrimSpace(text))
+	if !json.Valid(body) {
+		return nil, false
+	}
+	return body, true
+}
+
+func chromeTextDocumentViewerText(htmlContent string) (string, bool) {
 	if htmlContent == "" {
-		return false
+		return "", false
 	}
 
 	content := strings.ToLower(htmlContent)
 	if !strings.Contains(content, "<pre") || !strings.Contains(content, `name="color-scheme"`) {
-		return false
+		return "", false
 	}
 
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlContent))
 	if err != nil {
-		return false
+		return "", false
 	}
 	if doc.Find(`head meta[name="color-scheme"]`).Length() == 0 {
-		return false
+		return "", false
 	}
 	body := doc.Find("body")
 	if body.Length() != 1 {
-		return false
+		return "", false
 	}
 	children := body.Children()
+	var pre *goquery.Selection
 	switch children.Length() {
 	case 1:
-		return strings.EqualFold(goquery.NodeName(children.First()), "pre")
+		pre = children.First()
+		if !strings.EqualFold(goquery.NodeName(pre), "pre") {
+			return "", false
+		}
 	case 2:
 		first := children.First()
 		second := children.Last()
-		return strings.EqualFold(goquery.NodeName(first), "pre") &&
-			strings.EqualFold(goquery.NodeName(second), "div") &&
-			second.HasClass("json-formatter-container")
+		if !strings.EqualFold(goquery.NodeName(first), "pre") ||
+			!strings.EqualFold(goquery.NodeName(second), "div") ||
+			!second.HasClass("json-formatter-container") {
+			return "", false
+		}
+		pre = first
 	default:
-		return false
+		return "", false
 	}
+
+	return pre.Text(), true
 }
 
 func shouldParseStaticAssetViewerHTML(htmlContent string) bool {

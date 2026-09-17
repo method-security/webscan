@@ -15,18 +15,18 @@ webscan is designed as a simple, easy to use web application scanning tool that 
 
 The types of scans that webscan can conduct are constantly growing. For the most up to date listing, please see the documentation [here](./docs/index.md)
 
-To learn more about webscan, please see the [Documentation site](https://method-security.github.io/webscan/) for the most detailed information.
+To learn more about webscan, please see the [Documentation site](./docs/index.md) for the most detailed information.
 
 ## Quick Start
 
 ### Get webscan
 
-For the full list of available installation options, please see the [Installation](./getting-started/installation.md) page. For convenience, here are some of the most commonly used options:
+For the full list of available installation options, please see the [Installation](./docs/getting-started/installation.md) page. For convenience, here are some of the most commonly used options:
 
 - `docker run methodsecurity/webscan`
 - `docker run ghcr.io/method-security/webscan`
 - Download the latest binary from the [Github Releases](https://github.com/Method-Security/webscan/releases/latest) page
-- [Installation documentation](./getting-started/installation.md)
+- [Installation documentation](./docs/getting-started/installation.md)
 
 ### Examples
 

@@ -225,7 +225,10 @@ func SplitTargetURL(target string) (string, string, map[string]string, error) {
 	baseURL := fmt.Sprintf("%s://%s", parsedURL.Scheme, parsedURL.Host)
 	baseURL = strings.TrimRight(baseURL, "/")
 
-	path := NormalizeTargetPath(parsedURL.Path)
+	// Path is decoded by net/url.Parse. Use EscapedPath so existing percent-
+	// encoded octets are not decoded and then reinterpreted by downstream URL
+	// construction.
+	path := NormalizeTargetPath(parsedURL.EscapedPath())
 
 	// Parse query parameters
 	var queryParams map[string]string

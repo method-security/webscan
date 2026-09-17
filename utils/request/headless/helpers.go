@@ -526,7 +526,7 @@ func isChromeStaticAssetViewerHTML(htmlContent string) bool {
 }
 
 func isChromeTextDocumentViewerHTML(htmlContent string) bool {
-	if htmlContent == "" || len(htmlContent) > 256*1024 {
+	if htmlContent == "" {
 		return false
 	}
 

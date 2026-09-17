@@ -536,7 +536,7 @@ func extractChromeJSONDocumentViewerBody(htmlContent string) ([]byte, bool) {
 		return nil, false
 	}
 
-	body := []byte(strings.TrimSpace(text))
+	body := []byte(text)
 	if !json.Valid(body) {
 		return nil, false
 	}

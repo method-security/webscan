@@ -63,3 +63,15 @@ func TestExtractChromeJSONDocumentViewerBodyDecodesSerializedHTMLText(t *testing
 		t.Fatalf("body = %q, want decoded JSON text", string(body))
 	}
 }
+
+func TestExtractChromeJSONDocumentViewerBodyPreservesWhitespace(t *testing.T) {
+	htmlContent := "<html><head><meta name=\"color-scheme\" content=\"light dark\"></head><body><pre>  {\"id\":1}\n</pre></body></html>"
+
+	body, ok := extractChromeJSONDocumentViewerBody(htmlContent)
+	if !ok {
+		t.Fatal("expected whitespace-padded Chrome JSON viewer body to be extracted")
+	}
+	if string(body) != "  {\"id\":1}\n" {
+		t.Fatalf("body = %q, want original JSON whitespace preserved", string(body))
+	}
+}

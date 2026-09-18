@@ -10,7 +10,7 @@ import (
 )
 
 const angularRuntime = `r.f={},r.e=e=>Promise.all(Object.keys(r.f).reduce((n,t)=>(r.f[t](e,n),n),[])),` +
-	`r.u=e=>(592===e?"common":e)+"."+{35:"323cd2b6946630f9",93:"4604c85726867f27",592:"db169500d0bc1d46"}[e]+".js",` +
+	`r.u=e=>(244===e?"common":e)+"."+{12:"72be1c23b6720bf4",27:"c9e27dcded280830",244:"5f063605d7248ff0"}[e]+".js",` +
 	`r.miniCssF=e=>{},r.p="",`
 
 func TestExtractWebpackChunkNamesAppliesHashAndRename(t *testing.T) {
@@ -18,9 +18,9 @@ func TestExtractWebpackChunkNamesAppliesHashAndRename(t *testing.T) {
 	sort.Strings(names)
 
 	expected := []string{
-		"35.323cd2b6946630f9.js",
-		"93.4604c85726867f27.js",
-		"common.db169500d0bc1d46.js",
+		"12.72be1c23b6720bf4.js",
+		"27.c9e27dcded280830.js",
+		"common.5f063605d7248ff0.js",
 	}
 	if len(names) != len(expected) {
 		t.Fatalf("expected %d chunks, got %d: %v", len(expected), len(names), names)
@@ -81,10 +81,10 @@ func TestExtractWebpackChunkNamesAgainstFullRuntime(t *testing.T) {
 	}
 
 	joined := strings.Join(names, " ")
-	if !strings.Contains(joined, "common.db169500d0bc1d46.js") {
+	if !strings.Contains(joined, "common.5f063605d7248ff0.js") {
 		t.Fatalf("expected the renamed common chunk, got %v", names)
 	}
-	if strings.Contains(joined, "592.") {
-		t.Fatalf("expected chunk 592 to be renamed rather than emitted by id, got %v", names)
+	if strings.Contains(joined, "244.") {
+		t.Fatalf("expected chunk 244 to be renamed rather than emitted by id, got %v", names)
 	}
 }

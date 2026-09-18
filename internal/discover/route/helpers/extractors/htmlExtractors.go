@@ -246,3 +246,28 @@ func ExtractLinkRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig
 
 	return discoverroutehelpers.MergeWebRoutes(routes), discoverroutehelpers.SetToListString(urls), errors
 }
+
+// ExtractScriptAssets records the JavaScript bundles a document references, so they are reported as
+// static assets rather than mined here. Returns a slice of URLs and a slice of errors.
+func ExtractScriptAssets(doc *goquery.Document, baseURL string, routeCaptureConfig discover.DiscoverRouteConfig) ([]string, []string) {
+	urls := make(map[string]struct{})
+	errors := []string{}
+
+	doc.Find("script[src]").Each(func(i int, s *goquery.Selection) {
+		src, exists := s.Attr("src")
+		if !exists || src == "" {
+			return
+		}
+
+		fullURL := discoverroutehelpers.ResolveURL(baseURL, src)
+		urlNoQuery, err := discoverroutehelpers.URLRemoveQueryParams(fullURL)
+		if err != nil {
+			errors = append(errors, err.Error())
+			return
+		}
+
+		discoverroutehelpers.CaptureStaticAssetReference(urls, routeCaptureConfig.Target, urlNoQuery, routeCaptureConfig.IgnoreCrossDomainStaticAssets, routeCaptureConfig.CollectStaticAssets)
+	})
+
+	return discoverroutehelpers.SetToListString(urls), errors
+}

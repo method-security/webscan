@@ -420,10 +420,7 @@ func NormalizeURLForIdentity(rawURL string) string {
 // so scope stays tight to the target the user requested: the target host and its
 // subdomains (children) are in scope, while the apex domain and sibling subdomains
 // (e.g. careers.example.com when the target is www.example.com) are treated as out
-// of scope. JS bundle fetching for route discovery is gated separately by
-// MaxBundles in the bundle extractors and intentionally bypasses this allowlist;
-// endpoints discovered inside a bundle are still filtered through IsURLAllowed
-// against the target host.
+// of scope.
 func IsURLAllowed(scopeURL string, targetURL string, ignoreCrossDomain bool, captureStaticAssets bool) bool {
 	if IsKnownProviderNoiseURL(targetURL) {
 		return false

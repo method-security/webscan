@@ -20,9 +20,6 @@ types:
       requestMethod: method.RequestMethod
       headlessConfig: optional<method.HeadlessRequestConfig>
       browserbaseConfig: optional<method.BrowserbaseRequestConfig>
-      bundleUrls: optional<list<string>>
-      fetchSourceMaps: boolean
-      maxBundles: integer
       headers: optional<map<string, string>>
       cookies: optional<map<string, string>>
       localStorage: optional<map<string, string>>

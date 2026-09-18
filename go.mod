@@ -3,6 +3,7 @@ module github.com/Method-Security/webscan
 go 1.26.8
 
 require (
+	github.com/BishopFox/jsluice v0.0.0-20240110145140-0ddfab153e06
 	github.com/Method-Security/pkg v0.1.1
 	github.com/PuerkitoBio/goquery v1.12.0
 	github.com/corona10/goimagehash v1.1.0
@@ -342,6 +343,7 @@ require (
 	github.com/sijms/go-ora/v2 v2.9.0 // indirect
 	github.com/sirupsen/logrus v1.9.4 // indirect
 	github.com/skeema/knownhosts v1.3.2 // indirect
+	github.com/smacker/go-tree-sitter v0.0.0-20230720070738-0d0a9f78d8f8 // indirect
 	github.com/sorairolake/lzip-go v0.3.8 // indirect
 	github.com/spf13/afero v1.15.0 // indirect
 	github.com/spf13/cast v1.10.0 // indirect

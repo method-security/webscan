@@ -1004,23 +1004,6 @@ func (a *WebScan) InitDiscoverCommand() {
 				return
 			}
 
-			// Get JS route enhancement flags
-			bundleURLs, err := cmd.Flags().GetStringSlice("bundle-urls")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			fetchSourceMaps, err := cmd.Flags().GetBool("fetch-source-maps")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-			maxBundles, err := cmd.Flags().GetInt("max-bundles")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
-
 			// Authenticated-crawl flags
 			headerPairs, err := cmd.Flags().GetStringArray("header")
 			if err != nil {
@@ -1044,7 +1027,7 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Set Config
-			config := getDiscoverRouteConfig(target, ignoreCrossDomainRoutes, ignoreCrossDomainStaticAssets, collectStaticAssets, spiderDepth, maxRedirects, verifyTLS, timeout, sleep, jitter, threads, userAgentPreset, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig, bundleURLs, fetchSourceMaps, maxBundles)
+			config := getDiscoverRouteConfig(target, ignoreCrossDomainRoutes, ignoreCrossDomainStaticAssets, collectStaticAssets, spiderDepth, maxRedirects, verifyTLS, timeout, sleep, jitter, threads, userAgentPreset, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
 			config.Headers, err = requesthelpers.ParseHeaderPairs(headerPairs)
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -1094,10 +1077,6 @@ func (a *WebScan) InitDiscoverCommand() {
 	discoverRouteCmd.Flags().String("browserbase-project", "", "Browserbase project ID")
 	discoverRouteCmd.Flags().Bool("browserbase-proxy", false, "Use Browserbase proxy for requests")
 	discoverRouteCmd.Flags().StringSlice("browserbase-countries", []string{}, "List of countries to use for Browserbase proxy")
-	// JS route discovery enhancement flags
-	discoverRouteCmd.Flags().StringSlice("bundle-urls", []string{}, "Explicit JS bundle URLs to scan for routes")
-	discoverRouteCmd.Flags().Bool("fetch-source-maps", true, "Fetch and scan source maps for additional routes")
-	discoverRouteCmd.Flags().Int("max-bundles", -1, "Maximum number of JS bundles to process (-1 = unlimited, 0 = disabled)")
 	// Authenticated-crawl flags
 	discoverRouteCmd.Flags().StringArray("header", []string{}, "Request header for authenticated crawl as 'Name: Value' (repeatable; missing colon errors; repeated names are case-insensitively comma-joined per RFC 7230 §3.2.2)")
 	discoverRouteCmd.Flags().StringArray("cookie", []string{}, "Cookie for authenticated crawl as 'name=value' (repeatable; missing equals errors)")
@@ -1730,7 +1709,7 @@ func getDiscoverProbeConfig(targets []string, protocol string, maxRedirects int,
 }
 
 // getDiscoverRouteConfig builds the config for route discovery.
-func getDiscoverRouteConfig(target string, ignoreCrossDomainRoutes bool, ignoreCrossDomainStaticAssets bool, collectStaticAssets bool, spiderDepth int, maxRedirects int, verifyTLS bool, timeout int, sleep int, jitter int, threads int, userAgent common.UserAgentPreset, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig, bundleURLs []string, fetchSourceMaps bool, maxBundles int) discover.DiscoverRouteConfig {
+func getDiscoverRouteConfig(target string, ignoreCrossDomainRoutes bool, ignoreCrossDomainStaticAssets bool, collectStaticAssets bool, spiderDepth int, maxRedirects int, verifyTLS bool, timeout int, sleep int, jitter int, threads int, userAgent common.UserAgentPreset, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, browserbaseConfig *common.BrowserbaseRequestConfig) discover.DiscoverRouteConfig {
 	config := discover.DiscoverRouteConfig{
 		Target:                        target,
 		CollectStaticAssets:           collectStaticAssets,
@@ -1747,12 +1726,6 @@ func getDiscoverRouteConfig(target string, ignoreCrossDomainRoutes bool, ignoreC
 		RequestMethod:                 requestMethod,
 		HeadlessConfig:                headlessConfig,
 		BrowserbaseConfig:             browserbaseConfig,
-		FetchSourceMaps:               fetchSourceMaps,
-		MaxBundles:                    maxBundles,
-	}
-
-	if len(bundleURLs) > 0 {
-		config.BundleUrls = bundleURLs
 	}
 
 	return config

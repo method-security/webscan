@@ -30,61 +30,6 @@ import (
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
-// resolveEffectiveTarget follows HTTP redirects for target and returns the final URL.
-// Falls back to target if the HEAD request fails. Routes the HEAD through
-// utils/request so it honors VerifyTls, UserAgent and Timeout from the
-// surrounding DiscoverRouteConfig.
-//
-// TODO(aitf-71-followup): support headless/browserbase modes; today this
-// always uses the standard transport regardless of config.RequestMethod.
-func resolveEffectiveTarget(ctx context.Context, target string, config discover.DiscoverRouteConfig) string {
-	baseURL, path, queryParams, err := requesthelpers.SplitTargetURL(target)
-	if err != nil {
-		return target
-	}
-
-	httpRequest := common.HttpRequest{
-		BaseUrl: baseURL,
-		Path:    path,
-		Method:  common.HttpMethodHead,
-		Params: &common.HttpRequestParams{
-			Query: queryParams,
-			// Carry auth headers/cookies so redirect resolution matches the
-			// credentialed spider requests (login/session cookies can change
-			// where the target redirects).
-			Headers: requesthelpers.BuildAuthHeaders(config.Headers, config.Cookies),
-		},
-	}
-
-	sendConfig := common.SendHttpRequestConfig{
-		Request:      &httpRequest,
-		MaxRedirects: config.MaxRedirects,
-		VerifyTls:    config.VerifyTls,
-		Timeout:      config.Timeout,
-		// IgnoreCrossDomainRedirects is the transport-layer flag — a strict
-		// hostname-string equality check. Leave it false here so this HEAD
-		// resolve still follows hostname-changing redirects (e.g. apex → www)
-		// and lands on the final effective target host. The route allowlist
-		// (IsURLAllowed / IsHostInScope) then scopes discovery to that resolved
-		// host and its subdomains at discover time.
-		IgnoreCrossDomainRedirects: false,
-		UserAgent:                  config.UserAgent,
-		RequestMethod:              common.RequestMethodStandard,
-	}
-
-	// Add proxy settings from context
-	requesthelpers.ApplyProxySettings(ctx, &sendConfig)
-
-	response, err := request.SendRequest(ctx, sendConfig)
-	if err != nil || response == nil || response.Response == nil {
-		return target
-	}
-	if chain := response.Response.RedirectChain; len(chain) > 0 {
-		return strings.TrimRight(chain[len(chain)-1], "/")
-	}
-	return target
-}
-
 // ExtractRedirectRoutes analyzes redirect chain URLs to extract routes with parameters.
 // Scope is anchored on the original target (routeCaptureConfig.Target), not the
 // per-page post-redirect host.
@@ -278,19 +223,11 @@ func extractRoutes(ctx context.Context, httpRequestResponse *common.HttpRequestR
 	urls = discoverroutehelpers.AddListToSetString(urls, linkUrls)
 	processErrors("Link Elements", linkErrors)
 
-	// Extract routes from script elements
-	log.Info("Extracting routes from script elements")
-	scriptRoutes, scriptUrls, scriptErrors := capturerouteextractors.ExtractScriptRoutes(ctx, doc, redirectedURL, routeCaptureConfig)
-	routes = append(routes, scriptRoutes...)
-	urls = discoverroutehelpers.AddListToSetString(urls, scriptUrls)
-	errors = append(errors, scriptErrors...)
-
-	// Extract routes from inline script elements
-	log.Info("Extracting routes from inline script elements")
-	inlineScriptRoutes, inlineScriptUrls, inlineScriptErrors := capturerouteextractors.ExtractInlineScriptRoutes(ctx, doc, redirectedURL, routeCaptureConfig)
-	routes = append(routes, inlineScriptRoutes...)
-	urls = discoverroutehelpers.AddListToSetString(urls, inlineScriptUrls)
-	errors = append(errors, inlineScriptErrors...)
+	// Record the JavaScript bundles the document references
+	log.Info("Recording JavaScript bundles referenced by script elements")
+	scriptAssetUrls, scriptAssetErrors := capturerouteextractors.ExtractScriptAssets(doc, redirectedURL, routeCaptureConfig)
+	urls = discoverroutehelpers.AddListToSetString(urls, scriptAssetUrls)
+	processErrors("Script Elements", scriptAssetErrors)
 
 	// Extract routes from redirect chain (analyze redirect URLs for parameters)
 	log.Info("Extracting routes from redirect chain")
@@ -463,15 +400,6 @@ func PerformRouteCapture(ctx context.Context, config discover.DiscoverRouteConfi
 	// Mutex to protect shared data structures
 	var mu sync.Mutex
 
-	// Extract routes from explicit bundle URLs once before spidering (not per page)
-	if len(config.BundleUrls) > 0 {
-		log.Info("Extracting routes from explicit bundle URLs")
-		effectiveBase := resolveEffectiveTarget(ctx, config.Target, config)
-		bundleRoutes, _, bundleErrors := capturerouteextractors.ExtractBundleURLRoutes(ctx, config.BundleUrls, effectiveBase, config)
-		allRoutes = append(allRoutes, bundleRoutes...)
-		errors = append(errors, bundleErrors...)
-	}
-
 	// Spider through Route URLs up to the specified depth
 	for len(urlsToVisit) > 0 && currentDepth < config.SpiderDepth {
 		// Process all URLs at the current depth
@@ -636,10 +564,7 @@ func PerformRouteCapture(ctx context.Context, config discover.DiscoverRouteConfi
 		currentDepth++
 	}
 
-	// Root candidates before merging so an unrooted path never merges with a real one.
-	rootedRoutes := discoverroutehelpers.ResolveUnrootedInterpolatedRoutes(allRoutes)
-	mergedRoutes := discoverroutehelpers.MergeWebRoutes(rootedRoutes)
-	mergedRoutes = discoverroutehelpers.ApplyDeclaredRouteTemplates(mergedRoutes)
+	mergedRoutes := discoverroutehelpers.MergeWebRoutes(allRoutes)
 	sortRoutes(mergedRoutes)
 	report.Result.WebApplications = buildWebApplications(mergedRoutes, allStaticAssetsByBaseURL)
 	report.Errors = append(report.Errors, errors...)

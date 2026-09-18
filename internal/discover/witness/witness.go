@@ -67,6 +67,8 @@ func processTarget(
 	result.Request = pageReport.Result.Request
 	result.Screenshot = pageReport.Result.Screenshot
 	result.ScreenshotPerceptualHash = pageReport.Result.ScreenshotPerceptualHash
+	result.HtmlTitle = pageReport.Result.HtmlTitle
+	result.WafDetection = pageReport.Result.WafDetection
 	result.Target = &target
 
 	// Run Wappalyzer fingerprinting over the captured response

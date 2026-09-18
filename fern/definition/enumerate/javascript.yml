@@ -1,0 +1,77 @@
+imports:
+  http: ../common/http.yml
+  method: ../common/method.yml
+types:
+  # ENUMs
+  JavascriptArtifactKind:
+    enum:
+      - ENTRY
+      - CHUNK
+      - SOURCE_MAP
+  JavascriptSecretSeverity:
+    enum:
+      - INFO
+      - LOW
+      - MEDIUM
+      - HIGH
+  # Common Objects
+  JavascriptArtifact:
+    properties:
+      url: string
+      kind: JavascriptArtifactKind
+      sizeBytes: integer
+      statusCode: optional<integer>
+      contentType: optional<string>
+      analyzed: boolean
+      discoveredFrom: optional<string>
+  JavascriptEndpoint:
+    properties:
+      path: string
+      baseUrl: optional<string>
+      method: optional<http.HttpMethod>
+      queryParams: optional<list<string>>
+      bodyParams: optional<list<string>>
+      contentType: optional<string>
+      callExpression: optional<string>
+      sourceUrl: string
+      rooted: boolean
+  JavascriptSecret:
+    properties:
+      kind: string
+      severity: JavascriptSecretSeverity
+      value: optional<string>
+      context: optional<string>
+      sourceUrl: string
+  # Config Struct
+  EnumerateJavascriptConfig:
+    properties:
+      target: string
+      followChunks: boolean
+      fetchSourceMaps: boolean
+      maxArtifacts: integer
+      analysisWindowBytes: integer
+      analysisWindowOverlapBytes: integer
+      ignoreCrossDomainEndpoints: boolean
+      maxRedirects: integer
+      verifyTls: boolean
+      timeout: integer
+      sleep: integer
+      jitter: integer
+      threads: integer
+      userAgent: method.UserAgentPreset
+      headers: optional<map<string, string>>
+      cookies: optional<map<string, string>>
+  # Result Struct
+  EnumerateJavascriptResult:
+    properties:
+      target: string
+      baseUrlCandidates: optional<list<string>>
+      artifacts: optional<list<JavascriptArtifact>>
+      endpoints: optional<list<JavascriptEndpoint>>
+      secrets: optional<list<JavascriptSecret>>
+  # Report Struct
+  EnumerateJavascriptReport:
+    properties:
+      config: EnumerateJavascriptConfig
+      result: EnumerateJavascriptResult
+      errors: optional<list<string>>

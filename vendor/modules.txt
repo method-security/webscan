@@ -118,6 +118,9 @@ github.com/AzureAD/microsoft-authentication-library-for-go/apps/internal/shared
 github.com/AzureAD/microsoft-authentication-library-for-go/apps/internal/version
 github.com/AzureAD/microsoft-authentication-library-for-go/apps/managedidentity
 github.com/AzureAD/microsoft-authentication-library-for-go/apps/public
+# github.com/BishopFox/jsluice v0.0.0-20240110145140-0ddfab153e06
+## explicit; go 1.18
+github.com/BishopFox/jsluice
 # github.com/FalconOpsLLC/goexec v0.3.0
 ## explicit; go 1.24.1
 github.com/FalconOpsLLC/goexec/internal/util
@@ -2206,6 +2209,10 @@ github.com/sirupsen/logrus
 # github.com/skeema/knownhosts v1.3.2
 ## explicit; go 1.24.0
 github.com/skeema/knownhosts
+# github.com/smacker/go-tree-sitter v0.0.0-20230720070738-0d0a9f78d8f8
+## explicit; go 1.13
+github.com/smacker/go-tree-sitter
+github.com/smacker/go-tree-sitter/javascript
 # github.com/sorairolake/lzip-go v0.3.8
 ## explicit; go 1.22
 github.com/sorairolake/lzip-go
@@ -2631,6 +2638,7 @@ golang.org/x/crypto/ssh/knownhosts
 ## explicit; go 1.25.0
 golang.org/x/exp/constraints
 golang.org/x/exp/maps
+golang.org/x/exp/slices
 # golang.org/x/mod v0.40.0
 ## explicit; go 1.25.0
 golang.org/x/mod/internal/lazyregexp

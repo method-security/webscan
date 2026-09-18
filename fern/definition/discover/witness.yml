@@ -1,6 +1,7 @@
 imports:
   http: ../common/http.yml
   method: ../common/method.yml
+  waf: ../common/waf.yml
 types:
   DetectedTechnologyType:
     enum:
@@ -60,6 +61,8 @@ types:
       request: optional<http.HttpRequestResponse>
       screenshot: optional<base64>
       screenshotPerceptualHash: optional<string>
+      htmlTitle: optional<string>
+      wafDetection: optional<waf.WafDetection>
       favicon: optional<DiscoverWitnessFavicon>
       technologies: optional<DiscoverWitnessTechnologies>
   # Report Struct

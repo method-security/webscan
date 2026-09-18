@@ -60,13 +60,21 @@ func processTarget(
 	// Copy page errors
 	targetErrors = append(targetErrors, pageReport.Errors...)
 
-	if pageReport.Result == nil || pageReport.Result.Request == nil || pageReport.Result.Request.Response == nil {
+	if pageReport.Result == nil {
+		return result, targetErrors
+	}
+
+	// Page capture records WAF evidence even when it filters the response out, so copy it before bailing.
+	result.WafDetection = pageReport.Result.WafDetection
+
+	if pageReport.Result.Request == nil || pageReport.Result.Request.Response == nil {
 		return result, targetErrors
 	}
 
 	result.Request = pageReport.Result.Request
 	result.Screenshot = pageReport.Result.Screenshot
 	result.ScreenshotPerceptualHash = pageReport.Result.ScreenshotPerceptualHash
+	result.HtmlTitle = pageReport.Result.HtmlTitle
 	result.Target = &target
 
 	// Run Wappalyzer fingerprinting over the captured response

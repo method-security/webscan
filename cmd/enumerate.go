@@ -847,6 +847,9 @@ func (a *WebScan) InitEnumerateCommand() {
 	enumerateCmd.AddCommand(enumerateContainerRegistryCmd)
 
 	// Add Command to Root Command
+	// JavaScript Command
+	a.InitEnumerateJavascriptCommand(enumerateCmd)
+
 	a.RootCmd.AddCommand(enumerateCmd)
 }
 

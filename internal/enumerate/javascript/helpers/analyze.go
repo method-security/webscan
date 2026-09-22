@@ -49,6 +49,7 @@ func AnalyzeSource(source []byte, sourceURL string, windowBytes int, overlapByte
 
 	for _, window := range windowsOf(len(source), windowBytes, overlapBytes) {
 		analyzer := jsluice.NewAnalyzer(source[window[0]:window[1]])
+		analyzer.AddSecretMatcher(CredentialMatcher())
 
 		for _, found := range analyzer.GetURLs() {
 			if found == nil {

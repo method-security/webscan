@@ -33,7 +33,7 @@ func TestCollectorReleasesArtifactsDroppedByTheBudget(t *testing.T) {
 		c.enqueue(u, enumerate.JavascriptArtifactKindChunk, "https://app.example.com/runtime.js")
 	}
 
-	c.drainQueue(t.Context())
+	c.drainQueue(t.Context(), reportFailures)
 
 	if len(c.claimed) != 1 {
 		t.Fatalf("expected only the retrieved URL to stay claimed, got %d: %v", len(c.claimed), c.claimed)
@@ -52,13 +52,27 @@ func TestCollectorReleasesArtifactsDroppedByTheBudget(t *testing.T) {
 	}
 }
 
+// A budget message survives even when individual retrieval failures are suppressed, or
+// --fetch-source-maps could retrieve nothing and still exit clean.
+func TestCollectorReportsBudgetEvenWhenFailuresAreQuiet(t *testing.T) {
+	c := testCollector(1)
+	c.remaining = 0
+	c.enqueue("https://app.example.com/main.js.map", enumerate.JavascriptArtifactKindSourceMap, "https://app.example.com/main.js")
+
+	c.drainQueue(t.Context(), quietFailures)
+
+	if len(c.errors) != 1 {
+		t.Fatalf("expected the budget skip to be reported, got %v", c.errors)
+	}
+}
+
 // An exhausted budget reports what it skipped rather than failing silently.
 func TestCollectorReportsSkippedArtifactsWhenBudgetIsExhausted(t *testing.T) {
 	c := testCollector(1)
 	c.remaining = 0
 	c.enqueue("https://app.example.com/a.js", enumerate.JavascriptArtifactKindChunk, "https://app.example.com/runtime.js")
 
-	c.drainQueue(t.Context())
+	c.drainQueue(t.Context(), reportFailures)
 
 	if len(c.errors) != 1 {
 		t.Fatalf("expected a skip to be reported, got %v", c.errors)

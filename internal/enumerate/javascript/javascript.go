@@ -170,7 +170,7 @@ func (c *collector) enqueue(url string, kind enumerate.JavascriptArtifactKind, d
 
 // retrieveBundles fetches everything the seed stage queued, honoring the artifact budget.
 func (c *collector) retrieveBundles(ctx context.Context) {
-	c.drainQueue(ctx)
+	c.drainQueue(ctx, reportFailures)
 }
 
 // expandChunks reads the chunk manifest of every retrieved artifact and retrieves what it declares.
@@ -205,7 +205,7 @@ func (c *collector) expandChunks(ctx context.Context) {
 		if len(c.queue) == 0 {
 			return
 		}
-		c.drainQueue(ctx)
+		c.drainQueue(ctx, reportFailures)
 	}
 }
 
@@ -221,14 +221,21 @@ func (c *collector) retrieveSourceMaps(ctx context.Context) {
 		mapURL := strings.SplitN(current.details.Url, "?", 2)[0] + ".map"
 		c.enqueue(mapURL, enumerate.JavascriptArtifactKindSourceMap, current.details.Url)
 	}
-	// A missing source map is the normal case, so its absence is not reported as a failure.
-	before := len(c.errors)
-	c.drainQueue(ctx)
-	c.errors = c.errors[:before]
+	// A missing source map is the normal case, so a failed retrieval is not reported. Budget
+	// messages still are, or `--fetch-source-maps` could retrieve nothing and still exit clean.
+	c.drainQueue(ctx, quietFailures)
 }
 
+// retrievalMode says whether a failed retrieval is worth reporting.
+type retrievalMode bool
+
+const (
+	reportFailures retrievalMode = false
+	quietFailures  retrievalMode = true
+)
+
 // drainQueue retrieves everything queued, concurrently and within the artifact budget.
-func (c *collector) drainQueue(ctx context.Context) {
+func (c *collector) drainQueue(ctx context.Context, mode retrievalMode) {
 	pending := c.queue
 	c.queue = nil
 	if len(pending) == 0 {
@@ -298,7 +305,7 @@ func (c *collector) drainQueue(ctx context.Context) {
 		if results[index] != nil {
 			c.record(results[index])
 		}
-		if failures[index] != "" {
+		if failures[index] != "" && mode == reportFailures {
 			c.errors = append(c.errors, failures[index])
 		}
 	}

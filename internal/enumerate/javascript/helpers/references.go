@@ -25,6 +25,13 @@ func ExtractScriptReferences(html string, pageURL string) []string {
 	if err != nil {
 		return nil
 	}
+	// A relative src resolves against <base href>, not the page URL. Angular ships `<base href="/">`
+	// with bare bundle names, so a page below the root would otherwise build the wrong path.
+	if href, exists := document.Find("base[href]").First().Attr("href"); exists && strings.TrimSpace(href) != "" {
+		if declared, err := url.Parse(strings.TrimSpace(href)); err == nil {
+			base = base.ResolveReference(declared)
+		}
+	}
 
 	seen := map[string]struct{}{}
 	references := []string{}

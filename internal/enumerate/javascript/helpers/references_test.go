@@ -66,6 +66,36 @@ func TestExtractScriptReferencesDeduplicatesRepeatedSources(t *testing.T) {
 	}
 }
 
+// Angular ships `<base href="/">` with bare bundle names, so a page below the root must still
+// resolve them against the declared base rather than its own directory.
+func TestExtractScriptReferencesHonorsBaseHref(t *testing.T) {
+	html := `<html><head><base href="/"><script src="runtime.111.js"></script></head></html>`
+
+	refs := enumeratejavascript.ExtractScriptReferences(html, "https://app.example.com/a/b/page")
+	if len(refs) != 1 || refs[0] != "https://app.example.com/runtime.111.js" {
+		t.Fatalf("expected the base href to root the bundle, got %v", refs)
+	}
+}
+
+func TestExtractScriptReferencesHonorsANestedBaseHref(t *testing.T) {
+	html := `<html><head><base href="/app/"><script src="runtime.111.js"></script></head></html>`
+
+	refs := enumeratejavascript.ExtractScriptReferences(html, "https://app.example.com/a/b/page")
+	if len(refs) != 1 || refs[0] != "https://app.example.com/app/runtime.111.js" {
+		t.Fatalf("expected the nested base href to be applied, got %v", refs)
+	}
+}
+
+// Without a base href a relative src still resolves against the page's own directory.
+func TestExtractScriptReferencesFallsBackToThePageDirectory(t *testing.T) {
+	html := `<html><head><script src="runtime.111.js"></script></head></html>`
+
+	refs := enumeratejavascript.ExtractScriptReferences(html, "https://app.example.com/a/b/page")
+	if len(refs) != 1 || refs[0] != "https://app.example.com/a/b/runtime.111.js" {
+		t.Fatalf("expected page-relative resolution, got %v", refs)
+	}
+}
+
 func TestLooksLikeHTMLRecognisesShellsAndBlockPages(t *testing.T) {
 	if !enumeratejavascript.LooksLikeHTML("<!doctype html><html></html>", "") {
 		t.Fatalf("expected a doctype body to read as HTML")

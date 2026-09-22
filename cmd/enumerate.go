@@ -989,7 +989,7 @@ a deduplicated set before anything is retrieved, so a bundle shared by many page
 	// Config Flags
 	enumerateJavascriptCmd.Flags().Bool("follow-chunks", true, "Resolve and analyze the lazily-loaded chunks the bundle's runtime declares")
 	enumerateJavascriptCmd.Flags().Bool("fetch-source-maps", false, "Fetch the source map published beside each artifact, when one is")
-	enumerateJavascriptCmd.Flags().Int("max-artifacts", 50, "Maximum number of declared chunks to fetch (0 = unlimited)")
+	enumerateJavascriptCmd.Flags().Int("max-artifacts", 50, "Maximum number of artifacts to retrieve across the run (0 = unlimited)")
 	enumerateJavascriptCmd.Flags().Int("analysis-window-bytes", javascripthelpers.DefaultWindowBytes, "Bytes of source analyzed per parse")
 	enumerateJavascriptCmd.Flags().Int("analysis-window-overlap-bytes", javascripthelpers.DefaultWindowOverlapBytes, "Bytes each analysis window overlaps the previous one")
 	enumerateJavascriptCmd.Flags().Bool("ignore-cross-domain-endpoints", true, "Ignore API bases whose host is not the target host or a subdomain of it")

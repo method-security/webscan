@@ -201,6 +201,25 @@ func TestRootEndpointsPreservesTrailingSlash(t *testing.T) {
 	}
 }
 
+// A bare origin literal is a base candidate, never an endpoint with an empty path.
+func TestAnalyzeSourceDropsBareOriginLiterals(t *testing.T) {
+	source := []byte(`const a="https://cdn.example.com";const b="https://api.example.com/";fetch("https://api.example.com/v1/orders")`)
+
+	analysis := enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0)
+
+	for _, endpoint := range analysis.Endpoints {
+		if endpoint.Path == "" || endpoint.Path == "/" {
+			t.Fatalf("expected no empty-path endpoint, got %+v", endpoint)
+		}
+	}
+	if !contains(pathsOf(analysis.Endpoints), "/v1/orders") {
+		t.Fatalf("expected the real endpoint to survive, got %v", pathsOf(analysis.Endpoints))
+	}
+	if !contains(analysis.Origins, "https://cdn.example.com") {
+		t.Fatalf("expected the bare origin to remain a base candidate, got %v", analysis.Origins)
+	}
+}
+
 func contains(values []string, want string) bool {
 	for _, value := range values {
 		if value == want {

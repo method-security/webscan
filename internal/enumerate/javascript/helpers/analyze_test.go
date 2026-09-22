@@ -60,7 +60,7 @@ func TestAnalyzeSourceRootsRelativeCallsAgainstConfiguredBase(t *testing.T) {
 	class S { del(n){ return this.dataService.getRequest("general/DeleteFile?fileName="+n) } }`)
 
 	analysis := enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0)
-	rooted := enumeratejavascript.RootEndpoints(analysis.Endpoints, analysis.Origins, "portal.example.com")
+	rooted := enumeratejavascript.RootEndpoints(analysis.Endpoints, analysis.Origins, []string{"portal.example.com"})
 
 	endpoint := findEndpoint(t, rooted, "/serviceapi/v1/general/DeleteFile")
 	if !endpoint.Rooted {
@@ -75,7 +75,7 @@ func TestAnalyzeSourceKeepsRootRelativePathsUntouched(t *testing.T) {
 	source := []byte(`fetch("/api/v1/widgets?limit=10");const env={apiUrl:"https://portal.example.com/serviceapi/v1"};`)
 
 	analysis := enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0)
-	rooted := enumeratejavascript.RootEndpoints(analysis.Endpoints, analysis.Origins, "portal.example.com")
+	rooted := enumeratejavascript.RootEndpoints(analysis.Endpoints, analysis.Origins, []string{"portal.example.com"})
 
 	endpoint := findEndpoint(t, rooted, "/api/v1/widgets")
 	if endpoint.Method == nil || string(*endpoint.Method) != "GET" {
@@ -97,12 +97,12 @@ func TestAnalyzeSourceDropsStaticAssetReferences(t *testing.T) {
 func TestBaseCandidatesInScopeExcludesThirdPartyOrigins(t *testing.T) {
 	candidates := []string{"https://portal.example.com/serviceapi/v1", "https://identity.other.com/"}
 
-	kept := enumeratejavascript.BaseCandidatesInScope(candidates, "https://portal.example.com/main.js", true)
+	kept := enumeratejavascript.BaseCandidatesInScope(candidates, []string{"portal.example.com"}, true)
 	if len(kept) != 1 || kept[0] != "https://portal.example.com/serviceapi/v1" {
 		t.Fatalf("expected only the in-scope origin, got %v", kept)
 	}
 
-	kept = enumeratejavascript.BaseCandidatesInScope(candidates, "https://portal.example.com/main.js", false)
+	kept = enumeratejavascript.BaseCandidatesInScope(candidates, []string{"portal.example.com"}, false)
 	if len(kept) != 2 {
 		t.Fatalf("expected both origins when scoping is off, got %v", kept)
 	}
@@ -151,7 +151,7 @@ func TestPreferredBaseIgnoresPagesAndPicksTheApiRoot(t *testing.T) {
 	}
 	endpoints := []*enumerate.JavascriptEndpoint{{Path: "general/DeleteFile", SourceUrl: sourceURL}}
 
-	rooted := enumeratejavascript.RootEndpoints(endpoints, candidates, "portal.example.com")
+	rooted := enumeratejavascript.RootEndpoints(endpoints, candidates, []string{"portal.example.com"})
 	endpoint := findEndpoint(t, rooted, "/serviceapi/v1/general/DeleteFile")
 	if endpoint.BaseUrl == nil || *endpoint.BaseUrl != "https://portal.example.com" {
 		t.Fatalf("expected the API base, got %v", endpoint.BaseUrl)
@@ -161,7 +161,7 @@ func TestPreferredBaseIgnoresPagesAndPicksTheApiRoot(t *testing.T) {
 func TestPreferredBaseLeavesEndpointsAloneWhenNoBaseQualifies(t *testing.T) {
 	endpoints := []*enumerate.JavascriptEndpoint{{Path: "general/DeleteFile", SourceUrl: sourceURL}}
 
-	rooted := enumeratejavascript.RootEndpoints(endpoints, []string{"https://cdn.example.com"}, "portal.example.com")
+	rooted := enumeratejavascript.RootEndpoints(endpoints, []string{"https://cdn.example.com"}, []string{"portal.example.com"})
 	if len(rooted) != 1 || rooted[0].Rooted {
 		t.Fatalf("expected the endpoint to stay unrooted, got %v", rooted)
 	}
@@ -190,7 +190,7 @@ func TestRootEndpointsPreservesTrailingSlash(t *testing.T) {
 		{Path: "orders/list", SourceUrl: sourceURL},
 	}
 
-	rooted := enumeratejavascript.RootEndpoints(endpoints, []string{"https://portal.example.com/serviceapi/v1"}, "portal.example.com")
+	rooted := enumeratejavascript.RootEndpoints(endpoints, []string{"https://portal.example.com/serviceapi/v1"}, []string{"portal.example.com"})
 
 	paths := pathsOf(rooted)
 	if !contains(paths, "/serviceapi/v1/orders/list/") {
@@ -217,6 +217,44 @@ func TestAnalyzeSourceDropsBareOriginLiterals(t *testing.T) {
 	}
 	if !contains(analysis.Origins, "https://cdn.example.com") {
 		t.Fatalf("expected the bare origin to remain a base candidate, got %v", analysis.Origins)
+	}
+}
+
+// An application states its base in one bundle and makes its calls in another, so rooting must run
+// over the candidates pooled from every bundle rather than per bundle.
+func TestRootEndpointsUsesBaseDeclaredInAnotherBundle(t *testing.T) {
+	entry := enumeratejavascript.AnalyzeSource(
+		[]byte(`const env={serviceApiEndpoint:"https://portal.example.com/serviceapi/v1"};`), "https://portal.example.com/main.js", 0, 0)
+	chunk := enumeratejavascript.AnalyzeSource(
+		[]byte(`class S{del(n){return this.dataService.getRequest("general/DeleteFile?fileName="+n)}}`), "https://portal.example.com/44.js", 0, 0)
+
+	if len(chunk.Origins) != 0 {
+		t.Fatalf("expected the chunk to declare no base of its own, got %v", chunk.Origins)
+	}
+
+	pooled := append(append([]string{}, entry.Origins...), chunk.Origins...)
+	endpoints := append(append([]*enumerate.JavascriptEndpoint{}, entry.Endpoints...), chunk.Endpoints...)
+	rooted := enumeratejavascript.RootEndpoints(endpoints, pooled, []string{"portal.example.com"})
+
+	endpoint := findEndpoint(t, rooted, "/serviceapi/v1/general/DeleteFile")
+	if endpoint.BaseUrl == nil || *endpoint.BaseUrl != "https://portal.example.com" {
+		t.Fatalf("expected the base from the other bundle, got %v", endpoint.BaseUrl)
+	}
+	if endpoint.SourceUrl != "https://portal.example.com/44.js" {
+		t.Fatalf("expected the chunk to stay the source of record, got %s", endpoint.SourceUrl)
+	}
+}
+
+func TestBaseCandidatesInScopeSpansEveryAnalyzedHost(t *testing.T) {
+	candidates := []string{
+		"https://portal.example.com/serviceapi/v1",
+		"https://cdn.example.net/assets",
+		"https://identity.other.com/auth",
+	}
+
+	kept := enumeratejavascript.BaseCandidatesInScope(candidates, []string{"portal.example.com", "cdn.example.net"}, true)
+	if len(kept) != 2 {
+		t.Fatalf("expected both analyzed hosts to stay in scope, got %v", kept)
 	}
 }
 

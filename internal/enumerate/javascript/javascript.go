@@ -40,24 +40,44 @@ func PerformJavascriptEnumeration(ctx context.Context, config enumerate.Enumerat
 	report := enumerate.EnumerateJavascriptReport{
 		Config: &config,
 		Result: &enumerate.EnumerateJavascriptResult{
-			Target: config.Target,
+			Targets: config.Targets,
 		},
 	}
 	errors := []string{}
 
-	entry, err := fetchArtifact(ctx, config, config.Target, enumerate.JavascriptArtifactKindEntry, nil)
-	if err != nil {
-		report.Errors = append(report.Errors, err.Error())
-		return report
-	}
+	// An application splits what this tool needs across bundles — the API base in one, the chunk
+	// manifest in another, the calls in the chunks — so every target is analyzed as one application.
+	artifacts := []*artifact{}
+	fetched := map[string]struct{}{}
+	remaining := config.MaxArtifacts
 
-	artifacts := []*artifact{entry}
-	if config.FollowChunks {
-		log.Info("Expanding declared chunks", svc1log.SafeParam("target", config.Target))
-		chunks, chunkErrors := fetchDeclaredChunks(ctx, config, entry)
+	for _, target := range config.Targets {
+		if _, seen := fetched[target]; seen {
+			continue
+		}
+		fetched[target] = struct{}{}
+
+		entry, err := fetchArtifact(ctx, config, target, enumerate.JavascriptArtifactKindEntry, nil)
+		if err != nil {
+			errors = append(errors, err.Error())
+			continue
+		}
+		artifacts = append(artifacts, entry)
+
+		if !config.FollowChunks {
+			continue
+		}
+		log.Info("Expanding declared chunks", svc1log.SafeParam("target", target))
+		chunks, chunkErrors := fetchDeclaredChunks(ctx, config, entry, fetched, &remaining)
 		artifacts = append(artifacts, chunks...)
 		errors = append(errors, chunkErrors...)
 	}
+
+	if len(artifacts) == 0 {
+		report.Errors = append(report.Errors, errors...)
+		return report
+	}
+
 	if config.FetchSourceMaps {
 		maps, mapErrors := fetchSourceMaps(ctx, config, artifacts)
 		artifacts = append(artifacts, maps...)
@@ -78,8 +98,9 @@ func PerformJavascriptEnumeration(ctx context.Context, config enumerate.Enumerat
 		}
 	}
 
-	baseCandidates := javascripthelpers.BaseCandidatesInScope(sortedSet(origins), config.Target, config.IgnoreCrossDomainEndpoints)
-	endpoints = javascripthelpers.RootEndpoints(dedupeEndpoints(endpoints), baseCandidates, targetHost(config.Target))
+	hosts := targetHosts(config.Targets)
+	baseCandidates := javascripthelpers.BaseCandidatesInScope(sortedSet(origins), hosts, config.IgnoreCrossDomainEndpoints)
+	endpoints = javascripthelpers.RootEndpoints(dedupeEndpoints(endpoints), baseCandidates, hosts)
 
 	report.Result.Artifacts = artifactDetails(artifacts)
 	report.Result.BaseUrlCandidates = baseCandidates
@@ -90,7 +111,7 @@ func PerformJavascriptEnumeration(ctx context.Context, config enumerate.Enumerat
 }
 
 // fetchDeclaredChunks resolves the chunk names a bundle's runtime declares and fetches each.
-func fetchDeclaredChunks(ctx context.Context, config enumerate.EnumerateJavascriptConfig, entry *artifact) ([]*artifact, []string) {
+func fetchDeclaredChunks(ctx context.Context, config enumerate.EnumerateJavascriptConfig, entry *artifact, fetched map[string]struct{}, remaining *int) ([]*artifact, []string) {
 	source := string(entry.source)
 	names := javascripthelpers.ExtractWebpackChunkNames(source)
 	if len(names) == 0 {
@@ -103,15 +124,40 @@ func fetchDeclaredChunks(ctx context.Context, config enumerate.EnumerateJavascri
 	publicPath := javascripthelpers.ExtractPublicPath(source)
 	errors := []string{}
 
+	// Resolve first so the budget and the already-fetched set are applied to real URLs.
+	type chunk struct {
+		name string
+		url  string
+	}
 	declared := len(names)
-	if config.MaxArtifacts > 0 && declared > config.MaxArtifacts {
-		errors = append(errors, fmt.Sprintf("fetching %d of %d declared chunks: max-artifacts reached", config.MaxArtifacts, declared))
-		names = names[:config.MaxArtifacts]
+	pending := make([]chunk, 0, len(names))
+	for _, name := range names {
+		chunkURL, err := resolveChunkURL(entry.details.Url, publicPath, name)
+		if err != nil {
+			errors = append(errors, err.Error())
+			continue
+		}
+		if _, seen := fetched[chunkURL]; seen {
+			continue
+		}
+		fetched[chunkURL] = struct{}{}
+		pending = append(pending, chunk{name: name, url: chunkURL})
+	}
+
+	if config.MaxArtifacts > 0 {
+		if *remaining <= 0 {
+			return nil, append(errors, fmt.Sprintf("skipped %d declared chunks: max-artifacts reached", len(pending)))
+		}
+		if len(pending) > *remaining {
+			errors = append(errors, fmt.Sprintf("fetching %d of %d declared chunks: max-artifacts reached", *remaining, declared))
+			pending = pending[:*remaining]
+		}
+		*remaining -= len(pending)
 	}
 
 	// Indexed rather than appended: chunks complete out of order but the report must not.
-	fetched := make([]*artifact, len(names))
-	failures := make([]string, len(names))
+	results := make([]*artifact, len(pending))
+	failures := make([]string, len(pending))
 
 	maxConcurrent := runtime.GOMAXPROCS(0)
 	if config.Threads > 0 {
@@ -120,36 +166,30 @@ func fetchDeclaredChunks(ctx context.Context, config enumerate.EnumerateJavascri
 	semaphore := make(chan struct{}, maxConcurrent)
 
 	var waitGroup sync.WaitGroup
-	for index, name := range names {
+	for index, item := range pending {
 		waitGroup.Add(1)
 		semaphore <- struct{}{}
 
-		go func(index int, name string) {
+		go func(index int, item chunk) {
 			defer waitGroup.Done()
 			defer func() { <-semaphore }()
 
-			chunkURL, err := resolveChunkURL(entry.details.Url, publicPath, name)
-			if err != nil {
-				failures[index] = err.Error()
-				return
-			}
-
 			applyStealthDelay(ctx, config)
 
-			chunk, err := fetchArtifact(ctx, config, chunkURL, enumerate.JavascriptArtifactKindChunk, &entry.details.Url)
+			fetchedChunk, err := fetchArtifact(ctx, config, item.url, enumerate.JavascriptArtifactKindChunk, &entry.details.Url)
 			if err != nil {
 				failures[index] = err.Error()
 				return
 			}
-			fetched[index] = chunk
-		}(index, name)
+			results[index] = fetchedChunk
+		}(index, item)
 	}
 	waitGroup.Wait()
 
-	artifacts := make([]*artifact, 0, len(names))
-	for index := range names {
-		if fetched[index] != nil {
-			artifacts = append(artifacts, fetched[index])
+	artifacts := make([]*artifact, 0, len(pending))
+	for index := range pending {
+		if results[index] != nil {
+			artifacts = append(artifacts, results[index])
 		}
 		if failures[index] != "" {
 			errors = append(errors, failures[index])
@@ -358,13 +398,23 @@ func dedupeSecrets(secrets []*enumerate.JavascriptSecret) []*enumerate.Javascrip
 	return out
 }
 
-// targetHost returns the host of the analyzed bundle, used to prefer a same-origin API base.
-func targetHost(target string) string {
-	parsed, err := url.Parse(target)
-	if err != nil {
-		return ""
+// targetHosts returns the hosts of the analyzed bundles, used to prefer a same-origin API base.
+func targetHosts(targets []string) []string {
+	seen := map[string]struct{}{}
+	hosts := []string{}
+	for _, target := range targets {
+		parsed, err := url.Parse(target)
+		if err != nil || parsed.Hostname() == "" {
+			continue
+		}
+		host := strings.ToLower(parsed.Hostname())
+		if _, exists := seen[host]; exists {
+			continue
+		}
+		seen[host] = struct{}{}
+		hosts = append(hosts, host)
 	}
-	return parsed.Hostname()
+	return hosts
 }
 
 func sortedSet(set map[string]struct{}) []string {

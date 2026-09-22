@@ -17,8 +17,8 @@ import (
 // A bundle states its base once, as configuration, and then concatenates bare paths onto it. Left
 // alone the two never meet: the literal `general/DeleteFile` is not a path the origin serves, and
 // the base alone names no endpoint.
-func RootEndpoints(endpoints []*enumerate.JavascriptEndpoint, baseCandidates []string, preferHost string) []*enumerate.JavascriptEndpoint {
-	base, ok := preferredBase(baseCandidates, preferHost)
+func RootEndpoints(endpoints []*enumerate.JavascriptEndpoint, baseCandidates []string, preferHosts []string) []*enumerate.JavascriptEndpoint {
+	base, ok := preferredBase(baseCandidates, preferHosts)
 	if !ok {
 		return endpoints
 	}
@@ -62,10 +62,14 @@ var apiSegments = map[string]struct{}{
 // base is the one that reads as an API root: it carries a path, that path does not end in a page
 // extension, and it names an API. Depth alone is not enough — a sign-out page sits deeper than
 // `/serviceapi/v1` and would otherwise win.
-func preferredBase(candidates []string, preferHost string) (string, bool) {
+func preferredBase(candidates []string, preferHosts []string) (string, bool) {
 	ranked := append([]string{}, candidates...)
 	sort.Strings(ranked)
-	preferHost = strings.ToLower(preferHost)
+
+	preferred := map[string]struct{}{}
+	for _, host := range preferHosts {
+		preferred[strings.ToLower(host)] = struct{}{}
+	}
 
 	best := ""
 	bestScore := 0
@@ -94,7 +98,7 @@ func preferredBase(candidates []string, preferHost string) (string, bool) {
 				score += 5
 			}
 		}
-		if preferHost != "" && strings.EqualFold(parsed.Hostname(), preferHost) {
+		if _, wanted := preferred[strings.ToLower(parsed.Hostname())]; wanted {
 			score += 3
 		}
 		if score > bestScore {
@@ -133,17 +137,11 @@ func splitBase(base string) (string, string, error) {
 	return origin, prefix, nil
 }
 
-// BaseCandidatesInScope keeps only the origins that belong to the target host or a subdomain of it.
-func BaseCandidatesInScope(candidates []string, targetURL string, ignoreCrossDomain bool) []string {
-	if !ignoreCrossDomain {
+// BaseCandidatesInScope keeps only the origins belonging to an analyzed host or a subdomain of one.
+func BaseCandidatesInScope(candidates []string, targetHosts []string, ignoreCrossDomain bool) []string {
+	if !ignoreCrossDomain || len(targetHosts) == 0 {
 		return candidates
 	}
-
-	target, err := url.Parse(targetURL)
-	if err != nil || target.Host == "" {
-		return candidates
-	}
-	targetHost := strings.ToLower(target.Hostname())
 
 	kept := make([]string, 0, len(candidates))
 	for _, candidate := range candidates {
@@ -152,8 +150,12 @@ func BaseCandidatesInScope(candidates []string, targetURL string, ignoreCrossDom
 			continue
 		}
 		host := strings.ToLower(parsed.Hostname())
-		if host == targetHost || strings.HasSuffix(host, "."+targetHost) {
-			kept = append(kept, candidate)
+		for _, target := range targetHosts {
+			target = strings.ToLower(target)
+			if host == target || strings.HasSuffix(host, "."+target) {
+				kept = append(kept, candidate)
+				break
+			}
 		}
 	}
 	return kept

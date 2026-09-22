@@ -851,15 +851,19 @@ func (a *WebScan) InitEnumerateCommand() {
 	// JavaScript Command
 	enumerateJavascriptCmd := &cobra.Command{
 		Use:   "javascript",
-		Short: "Analyze a JavaScript bundle for endpoints, secrets and declared chunks",
-		Long: `Analyze a JavaScript bundle and the chunks its runtime declares, extracting API endpoints,
-configuration and secrets. Lazily-loaded chunks are resolved from the bundle's own chunk manifest
-rather than from the DOM, which never references them.`,
+		Short: "Analyze JavaScript bundles for endpoints, secrets and declared chunks",
+		Long: `Analyze JavaScript bundles and the chunks their runtimes declare, extracting API endpoints,
+configuration and secrets. Lazily-loaded chunks are resolved from a bundle's own chunk manifest
+rather than from the DOM, which never references them.
+
+Pass every bundle an application serves. A single-page app states its API base in one bundle, its
+chunk manifest in another and its requests in the chunks, so analyzing them together is what lets a
+path be reported against the base it is actually requested from.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			defer a.OutputSignal.PanicHandler(cmd.Context())
 
 			// Targets flag
-			target, err := cmd.Flags().GetString("target")
+			targets, err := cmd.Flags().GetStringSlice("targets")
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -944,7 +948,7 @@ rather than from the DOM, which never references them.`,
 
 			// Generate config
 			config := enumeratejavascriptfern.EnumerateJavascriptConfig{
-				Target:                     target,
+				Targets:                    targets,
 				FollowChunks:               followChunks,
 				FetchSourceMaps:            fetchSourceMaps,
 				MaxArtifacts:               maxArtifacts,
@@ -979,7 +983,7 @@ rather than from the DOM, which never references them.`,
 		},
 	}
 	// Target Flags
-	enumerateJavascriptCmd.Flags().String("target", "", "JavaScript bundle URL to analyze")
+	enumerateJavascriptCmd.Flags().StringSlice("targets", []string{}, "JavaScript bundle URLs to analyze as one application")
 	// Config Flags
 	enumerateJavascriptCmd.Flags().Bool("follow-chunks", true, "Resolve and analyze the lazily-loaded chunks the bundle's runtime declares")
 	enumerateJavascriptCmd.Flags().Bool("fetch-source-maps", false, "Fetch the source map published beside each artifact, when one is")
@@ -1000,7 +1004,7 @@ rather than from the DOM, which never references them.`,
 	enumerateJavascriptCmd.Flags().StringArray("cookie", []string{}, "Cookie as 'name=value' (repeatable)")
 
 	// Mark required flags
-	_ = enumerateJavascriptCmd.MarkFlagRequired("target")
+	_ = enumerateJavascriptCmd.MarkFlagRequired("targets")
 
 	// Add Command to 'Enumerate' Command
 	enumerateCmd.AddCommand(enumerateJavascriptCmd)

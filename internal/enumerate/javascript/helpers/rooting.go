@@ -3,6 +3,7 @@ package enumeratejavascript
 import (
 	// Standard
 	"net/url"
+	"path"
 	"sort"
 	"strings"
 
@@ -37,7 +38,7 @@ func RootEndpoints(endpoints []*enumerate.JavascriptEndpoint, baseCandidates []s
 		}
 		if !endpoint.Rooted {
 			endpoint.BaseUrl = &origin
-			endpoint.Path = prefix + "/" + strings.TrimPrefix(endpoint.Path, "/")
+			endpoint.Path = path.Join("/", prefix, endpoint.Path)
 			endpoint.Rooted = true
 		}
 		kept = append(kept, endpoint)

@@ -2141,12 +2141,6 @@ github.com/remeh/sizedwaitgroup
 # github.com/rivo/uniseg v0.4.7
 ## explicit; go 1.18
 github.com/rivo/uniseg
-# github.com/robertkrimen/otto v0.5.1
-## explicit; go 1.22
-github.com/robertkrimen/otto/ast
-github.com/robertkrimen/otto/file
-github.com/robertkrimen/otto/parser
-github.com/robertkrimen/otto/token
 # github.com/rs/xid v1.6.0
 ## explicit; go 1.16
 github.com/rs/xid
@@ -2881,10 +2875,6 @@ gopkg.in/alecthomas/kingpin.v2
 # gopkg.in/corvus-ch/zbase32.v1 v1.0.0
 ## explicit
 gopkg.in/corvus-ch/zbase32.v1
-# gopkg.in/sourcemap.v1 v1.0.5
-## explicit
-gopkg.in/sourcemap.v1
-gopkg.in/sourcemap.v1/base64vlq
 # gopkg.in/warnings.v0 v0.1.2
 ## explicit
 gopkg.in/warnings.v0

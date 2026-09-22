@@ -149,6 +149,10 @@ func toEndpoint(found *jsluice.URL, sourceURL string) *enumerate.JavascriptEndpo
 		if err != nil {
 			return nil
 		}
+		// A bare origin names no endpoint; it is only ever a base candidate.
+		if parsed.Path == "" || parsed.Path == "/" {
+			return nil
+		}
 		if isNonEndpointPath(parsed.Path) {
 			return nil
 		}

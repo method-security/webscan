@@ -33,8 +33,10 @@ func RootEndpoints(endpoints []*enumerate.JavascriptEndpoint, baseCandidates []s
 		if endpoint == nil {
 			continue
 		}
-		// The base itself names no endpoint, so it must not be reported as one.
-		if endpoint.Rooted && endpoint.Path == prefix && endpoint.BaseUrl != nil && *endpoint.BaseUrl == origin {
+		// The base itself names no endpoint, so it must not be reported as one. `/x` and `/x/` are
+		// the same base here even though they are different endpoints elsewhere.
+		if endpoint.Rooted && endpoint.BaseUrl != nil && *endpoint.BaseUrl == origin &&
+			strings.Trim(endpoint.Path, "/") == strings.Trim(prefix, "/") {
 			continue
 		}
 		if !endpoint.Rooted {
@@ -59,9 +61,9 @@ var apiSegments = map[string]struct{}{
 // preferredBase picks the API base from the absolute URLs a bundle references.
 //
 // A bundle references many absolute URLs, most of which are pages, CDNs or identity providers. The
-// base is the one that reads as an API root: it carries a path, that path does not end in a page
-// extension, and it names an API. Depth alone is not enough — a sign-out page sits deeper than
-// `/serviceapi/v1` and would otherwise win.
+// base is the shallowest path that reads as an API root. Scoring depth upwards would let a full
+// endpoint outrank the root it sits under, and relative literals would then be joined onto that
+// longer path.
 func preferredBase(candidates []string, preferHosts []string) (string, bool) {
 	ranked := append([]string{}, candidates...)
 	sort.Strings(ranked)
@@ -71,45 +73,71 @@ func preferredBase(candidates []string, preferHosts []string) (string, bool) {
 		preferred[strings.ToLower(host)] = struct{}{}
 	}
 
-	best := ""
-	bestScore := 0
+	var best *scoredBase
 	for _, candidate := range ranked {
 		parsed, err := url.Parse(candidate)
 		if err != nil || parsed.Host == "" {
 			continue
 		}
-		trimmed := strings.Trim(parsed.Path, "/")
+		trimmed := strings.Trim(parsed.EscapedPath(), "/")
 		if trimmed == "" {
 			continue
 		}
 		segments := strings.Split(trimmed, "/")
-		if looksLikePage(segments[len(segments)-1]) {
+		last := segments[len(segments)-1]
+		if looksLikePage(last) || isNonEndpointPath(parsed.EscapedPath()) {
 			continue
 		}
 
-		score := 1
-		for _, segment := range segments {
-			lowered := strings.ToLower(segment)
-			if _, exists := apiSegments[lowered]; exists {
-				score += 10
-				continue
-			}
-			if strings.HasSuffix(lowered, "api") || strings.HasSuffix(lowered, "apis") {
-				score += 5
-			}
+		_, sameHost := preferred[strings.ToLower(parsed.Hostname())]
+		current := scoredBase{
+			candidate: candidate,
+			apiLike:   namesAnAPI(segments),
+			sameHost:  sameHost,
+			depth:     len(segments),
 		}
-		if _, wanted := preferred[strings.ToLower(parsed.Hostname())]; wanted {
-			score += 3
-		}
-		if score > bestScore {
-			best = candidate
-			bestScore = score
+		if best == nil || betterBase(current, *best) {
+			chosen := current
+			best = &chosen
 		}
 	}
-	if best == "" {
+	if best == nil {
 		return "", false
 	}
-	return best, true
+	return best.candidate, true
+}
+
+// scoredBase is a base candidate with the properties it is ranked on.
+type scoredBase struct {
+	candidate string
+	apiLike   bool
+	sameHost  bool
+	depth     int
+}
+
+// betterBase ranks an API root above anything else, then a same-host base, then the shallower path.
+func betterBase(current scoredBase, best scoredBase) bool {
+	if current.apiLike != best.apiLike {
+		return current.apiLike
+	}
+	if current.sameHost != best.sameHost {
+		return current.sameHost
+	}
+	return current.depth < best.depth
+}
+
+// namesAnAPI reports a path whose segments mark it as an API root.
+func namesAnAPI(segments []string) bool {
+	for _, segment := range segments {
+		lowered := strings.ToLower(segment)
+		if _, exists := apiSegments[lowered]; exists {
+			return true
+		}
+		if strings.HasSuffix(lowered, "api") || strings.HasSuffix(lowered, "apis") {
+			return true
+		}
+	}
+	return false
 }
 
 // looksLikePage reports a final segment that names a document rather than an API root.
@@ -130,7 +158,7 @@ func splitBase(base string) (string, string, error) {
 		return "", "", err
 	}
 	origin := parsed.Scheme + "://" + parsed.Host
-	prefix := "/" + strings.Trim(parsed.Path, "/")
+	prefix := "/" + strings.Trim(parsed.EscapedPath(), "/")
 	if prefix == "/" {
 		prefix = ""
 	}

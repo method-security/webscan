@@ -130,6 +130,7 @@ func fetchDeclaredChunks(ctx context.Context, config enumerate.EnumerateJavascri
 		url  string
 	}
 	declared := len(names)
+	local := map[string]struct{}{}
 	pending := make([]chunk, 0, len(names))
 	for _, name := range names {
 		chunkURL, err := resolveChunkURL(entry.details.Url, publicPath, name)
@@ -140,8 +141,16 @@ func fetchDeclaredChunks(ctx context.Context, config enumerate.EnumerateJavascri
 		if _, seen := fetched[chunkURL]; seen {
 			continue
 		}
-		fetched[chunkURL] = struct{}{}
+		if _, seen := local[chunkURL]; seen {
+			continue
+		}
+		local[chunkURL] = struct{}{}
 		pending = append(pending, chunk{name: name, url: chunkURL})
+	}
+
+	// Nothing new to fetch is not a failure: another target's runtime declared the same chunks.
+	if len(pending) == 0 {
+		return nil, errors
 	}
 
 	if config.MaxArtifacts > 0 {
@@ -153,6 +162,12 @@ func fetchDeclaredChunks(ctx context.Context, config enumerate.EnumerateJavascri
 			pending = pending[:*remaining]
 		}
 		*remaining -= len(pending)
+	}
+
+	// Claimed only once committed to, so a chunk dropped by the budget stays reachable from a later
+	// target rather than being recorded as already fetched.
+	for _, item := range pending {
+		fetched[item.url] = struct{}{}
 	}
 
 	// Indexed rather than appended: chunks complete out of order but the report must not.

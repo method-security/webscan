@@ -258,6 +258,48 @@ func TestBaseCandidatesInScopeSpansEveryAnalyzedHost(t *testing.T) {
 	}
 }
 
+// A full endpoint under the API root must not outrank the root itself, or relative literals get
+// joined onto the longer path.
+func TestPreferredBasePrefersTheApiRootOverADeeperEndpoint(t *testing.T) {
+	candidates := []string{
+		"https://portal.example.com/serviceapi/v1",
+		"https://portal.example.com/serviceapi/v1/User/GetProfile",
+		"https://portal.example.com/api/v2/services/orders/detail",
+	}
+	endpoints := []*enumerate.JavascriptEndpoint{{Path: "general/DeleteFile", SourceUrl: sourceURL}}
+
+	rooted := enumeratejavascript.RootEndpoints(endpoints, candidates, []string{"portal.example.com"})
+	findEndpoint(t, rooted, "/serviceapi/v1/general/DeleteFile")
+}
+
+func TestPreferredBaseIgnoresStaticAssetCandidates(t *testing.T) {
+	candidates := []string{"https://portal.example.com/static/api/bundle.js"}
+	endpoints := []*enumerate.JavascriptEndpoint{{Path: "general/DeleteFile", SourceUrl: sourceURL}}
+
+	rooted := enumeratejavascript.RootEndpoints(endpoints, candidates, []string{"portal.example.com"})
+	if rooted[0].Rooted {
+		t.Fatalf("expected a static asset not to be used as a base, got %+v", rooted[0])
+	}
+}
+
+// The base is the same whether it was written with a trailing slash or without.
+func TestRootEndpointsDiscardsTheBaseWrittenWithATrailingSlash(t *testing.T) {
+	endpoints := []*enumerate.JavascriptEndpoint{
+		{Path: "/serviceapi/v1/", BaseUrl: strPtr("https://portal.example.com"), Rooted: true, SourceUrl: sourceURL},
+		{Path: "general/DeleteFile", SourceUrl: sourceURL},
+	}
+
+	rooted := enumeratejavascript.RootEndpoints(endpoints, []string{"https://portal.example.com/serviceapi/v1"}, []string{"portal.example.com"})
+	for _, endpoint := range rooted {
+		if strings.Trim(endpoint.Path, "/") == "serviceapi/v1" {
+			t.Fatalf("expected the base itself to be discarded, got %v", pathsOf(rooted))
+		}
+	}
+	findEndpoint(t, rooted, "/serviceapi/v1/general/DeleteFile")
+}
+
+func strPtr(value string) *string { return &value }
+
 func contains(values []string, want string) bool {
 	for _, value := range values {
 		if value == want {

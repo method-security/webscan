@@ -852,13 +852,15 @@ func (a *WebScan) InitEnumerateCommand() {
 	enumerateJavascriptCmd := &cobra.Command{
 		Use:   "javascript",
 		Short: "Analyze JavaScript bundles for endpoints, secrets and declared chunks",
-		Long: `Analyze JavaScript bundles and the chunks their runtimes declare, extracting API endpoints,
-configuration and secrets. Lazily-loaded chunks are resolved from a bundle's own chunk manifest
-rather than from the DOM, which never references them.
+		Long: `Analyze the JavaScript an application serves, extracting API endpoints, configuration and
+secrets. Targets may be pages or bundles: a page contributes the scripts it declares, a bundle is
+analyzed directly. Lazily-loaded chunks are resolved from a bundle's own chunk manifest rather than
+from the DOM, which never references them.
 
-Pass every bundle an application serves. A single-page app states its API base in one bundle, its
-chunk manifest in another and its requests in the chunks, so analyzing them together is what lets a
-path be reported against the base it is actually requested from.`,
+Pass every page or bundle belonging to one application. A single-page app states its API base in one
+bundle, its chunk manifest in another and its requests in the chunks, so analyzing them together is
+what lets a path be reported against the base it is actually requested from. Targets are resolved to
+a deduplicated set before anything is retrieved, so a bundle shared by many pages is fetched once.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			defer a.OutputSignal.PanicHandler(cmd.Context())
 
@@ -983,7 +985,7 @@ path be reported against the base it is actually requested from.`,
 		},
 	}
 	// Target Flags
-	enumerateJavascriptCmd.Flags().StringSlice("targets", []string{}, "JavaScript bundle URLs to analyze as one application")
+	enumerateJavascriptCmd.Flags().StringSlice("targets", []string{}, "Page or JavaScript bundle URLs to analyze as one application")
 	// Config Flags
 	enumerateJavascriptCmd.Flags().Bool("follow-chunks", true, "Resolve and analyze the lazily-loaded chunks the bundle's runtime declares")
 	enumerateJavascriptCmd.Flags().Bool("fetch-source-maps", false, "Fetch the source map published beside each artifact, when one is")

@@ -26,14 +26,20 @@ import (
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
-// artifact is one fetched JavaScript body plus the record kept about it.
+// artifact is one fetched body plus the record kept about it.
 type artifact struct {
-	details *enumerate.JavascriptArtifact
-	source  []byte
+	details  *enumerate.JavascriptArtifact
+	source   []byte
+	expanded bool
 }
 
-// PerformJavascriptEnumeration analyzes a JavaScript bundle and the chunks it declares, returning an
+// PerformJavascriptEnumeration analyzes the JavaScript an application serves, returning an
 // EnumerateJavascriptReport.
+//
+// Work is staged so nothing is fetched twice. Every target is resolved to the bundles it references
+// first, that set is deduplicated, only then are the bundles retrieved and their manifests expanded,
+// and analysis runs once per unique artifact. Pages routinely share entry bundles, so resolving and
+// analyzing per target would refetch the same multi-megabyte bundle once per page.
 func PerformJavascriptEnumeration(ctx context.Context, config enumerate.EnumerateJavascriptConfig) enumerate.EnumerateJavascriptReport {
 	log := svc1log.FromContext(ctx)
 
@@ -43,140 +49,217 @@ func PerformJavascriptEnumeration(ctx context.Context, config enumerate.Enumerat
 			Targets: config.Targets,
 		},
 	}
-	errors := []string{}
 
-	// An application splits what this tool needs across bundles — the API base in one, the chunk
-	// manifest in another, the calls in the chunks — so every target is analyzed as one application.
-	artifacts := []*artifact{}
-	fetched := map[string]struct{}{}
-	remaining := config.MaxArtifacts
+	collector := newCollector(config)
 
-	for _, target := range config.Targets {
-		if _, seen := fetched[target]; seen {
-			continue
-		}
-		fetched[target] = struct{}{}
+	log.Info("Resolving targets to the bundles they reference", svc1log.SafeParam("targets", len(config.Targets)))
+	collector.resolveSeeds(ctx)
 
-		entry, err := fetchArtifact(ctx, config, target, enumerate.JavascriptArtifactKindEntry, nil)
-		if err != nil {
-			errors = append(errors, err.Error())
-			continue
-		}
-		artifacts = append(artifacts, entry)
+	log.Info("Retrieving referenced bundles", svc1log.SafeParam("bundles", len(collector.pendingBundles())))
+	collector.retrieveBundles(ctx)
 
-		if !config.FollowChunks {
-			continue
-		}
-		log.Info("Expanding declared chunks", svc1log.SafeParam("target", target))
-		chunks, chunkErrors := fetchDeclaredChunks(ctx, config, entry, fetched, &remaining)
-		artifacts = append(artifacts, chunks...)
-		errors = append(errors, chunkErrors...)
+	if config.FollowChunks {
+		log.Info("Expanding declared chunks")
+		collector.expandChunks(ctx)
 	}
-
-	if len(artifacts) == 0 {
-		report.Errors = append(report.Errors, errors...)
-		return report
-	}
-
 	if config.FetchSourceMaps {
-		maps, mapErrors := fetchSourceMaps(ctx, config, artifacts)
-		artifacts = append(artifacts, maps...)
-		errors = append(errors, mapErrors...)
+		collector.retrieveSourceMaps(ctx)
 	}
 
-	endpoints := []*enumerate.JavascriptEndpoint{}
-	secrets := []*enumerate.JavascriptSecret{}
-	origins := map[string]struct{}{}
+	analysis := collector.analyze(config)
 
-	for _, current := range artifacts {
-		analysis := javascripthelpers.AnalyzeSource(current.source, current.details.Url, config.AnalysisWindowBytes, config.AnalysisWindowOverlapBytes)
-		current.details.Analyzed = true
-		endpoints = append(endpoints, analysis.Endpoints...)
-		secrets = append(secrets, analysis.Secrets...)
-		for _, origin := range analysis.Origins {
-			origins[origin] = struct{}{}
-		}
-	}
-
-	hosts := targetHosts(config.Targets)
-	baseCandidates := javascripthelpers.BaseCandidatesInScope(sortedSet(origins), hosts, config.IgnoreCrossDomainEndpoints)
-	endpoints = javascripthelpers.RootEndpoints(dedupeEndpoints(endpoints), baseCandidates, hosts)
-
-	report.Result.Artifacts = artifactDetails(artifacts)
-	report.Result.BaseUrlCandidates = baseCandidates
-	report.Result.Endpoints = endpoints
-	report.Result.Secrets = dedupeSecrets(secrets)
-	report.Errors = append(report.Errors, errors...)
+	report.Result.Artifacts = collector.artifactDetails()
+	report.Result.BaseUrlCandidates = analysis.bases
+	report.Result.Endpoints = analysis.endpoints
+	report.Result.Secrets = analysis.secrets
+	report.Errors = append(report.Errors, collector.errors...)
 	return report
 }
 
-// fetchDeclaredChunks resolves the chunk names a bundle's runtime declares and fetches each.
-func fetchDeclaredChunks(ctx context.Context, config enumerate.EnumerateJavascriptConfig, entry *artifact, fetched map[string]struct{}, remaining *int) ([]*artifact, []string) {
-	source := string(entry.source)
-	names := javascripthelpers.ExtractWebpackChunkNames(source)
-	if len(names) == 0 {
-		names = javascripthelpers.ExtractViteChunkNames(source)
-	}
-	if len(names) == 0 {
-		return nil, nil
-	}
+// collector accumulates artifacts across the stages, keeping one record per URL.
+type collector struct {
+	config    enumerate.EnumerateJavascriptConfig
+	artifacts []*artifact
+	// claimed guards every URL the run has decided to retrieve, so no URL is fetched twice however
+	// many pages or manifests name it.
+	claimed   map[string]struct{}
+	byURL     map[string]*artifact
+	queue     []queued
+	errors    []string
+	remaining int
+}
 
-	publicPath := javascripthelpers.ExtractPublicPath(source)
-	errors := []string{}
+// queued is a URL waiting to be retrieved, with where it was found.
+type queued struct {
+	url            string
+	kind           enumerate.JavascriptArtifactKind
+	discoveredFrom *string
+}
 
-	// Resolve first so the budget and the already-fetched set are applied to real URLs.
-	type chunk struct {
-		name string
-		url  string
+func newCollector(config enumerate.EnumerateJavascriptConfig) *collector {
+	return &collector{
+		config:    config,
+		claimed:   map[string]struct{}{},
+		byURL:     map[string]*artifact{},
+		remaining: config.MaxArtifacts,
 	}
-	declared := len(names)
-	local := map[string]struct{}{}
-	pending := make([]chunk, 0, len(names))
-	for _, name := range names {
-		chunkURL, err := resolveChunkURL(entry.details.Url, publicPath, name)
+}
+
+// claim reserves a URL for retrieval, reporting whether this call is the one that took it.
+func (c *collector) claim(url string) bool {
+	if _, exists := c.claimed[url]; exists {
+		return false
+	}
+	c.claimed[url] = struct{}{}
+	return true
+}
+
+func (c *collector) pendingBundles() []queued {
+	return c.queue
+}
+
+// resolveSeeds retrieves every target and reduces it to the bundles it references. A target that is
+// itself JavaScript is kept as retrieved; a page contributes the scripts it declares.
+func (c *collector) resolveSeeds(ctx context.Context) {
+	seeds := javascripthelpers.SortedUnique(c.config.Targets)
+	for _, seed := range seeds {
+		if !c.claim(seed) {
+			continue
+		}
+		fetched, err := fetchResource(ctx, c.config, seed, enumerate.JavascriptArtifactKindEntry, nil)
 		if err != nil {
-			errors = append(errors, err.Error())
+			c.errors = append(c.errors, err.Error())
 			continue
 		}
-		if _, seen := fetched[chunkURL]; seen {
-			continue
-		}
-		if _, seen := local[chunkURL]; seen {
-			continue
-		}
-		local[chunkURL] = struct{}{}
-		pending = append(pending, chunk{name: name, url: chunkURL})
-	}
 
-	// Nothing new to fetch is not a failure: another target's runtime declared the same chunks.
+		contentType := ""
+		if fetched.details.ContentType != nil {
+			contentType = *fetched.details.ContentType
+		}
+		if !javascripthelpers.LooksLikeHTML(string(fetched.source), contentType) {
+			c.record(fetched)
+			continue
+		}
+
+		// The page is provenance, not something to analyze as JavaScript.
+		fetched.details.Kind = enumerate.JavascriptArtifactKindPage
+		references := javascripthelpers.ExtractScriptReferences(string(fetched.source), seed)
+		count := len(references)
+		fetched.details.ReferenceCount = &count
+		fetched.source = nil
+		c.record(fetched)
+
+		if count == 0 {
+			c.errors = append(c.errors, fmt.Sprintf("%s: page references no JavaScript", seed))
+			continue
+		}
+		for _, reference := range references {
+			c.enqueue(reference, enumerate.JavascriptArtifactKindEntry, seed)
+		}
+	}
+}
+
+// enqueue schedules a URL for retrieval if no stage has claimed it yet.
+func (c *collector) enqueue(url string, kind enumerate.JavascriptArtifactKind, discoveredFrom string) {
+	if !c.claim(url) {
+		return
+	}
+	source := discoveredFrom
+	c.queue = append(c.queue, queued{url: url, kind: kind, discoveredFrom: &source})
+}
+
+// retrieveBundles fetches everything the seed stage queued, honoring the artifact budget.
+func (c *collector) retrieveBundles(ctx context.Context) {
+	c.drainQueue(ctx)
+}
+
+// expandChunks reads the chunk manifest of every retrieved artifact and retrieves what it declares.
+// It repeats while new manifests appear, since a chunk may itself carry one.
+func (c *collector) expandChunks(ctx context.Context) {
+	for pass := 0; pass < maxChunkPasses; pass++ {
+		for _, current := range c.artifacts {
+			if current.source == nil || current.expanded {
+				continue
+			}
+			current.expanded = true
+
+			source := string(current.source)
+			names := javascripthelpers.ExtractWebpackChunkNames(source)
+			if len(names) == 0 {
+				names = javascripthelpers.ExtractViteChunkNames(source)
+			}
+			if len(names) == 0 {
+				continue
+			}
+
+			publicPath := javascripthelpers.ExtractPublicPath(source)
+			for _, name := range names {
+				chunkURL, err := resolveChunkURL(current.details.Url, publicPath, name)
+				if err != nil {
+					c.errors = append(c.errors, err.Error())
+					continue
+				}
+				c.enqueue(chunkURL, enumerate.JavascriptArtifactKindChunk, current.details.Url)
+			}
+		}
+		if len(c.queue) == 0 {
+			return
+		}
+		c.drainQueue(ctx)
+	}
+}
+
+// maxChunkPasses bounds manifest-within-manifest expansion.
+const maxChunkPasses = 3
+
+// retrieveSourceMaps fetches the source map published beside each retrieved artifact, when one is.
+func (c *collector) retrieveSourceMaps(ctx context.Context) {
+	for _, current := range c.artifacts {
+		if current.source == nil || current.details.Kind == enumerate.JavascriptArtifactKindSourceMap {
+			continue
+		}
+		mapURL := strings.SplitN(current.details.Url, "?", 2)[0] + ".map"
+		c.enqueue(mapURL, enumerate.JavascriptArtifactKindSourceMap, current.details.Url)
+	}
+	// A missing source map is the normal case, so its absence is not reported as a failure.
+	before := len(c.errors)
+	c.drainQueue(ctx)
+	c.errors = c.errors[:before]
+}
+
+// drainQueue retrieves everything queued, concurrently and within the artifact budget.
+func (c *collector) drainQueue(ctx context.Context) {
+	pending := c.queue
+	c.queue = nil
 	if len(pending) == 0 {
-		return nil, errors
+		return
 	}
 
-	if config.MaxArtifacts > 0 {
-		if *remaining <= 0 {
-			return nil, append(errors, fmt.Sprintf("skipped %d declared chunks: max-artifacts reached", len(pending)))
+	if c.config.MaxArtifacts > 0 {
+		if c.remaining <= 0 {
+			c.errors = append(c.errors, fmt.Sprintf("skipped %d artifacts: max-artifacts reached", len(pending)))
+			for _, dropped := range pending {
+				delete(c.claimed, dropped.url)
+			}
+			return
 		}
-		if len(pending) > *remaining {
-			errors = append(errors, fmt.Sprintf("fetching %d of %d declared chunks: max-artifacts reached", *remaining, declared))
-			pending = pending[:*remaining]
+		if len(pending) > c.remaining {
+			c.errors = append(c.errors, fmt.Sprintf("retrieving %d of %d artifacts: max-artifacts reached", c.remaining, len(pending)))
+			// Released so `claimed` only ever holds URLs the run actually retrieves.
+			for _, dropped := range pending[c.remaining:] {
+				delete(c.claimed, dropped.url)
+			}
+			pending = pending[:c.remaining]
 		}
-		*remaining -= len(pending)
+		c.remaining -= len(pending)
 	}
 
-	// Claimed only once committed to, so a chunk dropped by the budget stays reachable from a later
-	// target rather than being recorded as already fetched.
-	for _, item := range pending {
-		fetched[item.url] = struct{}{}
-	}
-
-	// Indexed rather than appended: chunks complete out of order but the report must not.
 	results := make([]*artifact, len(pending))
 	failures := make([]string, len(pending))
 
 	maxConcurrent := runtime.GOMAXPROCS(0)
-	if config.Threads > 0 {
-		maxConcurrent = config.Threads
+	if c.config.Threads > 0 {
+		maxConcurrent = c.config.Threads
 	}
 	semaphore := make(chan struct{}, maxConcurrent)
 
@@ -185,32 +268,93 @@ func fetchDeclaredChunks(ctx context.Context, config enumerate.EnumerateJavascri
 		waitGroup.Add(1)
 		semaphore <- struct{}{}
 
-		go func(index int, item chunk) {
+		go func(index int, item queued) {
 			defer waitGroup.Done()
 			defer func() { <-semaphore }()
 
-			applyStealthDelay(ctx, config)
+			applyStealthDelay(ctx, c.config)
 
-			fetchedChunk, err := fetchArtifact(ctx, config, item.url, enumerate.JavascriptArtifactKindChunk, &entry.details.Url)
+			retrieved, err := fetchResource(ctx, c.config, item.url, item.kind, item.discoveredFrom)
 			if err != nil {
 				failures[index] = err.Error()
 				return
 			}
-			results[index] = fetchedChunk
+			contentType := ""
+			if retrieved.details.ContentType != nil {
+				contentType = *retrieved.details.ContentType
+			}
+			// A single-page app serves its shell for any unknown path, so a 200 alone does not mean
+			// the bundle exists.
+			if javascripthelpers.LooksLikeHTML(string(retrieved.source), contentType) {
+				failures[index] = fmt.Sprintf("fetching %s: served HTML rather than JavaScript", item.url)
+				return
+			}
+			results[index] = retrieved
 		}(index, item)
 	}
 	waitGroup.Wait()
 
-	artifacts := make([]*artifact, 0, len(pending))
 	for index := range pending {
 		if results[index] != nil {
-			artifacts = append(artifacts, results[index])
+			c.record(results[index])
 		}
 		if failures[index] != "" {
-			errors = append(errors, failures[index])
+			c.errors = append(c.errors, failures[index])
 		}
 	}
-	return artifacts, errors
+}
+
+// record keeps one artifact per URL.
+func (c *collector) record(current *artifact) {
+	if _, exists := c.byURL[current.details.Url]; exists {
+		return
+	}
+	c.byURL[current.details.Url] = current
+	c.artifacts = append(c.artifacts, current)
+}
+
+// analysisResult is what the analysis stage produced across every artifact.
+type analysisResult struct {
+	endpoints []*enumerate.JavascriptEndpoint
+	secrets   []*enumerate.JavascriptSecret
+	bases     []string
+}
+
+// analyze runs the extractor once per retrieved artifact and roots the result against the bases
+// pooled from all of them.
+func (c *collector) analyze(config enumerate.EnumerateJavascriptConfig) analysisResult {
+	endpoints := []*enumerate.JavascriptEndpoint{}
+	secrets := []*enumerate.JavascriptSecret{}
+	origins := map[string]struct{}{}
+
+	for _, current := range c.artifacts {
+		if current.source == nil {
+			continue
+		}
+		found := javascripthelpers.AnalyzeSource(current.source, current.details.Url, config.AnalysisWindowBytes, config.AnalysisWindowOverlapBytes)
+		current.details.Analyzed = true
+		endpoints = append(endpoints, found.Endpoints...)
+		secrets = append(secrets, found.Secrets...)
+		for _, origin := range found.Origins {
+			origins[origin] = struct{}{}
+		}
+	}
+
+	hosts := targetHosts(c.config.Targets)
+	bases := javascripthelpers.BaseCandidatesInScope(sortedSet(origins), hosts, config.IgnoreCrossDomainEndpoints)
+	return analysisResult{
+		endpoints: javascripthelpers.RootEndpoints(dedupeEndpoints(endpoints), bases, hosts),
+		secrets:   dedupeSecrets(secrets),
+		bases:     bases,
+	}
+}
+
+func (c *collector) artifactDetails() []*enumerate.JavascriptArtifact {
+	details := make([]*enumerate.JavascriptArtifact, 0, len(c.artifacts))
+	for _, current := range c.artifacts {
+		details = append(details, current.details)
+	}
+	return details
 }
 
 // applyStealthDelay spaces requests out when a sleep is configured.
@@ -224,30 +368,7 @@ func applyStealthDelay(ctx context.Context, config enumerate.EnumerateJavascript
 	}
 }
 
-// fetchSourceMaps retrieves the source map published beside each artifact, when one is.
-func fetchSourceMaps(ctx context.Context, config enumerate.EnumerateJavascriptConfig, artifacts []*artifact) ([]*artifact, []string) {
-	maps := []*artifact{}
-	errors := []string{}
-
-	for _, current := range artifacts {
-		if current.details.Kind == enumerate.JavascriptArtifactKindSourceMap {
-			continue
-		}
-		mapURL := strings.SplitN(current.details.Url, "?", 2)[0] + ".map"
-		sourceMap, err := fetchArtifact(ctx, config, mapURL, enumerate.JavascriptArtifactKindSourceMap, &current.details.Url)
-		if err != nil {
-			continue
-		}
-		if sourceMap.details.StatusCode == nil || *sourceMap.details.StatusCode != 200 {
-			continue
-		}
-		maps = append(maps, sourceMap)
-	}
-	return maps, errors
-}
-
-// fetchArtifact retrieves one artifact, rejecting bodies an SPA catch-all returned instead of code.
-func fetchArtifact(ctx context.Context, config enumerate.EnumerateJavascriptConfig, target string, kind enumerate.JavascriptArtifactKind, discoveredFrom *string) (*artifact, error) {
+func fetchResource(ctx context.Context, config enumerate.EnumerateJavascriptConfig, target string, kind enumerate.JavascriptArtifactKind, discoveredFrom *string) (*artifact, error) {
 	baseURL, path, queryParams, err := requesthelpers.SplitTargetURL(target)
 	if err != nil {
 		return nil, fmt.Errorf("parsing %s: %w", target, err)
@@ -301,11 +422,6 @@ func fetchArtifact(ctx context.Context, config enumerate.EnumerateJavascriptConf
 	if details.StatusCode == nil || *details.StatusCode != 200 {
 		return nil, fmt.Errorf("fetching %s: unexpected status", target)
 	}
-	// A single-page app serves its shell for any unknown path, so a 200 alone does not mean the
-	// chunk exists.
-	if looksLikeHTML(body, details.ContentType) {
-		return nil, fmt.Errorf("fetching %s: served HTML rather than JavaScript", target)
-	}
 
 	return &artifact{details: details, source: []byte(body)}, nil
 }
@@ -339,17 +455,6 @@ func resolveChunkURL(entryURL string, publicPath string, name string) (string, e
 	return root.JoinPath(name).String(), nil
 }
 
-func looksLikeHTML(body string, contentType *string) bool {
-	if contentType != nil && strings.Contains(strings.ToLower(*contentType), "text/html") {
-		return true
-	}
-	leading := strings.ToLower(strings.TrimSpace(body))
-	if len(leading) > 512 {
-		leading = leading[:512]
-	}
-	return strings.HasPrefix(leading, "<!doctype html") || strings.HasPrefix(leading, "<html")
-}
-
 func firstHeaderValue(headers map[string][]string, name string) string {
 	for key, values := range headers {
 		if strings.EqualFold(key, name) && len(values) > 0 {
@@ -357,14 +462,6 @@ func firstHeaderValue(headers map[string][]string, name string) string {
 		}
 	}
 	return ""
-}
-
-func artifactDetails(artifacts []*artifact) []*enumerate.JavascriptArtifact {
-	details := make([]*enumerate.JavascriptArtifact, 0, len(artifacts))
-	for _, current := range artifacts {
-		details = append(details, current.details)
-	}
-	return details
 }
 
 func dedupeEndpoints(endpoints []*enumerate.JavascriptEndpoint) []*enumerate.JavascriptEndpoint {

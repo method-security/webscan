@@ -5,6 +5,7 @@ types:
   # ENUMs
   JavascriptArtifactKind:
     enum:
+      - PAGE
       - ENTRY
       - CHUNK
       - SOURCE_MAP
@@ -24,6 +25,7 @@ types:
       contentType: optional<string>
       analyzed: boolean
       discoveredFrom: optional<string>
+      referenceCount: optional<integer>
   JavascriptEndpoint:
     properties:
       path: string

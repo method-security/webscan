@@ -5,14 +5,18 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"runtime"
 	"sort"
 	"strings"
+	"sync"
+	"time"
 
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
 	"github.com/Method-Security/webscan/generated/go/enumerate"
 
 	// Utils
+	utils "github.com/Method-Security/webscan/utils"
 	request "github.com/Method-Security/webscan/utils/request"
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
 
@@ -98,28 +102,71 @@ func fetchDeclaredChunks(ctx context.Context, config enumerate.EnumerateJavascri
 
 	publicPath := javascripthelpers.ExtractPublicPath(source)
 	errors := []string{}
-	artifacts := []*artifact{}
 
-	for _, name := range names {
-		if config.MaxArtifacts > 0 && len(artifacts) >= config.MaxArtifacts {
-			errors = append(errors, fmt.Sprintf("stopped after %d chunks: %d declared", len(artifacts), len(names)))
-			break
-		}
+	declared := len(names)
+	if config.MaxArtifacts > 0 && declared > config.MaxArtifacts {
+		errors = append(errors, fmt.Sprintf("fetching %d of %d declared chunks: max-artifacts reached", config.MaxArtifacts, declared))
+		names = names[:config.MaxArtifacts]
+	}
 
-		chunkURL, err := resolveChunkURL(entry.details.Url, publicPath, name)
-		if err != nil {
-			errors = append(errors, err.Error())
-			continue
-		}
+	// Indexed rather than appended: chunks complete out of order but the report must not.
+	fetched := make([]*artifact, len(names))
+	failures := make([]string, len(names))
 
-		chunk, err := fetchArtifact(ctx, config, chunkURL, enumerate.JavascriptArtifactKindChunk, &entry.details.Url)
-		if err != nil {
-			errors = append(errors, err.Error())
-			continue
+	maxConcurrent := runtime.GOMAXPROCS(0)
+	if config.Threads > 0 {
+		maxConcurrent = config.Threads
+	}
+	semaphore := make(chan struct{}, maxConcurrent)
+
+	var waitGroup sync.WaitGroup
+	for index, name := range names {
+		waitGroup.Add(1)
+		semaphore <- struct{}{}
+
+		go func(index int, name string) {
+			defer waitGroup.Done()
+			defer func() { <-semaphore }()
+
+			chunkURL, err := resolveChunkURL(entry.details.Url, publicPath, name)
+			if err != nil {
+				failures[index] = err.Error()
+				return
+			}
+
+			applyStealthDelay(ctx, config)
+
+			chunk, err := fetchArtifact(ctx, config, chunkURL, enumerate.JavascriptArtifactKindChunk, &entry.details.Url)
+			if err != nil {
+				failures[index] = err.Error()
+				return
+			}
+			fetched[index] = chunk
+		}(index, name)
+	}
+	waitGroup.Wait()
+
+	artifacts := make([]*artifact, 0, len(names))
+	for index := range names {
+		if fetched[index] != nil {
+			artifacts = append(artifacts, fetched[index])
 		}
-		artifacts = append(artifacts, chunk)
+		if failures[index] != "" {
+			errors = append(errors, failures[index])
+		}
 	}
 	return artifacts, errors
+}
+
+// applyStealthDelay spaces requests out when a sleep is configured.
+func applyStealthDelay(ctx context.Context, config enumerate.EnumerateJavascriptConfig) {
+	if config.Sleep <= 0 {
+		return
+	}
+	select {
+	case <-time.After(utils.CalculateDelayWithJitter(config.Sleep, config.Jitter)):
+	case <-ctx.Done():
+	}
 }
 
 // fetchSourceMaps retrieves the source map published beside each artifact, when one is.
@@ -214,23 +261,27 @@ func resolveChunkURL(entryURL string, publicPath string, name string) (string, e
 	if err != nil {
 		return "", fmt.Errorf("parsing %s: %w", entryURL, err)
 	}
-
-	if publicPath != "" {
-		if absolute, err := url.Parse(publicPath); err == nil && absolute.IsAbs() {
-			return absolute.JoinPath(name).String(), nil
-		}
-		resolved, err := base.Parse(strings.TrimSuffix(publicPath, "/") + "/" + name)
-		if err != nil {
-			return "", fmt.Errorf("resolving %s: %w", name, err)
-		}
-		return resolved.String(), nil
+	// A `//`-prefixed name parses as a host, which would redirect the fetch off the target.
+	if strings.HasPrefix(name, "//") {
+		return "", fmt.Errorf("resolving %s: protocol-relative chunk name", name)
 	}
 
-	resolved, err := base.Parse(name)
+	reference, err := url.Parse(name)
 	if err != nil {
 		return "", fmt.Errorf("resolving %s: %w", name, err)
 	}
-	return resolved.String(), nil
+	if publicPath == "" || reference.IsAbs() || strings.HasPrefix(name, "/") {
+		return base.ResolveReference(reference).String(), nil
+	}
+
+	root, err := url.Parse(publicPath)
+	if err != nil {
+		return "", fmt.Errorf("resolving public path %s: %w", publicPath, err)
+	}
+	if !root.IsAbs() {
+		root = base.ResolveReference(root)
+	}
+	return root.JoinPath(name).String(), nil
 }
 
 func looksLikeHTML(body string, contentType *string) bool {
@@ -272,7 +323,11 @@ func dedupeEndpoints(endpoints []*enumerate.JavascriptEndpoint) []*enumerate.Jav
 		if endpoint.Method != nil {
 			method = string(*endpoint.Method)
 		}
-		key := method + " " + endpoint.Path
+		base := ""
+		if endpoint.BaseUrl != nil {
+			base = *endpoint.BaseUrl
+		}
+		key := method + " " + base + " " + endpoint.Path
 		if _, exists := seen[key]; exists {
 			continue
 		}

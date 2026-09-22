@@ -183,6 +183,24 @@ func TestAnalyzeSourceReadsVerbFromClientCall(t *testing.T) {
 	}
 }
 
+// `/x/` and `/x` are different URIs, so rooting must not clean the trailing slash away.
+func TestRootEndpointsPreservesTrailingSlash(t *testing.T) {
+	endpoints := []*enumerate.JavascriptEndpoint{
+		{Path: "orders/list/", SourceUrl: sourceURL},
+		{Path: "orders/list", SourceUrl: sourceURL},
+	}
+
+	rooted := enumeratejavascript.RootEndpoints(endpoints, []string{"https://portal.example.com/serviceapi/v1"}, "portal.example.com")
+
+	paths := pathsOf(rooted)
+	if !contains(paths, "/serviceapi/v1/orders/list/") {
+		t.Fatalf("expected the trailing slash to survive rooting, got %v", paths)
+	}
+	if !contains(paths, "/serviceapi/v1/orders/list") {
+		t.Fatalf("expected the slashless path to remain distinct, got %v", paths)
+	}
+}
+
 func contains(values []string, want string) bool {
 	for _, value := range values {
 		if value == want {

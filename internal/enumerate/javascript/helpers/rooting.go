@@ -3,12 +3,13 @@ package enumeratejavascript
 import (
 	// Standard
 	"net/url"
-	"path"
 	"sort"
 	"strings"
 
 	// Generated
 	"github.com/Method-Security/webscan/generated/go/enumerate"
+	// Utils
+	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
 )
 
 // RootEndpoints resolves relative endpoint literals against the API base the bundle configures.
@@ -38,7 +39,7 @@ func RootEndpoints(endpoints []*enumerate.JavascriptEndpoint, baseCandidates []s
 		}
 		if !endpoint.Rooted {
 			endpoint.BaseUrl = &origin
-			endpoint.Path = path.Join("/", prefix, endpoint.Path)
+			endpoint.Path = requesthelpers.JoinPath(prefix, endpoint.Path)
 			endpoint.Rooted = true
 		}
 		kept = append(kept, endpoint)

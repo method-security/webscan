@@ -6,6 +6,30 @@ import (
 	"github.com/Method-Security/webscan/generated/go/enumerate"
 )
 
+// The budget is documented as run-wide, so an explicit target must draw on it too.
+func TestCollectorSpendsBudgetOnTargets(t *testing.T) {
+	c := testCollector(2)
+
+	if !c.spend() || !c.spend() {
+		t.Fatalf("expected the first two retrievals to be allowed")
+	}
+	if c.spend() {
+		t.Fatalf("expected the third retrieval to be refused")
+	}
+	if c.remaining != 0 {
+		t.Fatalf("expected the budget to be spent, got %d", c.remaining)
+	}
+}
+
+func TestCollectorBudgetIsUnlimitedWhenUnset(t *testing.T) {
+	c := testCollector(0)
+	for range 50 {
+		if !c.spend() {
+			t.Fatalf("expected an unset budget to allow every retrieval")
+		}
+	}
+}
+
 func testCollector(maxArtifacts int) *collector {
 	return newCollector(enumerate.EnumerateJavascriptConfig{MaxArtifacts: maxArtifacts, Timeout: 1})
 }

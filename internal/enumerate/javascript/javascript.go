@@ -105,6 +105,18 @@ func newCollector(config enumerate.EnumerateJavascriptConfig) *collector {
 	}
 }
 
+// spend takes one retrieval from the budget, reporting whether the budget allowed it.
+func (c *collector) spend() bool {
+	if c.config.MaxArtifacts <= 0 {
+		return true
+	}
+	if c.remaining <= 0 {
+		return false
+	}
+	c.remaining--
+	return true
+}
+
 // claim reserves a URL for retrieval, reporting whether this call is the one that took it.
 func (c *collector) claim(url string) bool {
 	if _, exists := c.claimed[url]; exists {
@@ -122,7 +134,13 @@ func (c *collector) pendingBundles() []queued {
 // itself JavaScript is kept as retrieved; a page contributes the scripts it declares.
 func (c *collector) resolveSeeds(ctx context.Context) {
 	seeds := javascripthelpers.SortedUnique(c.config.Targets)
-	for _, seed := range seeds {
+	for index, seed := range seeds {
+		// Targets are resolved before anything discovered, so an explicit one always outranks a
+		// reference when the budget is tight.
+		if !c.spend() {
+			c.errors = append(c.errors, fmt.Sprintf("skipped %d targets: max-artifacts reached", len(seeds)-index))
+			return
+		}
 		if !c.claim(seed) {
 			continue
 		}

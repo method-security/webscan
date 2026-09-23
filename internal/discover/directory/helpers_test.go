@@ -1,10 +1,12 @@
 package discoverdirectory
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
 	common "github.com/Method-Security/webscan/generated/go/common"
+	discover "github.com/Method-Security/webscan/generated/go/discover"
 )
 
 func TestExpandPathsExtensionsOnly(t *testing.T) {
@@ -177,5 +179,43 @@ func TestUnanimousDirectoryStatuses(t *testing.T) {
 				t.Errorf("unanimousDirectoryStatuses() = %v, want %v", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestCreateDirectorySendHTTPRequestConfigAppliesAuth(t *testing.T) {
+	config := &discover.DiscoverDirectoryConfig{
+		Headers: map[string]string{"X-Api-Key": "abc"},
+		Cookies: map[string]string{"session": "xyz"},
+	}
+	for _, tc := range []struct {
+		name   string
+		params common.HttpRequestParams
+		want   map[string][]string
+	}{
+		{
+			name:   "auth is applied to a bare request",
+			params: common.HttpRequestParams{},
+			want:   map[string][]string{"X-Api-Key": {"abc"}, "Cookie": {"session=xyz"}},
+		},
+		{
+			name:   "caller-supplied headers are left alone",
+			params: common.HttpRequestParams{Headers: map[string][]string{"X-Other": {"1"}}},
+			want:   map[string][]string{"X-Other": {"1"}},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := createDirectorySendHTTPRequestConfig(context.Background(), "https://example.com", "/admin", common.HttpMethodGet, tc.params, 0, config)
+			if !reflect.DeepEqual(got.Request.Params.Headers, tc.want) {
+				t.Errorf("headers = %v, want %v", got.Request.Params.Headers, tc.want)
+			}
+		})
+	}
+}
+
+func TestCreateDirectorySendHTTPRequestConfigWithoutAuth(t *testing.T) {
+	config := &discover.DiscoverDirectoryConfig{}
+	got := createDirectorySendHTTPRequestConfig(context.Background(), "https://example.com", "/admin", common.HttpMethodGet, common.HttpRequestParams{}, 0, config)
+	if got.Request.Params.Headers != nil {
+		t.Errorf("headers = %v, want nil", got.Request.Params.Headers)
 	}
 }

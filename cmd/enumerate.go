@@ -949,22 +949,7 @@ a deduplicated set before anything is retrieved, so a bundle shared by many page
 			}
 
 			// Generate config
-			config := enumeratejavascriptfern.EnumerateJavascriptConfig{
-				Targets:                    targets,
-				FollowChunks:               followChunks,
-				FetchSourceMaps:            fetchSourceMaps,
-				MaxArtifacts:               maxArtifacts,
-				AnalysisWindowBytes:        analysisWindowBytes,
-				AnalysisWindowOverlapBytes: analysisWindowOverlapBytes,
-				IgnoreCrossDomainEndpoints: ignoreCrossDomainEndpoints,
-				MaxRedirects:               maxRedirects,
-				VerifyTls:                  verifyTLS,
-				Timeout:                    max(timeout, 0),
-				Sleep:                      max(sleep, 0),
-				Jitter:                     max(jitter, 0),
-				Threads:                    max(threads, 0),
-				UserAgent:                  userAgentPreset,
-			}
+			config := getEnumerateJavascriptConfig(targets, followChunks, fetchSourceMaps, maxArtifacts, analysisWindowBytes, analysisWindowOverlapBytes, ignoreCrossDomainEndpoints, maxRedirects, verifyTLS, timeout, sleep, jitter, threads, userAgentPreset)
 			config.Headers, err = requesthelpers.ParseHeaderPairs(headerPairs)
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -1061,6 +1046,27 @@ func getEnumerateGeneralRateLimitConfig(targets []string, maxRequests int, sleep
 }
 
 // getEnumerateDockerConfig builds the config for Docker registry enumeration.
+// getEnumerateJavascriptConfig builds the config for JavaScript enumeration.
+func getEnumerateJavascriptConfig(targets []string, followChunks bool, fetchSourceMaps bool, maxArtifacts int, analysisWindowBytes int, analysisWindowOverlapBytes int, ignoreCrossDomainEndpoints bool, maxRedirects int, verifyTLS bool, timeout int, sleep int, jitter int, threads int, userAgent common.UserAgentPreset) enumeratejavascriptfern.EnumerateJavascriptConfig {
+	config := enumeratejavascriptfern.EnumerateJavascriptConfig{
+		Targets:                    targets,
+		FollowChunks:               followChunks,
+		FetchSourceMaps:            fetchSourceMaps,
+		MaxArtifacts:               maxArtifacts,
+		AnalysisWindowBytes:        analysisWindowBytes,
+		AnalysisWindowOverlapBytes: analysisWindowOverlapBytes,
+		IgnoreCrossDomainEndpoints: ignoreCrossDomainEndpoints,
+		MaxRedirects:               maxRedirects,
+		VerifyTls:                  verifyTLS,
+		Timeout:                    max(timeout, 0),
+		Sleep:                      max(sleep, 0),
+		Jitter:                     max(jitter, 0),
+		Threads:                    max(threads, 0),
+		UserAgent:                  userAgent,
+	}
+	return config
+}
+
 func getEnumerateDockerConfig(targets []string, verifyTLS bool, timeout int, sleep int, jitter int, threads int, userAgent common.UserAgentPreset) enumeratedockerfern.EnumerateDockerConfig {
 	config := enumeratedockerfern.EnumerateDockerConfig{
 		Targets:   targets,

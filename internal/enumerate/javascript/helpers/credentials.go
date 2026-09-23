@@ -22,8 +22,11 @@ type credentialKeys struct {
 	PublicKeyNames     []string `json:"publicKeyNames"`
 	PlaceholderValues  []string `json:"placeholderValues"`
 	PlaceholderMarkers []string `json:"placeholderMarkers"`
-	MinimumValueLength int      `json:"minimumValueLength"`
 }
+
+// minimumCredentialLength is the shortest value worth reporting. Below it a value carries too little
+// entropy to be a credential, and the false positives outweigh anything real.
+const minimumCredentialLength = 12
 
 var (
 	loadKeysOnce sync.Once
@@ -82,10 +85,11 @@ func namesACredential(name string) bool {
 
 // isShippedCredential reports a value that is a credential rather than a placeholder.
 func isShippedCredential(value string) bool {
-	fingerprints := credentialFingerprints()
-	if len(value) < fingerprints.MinimumValueLength {
+	if len(value) < minimumCredentialLength {
 		return false
 	}
+
+	fingerprints := credentialFingerprints()
 	if !opaqueValuePattern.MatchString(value) || templatedValuePattern.MatchString(value) {
 		return false
 	}

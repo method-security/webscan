@@ -46,6 +46,8 @@ types:
       jitter: integer
       threads: integer
       userAgent: method.UserAgentPreset
+      headers: optional<map<string, string>>
+      cookies: optional<map<string, string>>
   # Report Structs
   DirectoryTargetInfo:
     properties:

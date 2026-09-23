@@ -135,14 +135,17 @@ func (c *collector) pendingBundles() []queued {
 func (c *collector) resolveSeeds(ctx context.Context) {
 	seeds := javascripthelpers.SortedUnique(c.config.Targets)
 	for index, seed := range seeds {
-		// Targets are resolved before anything discovered, so an explicit one always outranks a
-		// reference when the budget is tight.
-		if !c.spend() {
-			c.errors = append(c.errors, fmt.Sprintf("skipped %d targets: max-artifacts reached", len(seeds)-index))
-			return
-		}
+		// Claimed before charged: a target another stage already took costs nothing, and a target
+		// the budget refuses is released rather than recorded as handled. Targets are resolved
+		// before anything discovered, so an explicit one outranks a reference when the budget is
+		// tight.
 		if !c.claim(seed) {
 			continue
+		}
+		if !c.spend() {
+			delete(c.claimed, seed)
+			c.errors = append(c.errors, fmt.Sprintf("skipped %d targets: max-artifacts reached", len(seeds)-index))
+			return
 		}
 		fetched, err := fetchResource(ctx, c.config, seed, enumerate.JavascriptArtifactKindEntry, nil)
 		if err != nil {

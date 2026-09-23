@@ -30,6 +30,41 @@ func TestCollectorBudgetIsUnlimitedWhenUnset(t *testing.T) {
 	}
 }
 
+// A target another stage already claimed must not be charged, or the budget is spent twice on one
+// URL and later targets are dropped for no retrieval.
+func TestCollectorDoesNotChargeForAnAlreadyClaimedTarget(t *testing.T) {
+	c := testCollector(3)
+
+	// A page target claims the bundle it references.
+	c.enqueue("https://app.example.com/main.js", enumerate.JavascriptArtifactKindEntry, "https://app.example.com/")
+	before := c.remaining
+
+	// The same bundle named explicitly as a target is already claimed, so it costs nothing.
+	if c.claim("https://app.example.com/main.js") {
+		t.Fatalf("expected the bundle to be claimed already")
+	}
+	if c.remaining != before {
+		t.Fatalf("expected no budget to be spent on an already-claimed target, got %d", c.remaining)
+	}
+}
+
+// A target the budget refuses must not stay claimed, or the run records it as handled.
+func TestCollectorReleasesATargetTheBudgetRefuses(t *testing.T) {
+	c := testCollector(1)
+	c.remaining = 0
+
+	if !c.claim("https://app.example.com/main.js") {
+		t.Fatalf("expected a fresh claim to succeed")
+	}
+	if c.spend() {
+		t.Fatalf("expected an exhausted budget to refuse")
+	}
+	delete(c.claimed, "https://app.example.com/main.js")
+	if len(c.claimed) != 0 {
+		t.Fatalf("expected the refused target to be released, got %v", c.claimed)
+	}
+}
+
 func testCollector(maxArtifacts int) *collector {
 	return newCollector(enumerate.EnumerateJavascriptConfig{MaxArtifacts: maxArtifacts, Timeout: 1})
 }

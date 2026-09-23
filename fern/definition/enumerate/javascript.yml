@@ -9,12 +9,6 @@ types:
       - ENTRY
       - CHUNK
       - SOURCE_MAP
-  JavascriptSecretSeverity:
-    enum:
-      - INFO
-      - LOW
-      - MEDIUM
-      - HIGH
   # Common Objects
   JavascriptArtifact:
     properties:
@@ -40,7 +34,6 @@ types:
   JavascriptSecret:
     properties:
       kind: string
-      severity: JavascriptSecretSeverity
       value: optional<string>
       context: optional<string>
       sourceUrl: string

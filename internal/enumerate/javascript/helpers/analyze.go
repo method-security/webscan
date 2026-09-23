@@ -187,7 +187,6 @@ func toEndpoint(found *jsluice.URL, sourceURL string) *enumerate.JavascriptEndpo
 func toSecret(found *jsluice.Secret, sourceURL string) *enumerate.JavascriptSecret {
 	secret := &enumerate.JavascriptSecret{
 		Kind:      found.Kind,
-		Severity:  secretSeverity(found.Severity),
 		SourceUrl: sourceURL,
 	}
 	if rendered := renderJSON(found.Data); rendered != "" {
@@ -213,21 +212,6 @@ func renderJSON(value any) string {
 	return string(encoded)
 }
 
-func secretSeverity(severity jsluice.Severity) enumerate.JavascriptSecretSeverity {
-	switch severity {
-	case jsluice.SeverityHigh:
-		return enumerate.JavascriptSecretSeverityHigh
-	case jsluice.SeverityMedium:
-		return enumerate.JavascriptSecretSeverityMedium
-	case jsluice.SeverityLow:
-		return enumerate.JavascriptSecretSeverityLow
-	default:
-		return enumerate.JavascriptSecretSeverityInfo
-	}
-}
-
-// requestMethod maps a jsluice method onto an HTTP verb, ignoring the call expressions it reports
-// when the verb is not stated.
 func requestMethod(method string) (common.HttpMethod, bool) {
 	trimmed := strings.ToUpper(strings.TrimSpace(method))
 	if trimmed == "" {

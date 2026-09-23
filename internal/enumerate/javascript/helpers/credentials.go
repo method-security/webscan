@@ -51,10 +51,9 @@ func CredentialMatcher() jsluice.SecretMatcher {
 		}
 
 		return &jsluice.Secret{
-			Kind:     "configuredCredential",
-			Severity: jsluice.SeverityHigh,
-			Data:     map[string]string{"name": name, "value": value},
-			Context:  credentialContext(node),
+			Kind:    "configuredCredential",
+			Data:    map[string]string{"name": name, "value": value},
+			Context: credentialContext(node),
 		}
 	}}
 }

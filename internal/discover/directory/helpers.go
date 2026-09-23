@@ -27,6 +27,10 @@ import (
 
 // createDirectorySendHTTPRequestConfig builds the config for directory discovery.
 func createDirectorySendHTTPRequestConfig(ctx context.Context, baseURL, path string, method common.HttpMethod, requestParams common.HttpRequestParams, MaxRedirects int, config *discover.DiscoverDirectoryConfig) common.SendHttpRequestConfig {
+	// Baseline and calibration route through here too; they must carry the sweep's credentials or the diff is meaningless.
+	if requestParams.Headers == nil {
+		requestParams.Headers = requesthelpers.BuildAuthHeaders(config.Headers, config.Cookies)
+	}
 	request := common.HttpRequest{
 		BaseUrl: baseURL,
 		Path:    path,

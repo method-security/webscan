@@ -347,8 +347,29 @@ func (a *WebScan) InitDiscoverCommand() {
 				return
 			}
 
+			headerPairs, err := cmd.Flags().GetStringArray("header")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			cookiePairs, err := cmd.Flags().GetStringArray("cookie")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
 			// Set config
 			config := getDiscoverDirectoryConfig(targets, paths, wordlistType, wordlistSize, extensions, addSlash, recursionDepth, recursionStatusCodes, httpMethods, responseCodes, enableCommonResponseFilters, verifyTLS, threshold, timeout, globalRateLimit, ignoreCrossDomainRedirects, maxRedirectsBaselineRequest, threads, globalTimeout, retries, sleep, jitter, userAgentPreset)
+			config.Headers, err = requesthelpers.ParseHeaderPairs(headerPairs)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			config.Cookies, err = requesthelpers.ParseCookiePairs(cookiePairs)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
 
 			// Generate a report
 			rep, err := discoverdirectory.RunDirectoryDiscovery(cmd.Context(), config)
@@ -385,6 +406,9 @@ func (a *WebScan) InitDiscoverCommand() {
 	discoverDirectoryCmd.Flags().Int("jitter", 0, "Jitter percentage (0-100) to apply random variance to sleep delay")
 	// User Agent Flag
 	discoverDirectoryCmd.Flags().String("user-agent", "RANDOM", "User-Agent preset (RANDOM, CHROME, FIREFOX, SAFARI, EDGE)")
+	// Authentication Flags
+	discoverDirectoryCmd.Flags().StringArray("header", []string{}, "Request header for an authenticated sweep as 'Name: Value' (repeatable; missing colon errors; repeated names are case-insensitively comma-joined per RFC 7230 §3.2.2)")
+	discoverDirectoryCmd.Flags().StringArray("cookie", []string{}, "Cookie for an authenticated sweep as 'name=value' (repeatable; missing equals errors)")
 
 	// Mark Required Flags
 	_ = discoverDirectoryCmd.MarkFlagRequired("targets")

@@ -5,6 +5,7 @@ import (
 	"errors"
 	// Generated
 	common "github.com/Method-Security/webscan/generated/go/common"
+	enumeratejavascriptfern "github.com/Method-Security/webscan/generated/go/enumerate"
 	enumerateapiapplicationfern "github.com/Method-Security/webscan/generated/go/enumerate/apiapplication"
 	enumeratecmsdrupalfern "github.com/Method-Security/webscan/generated/go/enumerate/cms/drupal"
 	enumeratecmswordpressfern "github.com/Method-Security/webscan/generated/go/enumerate/cms/wordpress"
@@ -17,6 +18,8 @@ import (
 	enumeratecms "github.com/Method-Security/webscan/internal/enumerate/cms"
 	enumeratedocker "github.com/Method-Security/webscan/internal/enumerate/containerregistry"
 	enumerategeneral "github.com/Method-Security/webscan/internal/enumerate/general"
+	enumeratejavascript "github.com/Method-Security/webscan/internal/enumerate/javascript"
+	javascripthelpers "github.com/Method-Security/webscan/internal/enumerate/javascript/helpers"
 	enumeratekube "github.com/Method-Security/webscan/internal/enumerate/kube"
 
 	// Configs
@@ -845,8 +848,156 @@ func (a *WebScan) InitEnumerateCommand() {
 
 	// Add Command to 'Enumerate' Command
 	enumerateCmd.AddCommand(enumerateContainerRegistryCmd)
+	// JavaScript Command
+	enumerateJavascriptCmd := &cobra.Command{
+		Use:   "javascript",
+		Short: "Analyze JavaScript bundles for endpoints, secrets and declared chunks",
+		Long: `Analyze the JavaScript an application serves, extracting API endpoints, configuration and
+secrets. Targets may be pages or bundles: a page contributes the scripts it declares, a bundle is
+analyzed directly. Lazily-loaded chunks are resolved from a bundle's own chunk manifest rather than
+from the DOM, which never references them.
+
+Pass every page or bundle belonging to one application. A single-page app states its API base in one
+bundle, its chunk manifest in another and its requests in the chunks, so analyzing them together is
+what lets a path be reported against the base it is actually requested from. Targets are resolved to
+a deduplicated set before anything is retrieved, so a bundle shared by many pages is fetched once.`,
+		Run: func(cmd *cobra.Command, args []string) {
+			defer a.OutputSignal.PanicHandler(cmd.Context())
+
+			// Targets flag
+			targets, err := cmd.Flags().GetStringSlice("targets")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Config flags
+			followChunks, err := cmd.Flags().GetBool("follow-chunks")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			fetchSourceMaps, err := cmd.Flags().GetBool("fetch-source-maps")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			maxArtifacts, err := cmd.Flags().GetInt("max-artifacts")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			analysisWindowBytes, err := cmd.Flags().GetInt("analysis-window-bytes")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			analysisWindowOverlapBytes, err := cmd.Flags().GetInt("analysis-window-overlap-bytes")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			ignoreCrossDomainEndpoints, err := cmd.Flags().GetBool("ignore-cross-domain-endpoints")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			maxRedirects, err := cmd.Flags().GetInt("max-redirects")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			verifyTLS, err := cmd.Flags().GetBool("verify-tls")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			timeout, err := cmd.Flags().GetInt("timeout")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			sleep, err := cmd.Flags().GetInt("sleep")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			jitter, err := cmd.Flags().GetInt("jitter")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			threads, err := cmd.Flags().GetInt("threads")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			userAgentPreset, err := requesthelpers.GetUserAgentFlag(cmd)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			headerPairs, err := cmd.Flags().GetStringArray("header")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			cookiePairs, err := cmd.Flags().GetStringArray("cookie")
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Generate config
+			config := getEnumerateJavascriptConfig(targets, followChunks, fetchSourceMaps, maxArtifacts, analysisWindowBytes, analysisWindowOverlapBytes, ignoreCrossDomainEndpoints, maxRedirects, verifyTLS, timeout, sleep, jitter, threads, userAgentPreset)
+			config.Headers, err = requesthelpers.ParseHeaderPairs(headerPairs)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			config.Cookies, err = requesthelpers.ParseCookiePairs(cookiePairs)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+
+			// Generate report
+			report := enumeratejavascript.PerformJavascriptEnumeration(cmd.Context(), config)
+			if len(report.Errors) > 0 {
+				a.OutputSignal.Status = 1
+			}
+			a.OutputSignal.Content = report
+		},
+	}
+	// Target Flags
+	enumerateJavascriptCmd.Flags().StringSlice("targets", []string{}, "Page or JavaScript bundle URLs to analyze as one application")
+	// Config Flags
+	enumerateJavascriptCmd.Flags().Bool("follow-chunks", true, "Resolve and analyze the lazily-loaded chunks the bundle's runtime declares")
+	enumerateJavascriptCmd.Flags().Bool("fetch-source-maps", false, "Fetch the source map published beside each artifact, when one is")
+	enumerateJavascriptCmd.Flags().Int("max-artifacts", 50, "Maximum number of artifacts to retrieve across the run, targets included (0 = unlimited)")
+	enumerateJavascriptCmd.Flags().Int("analysis-window-bytes", javascripthelpers.DefaultWindowBytes, "Bytes of source analyzed per parse")
+	enumerateJavascriptCmd.Flags().Int("analysis-window-overlap-bytes", javascripthelpers.DefaultWindowOverlapBytes, "Bytes each analysis window overlaps the previous one")
+	enumerateJavascriptCmd.Flags().Bool("ignore-cross-domain-endpoints", true, "Ignore API bases whose host is not the target host or a subdomain of it")
+	enumerateJavascriptCmd.Flags().Int("max-redirects", 3, "Maximum number of redirects to follow")
+	enumerateJavascriptCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
+	enumerateJavascriptCmd.Flags().Int("timeout", 60, "Timeout per request in seconds")
+	enumerateJavascriptCmd.Flags().Int("threads", 0, "Number of concurrent chunk fetches")
+	enumerateJavascriptCmd.Flags().Int("sleep", 0, "Number of seconds to sleep between requests")
+	enumerateJavascriptCmd.Flags().Int("jitter", 0, "Jitter percentage (0-100) to apply random variance to sleep delay")
+	// User Agent Flag
+	enumerateJavascriptCmd.Flags().String("user-agent", "RANDOM", "User-Agent preset (RANDOM, CHROME, FIREFOX, SAFARI, EDGE)")
+	// Authenticated-fetch Flags
+	enumerateJavascriptCmd.Flags().StringArray("header", []string{}, "Request header as 'Name: Value' (repeatable)")
+	enumerateJavascriptCmd.Flags().StringArray("cookie", []string{}, "Cookie as 'name=value' (repeatable)")
+
+	// Mark required flags
+	_ = enumerateJavascriptCmd.MarkFlagRequired("targets")
+
+	// Add Command to 'Enumerate' Command
+	enumerateCmd.AddCommand(enumerateJavascriptCmd)
 
 	// Add Command to Root Command
+
 	a.RootCmd.AddCommand(enumerateCmd)
 }
 
@@ -895,6 +1046,27 @@ func getEnumerateGeneralRateLimitConfig(targets []string, maxRequests int, sleep
 }
 
 // getEnumerateDockerConfig builds the config for Docker registry enumeration.
+// getEnumerateJavascriptConfig builds the config for JavaScript enumeration.
+func getEnumerateJavascriptConfig(targets []string, followChunks bool, fetchSourceMaps bool, maxArtifacts int, analysisWindowBytes int, analysisWindowOverlapBytes int, ignoreCrossDomainEndpoints bool, maxRedirects int, verifyTLS bool, timeout int, sleep int, jitter int, threads int, userAgent common.UserAgentPreset) enumeratejavascriptfern.EnumerateJavascriptConfig {
+	config := enumeratejavascriptfern.EnumerateJavascriptConfig{
+		Targets:                    targets,
+		FollowChunks:               followChunks,
+		FetchSourceMaps:            fetchSourceMaps,
+		MaxArtifacts:               maxArtifacts,
+		AnalysisWindowBytes:        analysisWindowBytes,
+		AnalysisWindowOverlapBytes: analysisWindowOverlapBytes,
+		IgnoreCrossDomainEndpoints: ignoreCrossDomainEndpoints,
+		MaxRedirects:               maxRedirects,
+		VerifyTls:                  verifyTLS,
+		Timeout:                    max(timeout, 0),
+		Sleep:                      max(sleep, 0),
+		Jitter:                     max(jitter, 0),
+		Threads:                    max(threads, 0),
+		UserAgent:                  userAgent,
+	}
+	return config
+}
+
 func getEnumerateDockerConfig(targets []string, verifyTLS bool, timeout int, sleep int, jitter int, threads int, userAgent common.UserAgentPreset) enumeratedockerfern.EnumerateDockerConfig {
 	config := enumeratedockerfern.EnumerateDockerConfig{
 		Targets:   targets,

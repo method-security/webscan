@@ -21,6 +21,7 @@ type credentialKeys struct {
 	CredentialKeyNames []string `json:"credentialKeyNames"`
 	PublicKeyNames     []string `json:"publicKeyNames"`
 	PlaceholderValues  []string `json:"placeholderValues"`
+	PlaceholderMarkers []string `json:"placeholderMarkers"`
 	MinimumValueLength int      `json:"minimumValueLength"`
 }
 
@@ -93,14 +94,16 @@ func isShippedCredential(value string) bool {
 			return false
 		}
 	}
-	// A placeholder often names itself, e.g. YOUR_API_KEY_HERE.
-	lowered := strings.ToLower(value)
-	for _, placeholder := range fingerprints.PlaceholderValues {
-		if strings.Contains(lowered, strings.ToLower(placeholder)) {
+	// Only unambiguous words are matched within a value. A short one like "true" or "none" occurs
+	// inside real credentials, so substring-matching those would discard them. Separators are
+	// stripped first so YOUR_API_KEY_HERE is caught by the same marker as yourApiKeyHere.
+	normalized := normalizeKeyName(value)
+	for _, marker := range fingerprints.PlaceholderMarkers {
+		if strings.Contains(normalized, normalizeKeyName(marker)) {
 			return false
 		}
 	}
-	return !strings.HasPrefix(lowered, "your")
+	return true
 }
 
 // CredentialMatcher reports configuration assignments whose key names a credential and whose value

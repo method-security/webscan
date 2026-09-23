@@ -300,6 +300,26 @@ func TestRootEndpointsDiscardsTheBaseWrittenWithATrailingSlash(t *testing.T) {
 
 func strPtr(value string) *string { return &value }
 
+// An API serves JSON and XML as readily as a file server does, so those stay eligible as endpoints
+// even though the crawler counts them as static assets.
+func TestAnalyzeSourceKeepsDataDocumentEndpoints(t *testing.T) {
+	source := []byte(`fetch("/api/v1/config.json");fetch("/feeds/products.xml");fetch("/exports/report.csv");` +
+		`const a="/assets/logo.png";const b="/static/app.js";const c="/styles/app.css";`)
+
+	paths := pathsOf(enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0).Endpoints)
+
+	for _, want := range []string{"/api/v1/config.json", "/feeds/products.xml", "/exports/report.csv"} {
+		if !contains(paths, want) {
+			t.Fatalf("expected %s to remain an endpoint, got %v", want, paths)
+		}
+	}
+	for _, unwanted := range []string{"/assets/logo.png", "/static/app.js", "/styles/app.css"} {
+		if contains(paths, unwanted) {
+			t.Fatalf("expected %s to be dropped as an asset, got %v", unwanted, paths)
+		}
+	}
+}
+
 func contains(values []string, want string) bool {
 	for _, value := range values {
 		if value == want {

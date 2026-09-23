@@ -76,6 +76,27 @@ func TestCredentialKeyNamesMatchAcrossNamingStyles(t *testing.T) {
 	}
 }
 
+// Short words like "true" and "none" occur inside real credentials, so they must only be rejected
+// when they are the whole value.
+func TestAnalyzeSourceKeepsCredentialsContainingShortPlaceholderWords(t *testing.T) {
+	for _, value := range []string{"aTRUEr4ndomK3yV4l", "noneOfThisIsReal1234", "emptyR3alLookingToken9"} {
+		source := "const c={apiKey:\"" + value + "\"};"
+		if len(secretValues(t, source)) == 0 {
+			t.Fatalf("expected %s to be reported despite containing a placeholder word", value)
+		}
+	}
+}
+
+// A marker still catches a placeholder however it is punctuated.
+func TestAnalyzeSourceRejectsPlaceholderMarkersAcrossPunctuation(t *testing.T) {
+	for _, value := range []string{"YOUR_API_KEY_HERE", "yourApiKeyHere", "change-me-before-deploy", "REPLACE_ME_NOW_PLEASE"} {
+		source := "const c={apiKey:\"" + value + "\"};"
+		if len(secretValues(t, source)) != 0 {
+			t.Fatalf("expected %s to be rejected as a placeholder", value)
+		}
+	}
+}
+
 // jsluice's own matchers must keep working alongside the added one.
 func TestAnalyzeSourceStillReportsShapedCredentials(t *testing.T) {
 	found := secretValues(t, `const k="AKIAIOSFODNN7EXAMPLE";`)

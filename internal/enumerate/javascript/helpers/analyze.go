@@ -31,6 +31,30 @@ type Analysis struct {
 	Origins   []string
 }
 
+// dataDocumentSuffixes name formats an API serves as readily as a file server does. They are static
+// assets to a crawler deciding what to spider, but a request for one is still a request.
+var dataDocumentSuffixes = []string{".json", ".xml", ".csv", ".txt", ".yaml", ".yml", ".md", ".markdown"}
+
+// isNonEndpointAsset reports a path that names a file rather than something worth requesting.
+//
+// The asset list is shared with the crawler so the two agree on what an asset is, less the data
+// documents, which an application requests from its API as often as it serves them as files.
+func isNonEndpointAsset(path string) bool {
+	if !utils.IsStaticAsset(path) {
+		return false
+	}
+	trimmed := strings.ToLower(path)
+	if cut := strings.IndexAny(trimmed, "?#"); cut >= 0 {
+		trimmed = trimmed[:cut]
+	}
+	for _, suffix := range dataDocumentSuffixes {
+		if strings.HasSuffix(trimmed, suffix) {
+			return false
+		}
+	}
+	return true
+}
+
 // AnalyzeSource extracts endpoints, secrets and origins from one artifact's source.
 func AnalyzeSource(source []byte, sourceURL string, windowBytes int, overlapBytes int) Analysis {
 	if windowBytes <= 0 {
@@ -151,7 +175,7 @@ func toEndpoint(found *jsluice.URL, sourceURL string) *enumerate.JavascriptEndpo
 		if parsed.Path == "" || parsed.Path == "/" {
 			return nil
 		}
-		if utils.IsStaticAsset(parsed.Path) {
+		if isNonEndpointAsset(parsed.Path) {
 			return nil
 		}
 		endpoint.BaseUrl = &base
@@ -160,7 +184,7 @@ func toEndpoint(found *jsluice.URL, sourceURL string) *enumerate.JavascriptEndpo
 		return endpoint
 	}
 
-	if utils.IsStaticAsset(path) {
+	if isNonEndpointAsset(path) {
 		return nil
 	}
 	if strings.HasPrefix(path, "//") {

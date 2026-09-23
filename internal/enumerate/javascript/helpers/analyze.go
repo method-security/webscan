@@ -11,6 +11,8 @@ import (
 	common "github.com/Method-Security/webscan/generated/go/common"
 	"github.com/Method-Security/webscan/generated/go/enumerate"
 
+	// Utils
+	utils "github.com/Method-Security/webscan/utils"
 	// External
 	"github.com/BishopFox/jsluice"
 )
@@ -27,11 +29,6 @@ type Analysis struct {
 	Endpoints []*enumerate.JavascriptEndpoint
 	Secrets   []*enumerate.JavascriptSecret
 	Origins   []string
-}
-
-var nonEndpointSuffixes = []string{
-	".js", ".css", ".map", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico",
-	".woff", ".woff2", ".ttf", ".otf", ".eot", ".webp", ".mp4", ".webm",
 }
 
 // AnalyzeSource extracts endpoints, secrets and origins from one artifact's source.
@@ -154,7 +151,7 @@ func toEndpoint(found *jsluice.URL, sourceURL string) *enumerate.JavascriptEndpo
 		if parsed.Path == "" || parsed.Path == "/" {
 			return nil
 		}
-		if isNonEndpointPath(parsed.Path) {
+		if utils.IsStaticAsset(parsed.Path) {
 			return nil
 		}
 		endpoint.BaseUrl = &base
@@ -163,7 +160,7 @@ func toEndpoint(found *jsluice.URL, sourceURL string) *enumerate.JavascriptEndpo
 		return endpoint
 	}
 
-	if isNonEndpointPath(path) {
+	if utils.IsStaticAsset(path) {
 		return nil
 	}
 	if strings.HasPrefix(path, "//") {
@@ -332,16 +329,6 @@ func absoluteOrigin(raw string) (string, bool) {
 		return "", false
 	}
 	return parsed.Scheme + "://" + parsed.Host, true
-}
-
-func isNonEndpointPath(path string) bool {
-	lowered := strings.ToLower(path)
-	for _, suffix := range nonEndpointSuffixes {
-		if strings.HasSuffix(lowered, suffix) {
-			return true
-		}
-	}
-	return false
 }
 
 func endpointKey(endpoint *enumerate.JavascriptEndpoint) string {

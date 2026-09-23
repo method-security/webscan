@@ -9,6 +9,7 @@ import (
 	// Generated
 	"github.com/Method-Security/webscan/generated/go/enumerate"
 	// Utils
+	utils "github.com/Method-Security/webscan/utils"
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
 )
 
@@ -85,7 +86,7 @@ func preferredBase(candidates []string, preferHosts []string) (string, bool) {
 		}
 		segments := strings.Split(trimmed, "/")
 		last := segments[len(segments)-1]
-		if looksLikePage(last) || isNonEndpointPath(parsed.EscapedPath()) {
+		if looksLikePage(last) || utils.IsStaticAsset(parsed.EscapedPath()) {
 			continue
 		}
 

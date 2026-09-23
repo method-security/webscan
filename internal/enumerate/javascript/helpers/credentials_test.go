@@ -56,6 +56,26 @@ func TestAnalyzeSourceIgnoresPublicIdentifiersAndPlaceholders(t *testing.T) {
 	}
 }
 
+// The fingerprints live in an embedded archive rebuilt by go:generate, so a stale archive would
+// silently disable detection. Matching a name that exists only in the file proves it was loaded.
+func TestCredentialFingerprintsAreLoadedFromTheEmbeddedConfig(t *testing.T) {
+	// encryptionKey is named only in the fingerprint file, never in code.
+	found := secretValues(t, `const c={encryptionKey:"a1b2c3d4e5f6a7b8c9d0"};`)
+	if len(found) == 0 {
+		t.Fatalf("expected a configured key name to be honored; is configs/embedded/configs.tar.gz stale?")
+	}
+}
+
+// One configured name covers every spelling of it.
+func TestCredentialKeyNamesMatchAcrossNamingStyles(t *testing.T) {
+	for _, key := range []string{"apimSubscriptionKey", "apim_subscription_key", `"APIM-SUBSCRIPTION-KEY"`} {
+		source := "const c={" + key + `:"9f3e1d7c05a84b26e1c0fa93d4b87e50"};`
+		if len(secretValues(t, source)) == 0 {
+			t.Fatalf("expected %s to be recognised", key)
+		}
+	}
+}
+
 // jsluice's own matchers must keep working alongside the added one.
 func TestAnalyzeSourceStillReportsShapedCredentials(t *testing.T) {
 	found := secretValues(t, `const k="AKIAIOSFODNN7EXAMPLE";`)

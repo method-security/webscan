@@ -320,6 +320,27 @@ func TestAnalyzeSourceKeepsDataDocumentEndpoints(t *testing.T) {
 	}
 }
 
+// A data document is a valid endpoint but never a base, or relative paths get joined onto a file.
+func TestPreferredBaseRejectsDataDocumentCandidates(t *testing.T) {
+	candidates := []string{
+		"https://portal.example.com/api/config.json",
+		"https://portal.example.com/serviceapi/v1",
+	}
+	endpoints := []*enumerate.JavascriptEndpoint{{Path: "general/DeleteFile", SourceUrl: sourceURL}}
+
+	rooted := enumeratejavascript.RootEndpoints(endpoints, candidates, []string{"portal.example.com"})
+	findEndpoint(t, rooted, "/serviceapi/v1/general/DeleteFile")
+}
+
+func TestPreferredBaseLeavesEndpointsAloneWhenOnlyFilesQualify(t *testing.T) {
+	endpoints := []*enumerate.JavascriptEndpoint{{Path: "general/DeleteFile", SourceUrl: sourceURL}}
+
+	rooted := enumeratejavascript.RootEndpoints(endpoints, []string{"https://portal.example.com/api/config.json"}, []string{"portal.example.com"})
+	if rooted[0].Rooted {
+		t.Fatalf("expected a file not to be used as a base, got %+v", rooted[0])
+	}
+}
+
 func contains(values []string, want string) bool {
 	for _, value := range values {
 		if value == want {

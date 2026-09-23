@@ -9,6 +9,7 @@ import (
 	// Generated
 	"github.com/Method-Security/webscan/generated/go/enumerate"
 	// Utils
+	utils "github.com/Method-Security/webscan/utils"
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
 )
 
@@ -85,7 +86,9 @@ func preferredBase(candidates []string, preferHosts []string) (string, bool) {
 		}
 		segments := strings.Split(trimmed, "/")
 		last := segments[len(segments)-1]
-		if looksLikePage(last) || isNonEndpointAsset(parsed.EscapedPath()) {
+		// A base is a prefix other paths hang off, so any file is disqualified — including the data
+		// documents that stay eligible as endpoints. Joining onto one yields /config.json/User/Get.
+		if looksLikePage(last) || utils.IsStaticAsset(parsed.EscapedPath()) {
 			continue
 		}
 

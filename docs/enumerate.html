@@ -741,6 +741,30 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#javascript" class="md-nav__link">
+    <span class="md-ellipsis">
+      JavaScript
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="JavaScript">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#help-text_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      Help Text
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#cms" class="md-nav__link">
     <span class="md-ellipsis">
       CMS
@@ -761,7 +785,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#help-text_3" class="md-nav__link">
+  <a href="#help-text_4" class="md-nav__link">
     <span class="md-ellipsis">
       Help Text
     </span>
@@ -785,7 +809,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#help-text_4" class="md-nav__link">
+  <a href="#help-text_5" class="md-nav__link">
     <span class="md-ellipsis">
       Help Text
     </span>
@@ -824,7 +848,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#help-text_5" class="md-nav__link">
+  <a href="#help-text_6" class="md-nav__link">
     <span class="md-ellipsis">
       Help Text
     </span>
@@ -863,7 +887,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#help-text_6" class="md-nav__link">
+  <a href="#help-text_7" class="md-nav__link">
     <span class="md-ellipsis">
       Help Text
     </span>
@@ -1252,6 +1276,30 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#javascript" class="md-nav__link">
+    <span class="md-ellipsis">
+      JavaScript
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="JavaScript">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#help-text_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      Help Text
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#cms" class="md-nav__link">
     <span class="md-ellipsis">
       CMS
@@ -1272,7 +1320,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#help-text_3" class="md-nav__link">
+  <a href="#help-text_4" class="md-nav__link">
     <span class="md-ellipsis">
       Help Text
     </span>
@@ -1296,7 +1344,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#help-text_4" class="md-nav__link">
+  <a href="#help-text_5" class="md-nav__link">
     <span class="md-ellipsis">
       Help Text
     </span>
@@ -1335,7 +1383,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#help-text_5" class="md-nav__link">
+  <a href="#help-text_6" class="md-nav__link">
     <span class="md-ellipsis">
       Help Text
     </span>
@@ -1374,7 +1422,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#help-text_6" class="md-nav__link">
+  <a href="#help-text_7" class="md-nav__link">
     <span class="md-ellipsis">
       Help Text
     </span>
@@ -1431,6 +1479,7 @@
 <li><strong>cms</strong>: Enumerate content management systems like WordPress plugins and Drupal modules</li>
 <li><strong>container-registry</strong>: Enumerate container registries including Docker registries</li>
 <li><strong>general</strong>: Perform general enumeration tasks like rate limit testing</li>
+<li><strong>javascript</strong>: Analyze JavaScript bundles for endpoints, secrets, and declared chunks</li>
 <li><strong>kube</strong>: Enumerate Kubernetes resources and configurations</li>
 </ul>
 <h2 id="commands">Commands<a class="headerlink" href="#commands" title="Permanent link">#</a></h2>
@@ -1500,13 +1549,45 @@ Global<span class="w"> </span>Flags:
 <span class="w">  </span>-q,<span class="w"> </span>--quiet<span class="w">                </span>Suppress<span class="w"> </span>output
 <span class="w">  </span>-v,<span class="w"> </span>--verbose<span class="w">              </span>Verbose<span class="w"> </span>output
 </code></pre></div>
+<h3 id="javascript">JavaScript<a class="headerlink" href="#javascript" title="Permanent link">#</a></h3>
+<div class="highlight"><pre><span></span><code>webscan<span class="w"> </span>enumerate<span class="w"> </span>javascript<span class="w"> </span>--targets<span class="w"> </span>https://example.com
+</code></pre></div>
+<h4 id="help-text_3">Help Text<a class="headerlink" href="#help-text_3" title="Permanent link">#</a></h4>
+<div class="highlight"><pre><span></span><code>webscan<span class="w"> </span>enumerate<span class="w"> </span>javascript<span class="w"> </span>-h
+Analyze<span class="w"> </span>the<span class="w"> </span>JavaScript<span class="w"> </span>an<span class="w"> </span>application<span class="w"> </span>serves,<span class="w"> </span>extracting<span class="w"> </span>API<span class="w"> </span>endpoints,<span class="w"> </span>configuration<span class="w"> </span>and
+secrets.<span class="w"> </span>Targets<span class="w"> </span>may<span class="w"> </span>be<span class="w"> </span>pages<span class="w"> </span>or<span class="w"> </span>bundles:<span class="w"> </span>a<span class="w"> </span>page<span class="w"> </span>contributes<span class="w"> </span>the<span class="w"> </span>scripts<span class="w"> </span>it<span class="w"> </span>declares,<span class="w"> </span>a<span class="w"> </span>bundle<span class="w"> </span>is
+analyzed<span class="w"> </span>directly.<span class="w"> </span>Lazily-loaded<span class="w"> </span>chunks<span class="w"> </span>are<span class="w"> </span>resolved<span class="w"> </span>from<span class="w"> </span>a<span class="w"> </span>bundle<span class="s1">'s own chunk manifest rather than</span>
+<span class="s1">from the DOM, which never references them.</span>
+
+<span class="s1">Usage:</span>
+<span class="s1">  webscan enumerate javascript [flags]</span>
+
+<span class="s1">Flags:</span>
+<span class="s1">      --analysis-window-bytes int           Bytes of source analyzed per parse (default 262144)</span>
+<span class="s1">      --analysis-window-overlap-bytes int   Bytes each analysis window overlaps the previous one (default 65536)</span>
+<span class="s1">      --cookie stringArray                  Cookie as '</span><span class="nv">name</span><span class="o">=</span>value<span class="s1">' (repeatable)</span>
+<span class="s1">      --fetch-source-maps                   Fetch the source map published beside each artifact, when one is</span>
+<span class="s1">      --follow-chunks                       Resolve and analyze the lazily-loaded chunks the bundle'</span>s<span class="w"> </span>runtime<span class="w"> </span>declares<span class="w"> </span><span class="o">(</span>default<span class="w"> </span><span class="nb">true</span><span class="o">)</span>
+<span class="w">      </span>--header<span class="w"> </span>stringArray<span class="w">                  </span>Request<span class="w"> </span>header<span class="w"> </span>as<span class="w"> </span><span class="s1">'Name: Value'</span><span class="w"> </span><span class="o">(</span>repeatable<span class="o">)</span>
+<span class="w">  </span>-h,<span class="w"> </span>--help<span class="w">                                </span><span class="nb">help</span><span class="w"> </span><span class="k">for</span><span class="w"> </span>javascript
+<span class="w">      </span>--ignore-cross-domain-endpoints<span class="w">       </span>Ignore<span class="w"> </span>API<span class="w"> </span>bases<span class="w"> </span>whose<span class="w"> </span>host<span class="w"> </span>is<span class="w"> </span>not<span class="w"> </span>the<span class="w"> </span>target<span class="w"> </span>host<span class="w"> </span>or<span class="w"> </span>a<span class="w"> </span>subdomain<span class="w"> </span>of<span class="w"> </span>it<span class="w"> </span><span class="o">(</span>default<span class="w"> </span><span class="nb">true</span><span class="o">)</span>
+<span class="w">      </span>--jitter<span class="w"> </span>int<span class="w">                          </span>Jitter<span class="w"> </span>percentage<span class="w"> </span><span class="o">(</span><span class="m">0</span>-100<span class="o">)</span><span class="w"> </span>to<span class="w"> </span>apply<span class="w"> </span>random<span class="w"> </span>variance<span class="w"> </span>to<span class="w"> </span>sleep<span class="w"> </span>delay
+<span class="w">      </span>--max-artifacts<span class="w"> </span>int<span class="w">                   </span>Maximum<span class="w"> </span>number<span class="w"> </span>of<span class="w"> </span>artifacts<span class="w"> </span>to<span class="w"> </span>retrieve<span class="w"> </span>across<span class="w"> </span>the<span class="w"> </span>run,<span class="w"> </span>targets<span class="w"> </span>included<span class="w"> </span><span class="o">(</span><span class="nv">0</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>unlimited<span class="o">)</span><span class="w"> </span><span class="o">(</span>default<span class="w"> </span><span class="m">50</span><span class="o">)</span>
+<span class="w">      </span>--max-redirects<span class="w"> </span>int<span class="w">                   </span>Maximum<span class="w"> </span>number<span class="w"> </span>of<span class="w"> </span>redirects<span class="w"> </span>to<span class="w"> </span>follow<span class="w"> </span><span class="o">(</span>default<span class="w"> </span><span class="m">3</span><span class="o">)</span>
+<span class="w">      </span>--sleep<span class="w"> </span>int<span class="w">                           </span>Number<span class="w"> </span>of<span class="w"> </span>seconds<span class="w"> </span>to<span class="w"> </span>sleep<span class="w"> </span>between<span class="w"> </span>requests
+<span class="w">      </span>--targets<span class="w"> </span>strings<span class="w">                     </span>Page<span class="w"> </span>or<span class="w"> </span>JavaScript<span class="w"> </span>bundle<span class="w"> </span>URLs<span class="w"> </span>to<span class="w"> </span>analyze<span class="w"> </span>as<span class="w"> </span>one<span class="w"> </span>application
+<span class="w">      </span>--threads<span class="w"> </span>int<span class="w">                         </span>Number<span class="w"> </span>of<span class="w"> </span>concurrent<span class="w"> </span>chunk<span class="w"> </span>fetches
+<span class="w">      </span>--timeout<span class="w"> </span>int<span class="w">                         </span>Timeout<span class="w"> </span>per<span class="w"> </span>request<span class="w"> </span><span class="k">in</span><span class="w"> </span>seconds<span class="w"> </span><span class="o">(</span>default<span class="w"> </span><span class="m">60</span><span class="o">)</span>
+<span class="w">      </span>--user-agent<span class="w"> </span>string<span class="w">                   </span>User-Agent<span class="w"> </span>preset<span class="w"> </span><span class="o">(</span>RANDOM,<span class="w"> </span>CHROME,<span class="w"> </span>FIREFOX,<span class="w"> </span>SAFARI,<span class="w"> </span>EDGE<span class="o">)</span><span class="w"> </span><span class="o">(</span>default<span class="w"> </span><span class="s2">"RANDOM"</span><span class="o">)</span>
+<span class="w">      </span>--verify-tls<span class="w">                          </span>Verify<span class="w"> </span>TLS<span class="w"> </span>certificates<span class="w"> </span>when<span class="w"> </span>making<span class="w"> </span>HTTPS<span class="w"> </span>requests
+</code></pre></div>
 <h3 id="cms">CMS<a class="headerlink" href="#cms" title="Permanent link">#</a></h3>
 <p>Enumerate content management systems.</p>
 <h4 id="wordpress-plugins">WordPress Plugins<a class="headerlink" href="#wordpress-plugins" title="Permanent link">#</a></h4>
 <p>In addition to enumerating installed plugins, this command detects the WordPress core version running on the target, trying (in order of reliability) the HTML <code>&lt;meta name="generator"&gt;</code> tag and <code>?ver=</code> query strings on known core-authored <code>wp-includes</code>/<code>wp-admin</code> asset URLs. The detected version and the method that found it are reported as <code>version</code> and <code>versionSource</code> on each target.</p>
 <div class="highlight"><pre><span></span><code>webscan<span class="w"> </span>enumerate<span class="w"> </span>cms<span class="w"> </span>wordpress<span class="w"> </span>plugins<span class="w"> </span>--targets<span class="w"> </span>https://example.com
 </code></pre></div>
-<h5 id="help-text_3">Help Text<a class="headerlink" href="#help-text_3" title="Permanent link">#</a></h5>
+<h5 id="help-text_4">Help Text<a class="headerlink" href="#help-text_4" title="Permanent link">#</a></h5>
 <div class="highlight"><pre><span></span><code>webscan<span class="w"> </span>enumerate<span class="w"> </span>cms<span class="w"> </span>wordpress<span class="w"> </span>plugins<span class="w"> </span>-h
 Discover<span class="w"> </span>and<span class="w"> </span>analyze<span class="w"> </span>WordPress<span class="w"> </span>plugins<span class="w"> </span>to<span class="w"> </span>identify<span class="w"> </span>installed<span class="w"> </span>components<span class="w"> </span>and<span class="w"> </span>potential<span class="w"> </span>security<span class="w"> </span>issues.
 
@@ -1537,7 +1618,7 @@ Global<span class="w"> </span>Flags:
 <h4 id="drupal-modules">Drupal Modules<a class="headerlink" href="#drupal-modules" title="Permanent link">#</a></h4>
 <div class="highlight"><pre><span></span><code>webscan<span class="w"> </span>enumerate<span class="w"> </span>cms<span class="w"> </span>drupal<span class="w"> </span>modules<span class="w"> </span>--targets<span class="w"> </span>https://example.com
 </code></pre></div>
-<h5 id="help-text_4">Help Text<a class="headerlink" href="#help-text_4" title="Permanent link">#</a></h5>
+<h5 id="help-text_5">Help Text<a class="headerlink" href="#help-text_5" title="Permanent link">#</a></h5>
 <div class="highlight"><pre><span></span><code>webscan<span class="w"> </span>enumerate<span class="w"> </span>cms<span class="w"> </span>drupal<span class="w"> </span>modules<span class="w"> </span>-h
 Discover<span class="w"> </span>and<span class="w"> </span>analyze<span class="w"> </span>Drupal<span class="w"> </span>modules<span class="w"> </span>to<span class="w"> </span>identify<span class="w"> </span>installed<span class="w"> </span>components<span class="w"> </span>and<span class="w"> </span>potential<span class="w"> </span>security<span class="w"> </span>issues.
 
@@ -1565,7 +1646,7 @@ Global<span class="w"> </span>Flags:
 <h4 id="docker">Docker<a class="headerlink" href="#docker" title="Permanent link">#</a></h4>
 <div class="highlight"><pre><span></span><code>webscan<span class="w"> </span>enumerate<span class="w"> </span>container-registry<span class="w"> </span>docker<span class="w"> </span>--targets<span class="w"> </span>https://registry.example.com
 </code></pre></div>
-<h5 id="help-text_5">Help Text<a class="headerlink" href="#help-text_5" title="Permanent link">#</a></h5>
+<h5 id="help-text_6">Help Text<a class="headerlink" href="#help-text_6" title="Permanent link">#</a></h5>
 <div class="highlight"><pre><span></span><code>webscan<span class="w"> </span>enumerate<span class="w"> </span>container-registry<span class="w"> </span>docker<span class="w"> </span>-h
 Discover<span class="w"> </span>and<span class="w"> </span>analyze<span class="w"> </span>Docker<span class="w"> </span>container<span class="w"> </span>registries,<span class="w"> </span>including<span class="w"> </span>repositories,<span class="w"> </span>images,<span class="w"> </span>and<span class="w"> </span>their<span class="w"> </span>manifest<span class="w"> </span>data.
 
@@ -1590,7 +1671,7 @@ Global<span class="w"> </span>Flags:
 <h4 id="ratelimit">Ratelimit<a class="headerlink" href="#ratelimit" title="Permanent link">#</a></h4>
 <div class="highlight"><pre><span></span><code>webscan<span class="w"> </span>enumerate<span class="w"> </span>general<span class="w"> </span>ratelimit<span class="w"> </span>--targets<span class="w"> </span>https://example.com
 </code></pre></div>
-<h5 id="help-text_6">Help Text<a class="headerlink" href="#help-text_6" title="Permanent link">#</a></h5>
+<h5 id="help-text_7">Help Text<a class="headerlink" href="#help-text_7" title="Permanent link">#</a></h5>
 <div class="highlight"><pre><span></span><code>webscan<span class="w"> </span>enumerate<span class="w"> </span>general<span class="w"> </span>ratelimit<span class="w"> </span>-h
 Analyze<span class="w"> </span>and<span class="w"> </span><span class="nb">test</span><span class="w"> </span>rate<span class="w"> </span>limiting<span class="w"> </span>controls<span class="w"> </span>to<span class="w"> </span>identify<span class="w"> </span>potential<span class="w"> </span>bypasses<span class="w"> </span>or<span class="w"> </span>misconfigurations.
 

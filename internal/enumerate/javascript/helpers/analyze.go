@@ -26,9 +26,24 @@ const DefaultWindowOverlapBytes = 64 * 1024
 
 // Analysis is everything one JavaScript artifact yielded.
 type Analysis struct {
-	Endpoints []*enumerate.JavascriptEndpoint
+	Endpoints []*Endpoint
 	Secrets   []*enumerate.JavascriptSecret
 	Origins   []string
+}
+
+// Endpoint is an extracted endpoint, the origin serving it and whether that origin is established.
+// Both are stages of the extraction: the origin is reported as the application the endpoint sits
+// under, and rooted is not reported at all.
+type Endpoint struct {
+	Details *enumerate.JavascriptEndpoint
+	BaseURL string
+	Rooted  bool
+}
+
+// Clone copies an endpoint so an artifact shared by two applications roots once per application.
+func (e *Endpoint) Clone() *Endpoint {
+	details := *e.Details
+	return &Endpoint{Details: &details, BaseURL: e.BaseURL, Rooted: e.Rooted}
 }
 
 // dataDocumentSuffixes name formats an API serves as readily as a file server does. They are static
@@ -64,7 +79,7 @@ func AnalyzeSource(source []byte, sourceURL string, windowBytes int, overlapByte
 		overlapBytes = windowBytes / 4
 	}
 
-	endpoints := map[string]*enumerate.JavascriptEndpoint{}
+	endpoints := map[string]*Endpoint{}
 	secrets := map[string]*enumerate.JavascriptSecret{}
 	bases := map[string]struct{}{}
 
@@ -133,7 +148,7 @@ func windowsOf(size int, windowBytes int, overlapBytes int) [][2]int {
 }
 
 // toEndpoint converts a jsluice URL into an endpoint, dropping references that are not requests.
-func toEndpoint(found *jsluice.URL, sourceURL string) *enumerate.JavascriptEndpoint {
+func toEndpoint(found *jsluice.URL, sourceURL string) *Endpoint {
 	raw := strings.TrimSpace(found.URL)
 	if raw == "" {
 		return nil
@@ -147,23 +162,24 @@ func toEndpoint(found *jsluice.URL, sourceURL string) *enumerate.JavascriptEndpo
 		return nil
 	}
 
-	endpoint := &enumerate.JavascriptEndpoint{
+	details := &enumerate.JavascriptEndpoint{
 		Path:        path,
 		SourceUrl:   sourceURL,
 		QueryParams: found.QueryParams,
 		BodyParams:  found.BodyParams,
 	}
+	endpoint := &Endpoint{Details: details}
 	if found.ContentType != "" {
-		endpoint.ContentType = &found.ContentType
+		details.ContentType = &found.ContentType
 	}
 	if found.Type != "" && found.Type != "stringLiteral" {
 		callExpression := found.Type
-		endpoint.CallExpression = &callExpression
+		details.CallExpression = &callExpression
 	}
 	if method, ok := requestMethod(found.Method); ok {
-		endpoint.Method = &method
+		details.Method = &method
 	} else if method, ok := methodFromCall(found.Type); ok {
-		endpoint.Method = &method
+		details.Method = &method
 	}
 
 	if base, ok := absoluteOrigin(raw); ok {
@@ -178,8 +194,8 @@ func toEndpoint(found *jsluice.URL, sourceURL string) *enumerate.JavascriptEndpo
 		if isNonEndpointAsset(parsed.Path) {
 			return nil
 		}
-		endpoint.BaseUrl = &base
-		endpoint.Path = parsed.Path
+		endpoint.BaseURL = base
+		details.Path = parsed.Path
 		endpoint.Rooted = true
 		return endpoint
 	}
@@ -204,33 +220,55 @@ func toEndpoint(found *jsluice.URL, sourceURL string) *enumerate.JavascriptEndpo
 	return endpoint
 }
 
-// toSecret converts a jsluice secret, rendering its payload as JSON so no structure is lost.
+// toSecret converts a jsluice secret into typed fields, lifting out the name and value a matcher
+// reports and leaving the rest addressable, since each matcher's payload has its own key set.
 func toSecret(found *jsluice.Secret, sourceURL string) *enumerate.JavascriptSecret {
 	secret := &enumerate.JavascriptSecret{
-		Kind:      found.Kind,
-		SourceUrl: sourceURL,
+		Kind:       found.Kind,
+		SourceUrl:  sourceURL,
+		Attributes: map[string]string{},
+		Context:    asStringMap(found.Context),
 	}
-	if rendered := renderJSON(found.Data); rendered != "" {
-		secret.Value = &rendered
+
+	for key, value := range asStringMap(found.Data) {
+		switch key {
+		case "name":
+			secret.Name = &value
+		case "value", "key":
+			secret.Value = &value
+		default:
+			secret.Attributes[key] = value
+		}
 	}
-	if rendered := renderJSON(found.Context); rendered != "" {
-		secret.Context = &rendered
+
+	if len(secret.Attributes) == 0 {
+		secret.Attributes = nil
 	}
 	return secret
 }
 
-func renderJSON(value any) string {
-	if value == nil {
-		return ""
+// asStringMap reduces a matcher payload to string pairs.
+func asStringMap(value any) map[string]string {
+	switch typed := value.(type) {
+	case nil:
+		return nil
+	case map[string]string:
+		return typed
+	case map[string]any:
+		out := make(map[string]string, len(typed))
+		for key, entry := range typed {
+			if text, ok := entry.(string); ok {
+				out[key] = text
+				continue
+			}
+			if encoded, err := json.Marshal(entry); err == nil {
+				out[key] = string(encoded)
+			}
+		}
+		return out
+	default:
+		return nil
 	}
-	if text, ok := value.(string); ok {
-		return text
-	}
-	encoded, err := json.Marshal(value)
-	if err != nil {
-		return ""
-	}
-	return string(encoded)
 }
 
 func requestMethod(method string) (common.HttpMethod, bool) {
@@ -276,18 +314,18 @@ func absoluteBase(raw string) (string, bool) {
 // The same call is reported with and without its verb, and again as a bare string literal. A record
 // carrying the verb is the complete one, so at a given location the verbless records are dropped
 // once any record states a verb.
-func mergeEndpointRecords(endpoints []*enumerate.JavascriptEndpoint) []*enumerate.JavascriptEndpoint {
+func mergeEndpointRecords(endpoints []*Endpoint) []*Endpoint {
 	locationHasMethod := map[string]bool{}
 	for _, endpoint := range endpoints {
-		if endpoint.Method != nil {
+		if endpoint.Details.Method != nil {
 			locationHasMethod[locationKey(endpoint)] = true
 		}
 	}
 
-	merged := map[string]*enumerate.JavascriptEndpoint{}
+	merged := map[string]*Endpoint{}
 	order := make([]string, 0, len(endpoints))
 	for _, endpoint := range endpoints {
-		if endpoint.Method == nil && locationHasMethod[locationKey(endpoint)] {
+		if endpoint.Details.Method == nil && locationHasMethod[locationKey(endpoint)] {
 			continue
 		}
 
@@ -298,18 +336,18 @@ func mergeEndpointRecords(endpoints []*enumerate.JavascriptEndpoint) []*enumerat
 			order = append(order, key)
 			continue
 		}
-		if existing.CallExpression == nil && endpoint.CallExpression != nil {
-			existing.CallExpression = endpoint.CallExpression
+		if existing.Details.CallExpression == nil && endpoint.Details.CallExpression != nil {
+			existing.Details.CallExpression = endpoint.Details.CallExpression
 		}
-		if existing.ContentType == nil && endpoint.ContentType != nil {
-			existing.ContentType = endpoint.ContentType
+		if existing.Details.ContentType == nil && endpoint.Details.ContentType != nil {
+			existing.Details.ContentType = endpoint.Details.ContentType
 		}
-		existing.QueryParams = unionStrings(existing.QueryParams, endpoint.QueryParams)
-		existing.BodyParams = unionStrings(existing.BodyParams, endpoint.BodyParams)
+		existing.Details.QueryParams = unionStrings(existing.Details.QueryParams, endpoint.Details.QueryParams)
+		existing.Details.BodyParams = unionStrings(existing.Details.BodyParams, endpoint.Details.BodyParams)
 	}
 
 	sort.Strings(order)
-	out := make([]*enumerate.JavascriptEndpoint, 0, len(order))
+	out := make([]*Endpoint, 0, len(order))
 	for _, key := range order {
 		out = append(out, merged[key])
 	}
@@ -335,12 +373,8 @@ func unionStrings(first []string, second []string) []string {
 	return out
 }
 
-func locationKey(endpoint *enumerate.JavascriptEndpoint) string {
-	base := ""
-	if endpoint.BaseUrl != nil {
-		base = *endpoint.BaseUrl
-	}
-	return base + endpoint.Path
+func locationKey(endpoint *Endpoint) string {
+	return endpoint.BaseURL + endpoint.Details.Path
 }
 
 // absoluteOrigin returns the scheme and host of an absolute http(s) URL.
@@ -355,34 +389,34 @@ func absoluteOrigin(raw string) (string, bool) {
 	return parsed.Scheme + "://" + parsed.Host, true
 }
 
-func endpointKey(endpoint *enumerate.JavascriptEndpoint) string {
-	base := ""
-	if endpoint.BaseUrl != nil {
-		base = *endpoint.BaseUrl
-	}
+func endpointKey(endpoint *Endpoint) string {
 	method := ""
-	if endpoint.Method != nil {
-		method = string(*endpoint.Method)
+	if endpoint.Details.Method != nil {
+		method = string(*endpoint.Details.Method)
 	}
-	return method + " " + base + endpoint.Path
+	return method + " " + endpoint.BaseURL + endpoint.Details.Path
 }
 
 func secretKey(secret *enumerate.JavascriptSecret) string {
+	name := ""
+	if secret.Name != nil {
+		name = *secret.Name
+	}
 	value := ""
 	if secret.Value != nil {
 		value = *secret.Value
 	}
-	return secret.Kind + " " + value
+	return secret.Kind + " " + name + " " + value
 }
 
-func sortedEndpoints(endpoints map[string]*enumerate.JavascriptEndpoint) []*enumerate.JavascriptEndpoint {
+func sortedEndpoints(endpoints map[string]*Endpoint) []*Endpoint {
 	keys := make([]string, 0, len(endpoints))
 	for key := range endpoints {
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
 
-	out := make([]*enumerate.JavascriptEndpoint, 0, len(keys))
+	out := make([]*Endpoint, 0, len(keys))
 	for _, key := range keys {
 		out = append(out, endpoints[key])
 	}

@@ -11,18 +11,18 @@ import (
 
 const sourceURL = "https://portal.example.com/main.abc123.js"
 
-func pathsOf(endpoints []*enumerate.JavascriptEndpoint) []string {
+func pathsOf(endpoints []*enumeratejavascript.Endpoint) []string {
 	paths := make([]string, 0, len(endpoints))
 	for _, endpoint := range endpoints {
-		paths = append(paths, endpoint.Path)
+		paths = append(paths, endpoint.Details.Path)
 	}
 	return paths
 }
 
-func findEndpoint(t *testing.T, endpoints []*enumerate.JavascriptEndpoint, path string) *enumerate.JavascriptEndpoint {
+func findEndpoint(t *testing.T, endpoints []*enumeratejavascript.Endpoint, path string) *enumeratejavascript.Endpoint {
 	t.Helper()
 	for _, endpoint := range endpoints {
-		if endpoint.Path == path {
+		if endpoint.Details.Path == path {
 			return endpoint
 		}
 	}
@@ -43,11 +43,11 @@ func TestAnalyzeSourceRecoversWrappedRelativeCalls(t *testing.T) {
 	if endpoint.Rooted {
 		t.Fatalf("expected a relative literal to be unrooted before rooting runs")
 	}
-	if len(endpoint.QueryParams) != 1 || endpoint.QueryParams[0] != "fileName" {
-		t.Fatalf("expected the fileName query param, got %v", endpoint.QueryParams)
+	if len(endpoint.Details.QueryParams) != 1 || endpoint.Details.QueryParams[0] != "fileName" {
+		t.Fatalf("expected the fileName query param, got %v", endpoint.Details.QueryParams)
 	}
-	if endpoint.CallExpression == nil || *endpoint.CallExpression != "this.dataService.getRequest" {
-		t.Fatalf("expected the wrapper call to be recorded, got %v", endpoint.CallExpression)
+	if endpoint.Details.CallExpression == nil || *endpoint.Details.CallExpression != "this.dataService.getRequest" {
+		t.Fatalf("expected the wrapper call to be recorded, got %v", endpoint.Details.CallExpression)
 	}
 
 	if !contains(analysis.Origins, "https://portal.example.com/serviceapi/v1") {
@@ -66,8 +66,8 @@ func TestAnalyzeSourceRootsRelativeCallsAgainstConfiguredBase(t *testing.T) {
 	if !endpoint.Rooted {
 		t.Fatalf("expected the endpoint to be marked rooted")
 	}
-	if endpoint.BaseUrl == nil || *endpoint.BaseUrl != "https://portal.example.com" {
-		t.Fatalf("expected the configured origin as base, got %v", endpoint.BaseUrl)
+	if endpoint.BaseURL != "https://portal.example.com" {
+		t.Fatalf("expected the configured origin as base, got %v", endpoint.BaseURL)
 	}
 }
 
@@ -78,8 +78,8 @@ func TestAnalyzeSourceKeepsRootRelativePathsUntouched(t *testing.T) {
 	rooted := enumeratejavascript.RootEndpoints(analysis.Endpoints, analysis.Origins, []string{"portal.example.com"})
 
 	endpoint := findEndpoint(t, rooted, "/api/v1/widgets")
-	if endpoint.Method == nil || string(*endpoint.Method) != "GET" {
-		t.Fatalf("expected a GET method, got %v", endpoint.Method)
+	if endpoint.Details.Method == nil || string(*endpoint.Details.Method) != "GET" {
+		t.Fatalf("expected a GET method, got %v", endpoint.Details.Method)
 	}
 }
 
@@ -135,8 +135,8 @@ func TestAnalyzeSourceHandlesMultiWindowMinifiedBundle(t *testing.T) {
 	}
 
 	endpoint := findEndpoint(t, analysis.Endpoints, "Order/GetAttachmentByOrder")
-	if len(endpoint.QueryParams) < 4 {
-		t.Fatalf("expected the recovered query params, got %v", endpoint.QueryParams)
+	if len(endpoint.Details.QueryParams) < 4 {
+		t.Fatalf("expected the recovered query params, got %v", endpoint.Details.QueryParams)
 	}
 }
 
@@ -149,17 +149,17 @@ func TestPreferredBaseIgnoresPagesAndPicksTheApiRoot(t *testing.T) {
 		"https://identity.example.com",
 		"https://identity.example.com/v5.0/webapps/pages/public/signout.aspx",
 	}
-	endpoints := []*enumerate.JavascriptEndpoint{{Path: "general/DeleteFile", SourceUrl: sourceURL}}
+	endpoints := []*enumeratejavascript.Endpoint{{Details: &enumerate.JavascriptEndpoint{Path: "general/DeleteFile", SourceUrl: sourceURL}}}
 
 	rooted := enumeratejavascript.RootEndpoints(endpoints, candidates, []string{"portal.example.com"})
 	endpoint := findEndpoint(t, rooted, "/serviceapi/v1/general/DeleteFile")
-	if endpoint.BaseUrl == nil || *endpoint.BaseUrl != "https://portal.example.com" {
-		t.Fatalf("expected the API base, got %v", endpoint.BaseUrl)
+	if endpoint.BaseURL != "https://portal.example.com" {
+		t.Fatalf("expected the API base, got %v", endpoint.BaseURL)
 	}
 }
 
 func TestPreferredBaseLeavesEndpointsAloneWhenNoBaseQualifies(t *testing.T) {
-	endpoints := []*enumerate.JavascriptEndpoint{{Path: "general/DeleteFile", SourceUrl: sourceURL}}
+	endpoints := []*enumeratejavascript.Endpoint{{Details: &enumerate.JavascriptEndpoint{Path: "general/DeleteFile", SourceUrl: sourceURL}}}
 
 	rooted := enumeratejavascript.RootEndpoints(endpoints, []string{"https://cdn.example.com"}, []string{"portal.example.com"})
 	if len(rooted) != 1 || rooted[0].Rooted {
@@ -173,21 +173,21 @@ func TestAnalyzeSourceReadsVerbFromClientCall(t *testing.T) {
 	analysis := enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0)
 
 	posted := findEndpoint(t, analysis.Endpoints, "/serviceapi/v1/User/Update")
-	if posted.Method == nil || string(*posted.Method) != "POST" {
-		t.Fatalf("expected POST read off the call, got %v", posted.Method)
+	if posted.Details.Method == nil || string(*posted.Details.Method) != "POST" {
+		t.Fatalf("expected POST read off the call, got %v", posted.Details.Method)
 	}
 
 	wrapped := findEndpoint(t, analysis.Endpoints, "User/Read")
-	if wrapped.Method != nil {
-		t.Fatalf("expected no verb guessed from a wrapper, got %v", *wrapped.Method)
+	if wrapped.Details.Method != nil {
+		t.Fatalf("expected no verb guessed from a wrapper, got %v", *wrapped.Details.Method)
 	}
 }
 
 // `/x/` and `/x` are different URIs, so rooting must not clean the trailing slash away.
 func TestRootEndpointsPreservesTrailingSlash(t *testing.T) {
-	endpoints := []*enumerate.JavascriptEndpoint{
-		{Path: "orders/list/", SourceUrl: sourceURL},
-		{Path: "orders/list", SourceUrl: sourceURL},
+	endpoints := []*enumeratejavascript.Endpoint{
+		{Details: &enumerate.JavascriptEndpoint{Path: "orders/list/", SourceUrl: sourceURL}},
+		{Details: &enumerate.JavascriptEndpoint{Path: "orders/list", SourceUrl: sourceURL}},
 	}
 
 	rooted := enumeratejavascript.RootEndpoints(endpoints, []string{"https://portal.example.com/serviceapi/v1"}, []string{"portal.example.com"})
@@ -208,7 +208,7 @@ func TestAnalyzeSourceDropsBareOriginLiterals(t *testing.T) {
 	analysis := enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0)
 
 	for _, endpoint := range analysis.Endpoints {
-		if endpoint.Path == "" || endpoint.Path == "/" {
+		if endpoint.Details.Path == "" || endpoint.Details.Path == "/" {
 			t.Fatalf("expected no empty-path endpoint, got %+v", endpoint)
 		}
 	}
@@ -233,15 +233,15 @@ func TestRootEndpointsUsesBaseDeclaredInAnotherBundle(t *testing.T) {
 	}
 
 	pooled := append(append([]string{}, entry.Origins...), chunk.Origins...)
-	endpoints := append(append([]*enumerate.JavascriptEndpoint{}, entry.Endpoints...), chunk.Endpoints...)
+	endpoints := append(append([]*enumeratejavascript.Endpoint{}, entry.Endpoints...), chunk.Endpoints...)
 	rooted := enumeratejavascript.RootEndpoints(endpoints, pooled, []string{"portal.example.com"})
 
 	endpoint := findEndpoint(t, rooted, "/serviceapi/v1/general/DeleteFile")
-	if endpoint.BaseUrl == nil || *endpoint.BaseUrl != "https://portal.example.com" {
-		t.Fatalf("expected the base from the other bundle, got %v", endpoint.BaseUrl)
+	if endpoint.BaseURL != "https://portal.example.com" {
+		t.Fatalf("expected the base from the other bundle, got %v", endpoint.BaseURL)
 	}
-	if endpoint.SourceUrl != "https://portal.example.com/44.js" {
-		t.Fatalf("expected the chunk to stay the source of record, got %s", endpoint.SourceUrl)
+	if endpoint.Details.SourceUrl != "https://portal.example.com/44.js" {
+		t.Fatalf("expected the chunk to stay the source of record, got %s", endpoint.Details.SourceUrl)
 	}
 }
 
@@ -266,7 +266,7 @@ func TestPreferredBasePrefersTheApiRootOverADeeperEndpoint(t *testing.T) {
 		"https://portal.example.com/serviceapi/v1/User/GetProfile",
 		"https://portal.example.com/api/v2/services/orders/detail",
 	}
-	endpoints := []*enumerate.JavascriptEndpoint{{Path: "general/DeleteFile", SourceUrl: sourceURL}}
+	endpoints := []*enumeratejavascript.Endpoint{{Details: &enumerate.JavascriptEndpoint{Path: "general/DeleteFile", SourceUrl: sourceURL}}}
 
 	rooted := enumeratejavascript.RootEndpoints(endpoints, candidates, []string{"portal.example.com"})
 	findEndpoint(t, rooted, "/serviceapi/v1/general/DeleteFile")
@@ -274,7 +274,7 @@ func TestPreferredBasePrefersTheApiRootOverADeeperEndpoint(t *testing.T) {
 
 func TestPreferredBaseIgnoresStaticAssetCandidates(t *testing.T) {
 	candidates := []string{"https://portal.example.com/static/api/bundle.js"}
-	endpoints := []*enumerate.JavascriptEndpoint{{Path: "general/DeleteFile", SourceUrl: sourceURL}}
+	endpoints := []*enumeratejavascript.Endpoint{{Details: &enumerate.JavascriptEndpoint{Path: "general/DeleteFile", SourceUrl: sourceURL}}}
 
 	rooted := enumeratejavascript.RootEndpoints(endpoints, candidates, []string{"portal.example.com"})
 	if rooted[0].Rooted {
@@ -284,21 +284,19 @@ func TestPreferredBaseIgnoresStaticAssetCandidates(t *testing.T) {
 
 // The base is the same whether it was written with a trailing slash or without.
 func TestRootEndpointsDiscardsTheBaseWrittenWithATrailingSlash(t *testing.T) {
-	endpoints := []*enumerate.JavascriptEndpoint{
-		{Path: "/serviceapi/v1/", BaseUrl: strPtr("https://portal.example.com"), Rooted: true, SourceUrl: sourceURL},
-		{Path: "general/DeleteFile", SourceUrl: sourceURL},
+	endpoints := []*enumeratejavascript.Endpoint{
+		{Details: &enumerate.JavascriptEndpoint{Path: "/serviceapi/v1/", SourceUrl: sourceURL}, BaseURL: "https://portal.example.com", Rooted: true},
+		{Details: &enumerate.JavascriptEndpoint{Path: "general/DeleteFile", SourceUrl: sourceURL}},
 	}
 
 	rooted := enumeratejavascript.RootEndpoints(endpoints, []string{"https://portal.example.com/serviceapi/v1"}, []string{"portal.example.com"})
 	for _, endpoint := range rooted {
-		if strings.Trim(endpoint.Path, "/") == "serviceapi/v1" {
+		if strings.Trim(endpoint.Details.Path, "/") == "serviceapi/v1" {
 			t.Fatalf("expected the base itself to be discarded, got %v", pathsOf(rooted))
 		}
 	}
 	findEndpoint(t, rooted, "/serviceapi/v1/general/DeleteFile")
 }
-
-func strPtr(value string) *string { return &value }
 
 // An API serves JSON and XML as readily as a file server does, so those stay eligible as endpoints
 // even though the crawler counts them as static assets.
@@ -326,14 +324,14 @@ func TestPreferredBaseRejectsDataDocumentCandidates(t *testing.T) {
 		"https://portal.example.com/api/config.json",
 		"https://portal.example.com/serviceapi/v1",
 	}
-	endpoints := []*enumerate.JavascriptEndpoint{{Path: "general/DeleteFile", SourceUrl: sourceURL}}
+	endpoints := []*enumeratejavascript.Endpoint{{Details: &enumerate.JavascriptEndpoint{Path: "general/DeleteFile", SourceUrl: sourceURL}}}
 
 	rooted := enumeratejavascript.RootEndpoints(endpoints, candidates, []string{"portal.example.com"})
 	findEndpoint(t, rooted, "/serviceapi/v1/general/DeleteFile")
 }
 
 func TestPreferredBaseLeavesEndpointsAloneWhenOnlyFilesQualify(t *testing.T) {
-	endpoints := []*enumerate.JavascriptEndpoint{{Path: "general/DeleteFile", SourceUrl: sourceURL}}
+	endpoints := []*enumeratejavascript.Endpoint{{Details: &enumerate.JavascriptEndpoint{Path: "general/DeleteFile", SourceUrl: sourceURL}}}
 
 	rooted := enumeratejavascript.RootEndpoints(endpoints, []string{"https://portal.example.com/api/config.json"}, []string{"portal.example.com"})
 	if rooted[0].Rooted {

@@ -456,13 +456,15 @@ func (c *collector) analyze(config enumerate.EnumerateJavascriptConfig) analysis
 	// bundle named it — a bundle routinely calls an API on a sibling host.
 	served := map[string][]*javascripthelpers.Endpoint{}
 	unrooted := []*javascripthelpers.Endpoint{}
+	// Scope is run-wide so a base on a sibling host the operator also targeted still roots, while the
+	// preference for which base to pick stays with the application whose bundles declared it.
+	scopeHosts := targetHosts(c.config.Targets)
 	sort.Strings(order)
 	for _, owner := range order {
 		bucket := buckets[owner]
-		hosts := targetHosts([]string{owner})
-		bucket.bases = javascripthelpers.BaseCandidatesInScope(sortedSet(bucket.origins), hosts, config.IgnoreCrossDomainEndpoints)
+		bucket.bases = javascripthelpers.BaseCandidatesInScope(sortedSet(bucket.origins), scopeHosts, config.IgnoreCrossDomainEndpoints)
 
-		for _, endpoint := range javascripthelpers.RootEndpoints(dedupeEndpoints(bucket.endpoints), bucket.bases, hosts) {
+		for _, endpoint := range javascripthelpers.RootEndpoints(dedupeEndpoints(bucket.endpoints), bucket.bases, targetHosts([]string{owner})) {
 			if !endpoint.Rooted {
 				unrooted = append(unrooted, endpoint)
 				continue

@@ -266,3 +266,32 @@ func TestAnalyzeDropsCrossDomainEndpointsWhenAsked(t *testing.T) {
 		}
 	}
 }
+
+// A base on a sibling host the operator also targeted must still root the relative literals that
+// hang off it, the same way an absolute URL to that host is kept.
+func TestAnalyzeRootsAgainstABaseOnAnotherTargetedHost(t *testing.T) {
+	config := enumerate.EnumerateJavascriptConfig{
+		Targets:                    []string{"https://app.example.com", "https://api.example.com"},
+		IgnoreCrossDomainEndpoints: true,
+	}
+	c := newCollector(config)
+	c.analyzed("https://app.example.com/main.js", enumerate.JavascriptArtifactKindEntry,
+		`const env={serviceApiEndpoint:"https://api.example.com/v1"};`+
+			`class S{read(u){return this.dataService.getRequest("User/Read?userId="+u)}}`,
+		[]string{"https://app.example.com"})
+
+	result := c.analyze(config)
+	if len(result.unrooted) != 0 {
+		t.Fatalf("expected the literal to root against the targeted sibling, got %v", result.unrooted)
+	}
+	for _, application := range result.applications {
+		if application.BaseUrl != "https://api.example.com" {
+			continue
+		}
+		if len(application.Endpoints) != 1 || application.Endpoints[0].Path != "/v1/User/Read" {
+			t.Fatalf("expected the rooted path under the serving host, got %v", application.Endpoints)
+		}
+		return
+	}
+	t.Fatalf("expected an application for the serving host, got %v", result.applications)
+}

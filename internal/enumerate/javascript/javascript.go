@@ -68,10 +68,8 @@ func PerformJavascriptEnumeration(ctx context.Context, config enumerate.Enumerat
 
 	analysis := collector.analyze(config)
 
-	report.Result.Artifacts = collector.artifactDetails()
-	report.Result.BaseUrlCandidates = analysis.bases
-	report.Result.Endpoints = analysis.endpoints
-	report.Result.Secrets = analysis.secrets
+	report.Result.WebApplications = analysis.applications
+	report.Result.UnrootedEndpoints = analysis.unrooted
 	report.Errors = append(report.Errors, collector.errors...)
 	return report
 }
@@ -82,8 +80,11 @@ type collector struct {
 	artifacts []*artifact
 	// claimed guards every URL the run has decided to retrieve, so no URL is fetched twice however
 	// many pages or manifests name it.
-	claimed   map[string]struct{}
-	byURL     map[string]*artifact
+	claimed map[string]struct{}
+	byURL   map[string]*artifact
+	// owners records the application each URL was reached for. A bundle a CDN serves to two
+	// applications belongs to both, so this is a list rather than a single value.
+	owners    map[string][]string
 	queue     []queued
 	errors    []string
 	remaining int
@@ -96,11 +97,21 @@ type queued struct {
 	discoveredFrom *string
 }
 
+// applicationBaseURL reduces a URL to the origin serving it.
+func applicationBaseURL(raw string) string {
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed.Host == "" {
+		return ""
+	}
+	return parsed.Scheme + "://" + parsed.Host
+}
+
 func newCollector(config enumerate.EnumerateJavascriptConfig) *collector {
 	return &collector{
 		config:    config,
 		claimed:   map[string]struct{}{},
 		byURL:     map[string]*artifact{},
+		owners:    map[string][]string{},
 		remaining: config.MaxArtifacts,
 	}
 }
@@ -147,6 +158,9 @@ func (c *collector) resolveSeeds(ctx context.Context) {
 			c.errors = append(c.errors, fmt.Sprintf("skipped %d targets: max-artifacts reached", len(seeds)-index))
 			return
 		}
+		owners := []string{applicationBaseURL(seed)}
+		c.addOwners(seed, owners)
+
 		fetched, err := fetchResource(ctx, c.config, seed, enumerate.JavascriptArtifactKindEntry, nil)
 		if err != nil {
 			c.errors = append(c.errors, err.Error())
@@ -175,18 +189,50 @@ func (c *collector) resolveSeeds(ctx context.Context) {
 			continue
 		}
 		for _, reference := range references {
-			c.enqueue(reference, enumerate.JavascriptArtifactKindEntry, seed)
+			c.enqueue(reference, enumerate.JavascriptArtifactKindEntry, seed, owners)
 		}
 	}
 }
 
-// enqueue schedules a URL for retrieval if no stage has claimed it yet.
-func (c *collector) enqueue(url string, kind enumerate.JavascriptArtifactKind, discoveredFrom string) {
-	if !c.claim(url) {
+// enqueue schedules a URL for retrieval if no stage has claimed it yet, recording the applications
+// it was reached for either way — a URL another application already claimed still belongs to this one.
+func (c *collector) enqueue(target string, kind enumerate.JavascriptArtifactKind, discoveredFrom string, owners []string) {
+	c.addOwners(target, owners)
+	if !c.claim(target) {
 		return
 	}
 	source := discoveredFrom
-	c.queue = append(c.queue, queued{url: url, kind: kind, discoveredFrom: &source})
+	c.queue = append(c.queue, queued{url: target, kind: kind, discoveredFrom: &source})
+}
+
+// addOwners records the applications a URL belongs to, keeping the order they were reached in.
+func (c *collector) addOwners(target string, owners []string) {
+	for _, owner := range owners {
+		if owner == "" {
+			continue
+		}
+		known := false
+		for _, existing := range c.owners[target] {
+			if existing == owner {
+				known = true
+				break
+			}
+		}
+		if !known {
+			c.owners[target] = append(c.owners[target], owner)
+		}
+	}
+}
+
+// ownersOf returns the applications an artifact belongs to, falling back to the origin serving it.
+func (c *collector) ownersOf(target string) []string {
+	if owners := c.owners[target]; len(owners) > 0 {
+		return owners
+	}
+	if base := applicationBaseURL(target); base != "" {
+		return []string{base}
+	}
+	return nil
 }
 
 // retrieveBundles fetches everything the seed stage queued, honoring the artifact budget.
@@ -220,7 +266,7 @@ func (c *collector) expandChunks(ctx context.Context) {
 					c.errors = append(c.errors, err.Error())
 					continue
 				}
-				c.enqueue(chunkURL, enumerate.JavascriptArtifactKindChunk, current.details.Url)
+				c.enqueue(chunkURL, enumerate.JavascriptArtifactKindChunk, current.details.Url, c.ownersOf(current.details.Url))
 			}
 		}
 		if len(c.queue) == 0 {
@@ -240,7 +286,7 @@ func (c *collector) retrieveSourceMaps(ctx context.Context) {
 			continue
 		}
 		mapURL := strings.SplitN(current.details.Url, "?", 2)[0] + ".map"
-		c.enqueue(mapURL, enumerate.JavascriptArtifactKindSourceMap, current.details.Url)
+		c.enqueue(mapURL, enumerate.JavascriptArtifactKindSourceMap, current.details.Url, c.ownersOf(current.details.Url))
 	}
 	// A missing source map is the normal case, so a failed retrieval is not reported. Budget
 	// messages still are, or `--fetch-source-maps` could retrieve nothing and still exit clean.
@@ -341,48 +387,143 @@ func (c *collector) record(current *artifact) {
 	c.artifacts = append(c.artifacts, current)
 }
 
-// analysisResult is what the analysis stage produced across every artifact.
+// analysisResult is what the analysis stage produced, grouped by the application it belongs to.
 type analysisResult struct {
-	endpoints []*enumerate.JavascriptEndpoint
-	secrets   []*enumerate.JavascriptSecret
-	bases     []string
+	applications []*enumerate.JavascriptApplicationDetails
+	unrooted     []*enumerate.JavascriptEndpoint
 }
 
-// analyze runs the extractor once per retrieved artifact and roots the result against the bases
-// pooled from all of them.
+// applicationBucket accumulates one application's artifacts and findings during analysis.
+type applicationBucket struct {
+	baseURL   string
+	pages     []*enumerate.JavascriptArtifact
+	local     []*enumerate.JavascriptArtifact
+	remote    []*enumerate.JavascriptArtifact
+	origins   map[string]struct{}
+	bases     []string
+	endpoints []*javascripthelpers.Endpoint
+	secrets   []*enumerate.JavascriptSecret
+}
+
+// analyze runs the extractor once per retrieved artifact and groups what it found under the
+// application the artifact was retrieved for, rooting each application against its own bases.
 func (c *collector) analyze(config enumerate.EnumerateJavascriptConfig) analysisResult {
-	endpoints := []*enumerate.JavascriptEndpoint{}
-	secrets := []*enumerate.JavascriptSecret{}
-	origins := map[string]struct{}{}
+	buckets := map[string]*applicationBucket{}
+	order := []string{}
 
 	for _, current := range c.artifacts {
-		if current.source == nil {
+		owners := c.ownersOf(current.details.Url)
+		if len(owners) == 0 {
 			continue
 		}
-		found := javascripthelpers.AnalyzeSource(current.source, current.details.Url, config.AnalysisWindowBytes, config.AnalysisWindowOverlapBytes)
-		current.details.Analyzed = true
-		endpoints = append(endpoints, found.Endpoints...)
-		secrets = append(secrets, found.Secrets...)
-		for _, origin := range found.Origins {
-			origins[origin] = struct{}{}
+
+		var found javascripthelpers.Analysis
+		if current.source != nil {
+			found = javascripthelpers.AnalyzeSource(current.source, current.details.Url, config.AnalysisWindowBytes, config.AnalysisWindowOverlapBytes)
+		}
+
+		for _, owner := range owners {
+			bucket, exists := buckets[owner]
+			if !exists {
+				bucket = &applicationBucket{baseURL: owner, origins: map[string]struct{}{}}
+				buckets[owner] = bucket
+				order = append(order, owner)
+			}
+
+			if current.details.Kind == enumerate.JavascriptArtifactKindPage {
+				bucket.pages = append(bucket.pages, current.details)
+				continue
+			}
+			if utils.IsHostInScope(owner, current.details.Url) {
+				bucket.local = append(bucket.local, current.details)
+			} else {
+				bucket.remote = append(bucket.remote, current.details)
+			}
+
+			// Cloned because rooting rewrites the endpoint, and an artifact two applications share
+			// roots against a different base for each of them.
+			for _, endpoint := range found.Endpoints {
+				bucket.endpoints = append(bucket.endpoints, endpoint.Clone())
+			}
+			bucket.secrets = append(bucket.secrets, found.Secrets...)
+			for _, origin := range found.Origins {
+				bucket.origins[origin] = struct{}{}
+			}
 		}
 	}
 
-	hosts := targetHosts(c.config.Targets)
-	bases := javascripthelpers.BaseCandidatesInScope(sortedSet(origins), hosts, config.IgnoreCrossDomainEndpoints)
-	return analysisResult{
-		endpoints: javascripthelpers.RootEndpoints(dedupeEndpoints(endpoints), bases, hosts),
-		secrets:   dedupeSecrets(secrets),
-		bases:     bases,
+	// An endpoint belongs to the host that serves it, which is not always the application whose
+	// bundle named it — a bundle routinely calls an API on a sibling host.
+	served := map[string][]*javascripthelpers.Endpoint{}
+	unrooted := []*javascripthelpers.Endpoint{}
+	// Scope is run-wide so a base on a sibling host the operator also targeted still roots, while the
+	// preference for which base to pick stays with the application whose bundles declared it.
+	scopeHosts := targetHosts(c.config.Targets)
+	sort.Strings(order)
+	for _, owner := range order {
+		bucket := buckets[owner]
+		bucket.bases = javascripthelpers.BaseCandidatesInScope(sortedSet(bucket.origins), scopeHosts, config.IgnoreCrossDomainEndpoints)
+
+		for _, endpoint := range javascripthelpers.RootEndpoints(dedupeEndpoints(bucket.endpoints), bucket.bases, targetHosts([]string{owner})) {
+			if !endpoint.Rooted {
+				unrooted = append(unrooted, endpoint)
+				continue
+			}
+			// A root-relative path resolves against the application that loaded the bundle.
+			if endpoint.BaseURL == "" {
+				endpoint.BaseURL = owner
+			}
+			// An absolute URL to an unrelated host is a link the bundle happens to contain, not an
+			// endpoint of anything being scanned. Left in it would stand up an application per
+			// social network the page links to.
+			if config.IgnoreCrossDomainEndpoints && !c.inScope(endpoint.BaseURL) {
+				continue
+			}
+			served[endpoint.BaseURL] = append(served[endpoint.BaseURL], endpoint)
+			if _, exists := buckets[endpoint.BaseURL]; !exists {
+				buckets[endpoint.BaseURL] = &applicationBucket{baseURL: endpoint.BaseURL, origins: map[string]struct{}{}}
+				order = append(order, endpoint.BaseURL)
+			}
+		}
 	}
+
+	sort.Strings(order)
+	applications := make([]*enumerate.JavascriptApplicationDetails, 0, len(order))
+	for _, base := range order {
+		bucket := buckets[base]
+		application := &enumerate.JavascriptApplicationDetails{
+			BaseUrl:           bucket.baseURL,
+			Pages:             bucket.pages,
+			BaseUrlCandidates: bucket.bases,
+			Endpoints:         detailsOf(dedupeEndpoints(served[base])),
+			Secrets:           dedupeSecrets(bucket.secrets),
+		}
+		if len(bucket.local) > 0 || len(bucket.remote) > 0 {
+			application.Bundles = &enumerate.JavascriptBundleDetails{Local: bucket.local, Remote: bucket.remote}
+		}
+		applications = append(applications, application)
+	}
+
+	return analysisResult{applications: applications, unrooted: detailsOf(dedupeEndpoints(unrooted))}
 }
 
-func (c *collector) artifactDetails() []*enumerate.JavascriptArtifact {
-	details := make([]*enumerate.JavascriptArtifact, 0, len(c.artifacts))
-	for _, current := range c.artifacts {
-		details = append(details, current.details)
+// inScope reports a URL served by a target's host or a subdomain of it.
+func (c *collector) inScope(target string) bool {
+	for _, configured := range c.config.Targets {
+		if base := applicationBaseURL(configured); base != "" && utils.IsHostInScope(base, target) {
+			return true
+		}
 	}
-	return details
+	return false
+}
+
+// detailsOf unwraps the reported endpoint from each analysis record.
+func detailsOf(endpoints []*javascripthelpers.Endpoint) []*enumerate.JavascriptEndpoint {
+	out := make([]*enumerate.JavascriptEndpoint, 0, len(endpoints))
+	for _, endpoint := range endpoints {
+		out = append(out, endpoint.Details)
+	}
+	return out
 }
 
 // applyStealthDelay spaces requests out when a sleep is configured.
@@ -492,22 +633,18 @@ func firstHeaderValue(headers map[string][]string, name string) string {
 	return ""
 }
 
-func dedupeEndpoints(endpoints []*enumerate.JavascriptEndpoint) []*enumerate.JavascriptEndpoint {
+func dedupeEndpoints(endpoints []*javascripthelpers.Endpoint) []*javascripthelpers.Endpoint {
 	seen := map[string]struct{}{}
-	out := make([]*enumerate.JavascriptEndpoint, 0, len(endpoints))
+	out := make([]*javascripthelpers.Endpoint, 0, len(endpoints))
 	for _, endpoint := range endpoints {
-		if endpoint == nil {
+		if endpoint == nil || endpoint.Details == nil {
 			continue
 		}
 		method := ""
-		if endpoint.Method != nil {
-			method = string(*endpoint.Method)
+		if endpoint.Details.Method != nil {
+			method = string(*endpoint.Details.Method)
 		}
-		base := ""
-		if endpoint.BaseUrl != nil {
-			base = *endpoint.BaseUrl
-		}
-		key := method + " " + base + " " + endpoint.Path
+		key := method + " " + endpoint.BaseURL + " " + endpoint.Details.Path
 		if _, exists := seen[key]; exists {
 			continue
 		}
@@ -524,11 +661,15 @@ func dedupeSecrets(secrets []*enumerate.JavascriptSecret) []*enumerate.Javascrip
 		if secret == nil {
 			continue
 		}
+		name := ""
+		if secret.Name != nil {
+			name = *secret.Name
+		}
 		value := ""
 		if secret.Value != nil {
 			value = *secret.Value
 		}
-		key := secret.Kind + " " + value
+		key := secret.Kind + " " + name + " " + value
 		if _, exists := seen[key]; exists {
 			continue
 		}

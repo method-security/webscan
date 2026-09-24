@@ -112,3 +112,52 @@ func TestAnalyzeSourceIgnoresShortAndProseValues(t *testing.T) {
 		t.Fatalf("expected short and prose values to be ignored, got %v", found)
 	}
 }
+
+// The key a credential was assigned to and the credential itself are separate fields.
+func TestAnalyzeSourceReportsNameAndValueSeparately(t *testing.T) {
+	source := `const env={gatewaySubscriptionKey:"9f3e1d7c05a84b26e1c0fa93d4b87e50",apiEndpoint:"https://app.example.com/api"};`
+
+	secrets := enumeratejavascript.AnalyzeSource([]byte(source), "https://app.example.com/main.js", 0, 0).Secrets
+	if len(secrets) != 1 {
+		t.Fatalf("expected exactly one secret, got %d", len(secrets))
+	}
+
+	secret := secrets[0]
+	if secret.Name == nil || *secret.Name != "gatewaySubscriptionKey" {
+		t.Fatalf("expected the assigned key as the name, got %v", secret.Name)
+	}
+	if secret.Value == nil || *secret.Value != "9f3e1d7c05a84b26e1c0fa93d4b87e50" {
+		t.Fatalf("expected the bare credential as the value, got %v", secret.Value)
+	}
+	if secret.Context["apiEndpoint"] != "https://app.example.com/api" {
+		t.Fatalf("expected the surrounding configuration as context, got %v", secret.Context)
+	}
+}
+
+// A vendor matcher reports a bare key with no name of its own, which still lands in the value.
+func TestAnalyzeSourceReportsShapedCredentialsAsValues(t *testing.T) {
+	secrets := enumeratejavascript.AnalyzeSource([]byte(`const k="AKIAIOSFODNN7EXAMPLE";`), "https://app.example.com/main.js", 0, 0).Secrets
+	if len(secrets) == 0 {
+		t.Fatalf("expected the AWS key to be reported")
+	}
+	if secrets[0].Value == nil || *secrets[0].Value != "AKIAIOSFODNN7EXAMPLE" {
+		t.Fatalf("expected the bare AWS key as the value, got %v", secrets[0].Value)
+	}
+}
+
+// A matcher returning the bundle's own object literal has no fixed key set, so the rest stays addressable.
+func TestAnalyzeSourceKeepsOpenEndedPayloadsAsAttributes(t *testing.T) {
+	source := `const config={apiKey:"AIzaSyC1x2v3B4n5M6q7W8e9R0t1Y2u3I4o5P6a",authDomain:"demo.firebaseapp.com",` +
+		`projectId:"demo",storageBucket:"demo.appspot.com",messagingSenderId:"123456789012",appId:"1:123:web:abc"};`
+
+	for _, secret := range enumeratejavascript.AnalyzeSource([]byte(source), "https://app.example.com/main.js", 0, 0).Secrets {
+		if secret.Kind != "firebase" {
+			continue
+		}
+		if secret.Attributes["authDomain"] != "demo.firebaseapp.com" || secret.Attributes["projectId"] != "demo" {
+			t.Fatalf("expected the object's own keys to be addressable, got %v", secret.Attributes)
+		}
+		return
+	}
+	t.Fatalf("expected a firebase secret to be reported")
+}

@@ -6,8 +6,6 @@ import (
 	"sort"
 	"strings"
 
-	// Generated
-	"github.com/Method-Security/webscan/generated/go/enumerate"
 	// Utils
 	utils "github.com/Method-Security/webscan/utils"
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
@@ -18,7 +16,7 @@ import (
 // A bundle states its base once, as configuration, and then concatenates bare paths onto it. Left
 // alone the two never meet: the literal `general/DeleteFile` is not a path the origin serves, and
 // the base alone names no endpoint.
-func RootEndpoints(endpoints []*enumerate.JavascriptEndpoint, baseCandidates []string, preferHosts []string) []*enumerate.JavascriptEndpoint {
+func RootEndpoints(endpoints []*Endpoint, baseCandidates []string, preferHosts []string) []*Endpoint {
 	base, ok := preferredBase(baseCandidates, preferHosts)
 	if !ok {
 		return endpoints
@@ -29,20 +27,21 @@ func RootEndpoints(endpoints []*enumerate.JavascriptEndpoint, baseCandidates []s
 		return endpoints
 	}
 
-	kept := make([]*enumerate.JavascriptEndpoint, 0, len(endpoints))
+	kept := make([]*Endpoint, 0, len(endpoints))
 	for _, endpoint := range endpoints {
-		if endpoint == nil {
+		if endpoint == nil || endpoint.Details == nil {
 			continue
 		}
+		details := endpoint.Details
 		// The base itself names no endpoint, so it must not be reported as one. `/x` and `/x/` are
 		// the same base here even though they are different endpoints elsewhere.
-		if endpoint.Rooted && endpoint.BaseUrl != nil && *endpoint.BaseUrl == origin &&
-			strings.Trim(endpoint.Path, "/") == strings.Trim(prefix, "/") {
+		if endpoint.Rooted && endpoint.BaseURL == origin &&
+			strings.Trim(details.Path, "/") == strings.Trim(prefix, "/") {
 			continue
 		}
 		if !endpoint.Rooted {
-			endpoint.BaseUrl = &origin
-			endpoint.Path = requesthelpers.JoinPath(prefix, endpoint.Path)
+			endpoint.BaseURL = origin
+			details.Path = requesthelpers.JoinPath(prefix, details.Path)
 			endpoint.Rooted = true
 		}
 		kept = append(kept, endpoint)

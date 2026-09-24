@@ -14,9 +14,11 @@ webscan has several top level flags that can be used on any subcommand. These in
 ```bash
 Flags:
   -h, --help                 help for webscan
+      --http-proxy string    HTTP/HTTPS proxy URL (e.g., http://proxy.example.com:8080)
   -o, --output string        Output format (signal, json, yaml). Default value is signal (default "signal")
   -f, --output-file string   Path to output file. If blank, will output to STDOUT
   -q, --quiet                Suppress output
+      --socks-proxy string   SOCKS proxy URL (e.g., socks5://proxy.example.com:1080)
   -v, --verbose              Verbose output
 ```
 

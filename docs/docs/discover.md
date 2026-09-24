@@ -14,8 +14,11 @@ webscan discover [command]
 - **directory**: Directory and file bruteforce discovery
 - **page**: Web page capture and analysis
 - **probe**: Probe targets for web application existence
+- **request**: Send a freeform HTTP request to a target
 - **route**: Route discovery and analysis
 - **saas**: SaaS application discovery by organization name
+- **witness**: Single-pass screenshot, HTTP capture, favicon, and technology fingerprinting
+- **wordlist**: Generate a wordlist from web content
 
 ## Common Flags
 
@@ -181,6 +184,42 @@ Global Flags:
   -v, --verbose              Verbose output
 ```
 
+### Request
+
+Send a freeform HTTP request and capture the response and TLS details.
+
+#### Usage
+```bash
+webscan discover request --target https://example.com --http-method GET
+```
+
+#### Help Text
+```bash
+webscan discover request -h
+Send a freeform HTTP request to a target URL and capture the full HTTP response along with TLS certificate details.
+
+Usage:
+  webscan discover request [flags]
+
+Flags:
+      --binary-body string             Raw request body as base64-encoded bytes
+      --binary-body-mime-type string   Content-Type for --binary-body (default application/octet-stream)
+      --file stringArray               Multipart file part as 'fieldName|fileName|contentType|base64' (repeatable; contentType may be empty)
+      --follow-redirects               Follow HTTP redirects (default true)
+      --form-data stringArray          Form data as 'key=value' (repeatable; missing equals errors)
+      --header stringArray             Request header as 'Name: Value' (repeatable)
+  -h, --help                           help for request
+      --http-method string             HTTP method (GET,POST,PUT,DELETE,PATCH,HEAD,OPTIONS) (default "GET")
+      --json-body string               Request body as JSON string
+      --json-body-base64 string        Request body as base64-encoded JSON string
+      --max-redirects int              Maximum number of redirects to follow (default 10)
+      --target string                  URL to send the HTTP request to
+      --text-body string               Request body as plain text
+      --timeout int                    Request timeout in seconds (default 30)
+      --user-agent string              User-Agent preset (RANDOM, CHROME, FIREFOX, SAFARI, EDGE) (default "RANDOM")
+      --verify-tls                     Verify TLS certificates
+```
+
 ### Route
 
 Discover and analyze application routes.
@@ -222,6 +261,79 @@ Global Flags:
   -f, --output-file string   Path to output file. If blank, will output to STDOUT
   -q, --quiet                Suppress output
   -v, --verbose              Verbose output
+```
+
+### Witness
+
+Capture a page once and enrich it with HTTP metadata, favicon data, and technology fingerprints.
+
+#### Usage
+```bash
+webscan discover witness --target https://example.com --screenshot
+```
+
+#### Help Text
+```bash
+webscan discover witness -h
+Perform a single-pass web witness scan: navigate to a target URL, capture a screenshot, extract HTTP metadata, fetch a favicon, and run Wappalyzer technology fingerprinting.
+
+Usage:
+  webscan discover witness [flags]
+
+Flags:
+      --browserbase-countries strings   List of countries to use for Browserbase proxy
+      --browserbase-project string      Browserbase project ID
+      --browserbase-proxy               Use Browserbase proxy for requests
+      --browserbase-token string        Browserbase API token for cloud browser access
+      --cookie stringArray              Cookie for authenticated capture as 'name=value' (repeatable)
+      --header stringArray              Request header for authenticated capture as 'Name: Value' (repeatable)
+      --headless-path string            Path to headless browser executable
+  -h, --help                            help for witness
+      --local-storage stringArray       localStorage entry as 'key=value' injected before page load (repeatable, headless only)
+      --max-redirects int               Maximum number of redirects to follow (default 10)
+      --min-dom-stabalize-time int      Minimum time to wait for DOM stabilization in seconds (default 20)
+      --request-method string           Request method to use (standard, headless, browserbase) (default "HEADLESS")
+      --response-codes string           Response codes to consider as valid responses (default "200-599")
+      --screenshot                      Capture a screenshot of the page (headless only)
+      --session-storage stringArray     sessionStorage entry as 'key=value' injected before page load (repeatable, headless only)
+      --target string                   Single URL target for witness scan
+      --timeout int                     Timeout per request in seconds (default 180)
+      --user-agent string               User-Agent preset (RANDOM, CHROME, FIREFOX, SAFARI, EDGE) (default "RANDOM")
+      --verify-tls                      Verify TLS certificates when making HTTPS requests
+```
+
+### Wordlist
+
+Build a custom wordlist from crawled page content.
+
+#### Usage
+```bash
+webscan discover wordlist --target https://example.com
+```
+
+#### Help Text
+```bash
+webscan discover wordlist -h
+Crawl a target website and extract unique words from page content to build a custom wordlist, similar to CeWL.
+
+Usage:
+  webscan discover wordlist [flags]
+
+Flags:
+  -h, --help                  help for wordlist
+      --ignore-cross-domain   Ignore links that lead to a different domain (default true)
+      --include-alt-text      Include words from image alt attributes
+      --include-comments      Include words from HTML comments
+      --include-metadata      Include words from meta tag content
+      --jitter int            Jitter percentage (0-100) to apply random variance to sleep delay
+      --min-word-length int   Minimum word length to include in wordlist (default 5)
+      --sleep int             Number of seconds to sleep between requests
+      --spider-depth int      Maximum depth for web spidering (default 2)
+      --target string         URL target to crawl for wordlist generation
+      --threads int           Number of concurrent threads for crawling (default 5)
+      --timeout int           Timeout per request in seconds (default 30)
+      --user-agent string     User-Agent preset (RANDOM, CHROME, FIREFOX, SAFARI, EDGE) (default "RANDOM")
+      --verify-tls            Verify TLS certificates when making HTTPS requests
 ```
 
 ### SaaS

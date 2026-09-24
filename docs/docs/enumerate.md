@@ -13,6 +13,7 @@ webscan enumerate [command]
 - **cms**: Enumerate content management systems like WordPress plugins and Drupal modules
 - **container-registry**: Enumerate container registries including Docker registries
 - **general**: Perform general enumeration tasks like rate limit testing
+- **javascript**: Analyze JavaScript bundles for endpoints, secrets, and declared chunks
 - **kube**: Enumerate Kubernetes resources and configurations
 
 ## Commands
@@ -92,6 +93,41 @@ Global Flags:
   -f, --output-file string   Path to output file. If blank, will output to STDOUT
   -q, --quiet                Suppress output
   -v, --verbose              Verbose output
+```
+
+### JavaScript
+```bash
+webscan enumerate javascript --targets https://example.com
+```
+#### Help Text
+```bash
+webscan enumerate javascript -h
+Analyze the JavaScript an application serves, extracting API endpoints, configuration and
+secrets. Targets may be pages or bundles: a page contributes the scripts it declares, a bundle is
+analyzed directly. Lazily-loaded chunks are resolved from a bundle's own chunk manifest rather than
+from the DOM, which never references them.
+
+Usage:
+  webscan enumerate javascript [flags]
+
+Flags:
+      --analysis-window-bytes int           Bytes of source analyzed per parse (default 262144)
+      --analysis-window-overlap-bytes int   Bytes each analysis window overlaps the previous one (default 65536)
+      --cookie stringArray                  Cookie as 'name=value' (repeatable)
+      --fetch-source-maps                   Fetch the source map published beside each artifact, when one is
+      --follow-chunks                       Resolve and analyze the lazily-loaded chunks the bundle's runtime declares (default true)
+      --header stringArray                  Request header as 'Name: Value' (repeatable)
+  -h, --help                                help for javascript
+      --ignore-cross-domain-endpoints       Ignore API bases whose host is not the target host or a subdomain of it (default true)
+      --jitter int                          Jitter percentage (0-100) to apply random variance to sleep delay
+      --max-artifacts int                   Maximum number of artifacts to retrieve across the run, targets included (0 = unlimited) (default 50)
+      --max-redirects int                   Maximum number of redirects to follow (default 3)
+      --sleep int                           Number of seconds to sleep between requests
+      --targets strings                     Page or JavaScript bundle URLs to analyze as one application
+      --threads int                         Number of concurrent chunk fetches
+      --timeout int                         Timeout per request in seconds (default 60)
+      --user-agent string                   User-Agent preset (RANDOM, CHROME, FIREFOX, SAFARI, EDGE) (default "RANDOM")
+      --verify-tls                          Verify TLS certificates when making HTTPS requests
 ```
 
 ### CMS

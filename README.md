@@ -81,7 +81,7 @@ webscan pentest waf detect --targets https://method.security --http-methods GET,
 6. OR run command without shell example: `docker run webscan:local discover probe --targets method.security --request-method HEADLESS -o json --headless-path /headless-shell/run.sh`
 
 ### Fern
-If updating the fern yaml configuration you need to [install](https://buildwithfern.com/learn/cli-reference/overview) Fern CLI. After installation you can execute `fern generate` to generate the updates.
+If updating the Fern YAML configuration you need to [install](https://buildwithfern.com/learn/cli-reference/overview) Fern CLI. Keep the CLI and generators current with `fern upgrade` and `fern generator upgrade`, then execute `fern generate --group local --retry-rate-limited` to generate the local Go types.
 
 ### Updating Embedded Scan Assets
 

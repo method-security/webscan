@@ -3,7 +3,7 @@ groups:
   local:
     generators:
       - name: fernapi/fern-go-sdk
-        version: 1.46.4
+        version: 1.62.0
         config:
           importPath: github.com/Method-Security/webscan/generated/go
         output:

@@ -155,18 +155,27 @@ func toEndpoint(found *jsluice.URL, sourceURL string) *Endpoint {
 	}
 
 	path := raw
+	query := ""
 	if cut := strings.IndexAny(path, "?#"); cut >= 0 {
+		if path[cut] == '?' {
+			query = path[cut+1:]
+			if end := strings.IndexByte(query, '#'); end >= 0 {
+				query = query[:end]
+			}
+		}
 		path = path[:cut]
 	}
-	if path == "" {
+	path, ok := normalizeExpressionPath(path)
+	if !ok {
 		return nil
 	}
 
 	details := &enumerate.JavascriptEndpoint{
-		Path:        path,
-		SourceUrl:   sourceURL,
-		QueryParams: found.QueryParams,
-		BodyParams:  found.BodyParams,
+		Path:             path,
+		SourceUrl:        sourceURL,
+		QueryParams:      found.QueryParams,
+		QueryParamValues: literalQueryValues(query),
+		BodyParams:       found.BodyParams,
 	}
 	endpoint := &Endpoint{Details: details}
 	if found.ContentType != "" {
@@ -194,8 +203,12 @@ func toEndpoint(found *jsluice.URL, sourceURL string) *Endpoint {
 		if isNonEndpointAsset(parsed.Path) {
 			return nil
 		}
+		absolutePath, ok := normalizeExpressionPath(parsed.Path)
+		if !ok {
+			return nil
+		}
 		endpoint.BaseURL = base
-		details.Path = parsed.Path
+		details.Path = absolutePath
 		endpoint.Rooted = true
 		return endpoint
 	}
@@ -344,6 +357,7 @@ func mergeEndpointRecords(endpoints []*Endpoint) []*Endpoint {
 		}
 		existing.Details.QueryParams = unionStrings(existing.Details.QueryParams, endpoint.Details.QueryParams)
 		existing.Details.BodyParams = unionStrings(existing.Details.BodyParams, endpoint.Details.BodyParams)
+		existing.Details.QueryParamValues = mergeQueryValues(existing.Details.QueryParamValues, endpoint.Details.QueryParamValues)
 	}
 
 	sort.Strings(order)
@@ -444,4 +458,81 @@ func sortedKeys(set map[string]struct{}) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+// normalizeExpressionPath resolves jsluice's expression placeholder into a path template, or reports
+// the path unusable. A segment that is wholly a placeholder is a path parameter and becomes `{param}`;
+// a placeholder glued into a segment leaves a name nothing can recover, and that literal reached the
+// wire as an invented endpoint before this existed.
+func normalizeExpressionPath(path string) (string, bool) {
+	if path == "" {
+		return "", false
+	}
+	if !strings.Contains(path, jsluice.ExpressionPlaceholder) {
+		return path, true
+	}
+
+	segments := strings.Split(path, "/")
+	for i, segment := range segments {
+		if !strings.Contains(segment, jsluice.ExpressionPlaceholder) {
+			continue
+		}
+		if segment != jsluice.ExpressionPlaceholder {
+			return "", false
+		}
+		segments[i] = "{param}"
+	}
+	return strings.Join(segments, "/"), true
+}
+
+// literalQueryValues keeps the values a client hard-codes and drops the ones it computes. The
+// placeholder means the value is supplied at runtime, so it is absent rather than empty: a probe
+// has to generate one, and sending "EXPR" would be worse than sending nothing.
+func literalQueryValues(query string) map[string]string {
+	if query == "" {
+		return nil
+	}
+	values := map[string]string{}
+	for _, pair := range strings.Split(query, "&") {
+		if pair == "" {
+			continue
+		}
+		name, value, found := strings.Cut(pair, "=")
+		if !found || name == "" || value == "" {
+			continue
+		}
+		if strings.Contains(value, jsluice.ExpressionPlaceholder) {
+			continue
+		}
+		decodedName, err := url.QueryUnescape(name)
+		if err != nil {
+			decodedName = name
+		}
+		decodedValue, err := url.QueryUnescape(value)
+		if err != nil {
+			decodedValue = value
+		}
+		values[decodedName] = decodedValue
+	}
+	if len(values) == 0 {
+		return nil
+	}
+	return values
+}
+
+// mergeQueryValues keeps the first literal seen for a parameter. Two call sites passing different
+// constants both describe a real request, and one of them is as good a probe value as the other.
+func mergeQueryValues(existing map[string]string, incoming map[string]string) map[string]string {
+	if len(incoming) == 0 {
+		return existing
+	}
+	if existing == nil {
+		existing = map[string]string{}
+	}
+	for name, value := range incoming {
+		if _, seen := existing[name]; !seen {
+			existing[name] = value
+		}
+	}
+	return existing
 }

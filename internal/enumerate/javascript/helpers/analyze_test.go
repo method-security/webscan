@@ -347,3 +347,53 @@ func contains(values []string, want string) bool {
 	}
 	return false
 }
+
+func TestAnalyzeSourceKeepsLiteralQueryValuesAndDropsComputedOnes(t *testing.T) {
+	source := []byte(`$.ajax({url:'/api/general/maintenance?portalTypeId=2&isExistingUser=false&userId='+u});`)
+
+	analysis := enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0)
+	endpoint := findEndpoint(t, analysis.Endpoints, "/api/general/maintenance")
+
+	values := endpoint.Details.QueryParamValues
+	if values["portalTypeId"] != "2" {
+		t.Fatalf("expected the hard-coded portalTypeId, got %v", values)
+	}
+	if values["isExistingUser"] != "false" {
+		t.Fatalf("expected the hard-coded isExistingUser, got %v", values)
+	}
+	if _, present := values["userId"]; present {
+		t.Fatalf("a computed value is absent, never a placeholder: %v", values)
+	}
+	if len(endpoint.Details.QueryParams) != 3 {
+		t.Fatalf("every parameter is still named whether or not its value is known, got %v", endpoint.Details.QueryParams)
+	}
+}
+
+func TestAnalyzeSourceTemplatesAWhollyComputedPathSegment(t *testing.T) {
+	source := []byte(`$.get('/api/orders/'+id+'/detail');`)
+
+	analysis := enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0)
+	if findEndpointOrNil(analysis.Endpoints, "/api/orders/{param}/detail") == nil {
+		t.Fatalf("expected a computed segment to become a path template, got %v", pathsOf(analysis.Endpoints))
+	}
+}
+
+func TestAnalyzeSourceDropsAPathWhoseNameIsPartlyComputed(t *testing.T) {
+	source := []byte(`$.get('/creditorapis/api/CreditorClaim/GetCreditor'+s);`)
+
+	analysis := enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0)
+	for _, endpoint := range analysis.Endpoints {
+		if strings.Contains(endpoint.Details.Path, "EXPR") {
+			t.Fatalf("a name the extractor invented must not reach the wire, got %q", endpoint.Details.Path)
+		}
+	}
+}
+
+func findEndpointOrNil(endpoints []*enumeratejavascript.Endpoint, path string) *enumeratejavascript.Endpoint {
+	for _, endpoint := range endpoints {
+		if endpoint.Details.Path == path {
+			return endpoint
+		}
+	}
+	return nil
+}

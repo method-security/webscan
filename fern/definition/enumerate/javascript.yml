@@ -24,6 +24,7 @@ types:
       path: string
       method: optional<http.HttpMethod>
       queryParams: optional<list<string>>
+      queryParamValues: optional<map<string, string>>
       bodyParams: optional<list<string>>
       contentType: optional<string>
       callExpression: optional<string>

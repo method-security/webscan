@@ -98,8 +98,13 @@ func AnalyzeSource(source []byte, sourceURL string, windowBytes int, overlapByte
 			if endpoint == nil {
 				continue
 			}
-			if _, exists := endpoints[endpointKey(endpoint)]; !exists {
-				endpoints[endpointKey(endpoint)] = endpoint
+			key := endpointKey(endpoint)
+			if existing, exists := endpoints[key]; exists {
+				// One call site may state a parameter another omits, and windows overlap, so a
+				// repeat is extra evidence about the same endpoint rather than a duplicate to drop.
+				mergeEndpointDetails(existing, endpoint)
+			} else {
+				endpoints[key] = endpoint
 			}
 		}
 
@@ -349,15 +354,7 @@ func mergeEndpointRecords(endpoints []*Endpoint) []*Endpoint {
 			order = append(order, key)
 			continue
 		}
-		if existing.Details.CallExpression == nil && endpoint.Details.CallExpression != nil {
-			existing.Details.CallExpression = endpoint.Details.CallExpression
-		}
-		if existing.Details.ContentType == nil && endpoint.Details.ContentType != nil {
-			existing.Details.ContentType = endpoint.Details.ContentType
-		}
-		existing.Details.QueryParams = unionStrings(existing.Details.QueryParams, endpoint.Details.QueryParams)
-		existing.Details.BodyParams = unionStrings(existing.Details.BodyParams, endpoint.Details.BodyParams)
-		existing.Details.QueryParamValues = mergeQueryValues(existing.Details.QueryParamValues, endpoint.Details.QueryParamValues)
+		mergeEndpointDetails(existing, endpoint)
 	}
 
 	sort.Strings(order)
@@ -535,4 +532,18 @@ func mergeQueryValues(existing map[string]string, incoming map[string]string) ma
 		}
 	}
 	return existing
+}
+
+// mergeEndpointDetails folds one record of an endpoint into another. Every field is additive: a
+// field the existing record lacks is taken, and a field both carry keeps what was seen first.
+func mergeEndpointDetails(existing *Endpoint, incoming *Endpoint) {
+	if existing.Details.CallExpression == nil && incoming.Details.CallExpression != nil {
+		existing.Details.CallExpression = incoming.Details.CallExpression
+	}
+	if existing.Details.ContentType == nil && incoming.Details.ContentType != nil {
+		existing.Details.ContentType = incoming.Details.ContentType
+	}
+	existing.Details.QueryParams = unionStrings(existing.Details.QueryParams, incoming.Details.QueryParams)
+	existing.Details.BodyParams = unionStrings(existing.Details.BodyParams, incoming.Details.BodyParams)
+	existing.Details.QueryParamValues = mergeQueryValues(existing.Details.QueryParamValues, incoming.Details.QueryParamValues)
 }

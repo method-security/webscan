@@ -397,3 +397,23 @@ func findEndpointOrNil(endpoints []*enumeratejavascript.Endpoint, path string) *
 	}
 	return nil
 }
+
+func TestAnalyzeSourceMergesValuesAcrossCallSitesForOneEndpoint(t *testing.T) {
+	// The value-bearing call site is second: a first-wins dedupe would discard it.
+	source := []byte(`$.ajax({url:'/api/report?scope='+s});
+$.ajax({url:'/api/report?scope=team&format=csv'});`)
+
+	analysis := enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0)
+	endpoint := findEndpoint(t, analysis.Endpoints, "/api/report")
+
+	values := endpoint.Details.QueryParamValues
+	if values["scope"] != "team" {
+		t.Fatalf("expected the literal from the later call site, got %v", values)
+	}
+	if values["format"] != "csv" {
+		t.Fatalf("expected a parameter only the later call site states, got %v", values)
+	}
+	if len(endpoint.Details.QueryParams) != 2 {
+		t.Fatalf("expected both parameter names to survive the merge, got %v", endpoint.Details.QueryParams)
+	}
+}

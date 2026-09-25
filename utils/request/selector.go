@@ -18,6 +18,12 @@ import (
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
+// WithReusableStandardClient installs a standard HTTP client on the context for callers that
+// issue many requests with identical transport settings.
+func WithReusableStandardClient(ctx context.Context, config common.SendHttpRequestConfig) context.Context {
+	return standard.WithReusableClient(ctx, config)
+}
+
 // SendRequest sends a request based on the specified request method
 func SendRequest(ctx context.Context, config common.SendHttpRequestConfig) (*common.HttpRequestResponse, error) {
 	requestCtx := ctx

@@ -67,6 +67,7 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 	errors := []string{}
 	result := discover.DiscoverDirectoryResult{}
 	limiter := newDirectoryRateLimiter(config.GlobalRateLimit)
+	ctx = request.WithReusableStandardClient(ctx, createDirectorySendHTTPRequestConfig(ctx, "", "", common.HttpMethodGet, common.HttpRequestParams{}, 0, &config))
 
 	// Gather all paths
 	allPaths, err := gatherPaths(config.Paths, config.WordlistType, config.WordlistSize, config.Extensions, addSlashEnabled(&config))

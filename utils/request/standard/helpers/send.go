@@ -23,11 +23,23 @@ import (
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
+type reusableClientContextKey struct{}
+
+// WithReusableClient stores a standard HTTP client on the context so callers that issue many
+// requests with the same transport settings can reuse connections instead of creating a new
+// transport for every request.
+func WithReusableClient(ctx context.Context, config common.SendHttpRequestConfig) context.Context {
+	return context.WithValue(ctx, reusableClientContextKey{}, newHTTPClient(config))
+}
+
 func SendHTTPRequest(ctx context.Context, url string, headers map[string]string, bodyReader io.Reader, config common.SendHttpRequestConfig) (*http.Response, []string, error) {
 	log := svc1log.FromContext(ctx)
 	log.Debug("Sending request", svc1log.SafeParam("url", url), svc1log.SafeParam("maxRedirects", config.MaxRedirects))
 
-	client := newHTTPClient(config)
+	client := clientFromContext(ctx)
+	if client == nil {
+		client = newHTTPClient(config)
+	}
 
 	// Initialize Redirect Chain
 	redirectChain := []string{url}
@@ -184,6 +196,11 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 	}
 
 	return nil, redirectChain, fmt.Errorf("maximum redirects (%d) exceeded for %s", config.MaxRedirects, url)
+}
+
+func clientFromContext(ctx context.Context) *httpclient.Client {
+	client, _ := ctx.Value(reusableClientContextKey{}).(*httpclient.Client)
+	return client
 }
 
 func newHTTPClient(config common.SendHttpRequestConfig) *httpclient.Client {

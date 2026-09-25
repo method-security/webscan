@@ -24,6 +24,10 @@ const DefaultWindowBytes = 256 * 1024
 // DefaultWindowOverlapBytes keeps a call split by a window boundary visible to one of the windows.
 const DefaultWindowOverlapBytes = 64 * 1024
 
+// MaxParameterBytes keeps malformed or embedded payload-like parameter names from bloating a
+// JavaScript endpoint record.
+const MaxParameterBytes = 256
+
 // Analysis is everything one JavaScript artifact yielded.
 type Analysis struct {
 	Endpoints []*Endpoint
@@ -165,8 +169,8 @@ func toEndpoint(found *jsluice.URL, sourceURL string) *Endpoint {
 	details := &enumerate.JavascriptEndpoint{
 		Path:        path,
 		SourceUrl:   sourceURL,
-		QueryParams: found.QueryParams,
-		BodyParams:  found.BodyParams,
+		QueryParams: boundedParams(found.QueryParams),
+		BodyParams:  boundedParams(found.BodyParams),
 	}
 	endpoint := &Endpoint{Details: details}
 	if found.ContentType != "" {
@@ -371,6 +375,20 @@ func unionStrings(first []string, second []string) []string {
 		out = append(out, value)
 	}
 	return out
+}
+
+func boundedParams(params []string) []string {
+	if len(params) == 0 {
+		return params
+	}
+	filtered := make([]string, 0, len(params))
+	for _, param := range params {
+		if len(param) > MaxParameterBytes {
+			continue
+		}
+		filtered = append(filtered, param)
+	}
+	return filtered
 }
 
 func locationKey(endpoint *Endpoint) string {

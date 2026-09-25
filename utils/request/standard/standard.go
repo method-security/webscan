@@ -14,6 +14,12 @@ import (
 	standardhelpers "github.com/Method-Security/webscan/utils/request/standard/helpers"
 )
 
+// WithReusableClient installs a standard HTTP client on the context for callers that issue many
+// requests with the same transport settings.
+func WithReusableClient(ctx context.Context, config common.SendHttpRequestConfig) context.Context {
+	return standardhelpers.WithReusableClient(ctx, config)
+}
+
 // SendStandardRequest performs an HTTP request using http/net and returns detailed information including response data
 func SendStandardRequest(ctx context.Context, config common.SendHttpRequestConfig) (common.HttpRequestResponse, error) {
 	// Set the request

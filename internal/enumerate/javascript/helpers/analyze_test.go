@@ -83,6 +83,18 @@ func TestAnalyzeSourceKeepsRootRelativePathsUntouched(t *testing.T) {
 	}
 }
 
+func TestAnalyzeSourceDropsOversizedParameterNames(t *testing.T) {
+	longParam := strings.Repeat("a", enumeratejavascript.MaxParameterBytes+1)
+	source := []byte(`fetch("/api/v1/widgets?short=1&` + longParam + `=2")`)
+
+	analysis := enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0)
+	endpoint := findEndpoint(t, analysis.Endpoints, "/api/v1/widgets")
+
+	if len(endpoint.Details.QueryParams) != 1 || endpoint.Details.QueryParams[0] != "short" {
+		t.Fatalf("expected only the bounded query param, got %v", endpoint.Details.QueryParams)
+	}
+}
+
 func TestAnalyzeSourceDropsStaticAssetReferences(t *testing.T) {
 	source := []byte(`const a="/assets/logo.png";const b="/styles/app.css";const c=fetch("/api/real")`)
 

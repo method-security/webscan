@@ -5,8 +5,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"sort"
+	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	common "github.com/Method-Security/webscan/generated/go/common"
 	"github.com/Method-Security/webscan/generated/go/discover"
@@ -286,5 +288,40 @@ func TestDirectoryDiscoveryCapturesFilteredWafResponse(t *testing.T) {
 	}
 	if status := target.WafDetection.Request.Response.StatusCode; status == nil || *status != http.StatusForbidden {
 		t.Fatalf("expected captured WAF status %d, got %v", http.StatusForbidden, status)
+	}
+}
+
+// A deadline that lands during a frontier's baseline request must be reported as the global
+// timeout it is, not as a per-frontier skip that leaves the partial result looking complete.
+func TestGlobalTimeoutDuringBaselineIsReportedAsTimeout(t *testing.T) {
+	// Outlasts GlobalTimeout so the deadline expires inside the first baseline request, the
+	// path that reports a request error rather than setting the timeout phase itself.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(2 * time.Second)
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte("<html><body>not found</body></html>"))
+	}))
+	t.Cleanup(server.Close)
+
+	config := directoryConfig(server.URL, true, 0)
+	config.GlobalTimeout = 1
+	config.Threads = 1
+
+	report, err := discoverdirectory.RunDirectoryDiscovery(context.Background(), config)
+	if err != nil {
+		t.Fatalf("RunDirectoryDiscovery returned error: %v", err)
+	}
+
+	var timedOut bool
+	for _, reported := range report.Errors {
+		if strings.Contains(reported, "timed out after") {
+			timedOut = true
+		}
+		if strings.Contains(reported, "failed to get base response profile") {
+			t.Fatalf("deadline expiry reported as a frontier skip: %s", reported)
+		}
+	}
+	if !timedOut {
+		t.Fatalf("expected a global timeout error, got %#v", report.Errors)
 	}
 }

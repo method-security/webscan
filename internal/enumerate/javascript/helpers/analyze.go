@@ -24,9 +24,9 @@ const DefaultWindowBytes = 256 * 1024
 // DefaultWindowOverlapBytes keeps a call split by a window boundary visible to one of the windows.
 const DefaultWindowOverlapBytes = 64 * 1024
 
-// MaxParameterBytes keeps malformed or embedded payload-like parameter names from bloating a
-// JavaScript endpoint record.
-const MaxParameterBytes = 256
+// MaxQueryParamValueBytes keeps embedded payload-like examples from bloating a JavaScript
+// endpoint record.
+const MaxQueryParamValueBytes = 256
 
 // Analysis is everything one JavaScript artifact yielded.
 type Analysis struct {
@@ -102,8 +102,13 @@ func AnalyzeSource(source []byte, sourceURL string, windowBytes int, overlapByte
 			if endpoint == nil {
 				continue
 			}
-			if _, exists := endpoints[endpointKey(endpoint)]; !exists {
-				endpoints[endpointKey(endpoint)] = endpoint
+			key := endpointKey(endpoint)
+			if existing, exists := endpoints[key]; exists {
+				// One call site may state a parameter another omits, and windows overlap, so a
+				// repeat is extra evidence about the same endpoint rather than a duplicate to drop.
+				mergeEndpointDetails(existing, endpoint)
+			} else {
+				endpoints[key] = endpoint
 			}
 		}
 
@@ -159,18 +164,27 @@ func toEndpoint(found *jsluice.URL, sourceURL string) *Endpoint {
 	}
 
 	path := raw
+	query := ""
 	if cut := strings.IndexAny(path, "?#"); cut >= 0 {
+		if path[cut] == '?' {
+			query = path[cut+1:]
+			if end := strings.IndexByte(query, '#'); end >= 0 {
+				query = query[:end]
+			}
+		}
 		path = path[:cut]
 	}
-	if path == "" {
+	path, ok := normalizeExpressionPath(path)
+	if !ok {
 		return nil
 	}
 
 	details := &enumerate.JavascriptEndpoint{
-		Path:        path,
-		SourceUrl:   sourceURL,
-		QueryParams: boundedParams(found.QueryParams),
-		BodyParams:  boundedParams(found.BodyParams),
+		Path:             path,
+		SourceUrl:        sourceURL,
+		QueryParams:      found.QueryParams,
+		QueryParamValues: literalQueryValues(query),
+		BodyParams:       found.BodyParams,
 	}
 	endpoint := &Endpoint{Details: details}
 	if found.ContentType != "" {
@@ -198,8 +212,12 @@ func toEndpoint(found *jsluice.URL, sourceURL string) *Endpoint {
 		if isNonEndpointAsset(parsed.Path) {
 			return nil
 		}
+		absolutePath, ok := normalizeExpressionPath(parsed.Path)
+		if !ok {
+			return nil
+		}
 		endpoint.BaseURL = base
-		details.Path = parsed.Path
+		details.Path = absolutePath
 		endpoint.Rooted = true
 		return endpoint
 	}
@@ -340,14 +358,7 @@ func mergeEndpointRecords(endpoints []*Endpoint) []*Endpoint {
 			order = append(order, key)
 			continue
 		}
-		if existing.Details.CallExpression == nil && endpoint.Details.CallExpression != nil {
-			existing.Details.CallExpression = endpoint.Details.CallExpression
-		}
-		if existing.Details.ContentType == nil && endpoint.Details.ContentType != nil {
-			existing.Details.ContentType = endpoint.Details.ContentType
-		}
-		existing.Details.QueryParams = unionStrings(existing.Details.QueryParams, endpoint.Details.QueryParams)
-		existing.Details.BodyParams = unionStrings(existing.Details.BodyParams, endpoint.Details.BodyParams)
+		mergeEndpointDetails(existing, endpoint)
 	}
 
 	sort.Strings(order)
@@ -375,20 +386,6 @@ func unionStrings(first []string, second []string) []string {
 		out = append(out, value)
 	}
 	return out
-}
-
-func boundedParams(params []string) []string {
-	if len(params) == 0 {
-		return params
-	}
-	filtered := make([]string, 0, len(params))
-	for _, param := range params {
-		if len(param) > MaxParameterBytes {
-			continue
-		}
-		filtered = append(filtered, param)
-	}
-	return filtered
 }
 
 func locationKey(endpoint *Endpoint) string {
@@ -462,4 +459,98 @@ func sortedKeys(set map[string]struct{}) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+// normalizeExpressionPath resolves jsluice's expression placeholder into a path template, or reports
+// the path unusable. A segment that is wholly a placeholder is a path parameter and becomes `{param}`;
+// a placeholder glued into a segment leaves a name nothing can recover, and that literal reached the
+// wire as an invented endpoint before this existed.
+func normalizeExpressionPath(path string) (string, bool) {
+	if path == "" {
+		return "", false
+	}
+	if !strings.Contains(path, jsluice.ExpressionPlaceholder) {
+		return path, true
+	}
+
+	segments := strings.Split(path, "/")
+	for i, segment := range segments {
+		if !strings.Contains(segment, jsluice.ExpressionPlaceholder) {
+			continue
+		}
+		if segment != jsluice.ExpressionPlaceholder {
+			return "", false
+		}
+		segments[i] = "{param}"
+	}
+	return strings.Join(segments, "/"), true
+}
+
+// literalQueryValues keeps the values a client hard-codes and drops the ones it computes. The
+// placeholder means the value is supplied at runtime, so it is absent rather than empty: a probe
+// has to generate one, and sending "EXPR" would be worse than sending nothing.
+func literalQueryValues(query string) map[string]string {
+	if query == "" {
+		return nil
+	}
+	values := map[string]string{}
+	for _, pair := range strings.Split(query, "&") {
+		if pair == "" {
+			continue
+		}
+		name, value, found := strings.Cut(pair, "=")
+		if !found || name == "" || value == "" {
+			continue
+		}
+		if strings.Contains(value, jsluice.ExpressionPlaceholder) {
+			continue
+		}
+		decodedName, err := url.QueryUnescape(name)
+		if err != nil {
+			decodedName = name
+		}
+		decodedValue, err := url.QueryUnescape(value)
+		if err != nil {
+			decodedValue = value
+		}
+		if len(decodedValue) > MaxQueryParamValueBytes {
+			continue
+		}
+		values[decodedName] = decodedValue
+	}
+	if len(values) == 0 {
+		return nil
+	}
+	return values
+}
+
+// mergeQueryValues keeps the first literal seen for a parameter. Two call sites passing different
+// constants both describe a real request, and one of them is as good a probe value as the other.
+func mergeQueryValues(existing map[string]string, incoming map[string]string) map[string]string {
+	if len(incoming) == 0 {
+		return existing
+	}
+	if existing == nil {
+		existing = map[string]string{}
+	}
+	for name, value := range incoming {
+		if _, seen := existing[name]; !seen {
+			existing[name] = value
+		}
+	}
+	return existing
+}
+
+// mergeEndpointDetails folds one record of an endpoint into another. Every field is additive: a
+// field the existing record lacks is taken, and a field both carry keeps what was seen first.
+func mergeEndpointDetails(existing *Endpoint, incoming *Endpoint) {
+	if existing.Details.CallExpression == nil && incoming.Details.CallExpression != nil {
+		existing.Details.CallExpression = incoming.Details.CallExpression
+	}
+	if existing.Details.ContentType == nil && incoming.Details.ContentType != nil {
+		existing.Details.ContentType = incoming.Details.ContentType
+	}
+	existing.Details.QueryParams = unionStrings(existing.Details.QueryParams, incoming.Details.QueryParams)
+	existing.Details.BodyParams = unionStrings(existing.Details.BodyParams, incoming.Details.BodyParams)
+	existing.Details.QueryParamValues = mergeQueryValues(existing.Details.QueryParamValues, incoming.Details.QueryParamValues)
 }

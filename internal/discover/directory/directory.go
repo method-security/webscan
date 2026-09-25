@@ -129,6 +129,13 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 		var timedOutPhase string
 
 		for len(queue) > 0 {
+			// Draining the queue after the deadline burns a baseline request per frontier and
+			// reports each expiry as its own skip.
+			if ctx.Err() != nil {
+				timedOutPhase = "frontier queue"
+				break
+			}
+
 			current := queue[0]
 			queue = queue[1:]
 
@@ -137,13 +144,13 @@ func RunDirectoryDiscovery(ctx context.Context, config discover.DiscoverDirector
 			targetInfo.Attempts = append(targetInfo.Attempts, outcome.attempts...)
 			targetInfo.Frontiers = append(targetInfo.Frontiers, newDirectoryFrontier(current))
 			errors = append(errors, groupRequestFailures(target, outcome.metrics)...)
-			if outcome.skipReason != "" {
-				errors = append(errors, fmt.Sprintf("target %s: frontier %s: %s", target, current.basePath, outcome.skipReason))
-				continue
-			}
 			if outcome.timedOutPhase != "" {
 				timedOutPhase = outcome.timedOutPhase
 				break
+			}
+			if outcome.skipReason != "" {
+				errors = append(errors, fmt.Sprintf("target %s: frontier %s: %s", target, current.basePath, outcome.skipReason))
+				continue
 			}
 
 			if current.depth >= maxDepth {
@@ -208,6 +215,11 @@ func sweepFrontier(ctx context.Context, baseURL string, current frontier, allPat
 		// Follow redirects to get the correct baseline size and word count.
 		baselineRequest, baselineSize, baselineWords, err := baseLine(ctx, baseURL, current.basePath, validCodes, config.MaxRedirectsBaselineRequest, config, limiter)
 		if err != nil {
+			// An expired deadline surfaces here as a request error; reporting it as a skip loses the timeout.
+			if ctx.Err() != nil {
+				outcome.timedOutPhase = "baseline setup"
+				return outcome
+			}
 			outcome.skipReason = fmt.Sprintf("failed to get base response profile, skipping enumeration: %v", err)
 			return outcome
 		}

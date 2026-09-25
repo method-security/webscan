@@ -379,7 +379,7 @@ func TestAnalyzeSourceTemplatesAWhollyComputedPathSegment(t *testing.T) {
 }
 
 func TestAnalyzeSourceDropsAPathWhoseNameIsPartlyComputed(t *testing.T) {
-	source := []byte(`$.get('/creditorapis/api/CreditorClaim/GetCreditor'+s);`)
+	source := []byte(`$.get('/api/billing/GetInvoice'+s);`)
 
 	analysis := enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0)
 	for _, endpoint := range analysis.Endpoints {

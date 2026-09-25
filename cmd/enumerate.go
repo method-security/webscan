@@ -963,9 +963,6 @@ a deduplicated set before anything is retrieved, so a bundle shared by many page
 
 			// Generate report
 			report := enumeratejavascript.PerformJavascriptEnumeration(cmd.Context(), config)
-			if len(report.Errors) > 0 {
-				a.OutputSignal.Status = 1
-			}
 			a.OutputSignal.Content = report
 		},
 	}

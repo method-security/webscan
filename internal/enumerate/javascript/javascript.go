@@ -26,11 +26,15 @@ import (
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
 
-// artifact is one fetched body plus the record kept about it.
+// artifact is private collection state. Only url, kind and sizeBytes are projected into the signal.
 type artifact struct {
-	details  *enumerate.JavascriptArtifact
-	source   []byte
-	expanded bool
+	url         string
+	kind        enumerate.JavascriptArtifactKind
+	sizeBytes   int
+	contentType string
+	source      []byte
+	isPage      bool
+	expanded    bool
 }
 
 // PerformJavascriptEnumeration analyzes the JavaScript an application serves, returning an
@@ -89,11 +93,10 @@ type collector struct {
 	remaining int
 }
 
-// queued is a URL waiting to be retrieved, with where it was found.
+// queued is an artifact URL and kind waiting to be retrieved.
 type queued struct {
-	url            string
-	kind           enumerate.JavascriptArtifactKind
-	discoveredFrom *string
+	url  string
+	kind enumerate.JavascriptArtifactKind
 }
 
 // applicationBaseURL reduces a URL to the origin serving it.
@@ -160,48 +163,41 @@ func (c *collector) resolveSeeds(ctx context.Context) {
 		owners := []string{applicationBaseURL(seed)}
 		c.addOwners(seed, owners)
 
-		fetched, err := fetchResource(ctx, c.config, seed, enumerate.JavascriptArtifactKindEntry, nil)
+		fetched, err := fetchResource(ctx, c.config, seed, enumerate.JavascriptArtifactKindEntry)
 		if err != nil {
 			c.errors = append(c.errors, err.Error())
 			continue
 		}
 
-		contentType := ""
-		if fetched.details.ContentType != nil {
-			contentType = *fetched.details.ContentType
-		}
-		if !javascripthelpers.LooksLikeHTML(string(fetched.source), contentType) {
+		if !javascripthelpers.LooksLikeHTML(string(fetched.source), fetched.contentType) {
 			c.record(fetched)
 			continue
 		}
 
 		// The page is provenance, not something to analyze as JavaScript.
-		fetched.details.Kind = enumerate.JavascriptArtifactKindPage
+		fetched.isPage = true
 		references := javascripthelpers.ExtractScriptReferences(string(fetched.source), seed)
-		count := len(references)
-		fetched.details.ReferenceCount = &count
 		fetched.source = nil
 		c.record(fetched)
 
-		if count == 0 {
+		if len(references) == 0 {
 			c.errors = append(c.errors, fmt.Sprintf("%s: page references no JavaScript", seed))
 			continue
 		}
 		for _, reference := range references {
-			c.enqueue(reference, enumerate.JavascriptArtifactKindEntry, seed, owners)
+			c.enqueue(reference, enumerate.JavascriptArtifactKindEntry, owners)
 		}
 	}
 }
 
 // enqueue schedules a URL for retrieval if no stage has claimed it yet, recording the applications
 // it was reached for either way — a URL another application already claimed still belongs to this one.
-func (c *collector) enqueue(target string, kind enumerate.JavascriptArtifactKind, discoveredFrom string, owners []string) {
+func (c *collector) enqueue(target string, kind enumerate.JavascriptArtifactKind, owners []string) {
 	c.addOwners(target, owners)
 	if !c.claim(target) {
 		return
 	}
-	source := discoveredFrom
-	c.queue = append(c.queue, queued{url: target, kind: kind, discoveredFrom: &source})
+	c.queue = append(c.queue, queued{url: target, kind: kind})
 }
 
 // addOwners records the applications a URL belongs to, keeping the order they were reached in.
@@ -260,12 +256,12 @@ func (c *collector) expandChunks(ctx context.Context) {
 
 			publicPath := javascripthelpers.ExtractPublicPath(source)
 			for _, name := range names {
-				chunkURL, err := resolveChunkURL(current.details.Url, publicPath, name)
+				chunkURL, err := resolveChunkURL(current.url, publicPath, name)
 				if err != nil {
 					c.errors = append(c.errors, err.Error())
 					continue
 				}
-				c.enqueue(chunkURL, enumerate.JavascriptArtifactKindChunk, current.details.Url, c.ownersOf(current.details.Url))
+				c.enqueue(chunkURL, enumerate.JavascriptArtifactKindChunk, c.ownersOf(current.url))
 			}
 		}
 		if len(c.queue) == 0 {
@@ -281,11 +277,11 @@ const maxChunkPasses = 3
 // retrieveSourceMaps fetches the source map published beside each retrieved artifact, when one is.
 func (c *collector) retrieveSourceMaps(ctx context.Context) {
 	for _, current := range c.artifacts {
-		if current.source == nil || current.details.Kind == enumerate.JavascriptArtifactKindSourceMap {
+		if current.source == nil || current.kind == enumerate.JavascriptArtifactKindSourceMap {
 			continue
 		}
-		mapURL := strings.SplitN(current.details.Url, "?", 2)[0] + ".map"
-		c.enqueue(mapURL, enumerate.JavascriptArtifactKindSourceMap, current.details.Url, c.ownersOf(current.details.Url))
+		mapURL := strings.SplitN(current.url, "?", 2)[0] + ".map"
+		c.enqueue(mapURL, enumerate.JavascriptArtifactKindSourceMap, c.ownersOf(current.url))
 	}
 	// A missing source map is the normal case, so a failed retrieval is not reported. Budget
 	// messages still are, or `--fetch-source-maps` could retrieve nothing and still exit clean.
@@ -347,18 +343,14 @@ func (c *collector) drainQueue(ctx context.Context, mode retrievalMode) {
 
 			applyStealthDelay(ctx, c.config)
 
-			retrieved, err := fetchResource(ctx, c.config, item.url, item.kind, item.discoveredFrom)
+			retrieved, err := fetchResource(ctx, c.config, item.url, item.kind)
 			if err != nil {
 				failures[index] = err.Error()
 				return
 			}
-			contentType := ""
-			if retrieved.details.ContentType != nil {
-				contentType = *retrieved.details.ContentType
-			}
 			// A single-page app serves its shell for any unknown path, so a 200 alone does not mean
 			// the bundle exists.
-			if javascripthelpers.LooksLikeHTML(string(retrieved.source), contentType) {
+			if javascripthelpers.LooksLikeHTML(string(retrieved.source), retrieved.contentType) {
 				failures[index] = fmt.Sprintf("fetching %s: served HTML rather than JavaScript", item.url)
 				return
 			}
@@ -379,10 +371,10 @@ func (c *collector) drainQueue(ctx context.Context, mode retrievalMode) {
 
 // record keeps one artifact per URL.
 func (c *collector) record(current *artifact) {
-	if _, exists := c.byURL[current.details.Url]; exists {
+	if _, exists := c.byURL[current.url]; exists {
 		return
 	}
-	c.byURL[current.details.Url] = current
+	c.byURL[current.url] = current
 	c.artifacts = append(c.artifacts, current)
 }
 
@@ -395,8 +387,8 @@ type analysisResult struct {
 // applicationBucket accumulates one application's artifacts and findings during analysis.
 type applicationBucket struct {
 	baseURL   string
-	local     []*enumerate.JavascriptArtifact
-	remote    []*enumerate.JavascriptArtifact
+	local     []*artifact
+	remote    []*artifact
 	origins   map[string]struct{}
 	bases     []string
 	endpoints []*javascripthelpers.Endpoint
@@ -410,14 +402,14 @@ func (c *collector) analyze(config enumerate.EnumerateJavascriptConfig) analysis
 	order := []string{}
 
 	for _, current := range c.artifacts {
-		owners := c.ownersOf(current.details.Url)
+		owners := c.ownersOf(current.url)
 		if len(owners) == 0 {
 			continue
 		}
 
 		var found javascripthelpers.Analysis
 		if current.source != nil {
-			found = javascripthelpers.AnalyzeSource(current.source, current.details.Url, config.AnalysisWindowBytes, config.AnalysisWindowOverlapBytes)
+			found = javascripthelpers.AnalyzeSource(current.source, current.url, config.AnalysisWindowBytes, config.AnalysisWindowOverlapBytes)
 		}
 
 		for _, owner := range owners {
@@ -428,13 +420,13 @@ func (c *collector) analyze(config enumerate.EnumerateJavascriptConfig) analysis
 				order = append(order, owner)
 			}
 
-			if current.details.Kind == enumerate.JavascriptArtifactKindPage {
+			if current.isPage {
 				continue
 			}
-			if utils.IsHostInScope(owner, current.details.Url) {
-				bucket.local = append(bucket.local, current.details)
+			if utils.IsHostInScope(owner, current.url) {
+				bucket.local = append(bucket.local, current)
 			} else {
-				bucket.remote = append(bucket.remote, current.details)
+				bucket.remote = append(bucket.remote, current)
 			}
 
 			// Cloned because rooting rewrites the endpoint, and an artifact two applications share
@@ -505,18 +497,17 @@ func (c *collector) analyze(config enumerate.EnumerateJavascriptConfig) analysis
 	return analysisResult{applications: applications, unrooted: detailsOf(dedupeEndpoints(unrooted))}
 }
 
-// signalArtifacts keeps the signal focused on bundle provenance. Fetch status, content type and
-// discovery ancestry are collector diagnostics; the processor needs the URL, kind and size.
-func signalArtifacts(artifacts []*enumerate.JavascriptArtifact) []*enumerate.JavascriptArtifact {
+// signalArtifacts projects private collection state into bundle provenance useful to processors.
+func signalArtifacts(artifacts []*artifact) []*enumerate.JavascriptArtifact {
 	out := make([]*enumerate.JavascriptArtifact, 0, len(artifacts))
 	for _, artifact := range artifacts {
 		if artifact == nil {
 			continue
 		}
 		out = append(out, &enumerate.JavascriptArtifact{
-			Url:       artifact.Url,
-			Kind:      artifact.Kind,
-			SizeBytes: artifact.SizeBytes,
+			Url:       artifact.url,
+			Kind:      artifact.kind,
+			SizeBytes: artifact.sizeBytes,
 		})
 	}
 	return out
@@ -552,7 +543,7 @@ func applyStealthDelay(ctx context.Context, config enumerate.EnumerateJavascript
 	}
 }
 
-func fetchResource(ctx context.Context, config enumerate.EnumerateJavascriptConfig, target string, kind enumerate.JavascriptArtifactKind, discoveredFrom *string) (*artifact, error) {
+func fetchResource(ctx context.Context, config enumerate.EnumerateJavascriptConfig, target string, kind enumerate.JavascriptArtifactKind) (*artifact, error) {
 	baseURL, path, queryParams, err := requesthelpers.SplitTargetURL(target)
 	if err != nil {
 		return nil, fmt.Errorf("parsing %s: %w", target, err)
@@ -586,14 +577,9 @@ func fetchResource(ctx context.Context, config enumerate.EnumerateJavascriptConf
 		return nil, fmt.Errorf("fetching %s: no response", target)
 	}
 
-	details := &enumerate.JavascriptArtifact{
-		Url:            target,
-		Kind:           kind,
-		StatusCode:     response.Response.StatusCode,
-		DiscoveredFrom: discoveredFrom,
-	}
+	current := &artifact{url: target, kind: kind}
 	if contentType := firstHeaderValue(response.Response.ResponseHeaders, "Content-Type"); contentType != "" {
-		details.ContentType = &contentType
+		current.contentType = contentType
 	}
 
 	bodyPtr := requesthelpers.GetResponseBodyStringFromBodyStruct(response.Response.ResponseBody)
@@ -601,13 +587,14 @@ func fetchResource(ctx context.Context, config enumerate.EnumerateJavascriptConf
 		return nil, fmt.Errorf("fetching %s: empty body", target)
 	}
 	body := *bodyPtr
-	details.SizeBytes = len(body)
+	current.sizeBytes = len(body)
 
-	if details.StatusCode == nil || *details.StatusCode != 200 {
+	if response.Response.StatusCode == nil || *response.Response.StatusCode != 200 {
 		return nil, fmt.Errorf("fetching %s: unexpected status", target)
 	}
 
-	return &artifact{details: details, source: []byte(body)}, nil
+	current.source = []byte(body)
+	return current, nil
 }
 
 // resolveChunkURL places a declared chunk name against the publicPath, falling back to the bundle.

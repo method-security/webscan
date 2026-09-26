@@ -1,10 +1,64 @@
 package enumeratejavascript
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/Method-Security/webscan/generated/go/enumerate"
 )
+
+func assertJSONKeys(t *testing.T, value map[string]any, expected ...string) {
+	t.Helper()
+	if len(value) != len(expected) {
+		t.Fatalf("expected keys %v, got %v", expected, value)
+	}
+	for _, key := range expected {
+		if _, exists := value[key]; !exists {
+			t.Fatalf("expected key %q in %v", key, value)
+		}
+	}
+}
+
+func TestJavascriptSignalShape(t *testing.T) {
+	report := enumerate.EnumerateJavascriptReport{
+		Config: &enumerate.EnumerateJavascriptConfig{Targets: []string{"https://app.example.com"}},
+		Result: &enumerate.EnumerateJavascriptResult{
+			Targets: []string{"https://app.example.com"},
+			WebApplications: []*enumerate.JavascriptApplicationDetails{{
+				BaseUrl: "https://app.example.com",
+				Bundles: &enumerate.JavascriptBundleDetails{
+					Local:  []*enumerate.JavascriptArtifact{{Url: "https://app.example.com/main.js", Kind: enumerate.JavascriptArtifactKindEntry, SizeBytes: 1234}},
+					Remote: []*enumerate.JavascriptArtifact{{Url: "https://cdn.example.net/chunk.js", Kind: enumerate.JavascriptArtifactKindChunk, SizeBytes: 456}},
+				},
+				Endpoints: []*enumerate.JavascriptEndpoint{{Path: "/api/orders", SourceUrl: "https://app.example.com/main.js"}},
+				Secrets:   []*enumerate.JavascriptSecret{{Kind: "api-key", SourceUrl: "https://app.example.com/main.js"}},
+			}},
+		},
+	}
+
+	encoded, err := json.Marshal(report)
+	if err != nil {
+		t.Fatalf("marshal report: %v", err)
+	}
+	var signal map[string]any
+	if err := json.Unmarshal(encoded, &signal); err != nil {
+		t.Fatalf("unmarshal report: %v", err)
+	}
+
+	assertJSONKeys(t, signal, "config", "result")
+	result := signal["result"].(map[string]any)
+	assertJSONKeys(t, result, "targets", "webApplications")
+	application := result["webApplications"].([]any)[0].(map[string]any)
+	assertJSONKeys(t, application, "baseUrl", "bundles", "endpoints", "secrets")
+	bundles := application["bundles"].(map[string]any)
+	assertJSONKeys(t, bundles, "local", "remote")
+	artifact := bundles["local"].([]any)[0].(map[string]any)
+	assertJSONKeys(t, artifact, "url", "kind", "sizeBytes")
+	endpoint := application["endpoints"].([]any)[0].(map[string]any)
+	assertJSONKeys(t, endpoint, "path", "sourceUrl")
+	secret := application["secrets"].([]any)[0].(map[string]any)
+	assertJSONKeys(t, secret, "kind", "sourceUrl")
+}
 
 // owners is the single application the collector tests enqueue against.
 var owners = []string{"https://app.example.com"}
@@ -39,7 +93,7 @@ func TestCollectorDoesNotChargeForAnAlreadyClaimedTarget(t *testing.T) {
 	c := testCollector(3)
 
 	// A page target claims the bundle it references.
-	c.enqueue("https://app.example.com/main.js", enumerate.JavascriptArtifactKindEntry, "https://app.example.com/", owners)
+	c.enqueue("https://app.example.com/main.js", enumerate.JavascriptArtifactKindEntry, owners)
 	before := c.remaining
 
 	// The same bundle named explicitly as a target is already claimed, so it costs nothing.
@@ -76,9 +130,9 @@ func testCollector(maxArtifacts int) *collector {
 func TestCollectorQueuesEachBundleOnce(t *testing.T) {
 	c := testCollector(0)
 
-	c.enqueue("https://app.example.com/main.js", enumerate.JavascriptArtifactKindEntry, "https://app.example.com/", owners)
-	c.enqueue("https://app.example.com/main.js", enumerate.JavascriptArtifactKindEntry, "https://app.example.com/login", owners)
-	c.enqueue("https://app.example.com/vendor.js", enumerate.JavascriptArtifactKindEntry, "https://app.example.com/login", owners)
+	c.enqueue("https://app.example.com/main.js", enumerate.JavascriptArtifactKindEntry, owners)
+	c.enqueue("https://app.example.com/main.js", enumerate.JavascriptArtifactKindEntry, owners)
+	c.enqueue("https://app.example.com/vendor.js", enumerate.JavascriptArtifactKindEntry, owners)
 
 	if len(c.pendingBundles()) != 2 {
 		t.Fatalf("expected 2 queued bundles, got %d", len(c.pendingBundles()))
@@ -92,7 +146,7 @@ func TestCollectorQueuesEachBundleOnce(t *testing.T) {
 func TestCollectorReleasesArtifactsDroppedByTheBudget(t *testing.T) {
 	c := testCollector(1)
 	for _, u := range []string{"https://app.example.com/a.js", "https://app.example.com/b.js", "https://app.example.com/c.js"} {
-		c.enqueue(u, enumerate.JavascriptArtifactKindChunk, "https://app.example.com/runtime.js", owners)
+		c.enqueue(u, enumerate.JavascriptArtifactKindChunk, owners)
 	}
 
 	c.drainQueue(t.Context(), reportFailures)
@@ -119,7 +173,7 @@ func TestCollectorReleasesArtifactsDroppedByTheBudget(t *testing.T) {
 func TestCollectorReportsBudgetEvenWhenFailuresAreQuiet(t *testing.T) {
 	c := testCollector(1)
 	c.remaining = 0
-	c.enqueue("https://app.example.com/main.js.map", enumerate.JavascriptArtifactKindSourceMap, "https://app.example.com/main.js", owners)
+	c.enqueue("https://app.example.com/main.js.map", enumerate.JavascriptArtifactKindSourceMap, owners)
 
 	c.drainQueue(t.Context(), quietFailures)
 
@@ -132,7 +186,7 @@ func TestCollectorReportsBudgetEvenWhenFailuresAreQuiet(t *testing.T) {
 func TestCollectorReportsSkippedArtifactsWhenBudgetIsExhausted(t *testing.T) {
 	c := testCollector(1)
 	c.remaining = 0
-	c.enqueue("https://app.example.com/a.js", enumerate.JavascriptArtifactKindChunk, "https://app.example.com/runtime.js", owners)
+	c.enqueue("https://app.example.com/a.js", enumerate.JavascriptArtifactKindChunk, owners)
 
 	c.drainQueue(t.Context(), reportFailures)
 
@@ -147,7 +201,7 @@ func TestCollectorReportsSkippedArtifactsWhenBudgetIsExhausted(t *testing.T) {
 // analyzed adds an artifact to the collector as if it had been retrieved and owned by each owner.
 func (c *collector) analyzed(url string, kind enumerate.JavascriptArtifactKind, source string, owners []string) {
 	c.addOwners(url, owners)
-	c.record(&artifact{details: &enumerate.JavascriptArtifact{Url: url, Kind: kind}, source: []byte(source)})
+	c.record(&artifact{url: url, kind: kind, source: []byte(source)})
 }
 
 // A bundle the application's own host serves is a local asset; one another host serves is a remote
@@ -156,7 +210,7 @@ func TestAnalyzeSplitsBundlesByWhoServesThem(t *testing.T) {
 	c := testCollector(0)
 	app := []string{"https://app.example.com"}
 	c.addOwners("https://app.example.com", app)
-	c.record(&artifact{details: &enumerate.JavascriptArtifact{Url: "https://app.example.com", Kind: enumerate.JavascriptArtifactKindPage}})
+	c.record(&artifact{url: "https://app.example.com", isPage: true})
 	c.analyzed("https://app.example.com/main.js", enumerate.JavascriptArtifactKindEntry, `const a=1;`, app)
 	c.analyzed("https://cdn.vendor.net/vendor.js", enumerate.JavascriptArtifactKindEntry, `const b=2;`, app)
 	c.analyzed("https://cdn.vendor.net/44.chunk.js", enumerate.JavascriptArtifactKindChunk, `const d=3;`, app)
@@ -178,22 +232,15 @@ func TestAnalyzeSplitsBundlesByWhoServesThem(t *testing.T) {
 	}
 }
 
-func TestAnalyzeReportsOnlyProcessorRelevantBundleFields(t *testing.T) {
+func TestAnalyzeProjectsBundleProvenanceFromCollectorState(t *testing.T) {
 	c := testCollector(0)
-	status := 200
-	contentType := "application/javascript"
-	discoveredFrom := "https://app.example.com"
 	c.addOwners("https://app.example.com/main.js", []string{"https://app.example.com"})
 	c.record(&artifact{
-		details: &enumerate.JavascriptArtifact{
-			Url:            "https://app.example.com/main.js",
-			Kind:           enumerate.JavascriptArtifactKindEntry,
-			SizeBytes:      1234,
-			StatusCode:     &status,
-			ContentType:    &contentType,
-			DiscoveredFrom: &discoveredFrom,
-		},
-		source: []byte(`fetch("/api/orders")`),
+		url:         "https://app.example.com/main.js",
+		kind:        enumerate.JavascriptArtifactKindEntry,
+		sizeBytes:   1234,
+		contentType: "application/javascript",
+		source:      []byte(`fetch("/api/orders")`),
 	})
 
 	result := c.analyze(enumerate.EnumerateJavascriptConfig{})
@@ -201,9 +248,6 @@ func TestAnalyzeReportsOnlyProcessorRelevantBundleFields(t *testing.T) {
 	bundle := application.Bundles.Local[0]
 	if bundle.Url != "https://app.example.com/main.js" || bundle.Kind != enumerate.JavascriptArtifactKindEntry || bundle.SizeBytes != 1234 {
 		t.Fatalf("expected bundle provenance to survive, got %+v", bundle)
-	}
-	if bundle.StatusCode != nil || bundle.ContentType != nil || bundle.DiscoveredFrom != nil || bundle.ReferenceCount != nil {
-		t.Fatalf("expected collector diagnostics to be omitted from the signal, got %+v", bundle)
 	}
 }
 

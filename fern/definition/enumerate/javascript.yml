@@ -64,16 +64,13 @@ types:
   JavascriptApplicationDetails:
     properties:
       baseUrl: string
-      pages: optional<list<JavascriptArtifact>>
       bundles: optional<JavascriptBundleDetails>
-      baseUrlCandidates: optional<list<string>>
       endpoints: optional<list<JavascriptEndpoint>>
       secrets: optional<list<JavascriptSecret>>
   EnumerateJavascriptResult:
     properties:
       targets: list<string>
       webApplications: optional<list<JavascriptApplicationDetails>>
-      unrootedEndpoints: optional<list<JavascriptEndpoint>>
   # Report Struct
   EnumerateJavascriptReport:
     properties:

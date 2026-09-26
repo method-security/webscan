@@ -170,14 +170,40 @@ func TestAnalyzeSplitsBundlesByWhoServesThem(t *testing.T) {
 	if application.BaseUrl != "https://app.example.com" {
 		t.Fatalf("expected the application that loaded the bundles, got %s", application.BaseUrl)
 	}
-	if len(application.Pages) != 1 {
-		t.Fatalf("expected the page to stay a page rather than a bundle, got %d", len(application.Pages))
-	}
 	if len(application.Bundles.Local) != 1 || application.Bundles.Local[0].Url != "https://app.example.com/main.js" {
 		t.Fatalf("expected only the same-host bundle to be local, got %v", application.Bundles.Local)
 	}
 	if len(application.Bundles.Remote) != 2 {
 		t.Fatalf("expected the CDN bundle and its chunk to be remote assets, got %v", application.Bundles.Remote)
+	}
+}
+
+func TestAnalyzeReportsOnlyProcessorRelevantBundleFields(t *testing.T) {
+	c := testCollector(0)
+	status := 200
+	contentType := "application/javascript"
+	discoveredFrom := "https://app.example.com"
+	c.addOwners("https://app.example.com/main.js", []string{"https://app.example.com"})
+	c.record(&artifact{
+		details: &enumerate.JavascriptArtifact{
+			Url:            "https://app.example.com/main.js",
+			Kind:           enumerate.JavascriptArtifactKindEntry,
+			SizeBytes:      1234,
+			StatusCode:     &status,
+			ContentType:    &contentType,
+			DiscoveredFrom: &discoveredFrom,
+		},
+		source: []byte(`fetch("/api/orders")`),
+	})
+
+	result := c.analyze(enumerate.EnumerateJavascriptConfig{})
+	application := result.applications[0]
+	bundle := application.Bundles.Local[0]
+	if bundle.Url != "https://app.example.com/main.js" || bundle.Kind != enumerate.JavascriptArtifactKindEntry || bundle.SizeBytes != 1234 {
+		t.Fatalf("expected bundle provenance to survive, got %+v", bundle)
+	}
+	if bundle.StatusCode != nil || bundle.ContentType != nil || bundle.DiscoveredFrom != nil || bundle.ReferenceCount != nil {
+		t.Fatalf("expected collector diagnostics to be omitted from the signal, got %+v", bundle)
 	}
 }
 

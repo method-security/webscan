@@ -394,6 +394,97 @@ func TestAnalyzeSourceTemplatesAWhollyComputedPathSegment(t *testing.T) {
 	}
 }
 
+func TestAnalyzeSourceTemplatesAWildcardPathSegment(t *testing.T) {
+	source := []byte(`const route = "/api/reports/*/files";`)
+
+	analysis := enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0)
+	if findEndpointOrNil(analysis.Endpoints, "/api/reports/{wildcard}/files") == nil {
+		t.Fatalf("expected a wildcard segment to become a readable path template, got %v", pathsOf(analysis.Endpoints))
+	}
+}
+
+func TestAnalyzeSourceDropsLocalBuildPaths(t *testing.T) {
+	source := []byte(`const sourceRoot = "/home/runner/work/react-pdf/react-pdf/packages/pdfkit/src/mixins";` +
+		`fetch("/api/reports");`)
+
+	paths := pathsOf(enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0).Endpoints)
+	if contains(paths, "/home/runner/work/react-pdf/react-pdf/packages/pdfkit/src/mixins") {
+		t.Fatalf("expected the local build path to be dropped, got %v", paths)
+	}
+	if !contains(paths, "/api/reports") {
+		t.Fatalf("expected the application endpoint to survive, got %v", paths)
+	}
+}
+
+func TestAnalyzeSourceDropsApplicationInsightsLiteralsOnlyWithLibraryEvidence(t *testing.T) {
+	source := []byte(`const collector = "https://dc.services.visualstudio.com";` +
+		`const ignored = ["/browserLinkSignalR/", "/__browserLink/", "/scripts/", "/next/", "/beta/"];` +
+		`const track = "/v2/track"; fetch("/api/orders");`)
+
+	paths := pathsOf(enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0).Endpoints)
+	for _, unwanted := range []string{"/browserLinkSignalR/", "/__browserLink/", "/scripts/", "/next/", "/beta/", "/v2/track"} {
+		if contains(paths, unwanted) {
+			t.Fatalf("expected Application Insights literal %s to be dropped, got %v", unwanted, paths)
+		}
+	}
+	if !contains(paths, "/api/orders") {
+		t.Fatalf("expected the application endpoint to survive, got %v", paths)
+	}
+}
+
+func TestAnalyzeSourceKeepsGenericPathsWithoutLibraryEvidence(t *testing.T) {
+	source := []byte(`const routes = ["/scripts/", "/next/", "/beta/"];`)
+
+	paths := pathsOf(enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0).Endpoints)
+	for _, expected := range []string{"/scripts/", "/next/", "/beta/"} {
+		if !contains(paths, expected) {
+			t.Fatalf("expected application route %s to survive without SDK evidence, got %v", expected, paths)
+		}
+	}
+}
+
+func TestAnalyzeSourceDropsMaterialUIDataGridSentinel(t *testing.T) {
+	source := []byte(`const context = {name: "MuiDataGridVariables", href: "/unset"};` +
+		`fetch("/api/grid");`)
+
+	paths := pathsOf(enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0).Endpoints)
+	if contains(paths, "/unset") {
+		t.Fatalf("expected the Material UI sentinel to be dropped, got %v", paths)
+	}
+	if !contains(paths, "/api/grid") {
+		t.Fatalf("expected the application endpoint to survive, got %v", paths)
+	}
+}
+
+func TestAnalyzeSourceDropsMarkupRendererClosingTags(t *testing.T) {
+	source := []byte(`this.tag("/blockquote"); const duplicate = "/blockquote";` +
+		`Renderer.prototype.block_quote = function() {}; this.tag(close ? "strong" : "/strong");` +
+		`fetch("/api/articles");`)
+
+	paths := pathsOf(enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0).Endpoints)
+	for _, unwanted := range []string{"/blockquote", "/strong"} {
+		if contains(paths, unwanted) {
+			t.Fatalf("expected the renderer's closing tag %s to be dropped, got %v", unwanted, paths)
+		}
+	}
+	if !contains(paths, "/api/articles") {
+		t.Fatalf("expected the application endpoint to survive, got %v", paths)
+	}
+}
+
+func TestAnalyzeSourceDropsOIDCCallbackParserFragment(t *testing.T) {
+	source := []byte(`function includesCode(url) { return url.endsWith("/code") || ` +
+		`url.includes("#code=") || url.includes("&code="); } fetch("/api/session");`)
+
+	paths := pathsOf(enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0).Endpoints)
+	if contains(paths, "/code") {
+		t.Fatalf("expected the OIDC callback parser fragment to be dropped, got %v", paths)
+	}
+	if !contains(paths, "/api/session") {
+		t.Fatalf("expected the application endpoint to survive, got %v", paths)
+	}
+}
+
 func TestAnalyzeSourceDropsAPathWhoseNameIsPartlyComputed(t *testing.T) {
 	source := []byte(`$.get('/api/billing/GetInvoice'+s);`)
 

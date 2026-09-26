@@ -69,7 +69,6 @@ func PerformJavascriptEnumeration(ctx context.Context, config enumerate.Enumerat
 	analysis := collector.analyze(config)
 
 	report.Result.WebApplications = analysis.applications
-	report.Result.UnrootedEndpoints = analysis.unrooted
 	report.Errors = append(report.Errors, collector.errors...)
 	return report
 }
@@ -396,7 +395,6 @@ type analysisResult struct {
 // applicationBucket accumulates one application's artifacts and findings during analysis.
 type applicationBucket struct {
 	baseURL   string
-	pages     []*enumerate.JavascriptArtifact
 	local     []*enumerate.JavascriptArtifact
 	remote    []*enumerate.JavascriptArtifact
 	origins   map[string]struct{}
@@ -431,7 +429,6 @@ func (c *collector) analyze(config enumerate.EnumerateJavascriptConfig) analysis
 			}
 
 			if current.details.Kind == enumerate.JavascriptArtifactKindPage {
-				bucket.pages = append(bucket.pages, current.details)
 				continue
 			}
 			if utils.IsHostInScope(owner, current.details.Url) {
@@ -492,19 +489,37 @@ func (c *collector) analyze(config enumerate.EnumerateJavascriptConfig) analysis
 	for _, base := range order {
 		bucket := buckets[base]
 		application := &enumerate.JavascriptApplicationDetails{
-			BaseUrl:           bucket.baseURL,
-			Pages:             bucket.pages,
-			BaseUrlCandidates: bucket.bases,
-			Endpoints:         detailsOf(dedupeEndpoints(served[base])),
-			Secrets:           dedupeSecrets(bucket.secrets),
+			BaseUrl:   bucket.baseURL,
+			Endpoints: detailsOf(dedupeEndpoints(served[base])),
+			Secrets:   dedupeSecrets(bucket.secrets),
 		}
 		if len(bucket.local) > 0 || len(bucket.remote) > 0 {
-			application.Bundles = &enumerate.JavascriptBundleDetails{Local: bucket.local, Remote: bucket.remote}
+			application.Bundles = &enumerate.JavascriptBundleDetails{
+				Local:  signalArtifacts(bucket.local),
+				Remote: signalArtifacts(bucket.remote),
+			}
 		}
 		applications = append(applications, application)
 	}
 
 	return analysisResult{applications: applications, unrooted: detailsOf(dedupeEndpoints(unrooted))}
+}
+
+// signalArtifacts keeps the signal focused on bundle provenance. Fetch status, content type and
+// discovery ancestry are collector diagnostics; the processor needs the URL, kind and size.
+func signalArtifacts(artifacts []*enumerate.JavascriptArtifact) []*enumerate.JavascriptArtifact {
+	out := make([]*enumerate.JavascriptArtifact, 0, len(artifacts))
+	for _, artifact := range artifacts {
+		if artifact == nil {
+			continue
+		}
+		out = append(out, &enumerate.JavascriptArtifact{
+			Url:       artifact.Url,
+			Kind:      artifact.Kind,
+			SizeBytes: artifact.SizeBytes,
+		})
+	}
+	return out
 }
 
 // inScope reports a URL served by a target's host or a subdomain of it.

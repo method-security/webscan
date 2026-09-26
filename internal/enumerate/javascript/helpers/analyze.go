@@ -2,6 +2,7 @@ package enumeratejavascript
 
 import (
 	// Standard
+	"bytes"
 	"encoding/json"
 	"net/url"
 	"sort"
@@ -86,19 +87,29 @@ func AnalyzeSource(source []byte, sourceURL string, windowBytes int, overlapByte
 	endpoints := map[string]*Endpoint{}
 	secrets := map[string]*enumerate.JavascriptSecret{}
 	bases := map[string]struct{}{}
+	renderedTags := map[string]struct{}{}
+	noise := sourceNoiseFor(source)
 
 	for _, window := range windowsOf(len(source), windowBytes, overlapBytes) {
 		analyzer := jsluice.NewAnalyzer(source[window[0]:window[1]])
 		analyzer.AddSecretMatcher(CredentialMatcher())
+		foundURLs := analyzer.GetURLs()
+		nonRequestPaths := tagRendererPaths(foundURLs)
+		for path := range nonRequestPaths {
+			renderedTags[path] = struct{}{}
+		}
 
-		for _, found := range analyzer.GetURLs() {
+		for _, found := range foundURLs {
 			if found == nil {
+				continue
+			}
+			if _, isTag := nonRequestPaths[found.URL]; isTag {
 				continue
 			}
 			if base, ok := absoluteBase(found.URL); ok {
 				bases[base] = struct{}{}
 			}
-			endpoint := toEndpoint(found, sourceURL)
+			endpoint := toEndpoint(found, sourceURL, noise)
 			if endpoint == nil {
 				continue
 			}
@@ -122,12 +133,31 @@ func AnalyzeSource(source []byte, sourceURL string, windowBytes int, overlapByte
 			}
 		}
 	}
+	for key, endpoint := range endpoints {
+		if _, isTag := renderedTags[endpoint.Details.Path]; isTag {
+			delete(endpoints, key)
+		}
+	}
 
 	return Analysis{
 		Endpoints: mergeEndpointRecords(sortedEndpoints(endpoints)),
 		Secrets:   sortedSecrets(secrets),
 		Origins:   sortedKeys(bases),
 	}
+}
+
+// tagRendererPaths returns closing-tag strings emitted through a renderer's tag helper. Jsluice
+// sees both the helper call and its nested string literal as URL candidates; suppressing the path
+// removes both records across all analysis windows while leaving an application route with the
+// same short name untouched in bundles that do not render that tag.
+func tagRendererPaths(foundURLs []*jsluice.URL) map[string]struct{} {
+	paths := map[string]struct{}{}
+	for _, found := range foundURLs {
+		if found != nil && found.Type == "this.tag" && strings.HasPrefix(found.URL, "/") {
+			paths[found.URL] = struct{}{}
+		}
+	}
+	return paths
 }
 
 // windowsOf returns [start, end) offsets covering size with the requested overlap.
@@ -157,7 +187,7 @@ func windowsOf(size int, windowBytes int, overlapBytes int) [][2]int {
 }
 
 // toEndpoint converts a jsluice URL into an endpoint, dropping references that are not requests.
-func toEndpoint(found *jsluice.URL, sourceURL string) *Endpoint {
+func toEndpoint(found *jsluice.URL, sourceURL string, noise sourceNoise) *Endpoint {
 	raw := strings.TrimSpace(found.URL)
 	if raw == "" {
 		return nil
@@ -174,8 +204,11 @@ func toEndpoint(found *jsluice.URL, sourceURL string) *Endpoint {
 		}
 		path = path[:cut]
 	}
-	path, ok := normalizeExpressionPath(path)
+	path, ok := normalizeTemplatePath(path)
 	if !ok {
+		return nil
+	}
+	if isLocalBuildPath(path) || noise.isKnownNonRequestPath(path) {
 		return nil
 	}
 
@@ -212,7 +245,7 @@ func toEndpoint(found *jsluice.URL, sourceURL string) *Endpoint {
 		if isNonEndpointAsset(parsed.Path) {
 			return nil
 		}
-		absolutePath, ok := normalizeExpressionPath(parsed.Path)
+		absolutePath, ok := normalizeTemplatePath(parsed.Path)
 		if !ok {
 			return nil
 		}
@@ -240,6 +273,54 @@ func toEndpoint(found *jsluice.URL, sourceURL string) *Endpoint {
 		return nil
 	}
 	return endpoint
+}
+
+// sourceNoise identifies literals that belong to a bundled library rather than the application.
+// The path alone is not enough evidence: applications can legitimately expose names such as
+// /next or /scripts, so those literals are suppressed only when the source fingerprints the SDK
+// that uses them as internal classification strings.
+type sourceNoise struct {
+	applicationInsights bool
+	commonMarkRenderer  bool
+	materialUIDataGrid  bool
+	oidcCallbackParser  bool
+}
+
+func sourceNoiseFor(source []byte) sourceNoise {
+	return sourceNoise{
+		applicationInsights: bytes.Contains(source, []byte("dc.services.visualstudio.com")),
+		commonMarkRenderer:  bytes.Contains(source, []byte("prototype.block_quote")),
+		materialUIDataGrid:  bytes.Contains(source, []byte("MuiDataGridVariables")),
+		oidcCallbackParser:  bytes.Contains(source, []byte("#code=")) && bytes.Contains(source, []byte("&code=")),
+	}
+}
+
+func (noise sourceNoise) isKnownNonRequestPath(path string) bool {
+	normalized := strings.ToLower(strings.TrimSuffix(path, "/"))
+	if noise.applicationInsights {
+		switch normalized {
+		case "/__browserlink", "/browserlinksignalr", "/beta", "/next", "/scripts", "/v2/track":
+			return true
+		}
+	}
+	if noise.commonMarkRenderer {
+		switch normalized {
+		case "/a", "/blockquote", "/code", "/em", "/li", "/p", "/pre", "/strong":
+			return true
+		}
+	}
+	if noise.oidcCallbackParser && normalized == "/code" {
+		return true
+	}
+	return noise.materialUIDataGrid && normalized == "/unset"
+}
+
+// isLocalBuildPath rejects source-code and build-machine paths embedded by dependencies. These are
+// useful to debuggers and source maps but cannot be requested from the analyzed application.
+func isLocalBuildPath(path string) bool {
+	lower := strings.ToLower(path)
+	return strings.HasPrefix(lower, "/home/runner/work/") ||
+		strings.HasPrefix(lower, "/github/workspace/")
 }
 
 // toSecret converts a jsluice secret into typed fields, lifting out the name and value a matcher
@@ -461,20 +542,23 @@ func sortedKeys(set map[string]struct{}) []string {
 	return keys
 }
 
-// normalizeExpressionPath resolves jsluice's expression placeholder into a path template, or reports
-// the path unusable. A segment that is wholly a placeholder is a path parameter and becomes `{param}`;
-// a placeholder glued into a segment leaves a name nothing can recover, and that literal reached the
-// wire as an invented endpoint before this existed.
-func normalizeExpressionPath(path string) (string, bool) {
+// normalizeTemplatePath turns unresolved whole path segments into explicit templates. A placeholder
+// glued into a segment leaves a name nothing can recover, so it is dropped rather than emitted as an
+// invented endpoint.
+func normalizeTemplatePath(path string) (string, bool) {
 	if path == "" {
 		return "", false
 	}
-	if !strings.Contains(path, jsluice.ExpressionPlaceholder) {
+	if !strings.Contains(path, jsluice.ExpressionPlaceholder) && !strings.Contains(path, "*") {
 		return path, true
 	}
 
 	segments := strings.Split(path, "/")
 	for i, segment := range segments {
+		if segment == "*" {
+			segments[i] = "{wildcard}"
+			continue
+		}
 		if !strings.Contains(segment, jsluice.ExpressionPlaceholder) {
 			continue
 		}

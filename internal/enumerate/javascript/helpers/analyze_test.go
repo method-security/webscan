@@ -403,15 +403,74 @@ func TestAnalyzeSourceTemplatesAWildcardPathSegment(t *testing.T) {
 	}
 }
 
+func TestAnalyzeSourceNormalizesNamedRouteSyntax(t *testing.T) {
+	source := []byte(`const routes = ["/users/:id", "/errors/[errorCode]", ` +
+		`"/docs/[[...markdownPath]]", "/api/md/:path*.json"];`)
+
+	paths := pathsOf(enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0).Endpoints)
+	for _, expected := range []string{
+		"/users/{id}",
+		"/errors/{errorCode}",
+		"/docs/{markdownPath...}",
+		"/api/md/{path...}.json",
+	} {
+		if !contains(paths, expected) {
+			t.Fatalf("expected normalized route %s, got %v", expected, paths)
+		}
+	}
+}
+
 func TestAnalyzeSourceDropsLocalBuildPaths(t *testing.T) {
 	source := []byte(`const sourceRoot = "/home/runner/work/react-pdf/react-pdf/packages/pdfkit/src/mixins";` +
+		`const moduleRoot = "/ROOT/node_modules/next/dist/compiled/process/";` +
 		`fetch("/api/reports");`)
 
 	paths := pathsOf(enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0).Endpoints)
 	if contains(paths, "/home/runner/work/react-pdf/react-pdf/packages/pdfkit/src/mixins") {
 		t.Fatalf("expected the local build path to be dropped, got %v", paths)
 	}
+	if contains(paths, "/ROOT/node_modules/next/dist/compiled/process/") {
+		t.Fatalf("expected the node_modules path to be dropped, got %v", paths)
+	}
 	if !contains(paths, "/api/reports") {
+		t.Fatalf("expected the application endpoint to survive, got %v", paths)
+	}
+}
+
+func TestAnalyzeSourceDropsKnownThirdPartyProviderBundleEndpoints(t *testing.T) {
+	source := []byte(`fetch("/collect"); const docs = "/docs/how-to/enable-source-coverage";`)
+
+	analysis := enumeratejavascript.AnalyzeSource(source, "https://snippet.meticulous.ai/v1/meticulous.js", 0, 0)
+	if len(analysis.Endpoints) != 0 {
+		t.Fatalf("expected provider bundle internals to be omitted, got %v", pathsOf(analysis.Endpoints))
+	}
+}
+
+func TestAnalyzeSourceDropsFrameworkProtocolAndStateLiterals(t *testing.T) {
+	source := []byte(`const NEXT_ROUTER_SEGMENT_PREFETCH_HEADER = "x-nextjs-segment";` +
+		`const segment = "/_tree";` +
+		`const states = {a: {requestStatus:"fulfilled"}, b: {requestStatus:"rejected"}};` +
+		`const pending = "/pending"; fetch("/api/search");`)
+
+	paths := pathsOf(enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0).Endpoints)
+	for _, unwanted := range []string{"/_tree", "/pending"} {
+		if contains(paths, unwanted) {
+			t.Fatalf("expected framework literal %s to be dropped, got %v", unwanted, paths)
+		}
+	}
+	if !contains(paths, "/api/search") {
+		t.Fatalf("expected the application endpoint to survive, got %v", paths)
+	}
+}
+
+func TestAnalyzeSourceDropsEncodedMarkupFragments(t *testing.T) {
+	source := []byte(`const svgTail = "/%3E%3C/svg%3E"; fetch("/api/image");`)
+
+	paths := pathsOf(enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0).Endpoints)
+	if contains(paths, "/%3E%3C/svg%3E") {
+		t.Fatalf("expected encoded markup to be dropped, got %v", paths)
+	}
+	if !contains(paths, "/api/image") {
 		t.Fatalf("expected the application endpoint to survive, got %v", paths)
 	}
 }

@@ -88,7 +88,7 @@ func AnalyzeSource(source []byte, sourceURL string, windowBytes int, overlapByte
 	secrets := map[string]*enumerate.JavascriptSecret{}
 	bases := map[string]struct{}{}
 	renderedTags := map[string]struct{}{}
-	noise := sourceNoiseFor(source)
+	noise := sourceNoiseFor(source, sourceURL)
 
 	for _, window := range windowsOf(len(source), windowBytes, overlapBytes) {
 		analyzer := jsluice.NewAnalyzer(source[window[0]:window[1]])
@@ -101,6 +101,9 @@ func AnalyzeSource(source []byte, sourceURL string, windowBytes int, overlapByte
 
 		for _, found := range foundURLs {
 			if found == nil {
+				continue
+			}
+			if noise.providerArtifact {
 				continue
 			}
 			if _, isTag := nonRequestPaths[found.URL]; isTag {
@@ -208,7 +211,7 @@ func toEndpoint(found *jsluice.URL, sourceURL string, noise sourceNoise) *Endpoi
 	if !ok {
 		return nil
 	}
-	if isLocalBuildPath(path) || noise.isKnownNonRequestPath(path) {
+	if isLocalBuildPath(path) || isMarkupFragmentPath(path) || noise.isKnownNonRequestPath(path) {
 		return nil
 	}
 
@@ -282,17 +285,38 @@ func toEndpoint(found *jsluice.URL, sourceURL string, noise sourceNoise) *Endpoi
 type sourceNoise struct {
 	applicationInsights bool
 	commonMarkRenderer  bool
+	coreJSRegExpTests   bool
+	dynamicOGImage      bool
+	fingerprintJS       bool
 	materialUIDataGrid  bool
+	nextRSCProtocol     bool
 	oidcCallbackParser  bool
+	providerArtifact    bool
+	reduxToolkit        bool
 }
 
-func sourceNoiseFor(source []byte) sourceNoise {
+func sourceNoiseFor(source []byte, sourceURL string) sourceNoise {
+	host := ""
+	if parsed, err := url.Parse(sourceURL); err == nil {
+		host = strings.ToLower(parsed.Hostname())
+	}
 	return sourceNoise{
 		applicationInsights: bytes.Contains(source, []byte("dc.services.visualstudio.com")),
 		commonMarkRenderer:  bytes.Contains(source, []byte("prototype.block_quote")),
+		coreJSRegExpTests:   bytes.Contains(source, []byte("RegExp.prototype")),
+		dynamicOGImage:      bytes.Contains(source, []byte(`"/images/og-"`)) && bytes.Contains(source, []byte(`".png"`)),
+		fingerprintJS:       bytes.Contains(source, []byte("openfpcdn.io/fingerprintjs")),
 		materialUIDataGrid:  bytes.Contains(source, []byte("MuiDataGridVariables")),
+		nextRSCProtocol:     bytes.Contains(source, []byte("NEXT_ROUTER_SEGMENT_PREFETCH_HEADER")),
 		oidcCallbackParser:  bytes.Contains(source, []byte("#code=")) && bytes.Contains(source, []byte("&code=")),
+		providerArtifact:    hostMatches(host, "googletagmanager.com") || hostMatches(host, "meticulous.ai"),
+		reduxToolkit: bytes.Contains(source, []byte(`requestStatus:"fulfilled"`)) &&
+			bytes.Contains(source, []byte(`requestStatus:"rejected"`)),
 	}
+}
+
+func hostMatches(host string, domain string) bool {
+	return host == domain || strings.HasSuffix(host, "."+domain)
 }
 
 func (noise sourceNoise) isKnownNonRequestPath(path string) bool {
@@ -309,8 +333,29 @@ func (noise sourceNoise) isKnownNonRequestPath(path string) bool {
 			return true
 		}
 	}
+	if noise.coreJSRegExpTests && (normalized == "/a/b" || normalized == "/a/i") {
+		return true
+	}
+	if noise.dynamicOGImage && (normalized == "/images/og-" || normalized == "/images/og") {
+		return true
+	}
+	if noise.fingerprintJS && normalized == "/npm-monitoring" {
+		return true
+	}
+	if noise.nextRSCProtocol {
+		switch normalized {
+		case "/_head", "/_index", "/_tree":
+			return true
+		}
+	}
 	if noise.oidcCallbackParser && normalized == "/code" {
 		return true
+	}
+	if noise.reduxToolkit {
+		switch normalized {
+		case "/fulfilled", "/pending", "/rejected":
+			return true
+		}
 	}
 	return noise.materialUIDataGrid && normalized == "/unset"
 }
@@ -320,7 +365,16 @@ func (noise sourceNoise) isKnownNonRequestPath(path string) bool {
 func isLocalBuildPath(path string) bool {
 	lower := strings.ToLower(path)
 	return strings.HasPrefix(lower, "/home/runner/work/") ||
-		strings.HasPrefix(lower, "/github/workspace/")
+		strings.HasPrefix(lower, "/github/workspace/") ||
+		strings.Contains(lower, "/node_modules/")
+}
+
+func isMarkupFragmentPath(path string) bool {
+	decoded, err := url.PathUnescape(path)
+	if err != nil {
+		decoded = path
+	}
+	return strings.ContainsAny(decoded, "<>")
 }
 
 // toSecret converts a jsluice secret into typed fields, lifting out the name and value a matcher
@@ -542,21 +596,25 @@ func sortedKeys(set map[string]struct{}) []string {
 	return keys
 }
 
-// normalizeTemplatePath turns unresolved whole path segments into explicit templates. A placeholder
-// glued into a segment leaves a name nothing can recover, so it is dropped rather than emitted as an
-// invented endpoint.
+// normalizeTemplatePath turns framework and extractor path parameters into explicit templates. A
+// jsluice expression glued into a segment leaves a name nothing can recover, so it is dropped rather
+// than emitted as an invented endpoint.
 func normalizeTemplatePath(path string) (string, bool) {
 	if path == "" {
 		return "", false
 	}
-	if !strings.Contains(path, jsluice.ExpressionPlaceholder) && !strings.Contains(path, "*") {
-		return path, true
-	}
-
 	segments := strings.Split(path, "/")
 	for i, segment := range segments {
+		if normalized, ok := normalizeNamedPathSegment(segment); ok {
+			segments[i] = normalized
+			continue
+		}
 		if segment == "*" {
 			segments[i] = "{wildcard}"
+			continue
+		}
+		if strings.Contains(segment, "*") {
+			segments[i] = strings.ReplaceAll(segment, "*", "{wildcard}")
 			continue
 		}
 		if !strings.Contains(segment, jsluice.ExpressionPlaceholder) {
@@ -568,6 +626,26 @@ func normalizeTemplatePath(path string) (string, bool) {
 		segments[i] = "{param}"
 	}
 	return strings.Join(segments, "/"), true
+}
+
+func normalizeNamedPathSegment(segment string) (string, bool) {
+	if strings.HasPrefix(segment, ":") && len(segment) > 1 {
+		name := strings.TrimPrefix(segment, ":")
+		if wildcard := strings.IndexByte(name, '*'); wildcard >= 0 {
+			return "{" + name[:wildcard] + "...}" + name[wildcard+1:], true
+		}
+		return "{" + name + "}", true
+	}
+	if strings.HasPrefix(segment, "[[...") && strings.HasSuffix(segment, "]]") {
+		return "{" + strings.TrimSuffix(strings.TrimPrefix(segment, "[[..."), "]]") + "...}", true
+	}
+	if strings.HasPrefix(segment, "[...") && strings.HasSuffix(segment, "]") {
+		return "{" + strings.TrimSuffix(strings.TrimPrefix(segment, "[..."), "]") + "...}", true
+	}
+	if strings.HasPrefix(segment, "[") && strings.HasSuffix(segment, "]") && len(segment) > 2 {
+		return "{" + strings.TrimSuffix(strings.TrimPrefix(segment, "["), "]") + "}", true
+	}
+	return "", false
 }
 
 // literalQueryValues keeps the values a client hard-codes and drops the ones it computes. The

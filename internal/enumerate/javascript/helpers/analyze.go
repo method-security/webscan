@@ -24,6 +24,10 @@ const DefaultWindowBytes = 256 * 1024
 // DefaultWindowOverlapBytes keeps a call split by a window boundary visible to one of the windows.
 const DefaultWindowOverlapBytes = 64 * 1024
 
+// MaxQueryParamValueBytes keeps embedded payload-like examples from bloating a JavaScript
+// endpoint record.
+const MaxQueryParamValueBytes = 256
+
 // Analysis is everything one JavaScript artifact yielded.
 type Analysis struct {
 	Endpoints []*Endpoint
@@ -508,6 +512,9 @@ func literalQueryValues(query string) map[string]string {
 		decodedValue, err := url.QueryUnescape(value)
 		if err != nil {
 			decodedValue = value
+		}
+		if len(decodedValue) > MaxQueryParamValueBytes {
+			continue
 		}
 		values[decodedName] = decodedValue
 	}

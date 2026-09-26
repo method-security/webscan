@@ -369,6 +369,22 @@ func TestAnalyzeSourceKeepsLiteralQueryValuesAndDropsComputedOnes(t *testing.T) 
 	}
 }
 
+func TestAnalyzeSourceDropsOversizedLiteralQueryValues(t *testing.T) {
+	longValue := strings.Repeat("a", enumeratejavascript.MaxQueryParamValueBytes+1)
+	source := []byte(`$.ajax({url:'/api/report?short=ok&oversized=` + longValue + `'});`)
+
+	analysis := enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0)
+	endpoint := findEndpoint(t, analysis.Endpoints, "/api/report")
+
+	values := endpoint.Details.QueryParamValues
+	if values["short"] != "ok" {
+		t.Fatalf("expected the bounded literal value, got %v", values)
+	}
+	if _, present := values["oversized"]; present {
+		t.Fatalf("expected oversized literal value to be omitted, got %v", values)
+	}
+}
+
 func TestAnalyzeSourceTemplatesAWhollyComputedPathSegment(t *testing.T) {
 	source := []byte(`$.get('/api/orders/'+id+'/detail');`)
 

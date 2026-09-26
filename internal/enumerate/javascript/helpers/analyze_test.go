@@ -423,6 +423,7 @@ func TestAnalyzeSourceNormalizesNamedRouteSyntax(t *testing.T) {
 func TestAnalyzeSourceDropsLocalBuildPaths(t *testing.T) {
 	source := []byte(`const sourceRoot = "/home/runner/work/react-pdf/react-pdf/packages/pdfkit/src/mixins";` +
 		`const moduleRoot = "/ROOT/node_modules/next/dist/compiled/process/";` +
+		`const contentSource = "@site/blog/post.md";` +
 		`fetch("/api/reports");`)
 
 	paths := pathsOf(enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0).Endpoints)
@@ -432,7 +433,47 @@ func TestAnalyzeSourceDropsLocalBuildPaths(t *testing.T) {
 	if contains(paths, "/ROOT/node_modules/next/dist/compiled/process/") {
 		t.Fatalf("expected the node_modules path to be dropped, got %v", paths)
 	}
+	if contains(paths, "@site/blog/post.md") {
+		t.Fatalf("expected the Docusaurus source path to be dropped, got %v", paths)
+	}
 	if !contains(paths, "/api/reports") {
+		t.Fatalf("expected the application endpoint to survive, got %v", paths)
+	}
+}
+
+func TestAnalyzeSourceDropsEscapedRegexCharacterClasses(t *testing.T) {
+	source := []byte("const regexClass = '/\\\\bfnrtu'; fetch('/api/events');")
+
+	paths := pathsOf(enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0).Endpoints)
+	if contains(paths, `/\bfnrtu`) {
+		t.Fatalf("expected the escaped regex character class to be dropped, got %v", paths)
+	}
+	if !contains(paths, "/api/events") {
+		t.Fatalf("expected the application endpoint to survive, got %v", paths)
+	}
+}
+
+func TestAnalyzeSourceDropsQuotedWebpackModuleIDs(t *testing.T) {
+	source := []byte(`const modules={"/9J+"(module,exports,require){"use strict"}};` +
+		`const imported = require("/9J+"); fetch("/api/team");`)
+
+	paths := pathsOf(enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0).Endpoints)
+	if contains(paths, "/9J+") {
+		t.Fatalf("expected the Webpack module ID to be dropped, got %v", paths)
+	}
+	if !contains(paths, "/api/team") {
+		t.Fatalf("expected the application endpoint to survive, got %v", paths)
+	}
+}
+
+func TestAnalyzeSourceDropsIncompleteAdobeAnalyticsBeaconPath(t *testing.T) {
+	source := []byte(`const prefix="/b/ss/"; const versionPath="/JS-"; fetch("/api/metrics");`)
+
+	paths := pathsOf(enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0).Endpoints)
+	if contains(paths, "/JS-") {
+		t.Fatalf("expected the incomplete analytics beacon path to be dropped, got %v", paths)
+	}
+	if !contains(paths, "/api/metrics") {
 		t.Fatalf("expected the application endpoint to survive, got %v", paths)
 	}
 }

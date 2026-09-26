@@ -283,6 +283,8 @@ func toEndpoint(found *jsluice.URL, sourceURL string, noise sourceNoise) *Endpoi
 // /next or /scripts, so those literals are suppressed only when the source fingerprints the SDK
 // that uses them as internal classification strings.
 type sourceNoise struct {
+	source              []byte
+	adobeAnalytics      bool
 	applicationInsights bool
 	commonMarkRenderer  bool
 	coreJSRegExpTests   bool
@@ -301,6 +303,8 @@ func sourceNoiseFor(source []byte, sourceURL string) sourceNoise {
 		host = strings.ToLower(parsed.Hostname())
 	}
 	return sourceNoise{
+		source:              source,
+		adobeAnalytics:      bytes.Contains(source, []byte(`"/b/ss/"`)) && bytes.Contains(source, []byte(`"/JS-"`)),
 		applicationInsights: bytes.Contains(source, []byte("dc.services.visualstudio.com")),
 		commonMarkRenderer:  bytes.Contains(source, []byte("prototype.block_quote")),
 		coreJSRegExpTests:   bytes.Contains(source, []byte("RegExp.prototype")),
@@ -321,6 +325,15 @@ func hostMatches(host string, domain string) bool {
 
 func (noise sourceNoise) isKnownNonRequestPath(path string) bool {
 	normalized := strings.ToLower(strings.TrimSuffix(path, "/"))
+	if noise.adobeAnalytics && normalized == "/js-" {
+		return true
+	}
+	// Webpack permits quoted module IDs as concise object methods. Jsluice sees slash-prefixed IDs
+	// in those declarations as URLs, but a quoted string immediately followed by `(` is code.
+	if strings.HasPrefix(path, "/") && (bytes.Contains(noise.source, []byte(`"`+path+`"(`)) ||
+		bytes.Contains(noise.source, []byte(`'`+path+`'(`))) {
+		return true
+	}
 	if noise.applicationInsights {
 		switch normalized {
 		case "/__browserlink", "/browserlinksignalr", "/beta", "/next", "/scripts", "/v2/track":
@@ -366,10 +379,15 @@ func isLocalBuildPath(path string) bool {
 	lower := strings.ToLower(path)
 	return strings.HasPrefix(lower, "/home/runner/work/") ||
 		strings.HasPrefix(lower, "/github/workspace/") ||
-		strings.Contains(lower, "/node_modules/")
+		strings.HasPrefix(lower, "@site/") ||
+		strings.Contains(lower, "/node_modules/") ||
+		strings.Contains(lower, "/@site/")
 }
 
 func isMarkupFragmentPath(path string) bool {
+	if strings.Contains(path, `\`) {
+		return true
+	}
 	decoded, err := url.PathUnescape(path)
 	if err != nil {
 		decoded = path

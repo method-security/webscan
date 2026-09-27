@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	common "github.com/Method-Security/webscan/generated/go/common"
 	"github.com/Method-Security/webscan/generated/go/enumerate"
 	enumeratejavascript "github.com/Method-Security/webscan/internal/enumerate/javascript/helpers"
 )
@@ -549,6 +550,30 @@ func TestAnalyzeSourceKeepsGenericPathsWithoutLibraryEvidence(t *testing.T) {
 		if !contains(paths, expected) {
 			t.Fatalf("expected application route %s to survive without SDK evidence, got %v", expected, paths)
 		}
+	}
+}
+
+func TestAnalyzeSourceKeepsRequestsThatSharePathsWithLibraryInternals(t *testing.T) {
+	source := []byte(`const collector = "https://dc.services.visualstudio.com";` +
+		`Renderer.prototype.block_quote = function() {};` +
+		`const grid = "MuiDataGridVariables";` +
+		`const callback = "#code=" + "&code=";` +
+		`fetch("/v2/track"); fetch("/strong"); fetch("/unset"); fetch("/code");`)
+
+	paths := pathsOf(enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0).Endpoints)
+	for _, expected := range []string{"/v2/track", "/strong", "/unset", "/code"} {
+		if !contains(paths, expected) {
+			t.Fatalf("expected explicit request %s to survive library noise filtering, got %v", expected, paths)
+		}
+	}
+}
+
+func TestAnalyzeSourceKeepsRequestThatSharesAPathWithRendererTag(t *testing.T) {
+	source := []byte(`this.tag("/strong"); fetch("/strong");`)
+
+	endpoint := findEndpoint(t, enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0).Endpoints, "/strong")
+	if endpoint.Details.Method == nil || *endpoint.Details.Method != common.HttpMethodGet {
+		t.Fatalf("expected the explicit GET request to survive renderer tag filtering, got %v", endpoint.Details.Method)
 	}
 }
 

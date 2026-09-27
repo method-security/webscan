@@ -88,6 +88,7 @@ func AnalyzeSource(source []byte, sourceURL string, windowBytes int, overlapByte
 	secrets := map[string]*enumerate.JavascriptSecret{}
 	bases := map[string]struct{}{}
 	renderedTags := map[string]struct{}{}
+	requestedPaths := map[string]struct{}{}
 	noise := sourceNoiseFor(source, sourceURL)
 
 	for _, window := range windowsOf(len(source), windowBytes, overlapBytes) {
@@ -106,7 +107,10 @@ func AnalyzeSource(source []byte, sourceURL string, windowBytes int, overlapByte
 			if noise.providerArtifact {
 				continue
 			}
-			if _, isTag := nonRequestPaths[found.URL]; isTag {
+			if isRequestExtraction(found) {
+				requestedPaths[found.URL] = struct{}{}
+			}
+			if _, isTag := nonRequestPaths[found.URL]; isTag && !isRequestExtraction(found) {
 				continue
 			}
 			if base, ok := absoluteBase(found.URL); ok {
@@ -137,7 +141,9 @@ func AnalyzeSource(source []byte, sourceURL string, windowBytes int, overlapByte
 		}
 	}
 	for key, endpoint := range endpoints {
-		if _, isTag := renderedTags[endpoint.Details.Path]; isTag {
+		_, isTag := renderedTags[endpoint.Details.Path]
+		_, wasRequested := requestedPaths[endpoint.Details.Path]
+		if isTag && !wasRequested {
 			delete(endpoints, key)
 		}
 	}
@@ -161,6 +167,25 @@ func tagRendererPaths(foundURLs []*jsluice.URL) map[string]struct{} {
 		}
 	}
 	return paths
+}
+
+// isRequestExtraction distinguishes a request/navigation call from the low-context string and
+// predicate matches jsluice also emits for the same literal. Noise rules may discard the latter,
+// but concrete request evidence always wins even when an SDK uses the same path internally.
+func isRequestExtraction(found *jsluice.URL) bool {
+	if found == nil || found.Type == "" || found.Type == "stringLiteral" {
+		return false
+	}
+	call := strings.ToLower(found.Type)
+	if call == "require" || call == "require.resolve" {
+		return false
+	}
+	for _, suffix := range []string{".endswith", ".includes", ".startswith", ".tag"} {
+		if strings.HasSuffix(call, suffix) {
+			return false
+		}
+	}
+	return true
 }
 
 // windowsOf returns [start, end) offsets covering size with the requested overlap.
@@ -211,7 +236,8 @@ func toEndpoint(found *jsluice.URL, sourceURL string, noise sourceNoise) *Endpoi
 	if !ok {
 		return nil
 	}
-	if isLocalBuildPath(path) || isMarkupFragmentPath(path) || noise.isKnownNonRequestPath(path) {
+	if isLocalBuildPath(path) || isMarkupFragmentPath(path) ||
+		(!isRequestExtraction(found) && noise.isKnownNonRequestPath(path)) {
 		return nil
 	}
 

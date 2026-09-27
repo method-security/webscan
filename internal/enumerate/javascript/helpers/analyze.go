@@ -107,10 +107,10 @@ func AnalyzeSource(source []byte, sourceURL string, windowBytes int, overlapByte
 			if noise.providerArtifact {
 				continue
 			}
-			if isRequestExtraction(found) {
+			if hasExplicitRequestEvidence(found) {
 				requestedPaths[found.URL] = struct{}{}
 			}
-			if _, isTag := nonRequestPaths[found.URL]; isTag && !isRequestExtraction(found) {
+			if _, isTag := nonRequestPaths[found.URL]; isTag && !hasExplicitRequestEvidence(found) {
 				continue
 			}
 			if base, ok := absoluteBase(found.URL); ok {
@@ -169,23 +169,17 @@ func tagRendererPaths(foundURLs []*jsluice.URL) map[string]struct{} {
 	return paths
 }
 
-// isRequestExtraction distinguishes a request/navigation call from the low-context string and
-// predicate matches jsluice also emits for the same literal. Noise rules may discard the latter,
-// but concrete request evidence always wins even when an SDK uses the same path internally.
-func isRequestExtraction(found *jsluice.URL) bool {
-	if found == nil || found.Type == "" || found.Type == "stringLiteral" {
+// hasExplicitRequestEvidence keeps a noise-shaped path only when jsluice identified an HTTP
+// method, either directly or from an exact verb call such as client.get or client.post.
+func hasExplicitRequestEvidence(found *jsluice.URL) bool {
+	if found == nil {
 		return false
 	}
-	call := strings.ToLower(found.Type)
-	if call == "require" || call == "require.resolve" {
-		return false
+	if _, ok := requestMethod(found.Method); ok {
+		return true
 	}
-	for _, suffix := range []string{".endswith", ".includes", ".startswith", ".tag"} {
-		if strings.HasSuffix(call, suffix) {
-			return false
-		}
-	}
-	return true
+	_, ok := methodFromCall(found.Type)
+	return ok
 }
 
 // windowsOf returns [start, end) offsets covering size with the requested overlap.
@@ -237,7 +231,7 @@ func toEndpoint(found *jsluice.URL, sourceURL string, noise sourceNoise) *Endpoi
 		return nil
 	}
 	if isLocalBuildPath(path) || isMarkupFragmentPath(path) ||
-		(!isRequestExtraction(found) && noise.isKnownNonRequestPath(path)) {
+		(!hasExplicitRequestEvidence(found) && noise.isKnownNonRequestPath(path)) {
 		return nil
 	}
 

@@ -553,7 +553,7 @@ func TestAnalyzeSourceKeepsGenericPathsWithoutLibraryEvidence(t *testing.T) {
 	}
 }
 
-func TestAnalyzeSourceKeepsRequestsThatSharePathsWithLibraryInternals(t *testing.T) {
+func TestAnalyzeSourceKeepsExplicitRequestsThatSharePathsWithLibraryInternals(t *testing.T) {
 	source := []byte(`const collector = "https://dc.services.visualstudio.com";` +
 		`Renderer.prototype.block_quote = function() {};` +
 		`const grid = "MuiDataGridVariables";` +

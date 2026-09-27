@@ -14,15 +14,17 @@ types:
       url: string
       kind: JavascriptArtifactKind
       sizeBytes: integer
+  JavascriptEndpointParam:
+    properties:
+      name: string
+      exampleValue: optional<string>
   JavascriptEndpoint:
     properties:
       path: string
       method: optional<http.HttpMethod>
-      queryParams: optional<list<string>>
-      queryParamValues: optional<map<string, string>>
-      bodyParams: optional<list<string>>
+      queryParams: optional<list<JavascriptEndpointParam>>
+      bodyParams: optional<list<JavascriptEndpointParam>>
       contentType: optional<string>
-      callExpression: optional<string>
       sourceUrl: string
   JavascriptSecret:
     properties:

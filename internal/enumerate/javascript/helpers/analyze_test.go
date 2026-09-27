@@ -30,6 +30,15 @@ func findEndpoint(t *testing.T, endpoints []*enumeratejavascript.Endpoint, path 
 	return nil
 }
 
+func findParam(params []*enumerate.JavascriptEndpointParam, name string) *enumerate.JavascriptEndpointParam {
+	for _, param := range params {
+		if param.Name == name {
+			return param
+		}
+	}
+	return nil
+}
+
 func TestAnalyzeSourceRecoversWrappedRelativeCalls(t *testing.T) {
 	source := []byte(`class S {
 		deleteFile(n){ return this.dataService.getRequest("general/DeleteFile?fileName="+n) }
@@ -43,11 +52,8 @@ func TestAnalyzeSourceRecoversWrappedRelativeCalls(t *testing.T) {
 	if endpoint.Rooted {
 		t.Fatalf("expected a relative literal to be unrooted before rooting runs")
 	}
-	if len(endpoint.Details.QueryParams) != 1 || endpoint.Details.QueryParams[0] != "fileName" {
+	if len(endpoint.Details.QueryParams) != 1 || endpoint.Details.QueryParams[0].Name != "fileName" {
 		t.Fatalf("expected the fileName query param, got %v", endpoint.Details.QueryParams)
-	}
-	if endpoint.Details.CallExpression == nil || *endpoint.Details.CallExpression != "this.dataService.getRequest" {
-		t.Fatalf("expected the wrapper call to be recorded, got %v", endpoint.Details.CallExpression)
 	}
 
 	if !contains(analysis.Origins, "https://portal.example.com/serviceapi/v1") {
@@ -354,15 +360,17 @@ func TestAnalyzeSourceKeepsLiteralQueryValuesAndDropsComputedOnes(t *testing.T) 
 	analysis := enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0)
 	endpoint := findEndpoint(t, analysis.Endpoints, "/api/general/maintenance")
 
-	values := endpoint.Details.QueryParamValues
-	if values["portalTypeId"] != "2" {
-		t.Fatalf("expected the hard-coded portalTypeId, got %v", values)
+	portalTypeID := findParam(endpoint.Details.QueryParams, "portalTypeId")
+	if portalTypeID == nil || portalTypeID.ExampleValue == nil || *portalTypeID.ExampleValue != "2" {
+		t.Fatalf("expected the hard-coded portalTypeId, got %v", endpoint.Details.QueryParams)
 	}
-	if values["isExistingUser"] != "false" {
-		t.Fatalf("expected the hard-coded isExistingUser, got %v", values)
+	isExistingUser := findParam(endpoint.Details.QueryParams, "isExistingUser")
+	if isExistingUser == nil || isExistingUser.ExampleValue == nil || *isExistingUser.ExampleValue != "false" {
+		t.Fatalf("expected the hard-coded isExistingUser, got %v", endpoint.Details.QueryParams)
 	}
-	if _, present := values["userId"]; present {
-		t.Fatalf("a computed value is absent, never a placeholder: %v", values)
+	userID := findParam(endpoint.Details.QueryParams, "userId")
+	if userID == nil || userID.ExampleValue != nil {
+		t.Fatalf("a computed value is absent, never a placeholder: %v", endpoint.Details.QueryParams)
 	}
 	if len(endpoint.Details.QueryParams) != 3 {
 		t.Fatalf("every parameter is still named whether or not its value is known, got %v", endpoint.Details.QueryParams)
@@ -376,12 +384,13 @@ func TestAnalyzeSourceDropsOversizedLiteralQueryValues(t *testing.T) {
 	analysis := enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0)
 	endpoint := findEndpoint(t, analysis.Endpoints, "/api/report")
 
-	values := endpoint.Details.QueryParamValues
-	if values["short"] != "ok" {
-		t.Fatalf("expected the bounded literal value, got %v", values)
+	short := findParam(endpoint.Details.QueryParams, "short")
+	if short == nil || short.ExampleValue == nil || *short.ExampleValue != "ok" {
+		t.Fatalf("expected the bounded literal value, got %v", endpoint.Details.QueryParams)
 	}
-	if _, present := values["oversized"]; present {
-		t.Fatalf("expected oversized literal value to be omitted, got %v", values)
+	oversized := findParam(endpoint.Details.QueryParams, "oversized")
+	if oversized == nil || oversized.ExampleValue != nil {
+		t.Fatalf("expected oversized literal value to be omitted, got %v", endpoint.Details.QueryParams)
 	}
 }
 
@@ -613,12 +622,13 @@ $.ajax({url:'/api/report?scope=team&format=csv'});`)
 	analysis := enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0)
 	endpoint := findEndpoint(t, analysis.Endpoints, "/api/report")
 
-	values := endpoint.Details.QueryParamValues
-	if values["scope"] != "team" {
-		t.Fatalf("expected the literal from the later call site, got %v", values)
+	scope := findParam(endpoint.Details.QueryParams, "scope")
+	if scope == nil || scope.ExampleValue == nil || *scope.ExampleValue != "team" {
+		t.Fatalf("expected the literal from the later call site, got %v", endpoint.Details.QueryParams)
 	}
-	if values["format"] != "csv" {
-		t.Fatalf("expected a parameter only the later call site states, got %v", values)
+	format := findParam(endpoint.Details.QueryParams, "format")
+	if format == nil || format.ExampleValue == nil || *format.ExampleValue != "csv" {
+		t.Fatalf("expected a parameter only the later call site states, got %v", endpoint.Details.QueryParams)
 	}
 	if len(endpoint.Details.QueryParams) != 2 {
 		t.Fatalf("expected both parameter names to survive the merge, got %v", endpoint.Details.QueryParams)

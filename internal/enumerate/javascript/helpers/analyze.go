@@ -216,19 +216,14 @@ func toEndpoint(found *jsluice.URL, sourceURL string, noise sourceNoise) *Endpoi
 	}
 
 	details := &enumerate.JavascriptEndpoint{
-		Path:             path,
-		SourceUrl:        sourceURL,
-		QueryParams:      found.QueryParams,
-		QueryParamValues: literalQueryValues(query),
-		BodyParams:       found.BodyParams,
+		Path:        path,
+		SourceUrl:   sourceURL,
+		QueryParams: endpointParams(found.QueryParams, literalQueryValues(query)),
+		BodyParams:  endpointParams(found.BodyParams, nil),
 	}
 	endpoint := &Endpoint{Details: details}
 	if found.ContentType != "" {
 		details.ContentType = &found.ContentType
-	}
-	if found.Type != "" && found.Type != "stringLiteral" {
-		callExpression := found.Type
-		details.CallExpression = &callExpression
 	}
 	if method, ok := requestMethod(found.Method); ok {
 		details.Method = &method
@@ -522,25 +517,6 @@ func mergeEndpointRecords(endpoints []*Endpoint) []*Endpoint {
 	return out
 }
 
-func unionStrings(first []string, second []string) []string {
-	if len(second) == 0 {
-		return first
-	}
-	seen := map[string]struct{}{}
-	for _, value := range first {
-		seen[value] = struct{}{}
-	}
-	out := first
-	for _, value := range second {
-		if _, exists := seen[value]; exists {
-			continue
-		}
-		seen[value] = struct{}{}
-		out = append(out, value)
-	}
-	return out
-}
-
 func locationKey(endpoint *Endpoint) string {
 	return endpoint.BaseURL + endpoint.Details.Path
 }
@@ -704,33 +680,56 @@ func literalQueryValues(query string) map[string]string {
 	return values
 }
 
-// mergeQueryValues keeps the first literal seen for a parameter. Two call sites passing different
-// constants both describe a real request, and one of them is as good a probe value as the other.
-func mergeQueryValues(existing map[string]string, incoming map[string]string) map[string]string {
-	if len(incoming) == 0 {
-		return existing
-	}
-	if existing == nil {
-		existing = map[string]string{}
-	}
-	for name, value := range incoming {
-		if _, seen := existing[name]; !seen {
-			existing[name] = value
-		}
-	}
-	return existing
-}
-
 // mergeEndpointDetails folds one record of an endpoint into another. Every field is additive: a
 // field the existing record lacks is taken, and a field both carry keeps what was seen first.
 func mergeEndpointDetails(existing *Endpoint, incoming *Endpoint) {
-	if existing.Details.CallExpression == nil && incoming.Details.CallExpression != nil {
-		existing.Details.CallExpression = incoming.Details.CallExpression
-	}
 	if existing.Details.ContentType == nil && incoming.Details.ContentType != nil {
 		existing.Details.ContentType = incoming.Details.ContentType
 	}
-	existing.Details.QueryParams = unionStrings(existing.Details.QueryParams, incoming.Details.QueryParams)
-	existing.Details.BodyParams = unionStrings(existing.Details.BodyParams, incoming.Details.BodyParams)
-	existing.Details.QueryParamValues = mergeQueryValues(existing.Details.QueryParamValues, incoming.Details.QueryParamValues)
+	existing.Details.QueryParams = mergeEndpointParams(existing.Details.QueryParams, incoming.Details.QueryParams)
+	existing.Details.BodyParams = mergeEndpointParams(existing.Details.BodyParams, incoming.Details.BodyParams)
+}
+
+func endpointParams(names []string, values map[string]string) []*enumerate.JavascriptEndpointParam {
+	if len(names) == 0 {
+		return nil
+	}
+	params := make([]*enumerate.JavascriptEndpointParam, 0, len(names))
+	seen := map[string]struct{}{}
+	for _, name := range names {
+		if _, exists := seen[name]; exists {
+			continue
+		}
+		seen[name] = struct{}{}
+		param := &enumerate.JavascriptEndpointParam{Name: name}
+		if value, exists := values[name]; exists {
+			param.ExampleValue = &value
+		}
+		params = append(params, param)
+	}
+	return params
+}
+
+// mergeEndpointParams keeps the first literal example seen for a parameter. Two call sites
+// passing different constants both describe a real request, and one of them is as good a probe
+// value as the other.
+func mergeEndpointParams(existing []*enumerate.JavascriptEndpointParam, incoming []*enumerate.JavascriptEndpointParam) []*enumerate.JavascriptEndpointParam {
+	if len(incoming) == 0 {
+		return existing
+	}
+	byName := make(map[string]*enumerate.JavascriptEndpointParam, len(existing))
+	for _, param := range existing {
+		byName[param.Name] = param
+	}
+	for _, param := range incoming {
+		if current, exists := byName[param.Name]; exists {
+			if current.ExampleValue == nil && param.ExampleValue != nil {
+				current.ExampleValue = param.ExampleValue
+			}
+			continue
+		}
+		existing = append(existing, param)
+		byName[param.Name] = param
+	}
+	return existing
 }

@@ -20,6 +20,7 @@ func assertJSONKeys(t *testing.T, value map[string]any, expected ...string) {
 }
 
 func TestJavascriptSignalShape(t *testing.T) {
+	exampleValue := "open"
 	report := enumerate.EnumerateJavascriptReport{
 		Config: &enumerate.EnumerateJavascriptConfig{Targets: []string{"https://app.example.com"}},
 		Result: &enumerate.EnumerateJavascriptResult{
@@ -30,8 +31,16 @@ func TestJavascriptSignalShape(t *testing.T) {
 					Local:  []*enumerate.JavascriptArtifact{{Url: "https://app.example.com/main.js", Kind: enumerate.JavascriptArtifactKindEntry, SizeBytes: 1234}},
 					Remote: []*enumerate.JavascriptArtifact{{Url: "https://cdn.example.net/chunk.js", Kind: enumerate.JavascriptArtifactKindChunk, SizeBytes: 456}},
 				},
-				Endpoints: []*enumerate.JavascriptEndpoint{{Path: "/api/orders", SourceUrl: "https://app.example.com/main.js"}},
-				Secrets:   []*enumerate.JavascriptSecret{{Kind: "api-key", SourceUrl: "https://app.example.com/main.js"}},
+				Endpoints: []*enumerate.JavascriptEndpoint{{
+					Path:      "/api/orders",
+					SourceUrl: "https://app.example.com/main.js",
+					QueryParams: []*enumerate.JavascriptEndpointParam{{
+						Name:         "status",
+						ExampleValue: &exampleValue,
+					}},
+					BodyParams: []*enumerate.JavascriptEndpointParam{{Name: "limit"}},
+				}},
+				Secrets: []*enumerate.JavascriptSecret{{Kind: "api-key", SourceUrl: "https://app.example.com/main.js"}},
 			}},
 		},
 	}
@@ -55,7 +64,11 @@ func TestJavascriptSignalShape(t *testing.T) {
 	artifact := bundles["local"].([]any)[0].(map[string]any)
 	assertJSONKeys(t, artifact, "url", "kind", "sizeBytes")
 	endpoint := application["endpoints"].([]any)[0].(map[string]any)
-	assertJSONKeys(t, endpoint, "path", "sourceUrl")
+	assertJSONKeys(t, endpoint, "path", "queryParams", "bodyParams", "sourceUrl")
+	queryParam := endpoint["queryParams"].([]any)[0].(map[string]any)
+	assertJSONKeys(t, queryParam, "name", "exampleValue")
+	bodyParam := endpoint["bodyParams"].([]any)[0].(map[string]any)
+	assertJSONKeys(t, bodyParam, "name")
 	secret := application["secrets"].([]any)[0].(map[string]any)
 	assertJSONKeys(t, secret, "kind", "sourceUrl")
 }

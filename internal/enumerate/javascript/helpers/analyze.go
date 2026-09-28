@@ -2,7 +2,6 @@ package enumeratejavascript
 
 import (
 	// Standard
-	"bytes"
 	"encoding/json"
 	"net/url"
 	"sort"
@@ -87,36 +86,19 @@ func AnalyzeSource(source []byte, sourceURL string, windowBytes int, overlapByte
 	endpoints := map[string]*Endpoint{}
 	secrets := map[string]*enumerate.JavascriptSecret{}
 	bases := map[string]struct{}{}
-	renderedTags := map[string]struct{}{}
-	requestedPaths := map[string]struct{}{}
-	noise := sourceNoiseFor(source, sourceURL)
 
 	for _, window := range windowsOf(len(source), windowBytes, overlapBytes) {
 		analyzer := jsluice.NewAnalyzer(source[window[0]:window[1]])
 		analyzer.AddSecretMatcher(CredentialMatcher())
-		foundURLs := analyzer.GetURLs()
-		nonRequestPaths := tagRendererPaths(foundURLs)
-		for path := range nonRequestPaths {
-			renderedTags[path] = struct{}{}
-		}
 
-		for _, found := range foundURLs {
+		for _, found := range analyzer.GetURLs() {
 			if found == nil {
-				continue
-			}
-			if noise.providerArtifact {
-				continue
-			}
-			if hasExplicitRequestEvidence(found) {
-				requestedPaths[found.URL] = struct{}{}
-			}
-			if _, isTag := nonRequestPaths[found.URL]; isTag && !hasExplicitRequestEvidence(found) {
 				continue
 			}
 			if base, ok := absoluteBase(found.URL); ok {
 				bases[base] = struct{}{}
 			}
-			endpoint := toEndpoint(found, sourceURL, noise)
+			endpoint := toEndpoint(found, sourceURL)
 			if endpoint == nil {
 				continue
 			}
@@ -140,46 +122,11 @@ func AnalyzeSource(source []byte, sourceURL string, windowBytes int, overlapByte
 			}
 		}
 	}
-	for key, endpoint := range endpoints {
-		_, isTag := renderedTags[endpoint.Details.Path]
-		_, wasRequested := requestedPaths[endpoint.Details.Path]
-		if isTag && !wasRequested {
-			delete(endpoints, key)
-		}
-	}
-
 	return Analysis{
 		Endpoints: mergeEndpointRecords(sortedEndpoints(endpoints)),
 		Secrets:   sortedSecrets(secrets),
 		Origins:   sortedKeys(bases),
 	}
-}
-
-// tagRendererPaths returns closing-tag strings emitted through a renderer's tag helper. Jsluice
-// sees both the helper call and its nested string literal as URL candidates; suppressing the path
-// removes both records across all analysis windows while leaving an application route with the
-// same short name untouched in bundles that do not render that tag.
-func tagRendererPaths(foundURLs []*jsluice.URL) map[string]struct{} {
-	paths := map[string]struct{}{}
-	for _, found := range foundURLs {
-		if found != nil && found.Type == "this.tag" && strings.HasPrefix(found.URL, "/") {
-			paths[found.URL] = struct{}{}
-		}
-	}
-	return paths
-}
-
-// hasExplicitRequestEvidence keeps a noise-shaped path only when jsluice identified an HTTP
-// method, either directly or from an exact verb call such as client.get or client.post.
-func hasExplicitRequestEvidence(found *jsluice.URL) bool {
-	if found == nil {
-		return false
-	}
-	if _, ok := requestMethod(found.Method); ok {
-		return true
-	}
-	_, ok := methodFromCall(found.Type)
-	return ok
 }
 
 // windowsOf returns [start, end) offsets covering size with the requested overlap.
@@ -209,7 +156,7 @@ func windowsOf(size int, windowBytes int, overlapBytes int) [][2]int {
 }
 
 // toEndpoint converts a jsluice URL into an endpoint, dropping references that are not requests.
-func toEndpoint(found *jsluice.URL, sourceURL string, noise sourceNoise) *Endpoint {
+func toEndpoint(found *jsluice.URL, sourceURL string) *Endpoint {
 	raw := strings.TrimSpace(found.URL)
 	if raw == "" {
 		return nil
@@ -230,8 +177,7 @@ func toEndpoint(found *jsluice.URL, sourceURL string, noise sourceNoise) *Endpoi
 	if !ok {
 		return nil
 	}
-	if isLocalBuildPath(path) || isMarkupFragmentPath(path) ||
-		(!hasExplicitRequestEvidence(found) && noise.isKnownNonRequestPath(path)) {
+	if isMarkupFragmentPath(path) {
 		return nil
 	}
 
@@ -291,112 +237,6 @@ func toEndpoint(found *jsluice.URL, sourceURL string, noise sourceNoise) *Endpoi
 		return nil
 	}
 	return endpoint
-}
-
-// sourceNoise identifies literals that belong to a bundled library rather than the application.
-// The path alone is not enough evidence: applications can legitimately expose names such as
-// /next or /scripts, so those literals are suppressed only when the source fingerprints the SDK
-// that uses them as internal classification strings.
-type sourceNoise struct {
-	source              []byte
-	adobeAnalytics      bool
-	applicationInsights bool
-	commonMarkRenderer  bool
-	coreJSRegExpTests   bool
-	dynamicOGImage      bool
-	fingerprintJS       bool
-	materialUIDataGrid  bool
-	nextRSCProtocol     bool
-	oidcCallbackParser  bool
-	providerArtifact    bool
-	reduxToolkit        bool
-}
-
-func sourceNoiseFor(source []byte, sourceURL string) sourceNoise {
-	host := ""
-	if parsed, err := url.Parse(sourceURL); err == nil {
-		host = strings.ToLower(parsed.Hostname())
-	}
-	return sourceNoise{
-		source:              source,
-		adobeAnalytics:      bytes.Contains(source, []byte(`"/b/ss/"`)) && bytes.Contains(source, []byte(`"/JS-"`)),
-		applicationInsights: bytes.Contains(source, []byte("dc.services.visualstudio.com")),
-		commonMarkRenderer:  bytes.Contains(source, []byte("prototype.block_quote")),
-		coreJSRegExpTests:   bytes.Contains(source, []byte("RegExp.prototype")),
-		dynamicOGImage:      bytes.Contains(source, []byte(`"/images/og-"`)) && bytes.Contains(source, []byte(`".png"`)),
-		fingerprintJS:       bytes.Contains(source, []byte("openfpcdn.io/fingerprintjs")),
-		materialUIDataGrid:  bytes.Contains(source, []byte("MuiDataGridVariables")),
-		nextRSCProtocol:     bytes.Contains(source, []byte("NEXT_ROUTER_SEGMENT_PREFETCH_HEADER")),
-		oidcCallbackParser:  bytes.Contains(source, []byte("#code=")) && bytes.Contains(source, []byte("&code=")),
-		providerArtifact:    hostMatches(host, "googletagmanager.com") || hostMatches(host, "meticulous.ai"),
-		reduxToolkit: bytes.Contains(source, []byte(`requestStatus:"fulfilled"`)) &&
-			bytes.Contains(source, []byte(`requestStatus:"rejected"`)),
-	}
-}
-
-func hostMatches(host string, domain string) bool {
-	return host == domain || strings.HasSuffix(host, "."+domain)
-}
-
-func (noise sourceNoise) isKnownNonRequestPath(path string) bool {
-	normalized := strings.ToLower(strings.TrimSuffix(path, "/"))
-	if noise.adobeAnalytics && normalized == "/js-" {
-		return true
-	}
-	// Webpack permits quoted module IDs as concise object methods. Jsluice sees slash-prefixed IDs
-	// in those declarations as URLs, but a quoted string immediately followed by `(` is code.
-	if strings.HasPrefix(path, "/") && (bytes.Contains(noise.source, []byte(`"`+path+`"(`)) ||
-		bytes.Contains(noise.source, []byte(`'`+path+`'(`))) {
-		return true
-	}
-	if noise.applicationInsights {
-		switch normalized {
-		case "/__browserlink", "/browserlinksignalr", "/beta", "/next", "/scripts", "/v2/track":
-			return true
-		}
-	}
-	if noise.commonMarkRenderer {
-		switch normalized {
-		case "/a", "/blockquote", "/code", "/em", "/li", "/p", "/pre", "/strong":
-			return true
-		}
-	}
-	if noise.coreJSRegExpTests && (normalized == "/a/b" || normalized == "/a/i") {
-		return true
-	}
-	if noise.dynamicOGImage && (normalized == "/images/og-" || normalized == "/images/og") {
-		return true
-	}
-	if noise.fingerprintJS && normalized == "/npm-monitoring" {
-		return true
-	}
-	if noise.nextRSCProtocol {
-		switch normalized {
-		case "/_head", "/_index", "/_tree":
-			return true
-		}
-	}
-	if noise.oidcCallbackParser && normalized == "/code" {
-		return true
-	}
-	if noise.reduxToolkit {
-		switch normalized {
-		case "/fulfilled", "/pending", "/rejected":
-			return true
-		}
-	}
-	return noise.materialUIDataGrid && normalized == "/unset"
-}
-
-// isLocalBuildPath rejects source-code and build-machine paths embedded by dependencies. These are
-// useful to debuggers and source maps but cannot be requested from the analyzed application.
-func isLocalBuildPath(path string) bool {
-	lower := strings.ToLower(path)
-	return strings.HasPrefix(lower, "/home/runner/work/") ||
-		strings.HasPrefix(lower, "/github/workspace/") ||
-		strings.HasPrefix(lower, "@site/") ||
-		strings.Contains(lower, "/node_modules/") ||
-		strings.Contains(lower, "/@site/")
 }
 
 func isMarkupFragmentPath(path string) bool {

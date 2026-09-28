@@ -430,27 +430,6 @@ func TestAnalyzeSourceNormalizesNamedRouteSyntax(t *testing.T) {
 	}
 }
 
-func TestAnalyzeSourceDropsLocalBuildPaths(t *testing.T) {
-	source := []byte(`const sourceRoot = "/home/runner/work/react-pdf/react-pdf/packages/pdfkit/src/mixins";` +
-		`const moduleRoot = "/ROOT/node_modules/next/dist/compiled/process/";` +
-		`const contentSource = "@site/blog/post.md";` +
-		`fetch("/api/reports");`)
-
-	paths := pathsOf(enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0).Endpoints)
-	if contains(paths, "/home/runner/work/react-pdf/react-pdf/packages/pdfkit/src/mixins") {
-		t.Fatalf("expected the local build path to be dropped, got %v", paths)
-	}
-	if contains(paths, "/ROOT/node_modules/next/dist/compiled/process/") {
-		t.Fatalf("expected the node_modules path to be dropped, got %v", paths)
-	}
-	if contains(paths, "@site/blog/post.md") {
-		t.Fatalf("expected the Docusaurus source path to be dropped, got %v", paths)
-	}
-	if !contains(paths, "/api/reports") {
-		t.Fatalf("expected the application endpoint to survive, got %v", paths)
-	}
-}
-
 func TestAnalyzeSourceDropsEscapedRegexCharacterClasses(t *testing.T) {
 	source := []byte("const regexClass = '/\\\\bfnrtu'; fetch('/api/events');")
 
@@ -459,57 +438,6 @@ func TestAnalyzeSourceDropsEscapedRegexCharacterClasses(t *testing.T) {
 		t.Fatalf("expected the escaped regex character class to be dropped, got %v", paths)
 	}
 	if !contains(paths, "/api/events") {
-		t.Fatalf("expected the application endpoint to survive, got %v", paths)
-	}
-}
-
-func TestAnalyzeSourceDropsQuotedWebpackModuleIDs(t *testing.T) {
-	source := []byte(`const modules={"/9J+"(module,exports,require){"use strict"}};` +
-		`const imported = require("/9J+"); fetch("/api/team");`)
-
-	paths := pathsOf(enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0).Endpoints)
-	if contains(paths, "/9J+") {
-		t.Fatalf("expected the Webpack module ID to be dropped, got %v", paths)
-	}
-	if !contains(paths, "/api/team") {
-		t.Fatalf("expected the application endpoint to survive, got %v", paths)
-	}
-}
-
-func TestAnalyzeSourceDropsIncompleteAdobeAnalyticsBeaconPath(t *testing.T) {
-	source := []byte(`const prefix="/b/ss/"; const versionPath="/JS-"; fetch("/api/metrics");`)
-
-	paths := pathsOf(enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0).Endpoints)
-	if contains(paths, "/JS-") {
-		t.Fatalf("expected the incomplete analytics beacon path to be dropped, got %v", paths)
-	}
-	if !contains(paths, "/api/metrics") {
-		t.Fatalf("expected the application endpoint to survive, got %v", paths)
-	}
-}
-
-func TestAnalyzeSourceDropsKnownThirdPartyProviderBundleEndpoints(t *testing.T) {
-	source := []byte(`fetch("/collect"); const docs = "/docs/how-to/enable-source-coverage";`)
-
-	analysis := enumeratejavascript.AnalyzeSource(source, "https://snippet.meticulous.ai/v1/meticulous.js", 0, 0)
-	if len(analysis.Endpoints) != 0 {
-		t.Fatalf("expected provider bundle internals to be omitted, got %v", pathsOf(analysis.Endpoints))
-	}
-}
-
-func TestAnalyzeSourceDropsFrameworkProtocolAndStateLiterals(t *testing.T) {
-	source := []byte(`const NEXT_ROUTER_SEGMENT_PREFETCH_HEADER = "x-nextjs-segment";` +
-		`const segment = "/_tree";` +
-		`const states = {a: {requestStatus:"fulfilled"}, b: {requestStatus:"rejected"}};` +
-		`const pending = "/pending"; fetch("/api/search");`)
-
-	paths := pathsOf(enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0).Endpoints)
-	for _, unwanted := range []string{"/_tree", "/pending"} {
-		if contains(paths, unwanted) {
-			t.Fatalf("expected framework literal %s to be dropped, got %v", unwanted, paths)
-		}
-	}
-	if !contains(paths, "/api/search") {
 		t.Fatalf("expected the application endpoint to survive, got %v", paths)
 	}
 }
@@ -526,96 +454,17 @@ func TestAnalyzeSourceDropsEncodedMarkupFragments(t *testing.T) {
 	}
 }
 
-func TestAnalyzeSourceDropsApplicationInsightsLiteralsOnlyWithLibraryEvidence(t *testing.T) {
-	source := []byte(`const collector = "https://dc.services.visualstudio.com";` +
-		`const ignored = ["/browserLinkSignalR/", "/__browserLink/", "/scripts/", "/next/", "/beta/"];` +
-		`const track = "/v2/track"; fetch("/api/orders");`)
-
-	paths := pathsOf(enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0).Endpoints)
-	for _, unwanted := range []string{"/browserLinkSignalR/", "/__browserLink/", "/scripts/", "/next/", "/beta/", "/v2/track"} {
-		if contains(paths, unwanted) {
-			t.Fatalf("expected Application Insights literal %s to be dropped, got %v", unwanted, paths)
+func TestAnalyzeSourceIgnoresSourceHostAndUnrelatedIdentifiers(t *testing.T) {
+	source := []byte(`const frameworkMarker = "NEXT_ROUTER_SEGMENT_PREFETCH_HEADER";` +
+		`const providerMarker = "dc.services.visualstudio.com"; fetch("/api/track");`)
+	for _, sourceURL := range []string{
+		"https://app.example.com/main.js",
+		"https://snippet.meticulous.ai/main.js",
+	} {
+		endpoint := findEndpoint(t, enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0).Endpoints, "/api/track")
+		if endpoint.Details.Method == nil || *endpoint.Details.Method != common.HttpMethodGet {
+			t.Fatalf("expected the explicit request from %s, got %v", sourceURL, endpoint.Details.Method)
 		}
-	}
-	if !contains(paths, "/api/orders") {
-		t.Fatalf("expected the application endpoint to survive, got %v", paths)
-	}
-}
-
-func TestAnalyzeSourceKeepsGenericPathsWithoutLibraryEvidence(t *testing.T) {
-	source := []byte(`const routes = ["/scripts/", "/next/", "/beta/"];`)
-
-	paths := pathsOf(enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0).Endpoints)
-	for _, expected := range []string{"/scripts/", "/next/", "/beta/"} {
-		if !contains(paths, expected) {
-			t.Fatalf("expected application route %s to survive without SDK evidence, got %v", expected, paths)
-		}
-	}
-}
-
-func TestAnalyzeSourceKeepsExplicitRequestsThatSharePathsWithLibraryInternals(t *testing.T) {
-	source := []byte(`const collector = "https://dc.services.visualstudio.com";` +
-		`Renderer.prototype.block_quote = function() {};` +
-		`const grid = "MuiDataGridVariables";` +
-		`const callback = "#code=" + "&code=";` +
-		`fetch("/v2/track"); fetch("/strong"); fetch("/unset"); fetch("/code");`)
-
-	paths := pathsOf(enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0).Endpoints)
-	for _, expected := range []string{"/v2/track", "/strong", "/unset", "/code"} {
-		if !contains(paths, expected) {
-			t.Fatalf("expected explicit request %s to survive library noise filtering, got %v", expected, paths)
-		}
-	}
-}
-
-func TestAnalyzeSourceKeepsRequestThatSharesAPathWithRendererTag(t *testing.T) {
-	source := []byte(`this.tag("/strong"); fetch("/strong");`)
-
-	endpoint := findEndpoint(t, enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0).Endpoints, "/strong")
-	if endpoint.Details.Method == nil || *endpoint.Details.Method != common.HttpMethodGet {
-		t.Fatalf("expected the explicit GET request to survive renderer tag filtering, got %v", endpoint.Details.Method)
-	}
-}
-
-func TestAnalyzeSourceDropsMaterialUIDataGridSentinel(t *testing.T) {
-	source := []byte(`const context = {name: "MuiDataGridVariables", href: "/unset"};` +
-		`fetch("/api/grid");`)
-
-	paths := pathsOf(enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0).Endpoints)
-	if contains(paths, "/unset") {
-		t.Fatalf("expected the Material UI sentinel to be dropped, got %v", paths)
-	}
-	if !contains(paths, "/api/grid") {
-		t.Fatalf("expected the application endpoint to survive, got %v", paths)
-	}
-}
-
-func TestAnalyzeSourceDropsMarkupRendererClosingTags(t *testing.T) {
-	source := []byte(`this.tag("/blockquote"); const duplicate = "/blockquote";` +
-		`Renderer.prototype.block_quote = function() {}; this.tag(close ? "strong" : "/strong");` +
-		`fetch("/api/articles");`)
-
-	paths := pathsOf(enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0).Endpoints)
-	for _, unwanted := range []string{"/blockquote", "/strong"} {
-		if contains(paths, unwanted) {
-			t.Fatalf("expected the renderer's closing tag %s to be dropped, got %v", unwanted, paths)
-		}
-	}
-	if !contains(paths, "/api/articles") {
-		t.Fatalf("expected the application endpoint to survive, got %v", paths)
-	}
-}
-
-func TestAnalyzeSourceDropsOIDCCallbackParserFragment(t *testing.T) {
-	source := []byte(`function includesCode(url) { return url.endsWith("/code") || ` +
-		`url.includes("#code=") || url.includes("&code="); } fetch("/api/session");`)
-
-	paths := pathsOf(enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0).Endpoints)
-	if contains(paths, "/code") {
-		t.Fatalf("expected the OIDC callback parser fragment to be dropped, got %v", paths)
-	}
-	if !contains(paths, "/api/session") {
-		t.Fatalf("expected the application endpoint to survive, got %v", paths)
 	}
 }
 

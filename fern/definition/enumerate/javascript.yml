@@ -2,6 +2,25 @@ imports:
   http: ../common/http.yml
   method: ../common/method.yml
 types:
+  # Config Struct
+  EnumerateJavascriptConfig:
+    properties:
+      targets: list<string>
+      followChunks: boolean
+      fetchSourceMaps: boolean
+      maxArtifacts: integer
+      analysisWindowBytes: integer
+      analysisWindowOverlapBytes: integer
+      ignoreCrossDomainEndpoints: boolean
+      maxRedirects: integer
+      verifyTls: boolean
+      timeout: integer
+      sleep: integer
+      jitter: integer
+      threads: integer
+      userAgent: method.UserAgentPreset
+      headers: optional<map<string, string>>
+      cookies: optional<map<string, string>>
   # ENUMs
   JavascriptArtifactKind:
     enum:
@@ -34,25 +53,6 @@ types:
       attributes: optional<map<string, string>>
       context: optional<map<string, string>>
       sourceUrl: string
-  # Config Struct
-  EnumerateJavascriptConfig:
-    properties:
-      targets: list<string>
-      followChunks: boolean
-      fetchSourceMaps: boolean
-      maxArtifacts: integer
-      analysisWindowBytes: integer
-      analysisWindowOverlapBytes: integer
-      ignoreCrossDomainEndpoints: boolean
-      maxRedirects: integer
-      verifyTls: boolean
-      timeout: integer
-      sleep: integer
-      jitter: integer
-      threads: integer
-      userAgent: method.UserAgentPreset
-      headers: optional<map<string, string>>
-      cookies: optional<map<string, string>>
   # Result Struct
   JavascriptBundleDetails:
     properties:

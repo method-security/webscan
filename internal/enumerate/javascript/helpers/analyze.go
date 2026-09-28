@@ -450,7 +450,7 @@ func sortedKeys(set map[string]struct{}) []string {
 	return keys
 }
 
-// normalizeTemplatePath turns framework and extractor path parameters into explicit templates. A
+// normalizeTemplatePath turns path parameters into explicit templates. A
 // jsluice expression glued into a segment leaves a name nothing can recover, so it is dropped rather
 // than emitted as an invented endpoint.
 func normalizeTemplatePath(path string) (string, bool) {
@@ -459,6 +459,13 @@ func normalizeTemplatePath(path string) (string, bool) {
 	}
 	segments := strings.Split(path, "/")
 	for i, segment := range segments {
+		if strings.Contains(segment, jsluice.ExpressionPlaceholder) {
+			if segment != jsluice.ExpressionPlaceholder {
+				return "", false
+			}
+			segments[i] = "{param}"
+			continue
+		}
 		if normalized, ok := normalizeNamedPathSegment(segment); ok {
 			segments[i] = normalized
 			continue
@@ -471,13 +478,6 @@ func normalizeTemplatePath(path string) (string, bool) {
 			segments[i] = strings.ReplaceAll(segment, "*", "{wildcard}")
 			continue
 		}
-		if !strings.Contains(segment, jsluice.ExpressionPlaceholder) {
-			continue
-		}
-		if segment != jsluice.ExpressionPlaceholder {
-			return "", false
-		}
-		segments[i] = "{param}"
 	}
 	return strings.Join(segments, "/"), true
 }

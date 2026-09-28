@@ -122,7 +122,6 @@ func AnalyzeSource(source []byte, sourceURL string, windowBytes int, overlapByte
 			}
 		}
 	}
-
 	return Analysis{
 		Endpoints: mergeEndpointRecords(sortedEndpoints(endpoints)),
 		Secrets:   sortedSecrets(secrets),
@@ -174,25 +173,23 @@ func toEndpoint(found *jsluice.URL, sourceURL string) *Endpoint {
 		}
 		path = path[:cut]
 	}
-	path, ok := normalizeExpressionPath(path)
+	path, ok := normalizeTemplatePath(path)
 	if !ok {
+		return nil
+	}
+	if isMarkupFragmentPath(path) {
 		return nil
 	}
 
 	details := &enumerate.JavascriptEndpoint{
-		Path:             path,
-		SourceUrl:        sourceURL,
-		QueryParams:      found.QueryParams,
-		QueryParamValues: literalQueryValues(query),
-		BodyParams:       found.BodyParams,
+		Path:        path,
+		SourceUrl:   sourceURL,
+		QueryParams: endpointParams(found.QueryParams, literalQueryValues(query)),
+		BodyParams:  endpointParams(found.BodyParams, nil),
 	}
 	endpoint := &Endpoint{Details: details}
 	if found.ContentType != "" {
 		details.ContentType = &found.ContentType
-	}
-	if found.Type != "" && found.Type != "stringLiteral" {
-		callExpression := found.Type
-		details.CallExpression = &callExpression
 	}
 	if method, ok := requestMethod(found.Method); ok {
 		details.Method = &method
@@ -212,7 +209,7 @@ func toEndpoint(found *jsluice.URL, sourceURL string) *Endpoint {
 		if isNonEndpointAsset(parsed.Path) {
 			return nil
 		}
-		absolutePath, ok := normalizeExpressionPath(parsed.Path)
+		absolutePath, ok := normalizeTemplatePath(parsed.Path)
 		if !ok {
 			return nil
 		}
@@ -240,6 +237,17 @@ func toEndpoint(found *jsluice.URL, sourceURL string) *Endpoint {
 		return nil
 	}
 	return endpoint
+}
+
+func isMarkupFragmentPath(path string) bool {
+	if strings.Contains(path, `\`) {
+		return true
+	}
+	decoded, err := url.PathUnescape(path)
+	if err != nil {
+		decoded = path
+	}
+	return strings.ContainsAny(decoded, "<>")
 }
 
 // toSecret converts a jsluice secret into typed fields, lifting out the name and value a matcher
@@ -369,25 +377,6 @@ func mergeEndpointRecords(endpoints []*Endpoint) []*Endpoint {
 	return out
 }
 
-func unionStrings(first []string, second []string) []string {
-	if len(second) == 0 {
-		return first
-	}
-	seen := map[string]struct{}{}
-	for _, value := range first {
-		seen[value] = struct{}{}
-	}
-	out := first
-	for _, value := range second {
-		if _, exists := seen[value]; exists {
-			continue
-		}
-		seen[value] = struct{}{}
-		out = append(out, value)
-	}
-	return out
-}
-
 func locationKey(endpoint *Endpoint) string {
 	return endpoint.BaseURL + endpoint.Details.Path
 }
@@ -461,29 +450,56 @@ func sortedKeys(set map[string]struct{}) []string {
 	return keys
 }
 
-// normalizeExpressionPath resolves jsluice's expression placeholder into a path template, or reports
-// the path unusable. A segment that is wholly a placeholder is a path parameter and becomes `{param}`;
-// a placeholder glued into a segment leaves a name nothing can recover, and that literal reached the
-// wire as an invented endpoint before this existed.
-func normalizeExpressionPath(path string) (string, bool) {
+// normalizeTemplatePath turns path parameters into explicit templates. A
+// jsluice expression glued into a segment leaves a name nothing can recover, so it is dropped rather
+// than emitted as an invented endpoint.
+func normalizeTemplatePath(path string) (string, bool) {
 	if path == "" {
 		return "", false
 	}
-	if !strings.Contains(path, jsluice.ExpressionPlaceholder) {
-		return path, true
-	}
-
 	segments := strings.Split(path, "/")
 	for i, segment := range segments {
-		if !strings.Contains(segment, jsluice.ExpressionPlaceholder) {
+		if strings.Contains(segment, jsluice.ExpressionPlaceholder) {
+			if segment != jsluice.ExpressionPlaceholder {
+				return "", false
+			}
+			segments[i] = "{param}"
 			continue
 		}
-		if segment != jsluice.ExpressionPlaceholder {
-			return "", false
+		if normalized, ok := normalizeNamedPathSegment(segment); ok {
+			segments[i] = normalized
+			continue
 		}
-		segments[i] = "{param}"
+		if segment == "*" {
+			segments[i] = "{wildcard}"
+			continue
+		}
+		if strings.Contains(segment, "*") {
+			segments[i] = strings.ReplaceAll(segment, "*", "{wildcard}")
+			continue
+		}
 	}
 	return strings.Join(segments, "/"), true
+}
+
+func normalizeNamedPathSegment(segment string) (string, bool) {
+	if strings.HasPrefix(segment, ":") && len(segment) > 1 {
+		name := strings.TrimPrefix(segment, ":")
+		if wildcard := strings.IndexByte(name, '*'); wildcard >= 0 {
+			return "{" + name[:wildcard] + "...}" + name[wildcard+1:], true
+		}
+		return "{" + name + "}", true
+	}
+	if strings.HasPrefix(segment, "[[...") && strings.HasSuffix(segment, "]]") {
+		return "{" + strings.TrimSuffix(strings.TrimPrefix(segment, "[[..."), "]]") + "...}", true
+	}
+	if strings.HasPrefix(segment, "[...") && strings.HasSuffix(segment, "]") {
+		return "{" + strings.TrimSuffix(strings.TrimPrefix(segment, "[..."), "]") + "...}", true
+	}
+	if strings.HasPrefix(segment, "[") && strings.HasSuffix(segment, "]") && len(segment) > 2 {
+		return "{" + strings.TrimSuffix(strings.TrimPrefix(segment, "["), "]") + "}", true
+	}
+	return "", false
 }
 
 // literalQueryValues keeps the values a client hard-codes and drops the ones it computes. The
@@ -524,33 +540,56 @@ func literalQueryValues(query string) map[string]string {
 	return values
 }
 
-// mergeQueryValues keeps the first literal seen for a parameter. Two call sites passing different
-// constants both describe a real request, and one of them is as good a probe value as the other.
-func mergeQueryValues(existing map[string]string, incoming map[string]string) map[string]string {
-	if len(incoming) == 0 {
-		return existing
-	}
-	if existing == nil {
-		existing = map[string]string{}
-	}
-	for name, value := range incoming {
-		if _, seen := existing[name]; !seen {
-			existing[name] = value
-		}
-	}
-	return existing
-}
-
 // mergeEndpointDetails folds one record of an endpoint into another. Every field is additive: a
 // field the existing record lacks is taken, and a field both carry keeps what was seen first.
 func mergeEndpointDetails(existing *Endpoint, incoming *Endpoint) {
-	if existing.Details.CallExpression == nil && incoming.Details.CallExpression != nil {
-		existing.Details.CallExpression = incoming.Details.CallExpression
-	}
 	if existing.Details.ContentType == nil && incoming.Details.ContentType != nil {
 		existing.Details.ContentType = incoming.Details.ContentType
 	}
-	existing.Details.QueryParams = unionStrings(existing.Details.QueryParams, incoming.Details.QueryParams)
-	existing.Details.BodyParams = unionStrings(existing.Details.BodyParams, incoming.Details.BodyParams)
-	existing.Details.QueryParamValues = mergeQueryValues(existing.Details.QueryParamValues, incoming.Details.QueryParamValues)
+	existing.Details.QueryParams = mergeEndpointParams(existing.Details.QueryParams, incoming.Details.QueryParams)
+	existing.Details.BodyParams = mergeEndpointParams(existing.Details.BodyParams, incoming.Details.BodyParams)
+}
+
+func endpointParams(names []string, values map[string]string) []*enumerate.JavascriptEndpointParam {
+	if len(names) == 0 {
+		return nil
+	}
+	params := make([]*enumerate.JavascriptEndpointParam, 0, len(names))
+	seen := map[string]struct{}{}
+	for _, name := range names {
+		if _, exists := seen[name]; exists {
+			continue
+		}
+		seen[name] = struct{}{}
+		param := &enumerate.JavascriptEndpointParam{Name: name}
+		if value, exists := values[name]; exists {
+			param.ExampleValue = &value
+		}
+		params = append(params, param)
+	}
+	return params
+}
+
+// mergeEndpointParams keeps the first literal example seen for a parameter. Two call sites
+// passing different constants both describe a real request, and one of them is as good a probe
+// value as the other.
+func mergeEndpointParams(existing []*enumerate.JavascriptEndpointParam, incoming []*enumerate.JavascriptEndpointParam) []*enumerate.JavascriptEndpointParam {
+	if len(incoming) == 0 {
+		return existing
+	}
+	byName := make(map[string]*enumerate.JavascriptEndpointParam, len(existing))
+	for _, param := range existing {
+		byName[param.Name] = param
+	}
+	for _, param := range incoming {
+		if current, exists := byName[param.Name]; exists {
+			if current.ExampleValue == nil && param.ExampleValue != nil {
+				current.ExampleValue = param.ExampleValue
+			}
+			continue
+		}
+		existing = append(existing, param)
+		byName[param.Name] = param
+	}
+	return existing
 }

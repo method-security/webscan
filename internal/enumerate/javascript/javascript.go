@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"path"
 	"runtime"
 	"sort"
 	"strings"
@@ -485,10 +486,12 @@ func (c *collector) analyze(config enumerate.EnumerateJavascriptConfig) analysis
 			Endpoints: detailsOf(dedupeEndpoints(served[base])),
 			Secrets:   dedupeSecrets(bucket.secrets),
 		}
-		if len(bucket.local) > 0 || len(bucket.remote) > 0 {
+		local := signalArtifacts(bucket.local)
+		remote := signalArtifacts(bucket.remote)
+		if len(local) > 0 || len(remote) > 0 {
 			application.Bundles = &enumerate.JavascriptBundleDetails{
-				Local:  signalArtifacts(bucket.local),
-				Remote: signalArtifacts(bucket.remote),
+				Local:  local,
+				Remote: remote,
 			}
 		}
 		applications = append(applications, application)
@@ -501,7 +504,7 @@ func (c *collector) analyze(config enumerate.EnumerateJavascriptConfig) analysis
 func signalArtifacts(artifacts []*artifact) []*enumerate.JavascriptArtifact {
 	out := make([]*enumerate.JavascriptArtifact, 0, len(artifacts))
 	for _, artifact := range artifacts {
-		if artifact == nil {
+		if artifact == nil || !hasFileEnding(artifact.url) {
 			continue
 		}
 		out = append(out, &enumerate.JavascriptArtifact{
@@ -511,6 +514,43 @@ func signalArtifacts(artifacts []*artifact) []*enumerate.JavascriptArtifact {
 		})
 	}
 	return out
+}
+
+// Bundle URLs without a file-shaped path are still analyzed, but cannot be reported as files.
+func hasFileEnding(raw string) bool {
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return false
+	}
+	if strings.HasSuffix(parsed.Path, "/") {
+		return false
+	}
+	name := path.Base(parsed.Path)
+	if name == "." || name == ".." || name == "/" {
+		return false
+	}
+	if strings.HasPrefix(name, ".") {
+		return len(name) > 1
+	}
+	period := strings.LastIndexByte(name, '.')
+	if period < 0 {
+		return false
+	}
+	suffix := name[period+1:]
+	if len(suffix) == 0 || len(suffix) > 32 || strings.EqualFold(suffix, "html") || strings.EqualFold(suffix, "htm") || strings.EqualFold(suffix, "xhtml") {
+		return false
+	}
+	hasLetter := false
+	for _, char := range suffix {
+		switch {
+		case char >= 'a' && char <= 'z', char >= 'A' && char <= 'Z':
+			hasLetter = true
+		case char >= '0' && char <= '9':
+		default:
+			return false
+		}
+	}
+	return hasLetter
 }
 
 // inScope reports a URL served by a target's host or a subdomain of it.

@@ -3,7 +3,10 @@ info:
   name: D-Link Router Management Console Detection
   author: method-security
   severity: info
-  description: Detects D-Link router web management interfaces using D-Link model titles and login form markers.
+  description: |
+    Detects D-Link router web management interfaces using D-Link model titles and login form markers.
+    Requires D-Link as a standalone brand token so unrelated HTML classes such as `cd-link-block` do not
+    combine with a reflected `/Main_Login.asp` path and create a false positive.
   metadata:
     method-application-type: ROUTER
     method-module-name: DLINK_ROUTER
@@ -25,6 +28,13 @@ http:
       - type: status
         status:
           - 200
+      # A raw substring match for "d-link" also matches unrelated tokens such
+      # as "cd-link-block". Keep the brand token bounded before evaluating
+      # the model/login variants below.
+      - type: regex
+        part: body
+        regex:
+          - '(?i)(?:^|[^a-z0-9])d-link(?:[^a-z0-9]|$)'
       - type: dsl
         dsl:
           - 'contains(tolower(body), "d-link") && contains(tolower(body), "login") && (contains(tolower(body), "dir-") || contains(tolower(body), "dsl-") || contains(tolower(body), "dap-"))'

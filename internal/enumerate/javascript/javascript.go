@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -485,10 +486,12 @@ func (c *collector) analyze(config enumerate.EnumerateJavascriptConfig) analysis
 			Endpoints: detailsOf(dedupeEndpoints(served[base])),
 			Secrets:   dedupeSecrets(bucket.secrets),
 		}
-		if len(bucket.local) > 0 || len(bucket.remote) > 0 {
+		local := signalArtifacts(bucket.local)
+		remote := signalArtifacts(bucket.remote)
+		if len(local) > 0 || len(remote) > 0 {
 			application.Bundles = &enumerate.JavascriptBundleDetails{
-				Local:  signalArtifacts(bucket.local),
-				Remote: signalArtifacts(bucket.remote),
+				Local:  local,
+				Remote: remote,
 			}
 		}
 		applications = append(applications, application)
@@ -501,7 +504,7 @@ func (c *collector) analyze(config enumerate.EnumerateJavascriptConfig) analysis
 func signalArtifacts(artifacts []*artifact) []*enumerate.JavascriptArtifact {
 	out := make([]*enumerate.JavascriptArtifact, 0, len(artifacts))
 	for _, artifact := range artifacts {
-		if artifact == nil {
+		if artifact == nil || !hasFileEnding(artifact.url) {
 			continue
 		}
 		out = append(out, &enumerate.JavascriptArtifact{
@@ -511,6 +514,61 @@ func signalArtifacts(artifacts []*artifact) []*enumerate.JavascriptArtifact {
 		})
 	}
 	return out
+}
+
+// Bundle URLs without a file-shaped path are still analyzed, but cannot be reported as files.
+func hasFileEnding(raw string) bool {
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed.Hostname() == "" {
+		return false
+	}
+	if port := parsed.Port(); port != "" {
+		value, err := strconv.Atoi(port)
+		if err != nil || value < 0 || value > 65535 {
+			return false
+		}
+	}
+	// Python's urlparse leaves percent escapes in the path and separates parameters from
+	// the final segment. Use the same path representation as ParsedUrl.has_file_ending.
+	escapedPath := parsed.EscapedPath()
+	if escapedPath == "" {
+		return false
+	}
+	name := escapedPath[strings.LastIndexByte(escapedPath, '/')+1:]
+	if index := strings.IndexByte(name, ';'); index >= 0 {
+		name = name[:index]
+	}
+	if name == "" || name == "." || name == ".." {
+		return false
+	}
+	period := strings.LastIndexByte(name, '.')
+	if period >= 0 {
+		suffix := name[period+1:]
+		if strings.EqualFold(suffix, "html") || strings.EqualFold(suffix, "htm") || strings.EqualFold(suffix, "xhtml") {
+			return false
+		}
+	}
+	if strings.HasPrefix(name, ".") {
+		return len(name) > 1
+	}
+	if period < 0 {
+		return false
+	}
+	suffix := name[period+1:]
+	if len(suffix) == 0 || len(suffix) > 32 {
+		return false
+	}
+	hasLetter := false
+	for _, char := range suffix {
+		switch {
+		case char >= 'a' && char <= 'z', char >= 'A' && char <= 'Z':
+			hasLetter = true
+		case char >= '0' && char <= '9':
+		default:
+			return false
+		}
+	}
+	return hasLetter
 }
 
 // inScope reports a URL served by a target's host or a subdomain of it.

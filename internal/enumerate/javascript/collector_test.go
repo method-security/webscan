@@ -264,6 +264,80 @@ func TestAnalyzeProjectsBundleProvenanceFromCollectorState(t *testing.T) {
 	}
 }
 
+func TestAnalyzeExtensionlessScriptWithoutReportingAWebFile(t *testing.T) {
+	c := testCollector(0)
+	owner := []string{"https://app.example.com"}
+	c.analyzed("https://cdn.vendor.net/scripts/loader?version=1", enumerate.JavascriptArtifactKindEntry,
+		`fetch("/api/orders")`, owner)
+
+	result := c.analyze(enumerate.EnumerateJavascriptConfig{})
+	if len(result.applications) != 1 {
+		t.Fatalf("expected one application, got %d", len(result.applications))
+	}
+	application := result.applications[0]
+	if application.Bundles != nil {
+		t.Fatalf("extensionless script must not be reported as a file, got %+v", application.Bundles)
+	}
+	if len(application.Endpoints) != 1 || application.Endpoints[0].Path != "/api/orders" {
+		t.Fatalf("expected to retain endpoints analyzed from the script, got %+v", application.Endpoints)
+	}
+}
+
+func TestSignalArtifactsRequireFileEnding(t *testing.T) {
+	artifacts := []*artifact{
+		{url: "https://cdn.example.com/main.js?cache=1"},
+		{url: "https://cdn.example.com/main.js.map"},
+		{url: "https://cdn.example.com/scripts/loader"},
+		{url: "https://cdn.example.com/main.js/"},
+		{url: "https://cdn.example.com/index.html"},
+		{url: "https://cdn.example.com/.htaccess"},
+	}
+	got := signalArtifacts(artifacts)
+	if len(got) != 3 {
+		t.Fatalf("expected three file-shaped artifacts, got %+v", got)
+	}
+	for _, expected := range []string{
+		"https://cdn.example.com/main.js?cache=1",
+		"https://cdn.example.com/main.js.map",
+		"https://cdn.example.com/.htaccess",
+	} {
+		found := false
+		for _, artifact := range got {
+			found = found || artifact.Url == expected
+		}
+		if !found {
+			t.Fatalf("expected %s in %+v", expected, got)
+		}
+	}
+}
+
+func TestHasFileEndingMatchesOntologyDefinition(t *testing.T) {
+	tests := []struct {
+		url  string
+		want bool
+	}{
+		{"https://example.com/main.js?x=1", true},
+		{"https://example.com/main.js;v=1", true},
+		{"https://example.com/.htaccess", true},
+		{"https://example.com/main.js/", false},
+		{"https://example.com/loader", false},
+		{"https://example.com/.html", false},
+		{"https://example.com/main%2Ejs", false},
+		{"https://example.com/loader;v.js", false},
+		{"https://example.com/file.123", false},
+		{"https://example.com/file.js_more", false},
+		{"/relative.js", false},
+		{"https://example.com:99999/main.js", false},
+	}
+	for _, test := range tests {
+		t.Run(test.url, func(t *testing.T) {
+			if got := hasFileEnding(test.url); got != test.want {
+				t.Fatalf("hasFileEnding(%q) = %t, want %t", test.url, got, test.want)
+			}
+		})
+	}
+}
+
 // A bundle a CDN serves to two applications belongs to both, rather than to whichever reached it first.
 func TestAnalyzeReportsASharedBundleUnderEveryApplication(t *testing.T) {
 	c := testCollector(0)

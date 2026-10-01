@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"net/url"
-	"path"
 	"runtime"
 	"sort"
 	"strings"
@@ -519,25 +518,37 @@ func signalArtifacts(artifacts []*artifact) []*enumerate.JavascriptArtifact {
 // Bundle URLs without a file-shaped path are still analyzed, but cannot be reported as files.
 func hasFileEnding(raw string) bool {
 	parsed, err := url.Parse(raw)
-	if err != nil {
+	if err != nil || parsed.Hostname() == "" {
 		return false
 	}
-	if strings.HasSuffix(parsed.Path, "/") {
+	// Python's urlparse leaves percent escapes in the path and separates parameters from
+	// the final segment. Use the same path representation as ParsedUrl.has_file_ending.
+	escapedPath := parsed.EscapedPath()
+	if escapedPath == "" {
 		return false
 	}
-	name := path.Base(parsed.Path)
-	if name == "." || name == ".." || name == "/" {
+	name := escapedPath[strings.LastIndexByte(escapedPath, '/')+1:]
+	if index := strings.IndexByte(name, ';'); index >= 0 {
+		name = name[:index]
+	}
+	if name == "" || name == "." || name == ".." {
 		return false
+	}
+	period := strings.LastIndexByte(name, '.')
+	if period >= 0 {
+		suffix := name[period+1:]
+		if strings.EqualFold(suffix, "html") || strings.EqualFold(suffix, "htm") || strings.EqualFold(suffix, "xhtml") {
+			return false
+		}
 	}
 	if strings.HasPrefix(name, ".") {
 		return len(name) > 1
 	}
-	period := strings.LastIndexByte(name, '.')
 	if period < 0 {
 		return false
 	}
 	suffix := name[period+1:]
-	if len(suffix) == 0 || len(suffix) > 32 || strings.EqualFold(suffix, "html") || strings.EqualFold(suffix, "htm") || strings.EqualFold(suffix, "xhtml") {
+	if len(suffix) == 0 || len(suffix) > 32 {
 		return false
 	}
 	hasLetter := false

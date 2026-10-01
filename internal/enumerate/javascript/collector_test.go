@@ -311,6 +311,32 @@ func TestSignalArtifactsRequireFileEnding(t *testing.T) {
 	}
 }
 
+func TestHasFileEndingMatchesOntologyDefinition(t *testing.T) {
+	tests := []struct {
+		url  string
+		want bool
+	}{
+		{"https://example.com/main.js?x=1", true},
+		{"https://example.com/main.js;v=1", true},
+		{"https://example.com/.htaccess", true},
+		{"https://example.com/main.js/", false},
+		{"https://example.com/loader", false},
+		{"https://example.com/.html", false},
+		{"https://example.com/main%2Ejs", false},
+		{"https://example.com/loader;v.js", false},
+		{"https://example.com/file.123", false},
+		{"https://example.com/file.js_more", false},
+		{"/relative.js", false},
+	}
+	for _, test := range tests {
+		t.Run(test.url, func(t *testing.T) {
+			if got := hasFileEnding(test.url); got != test.want {
+				t.Fatalf("hasFileEnding(%q) = %t, want %t", test.url, got, test.want)
+			}
+		})
+	}
+}
+
 // A bundle a CDN serves to two applications belongs to both, rather than to whichever reached it first.
 func TestAnalyzeReportsASharedBundleUnderEveryApplication(t *testing.T) {
 	c := testCollector(0)

@@ -2264,6 +2264,8 @@ github.com/syndtr/goleveldb/leveldb/opt
 github.com/syndtr/goleveldb/leveldb/storage
 github.com/syndtr/goleveldb/leveldb/table
 github.com/syndtr/goleveldb/leveldb/util
+# github.com/test-go/testify v1.1.4
+## explicit
 # github.com/tidwall/btree v1.8.1
 ## explicit; go 1.20
 github.com/tidwall/btree
@@ -2305,6 +2307,14 @@ github.com/tmthrgd/go-hex
 ## explicit
 github.com/trivago/tgo/tcontainer
 github.com/trivago/tgo/treflect
+# github.com/trustelem/zxcvbn v1.0.1
+## explicit
+github.com/trustelem/zxcvbn/adjacency
+github.com/trustelem/zxcvbn/frequency
+github.com/trustelem/zxcvbn/internal/mathutils
+github.com/trustelem/zxcvbn/match
+github.com/trustelem/zxcvbn/matching
+github.com/trustelem/zxcvbn/scoring
 # github.com/twitchyliquid64/golang-asm v0.15.1
 ## explicit; go 1.13
 github.com/twitchyliquid64/golang-asm/asm/arch

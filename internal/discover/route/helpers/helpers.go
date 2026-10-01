@@ -4,6 +4,7 @@ import (
 	// Standard
 	"encoding/json"
 	"fmt"
+	"math"
 	"net"
 	"net/url"
 	"regexp"
@@ -16,6 +17,10 @@ import (
 	// Utils
 	utils "github.com/Method-Security/webscan/utils"
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
+
+	// External
+	stats "github.com/montanaflynn/stats"
+	"github.com/trustelem/zxcvbn/matching"
 )
 
 type providerRouteNoiseSignature struct {
@@ -23,6 +28,21 @@ type providerRouteNoiseSignature struct {
 	pathMatcher       func(string) bool
 	method            common.HttpMethod
 	requiredBodyParam string
+}
+
+const (
+	minRouteDictionaryWordLength                 = 3
+	minHighEntropyPathSegmentLength              = 10
+	minHighEntropyPathSegmentEntropy             = 3.0
+	minHighEntropyRouteFamilySize                = 2
+	minHighEntropyRouteFamilyNormalizedEntropy   = 0.90
+	alphaNumericPathSegmentLowercaseAlphabetSize = 26
+	alphaNumericPathSegmentUppercaseAlphabetSize = 26
+	alphaNumericPathSegmentNumericAlphabetSize   = 10
+)
+
+type highEntropyRouteFamily struct {
+	variableSegmentsByPath map[string]string
 }
 
 // knownProviderRouteNoiseSignatures centralizes provider-generated paths that
@@ -76,16 +96,11 @@ func MergeStaticAssets(staticAssets []string) []string {
 // MergeWebRoutes merges WebRoutes, retaining only unique routes (by method and URL).
 func MergeWebRoutes(routes []*discover.RouteDetails) []*discover.RouteDetails {
 	routeMap := make(map[string]*discover.RouteDetails)
+	highEntropyRouteFamilies := collectHighEntropyRouteFamilies(routes)
 
 	for _, route := range routes {
-		if route == nil || IsKnownProviderRouteNoise(route) {
+		if route == nil || IsKnownProviderRouteNoise(route) || isHighEntropyRouteFamilyNoise(route, highEntropyRouteFamilies) {
 			continue
-		}
-
-		// Create a unique key based on method and URL
-		method := route.Method
-		if method == "" {
-			method = common.HttpMethodGet
 		}
 
 		// Normalize path: treat empty path "" and root path "/" as equivalent
@@ -95,7 +110,7 @@ func MergeWebRoutes(routes []*discover.RouteDetails) []*discover.RouteDetails {
 			normalizedPath = ""
 		}
 
-		key := fmt.Sprintf("%s:%s%s", method, NormalizeBaseURLForIdentity(route.BaseUrl), normalizedPath)
+		key := routeIdentityKey(route, normalizedPath)
 
 		if existingRoute, exists := routeMap[key]; exists {
 			// Merge QueryParams
@@ -527,6 +542,201 @@ func isOpaquePathSegment(segment string) bool {
 		}
 	}
 	return true
+}
+
+// A single opaque-looking segment can still be a legitimate resource ID. Only
+// suppress a route family when multiple sibling paths vary at the same fixed-
+// width high-entropy position and the changing values remain high-entropy as
+// a group.
+func collectHighEntropyRouteFamilies(routes []*discover.RouteDetails) map[string]*highEntropyRouteFamily {
+	families := make(map[string]*highEntropyRouteFamily)
+	for _, route := range routes {
+		familyKey, variableSegments, ok := highEntropyRouteFamilyKey(route)
+		if !ok {
+			continue
+		}
+		if _, exists := families[familyKey]; !exists {
+			families[familyKey] = &highEntropyRouteFamily{
+				variableSegmentsByPath: make(map[string]string),
+			}
+		}
+		families[familyKey].variableSegmentsByPath[route.Path] = variableSegments
+	}
+	return families
+}
+
+func isHighEntropyRouteFamilyNoise(route *discover.RouteDetails, families map[string]*highEntropyRouteFamily) bool {
+	familyKey, _, ok := highEntropyRouteFamilyKey(route)
+	if !ok {
+		return false
+	}
+	family, exists := families[familyKey]
+	if !exists || len(family.variableSegmentsByPath) < minHighEntropyRouteFamilySize {
+		return false
+	}
+
+	var variableSegments strings.Builder
+	for _, segment := range family.variableSegmentsByPath {
+		variableSegments.WriteString(segment)
+	}
+	return normalizedShannonEntropy(variableSegments.String()) >= minHighEntropyRouteFamilyNormalizedEntropy
+}
+
+func highEntropyRouteFamilyKey(route *discover.RouteDetails) (string, string, bool) {
+	if route == nil {
+		return "", "", false
+	}
+
+	segments := strings.Split(strings.Trim(route.Path, "/"), "/")
+	if len(segments) == 0 {
+		return "", "", false
+	}
+
+	hasHighEntropySegment := false
+	var variableSegments strings.Builder
+	for i, segment := range segments {
+		if entropySegmentKey, decodedSegment, ok := highEntropyPathSegmentKey(segment); ok {
+			segments[i] = entropySegmentKey
+			variableSegments.WriteString(decodedSegment)
+			hasHighEntropySegment = true
+		}
+	}
+	if !hasHighEntropySegment {
+		return "", "", false
+	}
+
+	return routeURLIdentityKey(route, "/"+strings.Join(segments, "/")), variableSegments.String(), true
+}
+
+func routeIdentityKey(route *discover.RouteDetails, routePath string) string {
+	return fmt.Sprintf("%s:%s%s", normalizeRouteMethod(route.Method), NormalizeBaseURLForIdentity(route.BaseUrl), routePath)
+}
+
+func routeURLIdentityKey(route *discover.RouteDetails, routePath string) string {
+	return fmt.Sprintf("%s%s", NormalizeBaseURLForIdentity(route.BaseUrl), routePath)
+}
+
+func normalizeRouteMethod(method common.HttpMethod) common.HttpMethod {
+	if method == "" {
+		return common.HttpMethodGet
+	}
+	return method
+}
+
+func highEntropyPathSegmentKey(segment string) (string, string, bool) {
+	decodedSegment, err := url.PathUnescape(segment)
+	if err == nil {
+		segment = decodedSegment
+	}
+	if len(segment) < minHighEntropyPathSegmentLength || !isAlphaNumericPathSegment(segment) {
+		return "", "", false
+	}
+	if hasKnownRouteWord(segment) {
+		return "", "", false
+	}
+	if shannonEntropyBits(segment) < minHighEntropyPathSegmentEntropy {
+		return "", "", false
+	}
+
+	// Rotating transport tokens are typically fixed-width. Preserve width in
+	// the family key so unrelated long named routes do not collapse into one
+	// generic entropy bucket solely because their character distributions vary.
+	return fmt.Sprintf("{entropy:%d}", len(segment)), segment, true
+}
+
+func hasKnownRouteWord(segment string) bool {
+	// Only literal English words protect routes; password, name, reversed, and
+	// leetspeak matches are not evidence of a named application route.
+	for _, match := range matching.Omnimatch(segment, nil) {
+		if match.Pattern != "dictionary" || match.Reversed || match.L33t || len(match.MatchedWord) < minRouteDictionaryWordLength {
+			continue
+		}
+		switch match.DictionaryName {
+		case "english_wikipedia", "us_tv_and_film":
+			return true
+		}
+	}
+	return false
+}
+
+func isAlphaNumericPathSegment(segment string) bool {
+	hasLetter := false
+	for _, r := range segment {
+		switch {
+		case r >= 'a' && r <= 'z':
+			hasLetter = true
+		case r >= 'A' && r <= 'Z':
+			hasLetter = true
+		case r >= '0' && r <= '9':
+		default:
+			return false
+		}
+	}
+	return hasLetter
+}
+
+func shannonEntropyBits(value string) float64 {
+	if value == "" {
+		return 0
+	}
+
+	counts := make(map[rune]int)
+	for _, r := range value {
+		counts[r]++
+	}
+
+	frequencies := make(stats.Float64Data, 0, len(counts))
+	for _, count := range counts {
+		frequencies = append(frequencies, float64(count))
+	}
+
+	// stats.Entropy returns Shannon entropy in nats; convert to bits so the
+	// threshold remains expressed as bits per character.
+	entropyNats, err := stats.Entropy(frequencies)
+	if err != nil {
+		return 0
+	}
+	return entropyNats / math.Ln2
+}
+
+func normalizedShannonEntropy(value string) float64 {
+	if value == "" {
+		return 0
+	}
+
+	alphabetSize := alphaNumericAlphabetSize(value)
+	if alphabetSize <= 1 {
+		return 0
+	}
+	return shannonEntropyBits(value) / math.Log2(float64(alphabetSize))
+}
+
+func alphaNumericAlphabetSize(value string) int {
+	hasLowercase := false
+	hasUppercase := false
+	hasNumeric := false
+	for _, r := range value {
+		switch {
+		case r >= 'a' && r <= 'z':
+			hasLowercase = true
+		case r >= 'A' && r <= 'Z':
+			hasUppercase = true
+		case r >= '0' && r <= '9':
+			hasNumeric = true
+		}
+	}
+
+	alphabetSize := 0
+	if hasLowercase {
+		alphabetSize += alphaNumericPathSegmentLowercaseAlphabetSize
+	}
+	if hasUppercase {
+		alphabetSize += alphaNumericPathSegmentUppercaseAlphabetSize
+	}
+	if hasNumeric {
+		alphabetSize += alphaNumericPathSegmentNumericAlphabetSize
+	}
+	return alphabetSize
 }
 
 // CaptureStaticAssetReference centralizes the static-asset-vs-route decision so

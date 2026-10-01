@@ -10,6 +10,7 @@ require (
 	github.com/go-rod/rod v0.116.2
 	github.com/gobwas/ws v1.4.0
 	github.com/google/uuid v1.6.0
+	github.com/montanaflynn/stats v0.12.2
 	github.com/palantir/pkg/datetime v1.4.0
 	github.com/palantir/pkg/safejson v1.3.0
 	github.com/palantir/witchcraft-go-logging v1.73.0
@@ -252,7 +253,6 @@ require (
 	github.com/moby/moby/client v0.5.1 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
-	github.com/montanaflynn/stats v0.12.2 // indirect
 	github.com/muesli/reflow v0.3.0 // indirect
 	github.com/muesli/termenv v0.16.0 // indirect
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646 // indirect
@@ -349,6 +349,7 @@ require (
 	github.com/spiffe/go-spiffe/v2 v2.8.1 // indirect
 	github.com/stangelandcl/ppmd v0.1.1 // indirect
 	github.com/syndtr/goleveldb v1.0.0 // indirect
+	github.com/test-go/testify v1.1.4 // indirect
 	github.com/tidwall/btree v1.8.1 // indirect
 	github.com/tidwall/buntdb v1.3.2 // indirect
 	github.com/tidwall/gjson v1.19.0 // indirect
@@ -362,6 +363,7 @@ require (
 	github.com/tklauser/numcpus v0.12.0 // indirect
 	github.com/tmthrgd/go-hex v0.0.0-20190904060850-447a3041c3bc // indirect
 	github.com/trivago/tgo v1.0.7 // indirect
+	github.com/trustelem/zxcvbn v1.0.1
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.3.2 // indirect
 	github.com/ulikunitz/xz v0.5.16 // indirect

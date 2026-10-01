@@ -3,7 +3,10 @@ info:
   name: ZTE GPON ONT Status Info Detection
   author: method-security
   severity: info
-  description: Detects ZTE F-series GPON ONT model and firmware information from a pre-auth device config endpoint.
+  description: |
+    Detects ZTE F-series GPON ONT model and firmware information from a pre-auth device config endpoint.
+    Requires the config-field structure returned by the endpoint, rather than the path alone, so SPA catch-all
+    responses and generic HTML pages do not get misidentified as ZTE firmware.
   metadata:
     method-application-type: ROUTER
     method-module-name: ZTE_GPON_ONT
@@ -24,20 +27,25 @@ http:
         words:
           - "ModelName"
           - "VersionInfo"
-          - "F660"
-          - "F670"
-          - "F668"
+        condition: and
         case-insensitive: true
+      # Keep the model tied to the ModelName field. A loose match on a short
+      # model token such as F660 can collide with unrelated asset hashes or
+      # app-shell content returned for arbitrary paths.
+      - type: regex
+        part: body
+        regex:
+          - '(?i)ModelName[^<>=:]{0,10}(?:=|:|>)\s*["'']?\s*F[0-9]{3,4}[A-Z]?'
     extractors:
       - type: regex
         name: model
         part: body
         group: 1
         regex:
-          - '(?i)ModelName[^<>=]{0,10}["=>]\s*([A-Z0-9-]+)'
+          - '(?i)ModelName[^<>=:]{0,10}(?:=|:|>)\s*["'']?\s*([A-Z0-9-]+)'
       - type: regex
         name: firmware_version
         part: body
         group: 1
         regex:
-          - '(?i)VersionInfo[^<>=]{0,10}["=>]\s*([A-Z0-9.\-_]+)'
+          - '(?i)VersionInfo[^<>=:]{0,10}(?:=|:|>)\s*["'']?\s*([A-Z0-9.\-_]+)'

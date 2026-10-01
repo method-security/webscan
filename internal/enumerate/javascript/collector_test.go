@@ -327,6 +327,7 @@ func TestHasFileEndingMatchesOntologyDefinition(t *testing.T) {
 		{"https://example.com/file.123", false},
 		{"https://example.com/file.js_more", false},
 		{"/relative.js", false},
+		{"https://example.com:99999/main.js", false},
 	}
 	for _, test := range tests {
 		t.Run(test.url, func(t *testing.T) {

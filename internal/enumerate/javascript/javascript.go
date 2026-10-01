@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -520,6 +521,12 @@ func hasFileEnding(raw string) bool {
 	parsed, err := url.Parse(raw)
 	if err != nil || parsed.Hostname() == "" {
 		return false
+	}
+	if port := parsed.Port(); port != "" {
+		value, err := strconv.Atoi(port)
+		if err != nil || value < 0 || value > 65535 {
+			return false
+		}
 	}
 	// Python's urlparse leaves percent escapes in the path and separates parameters from
 	// the final segment. Use the same path representation as ParsedUrl.has_file_ending.

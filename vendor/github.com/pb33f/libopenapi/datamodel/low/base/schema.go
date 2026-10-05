@@ -2,13 +2,12 @@ package base
 
 import (
 	"context"
-	"sync"
 
+	"github.com/pb33f/go-yaml"
 	"github.com/pb33f/libopenapi/datamodel/low"
 	"github.com/pb33f/libopenapi/index"
 	"github.com/pb33f/libopenapi/orderedmap"
 	"github.com/pb33f/libopenapi/utils"
-	"go.yaml.in/yaml/v4"
 )
 
 // SchemaDynamicValue is used to hold multiple possible types for a schema property. There are two values, a left
@@ -161,7 +160,7 @@ type Schema struct {
 	refIndex *index.SpecIndex
 
 	context   context.Context
-	nodeStore sync.Map
+	nodeStore low.NodeLines
 	reference low.Reference
 	*low.Reference
 	low.NodeMap

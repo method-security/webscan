@@ -13,11 +13,12 @@ require (
 	github.com/palantir/pkg/datetime v1.4.0
 	github.com/palantir/pkg/safejson v1.3.0
 	github.com/palantir/witchcraft-go-logging v1.73.0
-	github.com/pb33f/libopenapi v0.40.0
+	github.com/pb33f/go-yaml v0.1.1
+	github.com/pb33f/libopenapi v0.41.2
 	github.com/projectdiscovery/gologger v1.1.73
 	github.com/projectdiscovery/nuclei/v3 v3.11.1
 	github.com/projectdiscovery/useragent v0.0.109
-	github.com/projectdiscovery/wappalyzergo v0.3.2
+	github.com/projectdiscovery/wappalyzergo v0.3.4
 	github.com/spaolacci/murmur3 v1.1.0
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.12.1
@@ -277,8 +278,8 @@ require (
 	github.com/palantir/witchcraft-go-error v1.48.0 // indirect
 	github.com/palantir/witchcraft-go-params v1.46.0 // indirect
 	github.com/palantir/witchcraft-go-tracing v1.47.0 // indirect
-	github.com/pb33f/jsonpath v0.8.3 // indirect
-	github.com/pb33f/ordered-map/v2 v2.3.1 // indirect
+	github.com/pb33f/jsonpath v0.8.4 // indirect
+	github.com/pb33f/ordered-map/v2 v2.3.2 // indirect
 	github.com/pelletier/go-toml/v2 v2.4.3 // indirect
 	github.com/petermattis/goid v0.0.0-20260725062400-500c67a39b75 // indirect
 	github.com/pierrec/lz4/v4 v4.1.28 // indirect

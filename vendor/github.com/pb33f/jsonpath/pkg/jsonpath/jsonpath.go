@@ -2,9 +2,9 @@ package jsonpath
 
 import (
 	"fmt"
+	"github.com/pb33f/go-yaml"
 	"github.com/pb33f/jsonpath/pkg/jsonpath/config"
 	"github.com/pb33f/jsonpath/pkg/jsonpath/token"
-	"go.yaml.in/yaml/v4"
 )
 
 // NewPath compiles input into a reusable JSONPath using the supplied options.

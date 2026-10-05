@@ -23,6 +23,7 @@ import (
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
 
 	// External
+	schemayaml "github.com/pb33f/go-yaml"
 	libopenapi "github.com/pb33f/libopenapi"
 	base "github.com/pb33f/libopenapi/datamodel/high/base"
 	v2 "github.com/pb33f/libopenapi/datamodel/high/v2"
@@ -1297,9 +1298,9 @@ func convertEnumValues(s *base.Schema, rs *enumerateapiapplicationfern.RequestSc
 	}
 }
 
-func convertEnumValue(v *yaml.Node, report *enumerateapiapplicationfern.EnumerateSwaggerReport) interface{} {
+func convertEnumValue(v *schemayaml.Node, report *enumerateapiapplicationfern.EnumerateSwaggerReport) interface{} {
 	switch v.Kind {
-	case yaml.ScalarNode:
+	case schemayaml.ScalarNode:
 		switch v.Tag {
 		case "!!str":
 			return v.Value
@@ -1322,7 +1323,7 @@ func convertEnumValue(v *yaml.Node, report *enumerateapiapplicationfern.Enumerat
 			}
 			report.Errors = append(report.Errors, fmt.Sprintf("Failed to parse bool enum value: %s", err))
 		}
-	case yaml.SequenceNode, yaml.MappingNode:
+	case schemayaml.SequenceNode, schemayaml.MappingNode:
 		// For complex types, we return them as is
 		return v
 	}

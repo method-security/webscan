@@ -1563,12 +1563,18 @@ github.com/palantir/witchcraft-go-params
 # github.com/palantir/witchcraft-go-tracing v1.47.0
 ## explicit; go 1.26.0
 github.com/palantir/witchcraft-go-tracing/wtracing
-# github.com/pb33f/jsonpath v0.8.3
+# github.com/pb33f/go-yaml v0.1.1
+## explicit; go 1.18
+github.com/pb33f/go-yaml
+github.com/pb33f/go-yaml/internal/libyaml
+github.com/pb33f/go-yaml/internal/plugin
+github.com/pb33f/go-yaml/plugin/limit
+# github.com/pb33f/jsonpath v0.8.4
 ## explicit; go 1.24
 github.com/pb33f/jsonpath/pkg/jsonpath
 github.com/pb33f/jsonpath/pkg/jsonpath/config
 github.com/pb33f/jsonpath/pkg/jsonpath/token
-# github.com/pb33f/libopenapi v0.40.0
+# github.com/pb33f/libopenapi v0.41.2
 ## explicit; go 1.26.0
 github.com/pb33f/libopenapi
 github.com/pb33f/libopenapi/datamodel
@@ -1586,13 +1592,15 @@ github.com/pb33f/libopenapi/datamodel/low/overlay
 github.com/pb33f/libopenapi/datamodel/low/v2
 github.com/pb33f/libopenapi/datamodel/low/v3
 github.com/pb33f/libopenapi/index
+github.com/pb33f/libopenapi/internal/jsonnode
+github.com/pb33f/libopenapi/internal/weakcache
 github.com/pb33f/libopenapi/json
 github.com/pb33f/libopenapi/orderedmap
 github.com/pb33f/libopenapi/overlay
 github.com/pb33f/libopenapi/utils
 github.com/pb33f/libopenapi/what-changed
 github.com/pb33f/libopenapi/what-changed/model
-# github.com/pb33f/ordered-map/v2 v2.3.1
+# github.com/pb33f/ordered-map/v2 v2.3.2
 ## explicit; go 1.24
 github.com/pb33f/ordered-map/v2
 # github.com/pelletier/go-toml/v2 v2.4.3
@@ -2073,7 +2081,7 @@ github.com/projectdiscovery/utils/time
 github.com/projectdiscovery/utils/unit
 github.com/projectdiscovery/utils/update
 github.com/projectdiscovery/utils/url
-# github.com/projectdiscovery/wappalyzergo v0.3.2
+# github.com/projectdiscovery/wappalyzergo v0.3.4
 ## explicit; go 1.25.0
 github.com/projectdiscovery/wappalyzergo
 # github.com/projectdiscovery/yamldoc-go v1.0.6

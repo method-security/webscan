@@ -7,13 +7,12 @@ import (
 	"context"
 	"fmt"
 	"strconv"
-	"sync"
 
+	"github.com/pb33f/go-yaml"
 	"github.com/pb33f/libopenapi/datamodel/low"
 	"github.com/pb33f/libopenapi/index"
 	"github.com/pb33f/libopenapi/orderedmap"
 	"github.com/pb33f/libopenapi/utils"
-	"go.yaml.in/yaml/v4"
 )
 
 // Build will perform a number of operations.
@@ -49,7 +48,7 @@ func (s *Schema) Build(ctx context.Context, root *yaml.Node, idx *index.SpecInde
 
 	s.reference = low.Reference{}
 	s.Reference = &s.reference
-	s.nodeStore = sync.Map{}
+	s.nodeStore = low.NodeLines{}
 	s.Nodes = &s.nodeStore
 	if root != nil && len(root.Content) > 0 {
 		s.NodeMap.ExtractNodes(root, false)

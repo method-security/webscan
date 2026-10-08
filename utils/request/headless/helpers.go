@@ -873,6 +873,25 @@ func isCrossDomainRedirect(originalURL, redirectURL string) bool {
 	return !utils.IsHostInScope(originalURL, resolved.String())
 }
 
+// firstCrossDomainRedirect returns the first out-of-scope redirect hop in the
+// observed chain. A chain can legitimately bounce back to the original host
+// after leaving it; for ignoreCrossDomainRedirects we still need to fail closed
+// on that intermediate hop instead of only looking at the terminal URL.
+func firstCrossDomainRedirect(redirectChain []string) (string, bool) {
+	if len(redirectChain) < 2 {
+		return "", false
+	}
+
+	originalURL := redirectChain[0]
+	for _, redirectURL := range redirectChain[1:] {
+		if isCrossDomainRedirect(originalURL, redirectURL) {
+			return redirectURL, true
+		}
+	}
+
+	return "", false
+}
+
 // cleanErrMsg extracts meaningful error message from navigation errors
 func cleanErrMsg(err error) string {
 	if err == nil {

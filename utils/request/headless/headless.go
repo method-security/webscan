@@ -574,16 +574,27 @@ func (b *Requester) sendRequestWithArtifactsOnce(ctx context.Context, config com
 		finalErr = fmt.Errorf("headless capture failed: %s", cleanErrMsg(browserErr))
 	}
 
-	// Check for cross-domain redirect after navigation completes
+	// Re-snapshot the redirect chain after all artifact collection is complete.
+	// The page can continue navigating while we read HTML, cookies, or screenshots,
+	// so the earlier response snapshot may no longer reflect the terminal browser
+	// location. Keep the serialized response and the cross-domain policy check in
+	// lockstep by using this final chain for both.
 	redirectChainMu.Lock()
-	finalRedirectChain := append([]string(nil), redirectChain...)
+	finalRedirectChain := append([]string(nil), filterRedirectChain(redirectChain)...)
 	redirectChainMu.Unlock()
-	if config.IgnoreCrossDomainRedirects && len(finalRedirectChain) > 1 {
-		originalURL := finalRedirectChain[0]
-		finalURL := finalRedirectChain[len(finalRedirectChain)-1]
-		if isCrossDomainRedirect(originalURL, finalURL) {
-			log.Info("Cross-domain redirect detected in redirect chain", svc1log.SafeParam("from", originalURL), svc1log.SafeParam("to", finalURL))
-			return common.HttpRequestResponse{Request: config.Request}, screenshot, metadata, fmt.Errorf("cross-domain redirect blocked: %s -> %s", originalURL, finalURL)
+	if report.Response != nil {
+		report.Response.RedirectChain = append([]string(nil), finalRedirectChain...)
+	}
+
+	// Check for cross-domain redirects after navigation completes. Fail closed on
+	// any out-of-scope top-level hop, even if a later navigation returns to the
+	// original host. That keeps ignoreCrossDomainRedirects defensive against
+	// auth flows that briefly bounce through an external application host.
+	if config.IgnoreCrossDomainRedirects {
+		if crossDomainURL, ok := firstCrossDomainRedirect(finalRedirectChain); ok {
+			originalURL := finalRedirectChain[0]
+			log.Info("Cross-domain redirect detected in redirect chain", svc1log.SafeParam("from", originalURL), svc1log.SafeParam("to", crossDomainURL))
+			return common.HttpRequestResponse{Request: config.Request}, screenshot, metadata, fmt.Errorf("cross-domain redirect blocked: %s -> %s", originalURL, crossDomainURL)
 		}
 	}
 

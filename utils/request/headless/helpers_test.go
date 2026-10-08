@@ -5,6 +5,68 @@ import (
 	"testing"
 )
 
+func TestAppendRedirectURLLockedPreservesBounceFlows(t *testing.T) {
+	chain := []string{"https://auth.example.com/login"}
+
+	added, err := appendRedirectURLLocked(&chain, "https://app.example.net/", 10)
+	if err != nil {
+		t.Fatalf("append first redirect: %v", err)
+	}
+	if !added {
+		t.Fatal("expected cross-domain hop to be appended")
+	}
+
+	added, err = appendRedirectURLLocked(&chain, "https://auth.example.com/login", 10)
+	if err != nil {
+		t.Fatalf("append bounce redirect: %v", err)
+	}
+	if !added {
+		t.Fatal("expected bounce back to the original URL to be appended")
+	}
+
+	want := []string{
+		"https://auth.example.com/login",
+		"https://app.example.net/",
+		"https://auth.example.com/login",
+	}
+	if len(chain) != len(want) {
+		t.Fatalf("chain length = %d, want %d (%v)", len(chain), len(want), chain)
+	}
+	for i, got := range chain {
+		if got != want[i] {
+			t.Fatalf("chain[%d] = %q, want %q", i, got, want[i])
+		}
+	}
+}
+
+func TestFirstCrossDomainRedirectBlocksIntermediateBounceHop(t *testing.T) {
+	chain := []string{
+		"https://auth.example.com/login",
+		"https://app.example.net/callback",
+		"https://auth.example.com/login",
+	}
+
+	got, ok := firstCrossDomainRedirect(chain)
+	if !ok {
+		t.Fatal("expected intermediate cross-domain hop to be detected")
+	}
+	if got != "https://app.example.net/callback" {
+		t.Fatalf("cross-domain URL = %q, want %q", got, "https://app.example.net/callback")
+	}
+}
+
+func TestFirstCrossDomainRedirectAllowsScopedRedirects(t *testing.T) {
+	chain := []string{
+		"https://example.com/login",
+		"https://www.example.com/login",
+		"https://api.example.com/callback",
+	}
+
+	if got, ok := firstCrossDomainRedirect(chain); ok {
+		t.Fatalf("unexpected cross-domain URL %q for in-scope redirect chain", got)
+	}
+}
+
 func TestIsChromeTextDocumentViewerHTMLAllowsLargeJSONDocuments(t *testing.T) {
 	payload := `{"items":[` + strings.Repeat(`{"id":1},`, 40000) + `{"id":2}]}`
 	htmlContent := `<html><head><meta name="color-scheme" content="light dark"><meta charset="utf-8"></head><body><pre>` + payload + `</pre></body></html>`

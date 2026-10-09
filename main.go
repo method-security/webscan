@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"os"
 
 	"github.com/Method-Security/webscan/cmd"
@@ -10,8 +9,6 @@ import (
 var version = "none"
 
 func main() {
-	flag.Parse()
-
 	webscan := cmd.NewWebScan(version)
 	webscan.InitRootCommand()
 	webscan.InitDiscoverCommand()

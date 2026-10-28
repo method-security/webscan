@@ -301,10 +301,9 @@ github.com/alexsnet/go-vnc/rfbflags
 # github.com/alitto/pond v1.9.2
 ## explicit; go 1.18
 github.com/alitto/pond
-# github.com/andybalholm/brotli v1.2.2
+# github.com/andybalholm/brotli v1.2.7
 ## explicit; go 1.22
 github.com/andybalholm/brotli
-github.com/andybalholm/brotli/flate
 github.com/andybalholm/brotli/matchfinder
 # github.com/andybalholm/cascadia v1.3.4
 ## explicit; go 1.25.0

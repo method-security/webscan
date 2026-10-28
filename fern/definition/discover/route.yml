@@ -51,11 +51,17 @@ types:
     properties:
       local: optional<list<string>>
       remote: optional<list<string>>
+  WebFileDetails:
+    docs: Linked documents, archives, and data files, classified by URL extension.
+    properties:
+      local: optional<list<string>>
+      remote: optional<list<string>>
   WebApplicationDetails:
     properties:
       baseURL: string
       routes: optional<list<RouteDetails>>
       staticAssets: optional<StaticAssetDetails>
+      webFiles: optional<WebFileDetails>
   DiscoverRouteResult:
     properties:
       target: string

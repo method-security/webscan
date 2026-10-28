@@ -5,7 +5,9 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"path"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -308,6 +310,28 @@ func sortRoutes(routes []*discover.RouteDetails) {
 	})
 }
 
+// isWebFileURL separates documents/downloads from frontend assets without changing
+// the shared static-extension filter used by other commands and the crawler.
+func isWebFileURL(rawURL string) bool {
+	parsedURL, err := url.Parse(rawURL)
+	if err != nil {
+		return false
+	}
+	switch strings.ToLower(path.Ext(parsedURL.Path)) {
+	case ".7z", ".csv", ".doc", ".docx", ".gz", ".ini", ".json", ".markdown", ".md",
+		".pdf", ".ppt", ".pptx", ".rar", ".tar", ".toml", ".txt", ".xls", ".xlsx",
+		".xml", ".yaml", ".yml", ".zip":
+		return true
+	default:
+		return false
+	}
+}
+
+func uniqueSortedURLs(urls []string) []string {
+	slices.Sort(urls)
+	return slices.Compact(urls)
+}
+
 func buildWebApplications(routes []*discover.RouteDetails, staticAssetsByBaseURL map[string][]string) []*discover.WebApplicationDetails {
 	webApplicationsByBaseURL := make(map[string]*discover.WebApplicationDetails)
 	getWebApplication := func(baseURL string) *discover.WebApplicationDetails {
@@ -347,6 +371,17 @@ func buildWebApplications(routes []*discover.RouteDetails, staticAssetsByBaseURL
 			staticAssetDetails = &discover.StaticAssetDetails{}
 		}
 		for _, staticAsset := range discoverroutehelpers.MergeStaticAssets(staticAssets) {
+			if isWebFileURL(staticAsset) {
+				if webApplication.WebFiles == nil {
+					webApplication.WebFiles = &discover.WebFileDetails{}
+				}
+				if utils.IsHostInScope(webApplication.BaseUrl, staticAsset) {
+					webApplication.WebFiles.Local = append(webApplication.WebFiles.Local, staticAsset)
+				} else {
+					webApplication.WebFiles.Remote = append(webApplication.WebFiles.Remote, staticAsset)
+				}
+				continue
+			}
 			if utils.IsHostInScope(webApplication.BaseUrl, staticAsset) {
 				staticAssetDetails.Local = append(staticAssetDetails.Local, staticAsset)
 			} else {
@@ -361,10 +396,12 @@ func buildWebApplications(routes []*discover.RouteDetails, staticAssetsByBaseURL
 	webApplications := make([]*discover.WebApplicationDetails, 0, len(webApplicationsByBaseURL))
 	for _, webApplication := range webApplicationsByBaseURL {
 		if webApplication.StaticAssets != nil {
-			webApplication.StaticAssets.Local = discoverroutehelpers.MergeStaticAssets(webApplication.StaticAssets.Local)
-			webApplication.StaticAssets.Remote = discoverroutehelpers.MergeStaticAssets(webApplication.StaticAssets.Remote)
-			sort.Strings(webApplication.StaticAssets.Local)
-			sort.Strings(webApplication.StaticAssets.Remote)
+			webApplication.StaticAssets.Local = uniqueSortedURLs(webApplication.StaticAssets.Local)
+			webApplication.StaticAssets.Remote = uniqueSortedURLs(webApplication.StaticAssets.Remote)
+		}
+		if webApplication.WebFiles != nil {
+			webApplication.WebFiles.Local = uniqueSortedURLs(webApplication.WebFiles.Local)
+			webApplication.WebFiles.Remote = uniqueSortedURLs(webApplication.WebFiles.Remote)
 		}
 		webApplications = append(webApplications, webApplication)
 	}

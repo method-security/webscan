@@ -1072,7 +1072,7 @@ func (a *WebScan) InitDiscoverCommand() {
 	// Config Flags
 	discoverRouteCmd.Flags().Bool("ignore-cross-domain-routes", true, "Ignore discovered routes whose host is not the target host or a subdomain of it")
 	discoverRouteCmd.Flags().Bool("ignore-cross-domain-static-assets", true, "Ignore discovered static assets whose host is not the target host or a subdomain of it")
-	discoverRouteCmd.Flags().Bool("collect-static-assets", false, "Collect static assets from route discovery")
+	discoverRouteCmd.Flags().Bool("collect-static-assets", false, "Collect static assets and linked documents/downloads from route discovery")
 	discoverRouteCmd.Flags().Int("spider-depth", 1, "Maximum depth for route spidering")
 	discoverRouteCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
 	discoverRouteCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")

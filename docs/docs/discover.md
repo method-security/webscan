@@ -226,6 +226,18 @@ Flags:
 
 Discover and analyze application routes.
 
+With `--collect-static-assets`, each entry in `result.webApplications` separates
+frontend assets into `staticAssets` and linked documents/downloads into `webFiles`.
+Both fields contain `local` and `remote` URL lists. Local means the application's
+host or a child subdomain; remote URLs are collected only when
+`--ignore-cross-domain-static-assets=false`.
+
+`webFiles` includes PDFs, Office documents, archives, CSV, JSON, XML, Markdown,
+text, and configuration files. JavaScript, CSS, images, fonts, and media remain
+in `staticAssets`. Classification is based on the URL extension, not response
+content or how the application uses the file. These references are not crawled
+as routes, and neither collection is emitted when collection is disabled.
+
 #### Usage
 ```bash
 webscan discover route --target https://example.com
@@ -244,7 +256,7 @@ Flags:
       --browserbase-project string      Browserbase project ID
       --browserbase-proxy               Use Browserbase proxy for requests
       --browserbase-token string        Browserbase API token for cloud browser access
-      --collect-static-assets           Collect static assets from route discovery
+      --collect-static-assets           Collect static assets and linked documents/downloads from route discovery
       --headless-path string            Path to headless browser executable
   -h, --help                            help for route
       --ignore-cross-domain-routes             Ignore discovered routes whose host is not the target host or a subdomain of it (default true)

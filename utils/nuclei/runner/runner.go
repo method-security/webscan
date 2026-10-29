@@ -23,6 +23,7 @@ import (
 	"github.com/projectdiscovery/gologger"
 	nucleilib "github.com/projectdiscovery/nuclei/v3/lib"
 	"github.com/projectdiscovery/nuclei/v3/pkg/catalog/disk"
+	yaml "go.yaml.in/yaml/v4"
 )
 
 type Config struct {
@@ -124,6 +125,10 @@ func copyFilesToTmpDirs(cfg Config) (templateDir, workflowDir string, err error)
 			if strings.Contains(string(data), "workflows:") {
 				// This is a workflow file - put it in the root
 				dst = filepath.Join(workflowDir, filename)
+				data, err = makeWorkflowTemplatePathsAbsolute(data, workflowDir)
+				if err != nil {
+					return err
+				}
 			} else {
 				// This is a template file - put it in subtemplates/
 				dst = filepath.Join(subtemplatesDir, filename)
@@ -135,6 +140,49 @@ func copyFilesToTmpDirs(cfg Config) (templateDir, workflowDir string, err error)
 	}
 
 	return templateDir, workflowDir, nil
+}
+
+// makeWorkflowTemplatePathsAbsolute rewrites template references in a staged
+// workflow. Nuclei resolves relative workflow references against its process
+// working directory, not the custom catalog directory, so leaving these paths
+// relative makes bundled subtemplates impossible to load.
+func makeWorkflowTemplatePathsAbsolute(data []byte, workflowDir string) ([]byte, error) {
+	var document yaml.Node
+	if err := yaml.Unmarshal(data, &document); err != nil {
+		return nil, fmt.Errorf("failed to parse workflow: %w", err)
+	}
+	if err := makeTemplatePathNodesAbsolute(&document, workflowDir); err != nil {
+		return nil, err
+	}
+	rewritten, err := yaml.Marshal(&document)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal workflow: %w", err)
+	}
+	return rewritten, nil
+}
+
+func makeTemplatePathNodesAbsolute(node *yaml.Node, workflowDir string) error {
+	if node.Kind == yaml.MappingNode {
+		for i := 0; i+1 < len(node.Content); i += 2 {
+			key := node.Content[i]
+			value := node.Content[i+1]
+			if key.Value == "template" && value.Kind == yaml.ScalarNode && value.Value != "" &&
+				!filepath.IsAbs(value.Value) && !strings.Contains(value.Value, "://") {
+				resolved := filepath.Clean(filepath.Join(workflowDir, value.Value))
+				relative, err := filepath.Rel(workflowDir, resolved)
+				if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+					return fmt.Errorf("workflow template path escapes staging directory: %s", value.Value)
+				}
+				value.Value = resolved
+			}
+		}
+	}
+	for _, child := range node.Content {
+		if err := makeTemplatePathNodesAbsolute(child, workflowDir); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func buildNucleiOptions(cfg Config, templateDir, workflowDir string) []nucleilib.NucleiSDKOptions {

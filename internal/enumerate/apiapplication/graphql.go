@@ -157,19 +157,45 @@ func PerformAppEnumerateGraphQL(ctx context.Context, config enumerateapiapplicat
 	data.ApiType = enumerateapiapplicationfern.ApiTypeGraphQl
 	data.Raw = base64.StdEncoding.EncodeToString(body)
 
-	// Ad-hoc query mode: return the raw response without introspection parsing.
+	// Keep the raw ad-hoc response in the report, including when GraphQL returns
+	// an error envelope.
 	if config.Query != nil && *config.Query != "" {
 		response := string(body)
 		data.QueryResponse = &response
+	}
+	// Attach the evidence before attempting to decode it. Invalid JSON is still
+	// a failed scan, but callers need the received body to diagnose that failure.
+	report.Result.Data = data
+
+	// A GraphQL server can return HTTP 200 with a top-level errors array. Treat
+	// that response as a failed scan while retaining the raw response for review.
+	var responseEnvelope struct {
+		Errors []struct {
+			Message string `json:"message"`
+		} `json:"errors"`
+	}
+	if err := json.Unmarshal(body, &responseEnvelope); err != nil {
+		errMsg := fmt.Sprintf("endpoint did not return valid JSON: %v", err)
+		report.Errors = append(report.Errors, errMsg)
+		return report
+	}
+	if len(responseEnvelope.Errors) > 0 {
+		errorMessage := strings.TrimSpace(responseEnvelope.Errors[0].Message)
+		if errorMessage == "" {
+			errorMessage = "the response did not include an error message"
+		}
+		if len(responseEnvelope.Errors) == 1 {
+			report.Errors = append(report.Errors, fmt.Sprintf("GraphQL response returned an error: %s", errorMessage))
+		} else {
+			report.Errors = append(report.Errors, fmt.Sprintf("GraphQL response returned %d errors. First error: %s", len(responseEnvelope.Errors), errorMessage))
+		}
 		report.Result.Data = data
 		return report
 	}
 
-	// Check if the response is valid JSON
-	var jsonCheck interface{}
-	if err := json.Unmarshal(body, &jsonCheck); err != nil {
-		errMsg := fmt.Sprintf("endpoint did not return valid JSON: %v", err)
-		report.Errors = append(report.Errors, errMsg)
+	// Ad-hoc query mode does not require introspection parsing.
+	if config.Query != nil && *config.Query != "" {
+		report.Result.Data = data
 		return report
 	}
 

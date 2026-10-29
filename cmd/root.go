@@ -5,6 +5,7 @@ package cmd
 
 import (
 	"errors"
+	"flag"
 	"strings"
 	"time"
 
@@ -88,6 +89,12 @@ func (a *WebScan) InitRootCommand() {
 				a.OutputSignal.ErrorMessage,
 			)
 		},
+	}
+	// Rod registers its optional global flag with the standard-library flag
+	// package. Bind that one flag into Cobra without pre-parsing os.Args, which
+	// otherwise intercepts --help before Cobra can render the command tree.
+	if rodFlag := flag.Lookup("rod"); rodFlag != nil {
+		a.RootCmd.PersistentFlags().AddGoFlag(rodFlag)
 	}
 
 	// Root flags

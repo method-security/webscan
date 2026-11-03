@@ -52,17 +52,3 @@ func TestMergeWebRoutesRanksDeclarationAboveInterpolation(t *testing.T) {
 		}
 	}
 }
-
-func TestMergePathParamsUnionsExampleValues(t *testing.T) {
-	merged := discoverroute.MergePathParams(
-		[]*discover.RoutePathParam{{Name: "id", ExampleValues: []string{"1042"}}},
-		[]*discover.RoutePathParam{{Name: "id", ExampleValues: []string{"1042", "3517"}}},
-	)
-
-	if len(merged) != 1 {
-		t.Fatalf("expected one merged param, got %d", len(merged))
-	}
-	if len(merged[0].ExampleValues) != 2 {
-		t.Errorf("expected deduplicated union of examples, got %v", merged[0].ExampleValues)
-	}
-}

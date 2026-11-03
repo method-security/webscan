@@ -102,14 +102,9 @@ func MergeWebRoutes(routes []*discover.RouteDetails) []*discover.RouteDetails {
 			existingRoute.QueryParams = MergeQueryParams(existingRoute.QueryParams, route.QueryParams)
 			// Merge BodyParams
 			existingRoute.BodyParams = MergeBodyParams(existingRoute.BodyParams, route.BodyParams)
-			// Merge PathParams
-			existingRoute.PathParams = MergePathParams(existingRoute.PathParams, route.PathParams)
 			// Ranked so a stronger tag wins regardless of which arrived first.
 			if EvidenceRank(route.Evidence) > EvidenceRank(existingRoute.Evidence) {
 				existingRoute.Evidence = route.Evidence
-			}
-			if existingRoute.PathTemplate == nil && route.PathTemplate != nil {
-				existingRoute.PathTemplate = route.PathTemplate
 			}
 		} else {
 			// Add new route to the map

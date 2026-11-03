@@ -463,6 +463,41 @@ func TestAttachPathParamExamplesDoesNotGuessUnanchoredTemplates(t *testing.T) {
 	}
 }
 
+func TestAttachPathParamExamplesDoesNotCrossMethodsOrBaseURLs(t *testing.T) {
+	get := common.HttpMethodGet
+	post := common.HttpMethodPost
+	template := &enumeratejavascript.Endpoint{
+		BaseURL: "https://api.example.com",
+		Details: &enumerate.JavascriptEndpoint{
+			Path:       "/orders/{orderId}",
+			Method:     &get,
+			PathParams: []*enumerate.JavascriptEndpointParam{{Name: "orderId"}},
+		},
+	}
+	endpoints := []*enumeratejavascript.Endpoint{
+		template,
+		{
+			BaseURL: "https://api.example.com",
+			Details: &enumerate.JavascriptEndpoint{
+				Path:   "/orders/12",
+				Method: &post,
+			},
+		},
+		{
+			BaseURL: "https://other.example.com",
+			Details: &enumerate.JavascriptEndpoint{
+				Path:   "/orders/45",
+				Method: &get,
+			},
+		},
+	}
+
+	enumeratejavascript.AttachPathParamExamples(endpoints)
+	if param := findParam(template.Details.PathParams, "orderId"); param == nil || param.ExampleValue != nil {
+		t.Fatalf("expected mismatched method/base siblings to be ignored, got %v", template.Details.PathParams)
+	}
+}
+
 func TestAnalyzeSourceDropsEscapedRegexCharacterClasses(t *testing.T) {
 	source := []byte("const regexClass = '/\\\\bfnrtu'; fetch('/api/events');")
 

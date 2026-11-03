@@ -40,6 +40,27 @@ func TestGetPathParamExamplesV3UsesParameterExample(t *testing.T) {
 	}
 }
 
+func TestGetPathParamExamplesV3IgnoresNonPathAndNonScalarValues(t *testing.T) {
+	examples := getPathParamExamplesV3(nil, []*v3.Parameter{
+		{
+			Name:    "orderId",
+			In:      "query",
+			Example: scalarNode("12"),
+		},
+		{
+			Name: "itemId",
+			In:   "path",
+			Example: &schemayaml.Node{
+				Kind: schemayaml.MappingNode,
+			},
+		},
+	})
+
+	if len(examples) != 0 {
+		t.Fatalf("expected only explicit scalar path examples to be emitted, got %v", examples)
+	}
+}
+
 func TestGetPathParamsV3IncludesStructuredExamplesAndTemplateOnlyParams(t *testing.T) {
 	params := getPathParamsV3(nil, []*v3.Parameter{{
 		Name:    "orderId",

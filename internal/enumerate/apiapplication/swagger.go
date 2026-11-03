@@ -789,7 +789,7 @@ func getSchemaPropertiesRecursive(schema *base.Schema) []string {
 }
 
 // getQueryParamsV2 extracts query parameters from the operation parameters for Swagger (OpenAPI 2.0).
-func getQueryParamsV2(params []*v2.Parameter) []*enumerateapiapplicationfern.ApiApplicationQueryParam {
+func getQueryParamsV2(params []*v2.Parameter) []*enumerateapiapplicationfern.ApiApplicationParam {
 	var declared []string
 	for _, param := range params {
 		if param.In == "query" {
@@ -800,7 +800,7 @@ func getQueryParamsV2(params []*v2.Parameter) []*enumerateapiapplicationfern.Api
 }
 
 // getQueryParamsV3 extracts query parameters from the operation parameters for OpenAPI 3.0+.
-func getQueryParamsV3(params []*v3.Parameter) []*enumerateapiapplicationfern.ApiApplicationQueryParam {
+func getQueryParamsV3(params []*v3.Parameter) []*enumerateapiapplicationfern.ApiApplicationParam {
 	var declared []string
 	for _, param := range params {
 		if param.In == "query" {
@@ -843,7 +843,7 @@ func mergePathParamNames(declared []string, path string) []string {
 }
 
 // getPathParamsV2 extracts path parameters for Swagger (OpenAPI 2.0).
-func getPathParamsV2(pathItemParams []*v2.Parameter, operationParams []*v2.Parameter, path string) []*enumerateapiapplicationfern.ApiApplicationPathParam {
+func getPathParamsV2(pathItemParams []*v2.Parameter, operationParams []*v2.Parameter, path string) []*enumerateapiapplicationfern.ApiApplicationParam {
 	var declared []string
 	for _, param := range effectivePathParamsV2(pathItemParams, operationParams) {
 		declared = append(declared, param.Name)
@@ -852,7 +852,7 @@ func getPathParamsV2(pathItemParams []*v2.Parameter, operationParams []*v2.Param
 }
 
 // getPathParamsV3 extracts path parameters for OpenAPI 3.0+.
-func getPathParamsV3(pathItemParams []*v3.Parameter, operationParams []*v3.Parameter, path string) []*enumerateapiapplicationfern.ApiApplicationPathParam {
+func getPathParamsV3(pathItemParams []*v3.Parameter, operationParams []*v3.Parameter, path string) []*enumerateapiapplicationfern.ApiApplicationParam {
 	var declared []string
 	for _, param := range effectivePathParamsV3(pathItemParams, operationParams) {
 		declared = append(declared, param.Name)
@@ -860,27 +860,21 @@ func getPathParamsV3(pathItemParams []*v3.Parameter, operationParams []*v3.Param
 	return buildPathParams(mergePathParamNames(declared, path), getPathParamExamplesV3(pathItemParams, operationParams))
 }
 
-func buildQueryParams(names []string, examples map[string][]string) []*enumerateapiapplicationfern.ApiApplicationQueryParam {
-	if len(names) == 0 {
-		return nil
-	}
-	params := make([]*enumerateapiapplicationfern.ApiApplicationQueryParam, 0, len(names))
-	for _, name := range names {
-		params = append(params, &enumerateapiapplicationfern.ApiApplicationQueryParam{
-			Name:          name,
-			ExampleValues: examples[name],
-		})
-	}
-	return params
+func buildQueryParams(names []string, examples map[string][]string) []*enumerateapiapplicationfern.ApiApplicationParam {
+	return buildParams(names, examples)
 }
 
-func buildPathParams(names []string, examples map[string][]string) []*enumerateapiapplicationfern.ApiApplicationPathParam {
+func buildPathParams(names []string, examples map[string][]string) []*enumerateapiapplicationfern.ApiApplicationParam {
+	return buildParams(names, examples)
+}
+
+func buildParams(names []string, examples map[string][]string) []*enumerateapiapplicationfern.ApiApplicationParam {
 	if len(names) == 0 {
 		return nil
 	}
-	params := make([]*enumerateapiapplicationfern.ApiApplicationPathParam, 0, len(names))
+	params := make([]*enumerateapiapplicationfern.ApiApplicationParam, 0, len(names))
 	for _, name := range names {
-		params = append(params, &enumerateapiapplicationfern.ApiApplicationPathParam{
+		params = append(params, &enumerateapiapplicationfern.ApiApplicationParam{
 			Name:          name,
 			ExampleValues: examples[name],
 		})

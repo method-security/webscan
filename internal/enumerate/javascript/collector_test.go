@@ -32,8 +32,12 @@ func TestJavascriptSignalShape(t *testing.T) {
 					Remote: []*enumerate.JavascriptArtifact{{Url: "https://cdn.example.net/chunk.js", Kind: enumerate.JavascriptArtifactKindChunk, SizeBytes: 456}},
 				},
 				Endpoints: []*enumerate.JavascriptEndpoint{{
-					Path:      "/api/orders",
+					Path:      "/api/orders/{orderId}",
 					SourceUrl: "https://app.example.com/main.js",
+					PathParams: []*enumerate.JavascriptEndpointParam{{
+						Name:         "orderId",
+						ExampleValue: &exampleValue,
+					}},
 					QueryParams: []*enumerate.JavascriptEndpointParam{{
 						Name:         "status",
 						ExampleValue: &exampleValue,
@@ -64,7 +68,9 @@ func TestJavascriptSignalShape(t *testing.T) {
 	artifact := bundles["local"].([]any)[0].(map[string]any)
 	assertJSONKeys(t, artifact, "url", "kind", "sizeBytes")
 	endpoint := application["endpoints"].([]any)[0].(map[string]any)
-	assertJSONKeys(t, endpoint, "path", "queryParams", "bodyParams", "sourceUrl")
+	assertJSONKeys(t, endpoint, "path", "pathParams", "queryParams", "bodyParams", "sourceUrl")
+	pathParam := endpoint["pathParams"].([]any)[0].(map[string]any)
+	assertJSONKeys(t, pathParam, "name", "exampleValue")
 	queryParam := endpoint["queryParams"].([]any)[0].(map[string]any)
 	assertJSONKeys(t, queryParam, "name", "exampleValue")
 	bodyParam := endpoint["bodyParams"].([]any)[0].(map[string]any)

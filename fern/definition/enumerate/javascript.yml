@@ -41,6 +41,7 @@ types:
     properties:
       path: string
       method: optional<http.HttpMethod>
+      pathParams: optional<list<JavascriptEndpointParam>>
       queryParams: optional<list<JavascriptEndpointParam>>
       bodyParams: optional<list<JavascriptEndpointParam>>
       contentType: optional<string>

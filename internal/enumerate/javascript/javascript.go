@@ -454,7 +454,8 @@ func (c *collector) analyze(config enumerate.EnumerateJavascriptConfig) analysis
 		bucket := buckets[owner]
 		bucket.bases = javascripthelpers.BaseCandidatesInScope(sortedSet(bucket.origins), scopeHosts, config.IgnoreCrossDomainEndpoints)
 
-		for _, endpoint := range javascripthelpers.RootEndpoints(dedupeEndpoints(bucket.endpoints), bucket.bases, targetHosts([]string{owner})) {
+		rootedEndpoints := javascripthelpers.RootEndpoints(dedupeEndpoints(bucket.endpoints), bucket.bases, targetHosts([]string{owner}))
+		for _, endpoint := range javascripthelpers.AttachPathParamExamples(rootedEndpoints) {
 			if !endpoint.Rooted {
 				unrooted = append(unrooted, endpoint)
 				continue

@@ -1,0 +1,64 @@
+package apiapplication
+
+import (
+	"testing"
+
+	schemayaml "github.com/pb33f/go-yaml"
+	base "github.com/pb33f/libopenapi/datamodel/high/base"
+	v2 "github.com/pb33f/libopenapi/datamodel/high/v2"
+	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
+)
+
+func scalarNode(value string) *schemayaml.Node {
+	return &schemayaml.Node{Kind: schemayaml.ScalarNode, Tag: "!!str", Value: value}
+}
+
+func TestGetPathParamExamplesV2UsesExplicitDefaultsAndEnums(t *testing.T) {
+	examples := getPathParamExamplesV2(nil, []*v2.Parameter{{
+		Name:    "petId",
+		In:      "path",
+		Default: scalarNode("1042"),
+		Enum:    []*schemayaml.Node{scalarNode("1042"), scalarNode("3517")},
+	}})
+
+	got := examples["petId"]
+	if len(got) != 2 || got[0] != "1042" || got[1] != "3517" {
+		t.Fatalf("expected deduplicated explicit examples, got %v", got)
+	}
+}
+
+func TestGetPathParamExamplesV3UsesParameterExample(t *testing.T) {
+	examples := getPathParamExamplesV3(nil, []*v3.Parameter{{
+		Name:    "orderId",
+		In:      "path",
+		Example: scalarNode("12"),
+	}})
+
+	got := examples["orderId"]
+	if len(got) != 1 || got[0] != "12" {
+		t.Fatalf("expected the parameter example, got %v", got)
+	}
+}
+
+func TestAppendSchemaExampleValuesUsesExplicitSchemaValues(t *testing.T) {
+	values := appendSchemaExampleValues(nil, &base.Schema{
+		Example: scalarNode("dog"),
+		Default: scalarNode("cat"),
+		Enum:    []*schemayaml.Node{scalarNode("dog"), scalarNode("bird")},
+	})
+
+	if len(values) != 3 || values[0] != "dog" || values[1] != "cat" || values[2] != "bird" {
+		t.Fatalf("expected ordered schema examples, got %v", values)
+	}
+}
+
+func TestEffectivePathParamsV3LetsOperationOverridePathItem(t *testing.T) {
+	params := effectivePathParamsV3(
+		[]*v3.Parameter{{Name: "id", In: "path", Example: scalarNode("path-item")}},
+		[]*v3.Parameter{{Name: "id", In: "path", Example: scalarNode("operation")}},
+	)
+
+	if len(params) != 1 || params[0].Example == nil || params[0].Example.Value != "operation" {
+		t.Fatalf("expected the operation parameter to override the path item, got %v", params)
+	}
+}

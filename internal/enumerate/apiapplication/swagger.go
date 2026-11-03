@@ -98,6 +98,8 @@ const (
 	swaggerInitialMaxRedirects = 10
 	swaggerProbeMaxRedirects   = 0
 	swaggerSpecURLMaxRedirects = 1
+	maxPathParamExamples       = 5
+	maxPathParamExampleBytes   = 256
 )
 
 // generateSpecPaths creates all possible spec paths by combining base paths with extensions
@@ -640,6 +642,7 @@ func handleSwaggerV2(document libopenapi.Document, report *enumerateapiapplicati
 				Method:             method,
 				QueryParams:        getQueryParamsV2(operation.Parameters),
 				PathParams:         getPathParamsV2(pathItem.Parameters, operation.Parameters, path),
+				PathParamExamples:  getPathParamExamplesV2(pathItem.Parameters, operation.Parameters),
 				Security:           securityRequirements,
 				Type:               enumerateapiapplicationfern.ApiTypeSwaggerV2,
 				Description:        operation.Description,
@@ -754,6 +757,7 @@ func handleOpenAPIV3(document libopenapi.Document, report *enumerateapiapplicati
 				Method:             method,
 				QueryParams:        getQueryParamsV3(operation.Parameters),
 				PathParams:         getPathParamsV3(pathItem.Parameters, operation.Parameters, path),
+				PathParamExamples:  getPathParamExamplesV3(pathItem.Parameters, operation.Parameters),
 				Security:           securityRequirements,
 				Type:               enumerateapiapplicationfern.ApiTypeSwaggerV3,
 				Description:        operation.Description,
@@ -843,10 +847,8 @@ func mergePathParamNames(declared []string, path string) []string {
 // getPathParamsV2 extracts path parameters for Swagger (OpenAPI 2.0).
 func getPathParamsV2(pathItemParams []*v2.Parameter, operationParams []*v2.Parameter, path string) []string {
 	var declared []string
-	for _, param := range append(pathItemParams, operationParams...) {
-		if param.In == "path" {
-			declared = append(declared, param.Name)
-		}
+	for _, param := range effectivePathParamsV2(pathItemParams, operationParams) {
+		declared = append(declared, param.Name)
 	}
 	return mergePathParamNames(declared, path)
 }
@@ -854,12 +856,123 @@ func getPathParamsV2(pathItemParams []*v2.Parameter, operationParams []*v2.Param
 // getPathParamsV3 extracts path parameters for OpenAPI 3.0+.
 func getPathParamsV3(pathItemParams []*v3.Parameter, operationParams []*v3.Parameter, path string) []string {
 	var declared []string
-	for _, param := range append(pathItemParams, operationParams...) {
-		if param.In == "path" {
-			declared = append(declared, param.Name)
-		}
+	for _, param := range effectivePathParamsV3(pathItemParams, operationParams) {
+		declared = append(declared, param.Name)
 	}
 	return mergePathParamNames(declared, path)
+}
+
+// Operation parameters override path-item parameters with the same name and location.
+func effectivePathParamsV2(pathItemParams []*v2.Parameter, operationParams []*v2.Parameter) []*v2.Parameter {
+	return effectivePathParams(
+		pathItemParams,
+		operationParams,
+		func(param *v2.Parameter) string { return param.Name },
+		func(param *v2.Parameter) bool { return param != nil && param.In == "path" },
+	)
+}
+
+// Operation parameters override path-item parameters with the same name and location.
+func effectivePathParamsV3(pathItemParams []*v3.Parameter, operationParams []*v3.Parameter) []*v3.Parameter {
+	return effectivePathParams(
+		pathItemParams,
+		operationParams,
+		func(param *v3.Parameter) string { return param.Name },
+		func(param *v3.Parameter) bool { return param != nil && param.In == "path" },
+	)
+}
+
+func effectivePathParams[T any](pathItemParams []T, operationParams []T, nameOf func(T) string, isPath func(T) bool) []T {
+	params := make([]T, 0, len(pathItemParams)+len(operationParams))
+	positions := map[string]int{}
+	for _, param := range append(pathItemParams, operationParams...) {
+		if !isPath(param) {
+			continue
+		}
+		name := nameOf(param)
+		if name == "" {
+			continue
+		}
+		if index, exists := positions[name]; exists {
+			params[index] = param
+			continue
+		}
+		positions[name] = len(params)
+		params = append(params, param)
+	}
+	return params
+}
+
+func getPathParamExamplesV2(pathItemParams []*v2.Parameter, operationParams []*v2.Parameter) map[string][]string {
+	examples := map[string][]string{}
+	for _, param := range effectivePathParamsV2(pathItemParams, operationParams) {
+		values := appendNodeExampleValues(nil, param.Default)
+		values = appendNodeExampleValues(values, param.Enum...)
+		if len(values) > 0 {
+			examples[param.Name] = values
+		}
+	}
+	return nilIfEmpty(examples)
+}
+
+func getPathParamExamplesV3(pathItemParams []*v3.Parameter, operationParams []*v3.Parameter) map[string][]string {
+	examples := map[string][]string{}
+	for _, param := range effectivePathParamsV3(pathItemParams, operationParams) {
+		values := appendNodeExampleValues(nil, param.Example)
+		if param.Examples != nil {
+			for pair := param.Examples.Oldest(); pair != nil; pair = pair.Next() {
+				if pair.Value != nil {
+					values = appendNodeExampleValues(values, pair.Value.Value)
+				}
+			}
+		}
+		if param.Schema != nil {
+			values = appendSchemaExampleValues(values, param.Schema.Schema())
+		}
+		if len(values) > 0 {
+			examples[param.Name] = values
+		}
+	}
+	return nilIfEmpty(examples)
+}
+
+func appendSchemaExampleValues(values []string, schema *base.Schema) []string {
+	if schema == nil {
+		return values
+	}
+	values = appendNodeExampleValues(values, schema.Example)
+	values = appendNodeExampleValues(values, schema.Examples...)
+	values = appendNodeExampleValues(values, schema.Default)
+	values = appendNodeExampleValues(values, schema.Enum...)
+	return values
+}
+
+func appendNodeExampleValues(values []string, nodes ...*schemayaml.Node) []string {
+	for _, node := range nodes {
+		if len(values) >= maxPathParamExamples {
+			return values
+		}
+		value, ok := pathParamExampleValue(node)
+		if !ok || slices.Contains(values, value) {
+			continue
+		}
+		values = append(values, value)
+	}
+	return values
+}
+
+func pathParamExampleValue(node *schemayaml.Node) (string, bool) {
+	if node == nil || node.Kind != schemayaml.ScalarNode || node.Value == "" || len(node.Value) > maxPathParamExampleBytes {
+		return "", false
+	}
+	return node.Value, true
+}
+
+func nilIfEmpty(values map[string][]string) map[string][]string {
+	if len(values) == 0 {
+		return nil
+	}
+	return values
 }
 
 func convertSecurityDefinitionsV2(securityDefinitions map[string]*v2.SecurityScheme) map[string]*enumerateapiapplicationfern.SecurityScheme {

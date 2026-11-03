@@ -78,18 +78,20 @@ func ExtractFormRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig
 		routeVar.Method = common.HttpMethod(method)
 
 		// Collect input names
-		var queryParams []*discover.RouteQueryParam
-		var bodyParams []*discover.RouteBodyParam
+		var queryParams []*discover.RouteParam
+		var bodyParams []*discover.RouteParam
+		seenNames := make(map[string]bool)
 		s.Find("input[name], select[name], textarea[name]").Each(func(_ int, input *goquery.Selection) {
 			name, _ := input.Attr("name")
-			if name != "" {
+			if name != "" && !seenNames[name] {
+				seenNames[name] = true
 				if method == "POST" || method == "PUT" || method == "PATCH" {
 					// For POST, PUT, PATCH methods, add to BodyParams
-					param := &discover.RouteBodyParam{Name: name}
+					param := &discover.RouteParam{Name: name}
 					bodyParams = append(bodyParams, param)
 				} else {
 					// For GET and other methods, add to QueryParams
-					param := &discover.RouteQueryParam{Name: name}
+					param := &discover.RouteParam{Name: name}
 					queryParams = append(queryParams, param)
 				}
 			}
@@ -136,7 +138,7 @@ func ExtractAnchorRoutes(doc *goquery.Document, baseURL string, routeCaptureConf
 			return
 		}
 
-		var queryParams []*discover.RouteQueryParam
+		var queryParams []*discover.RouteParam
 		if parsedFullURL.RawQuery != "" {
 			queryParams = discoverroutehelpers.ParseQueryParams(parsedFullURL)
 		}
@@ -212,6 +214,18 @@ func ExtractLinkRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig
 			if discoverroutehelpers.CaptureStaticAssetReference(urls, routeCaptureConfig.Target, fullURL, routeCaptureConfig.IgnoreCrossDomainStaticAssets, routeCaptureConfig.CollectStaticAssets) {
 				return
 			}
+			// Stylesheets can use application paths instead of a .css extension.
+			for _, rel := range strings.Fields(s.AttrOr("rel", "")) {
+				if strings.EqualFold(rel, "stylesheet") {
+					return
+				}
+			}
+
+			parsedFullURL, err := url.Parse(fullURL)
+			if err != nil {
+				errors = append(errors, err.Error())
+				return
+			}
 
 			// The route URL should not have query params, those are stored in QueryParams
 			urlNoQuery, err := discoverroutehelpers.URLRemoveQueryParams(fullURL)
@@ -235,9 +249,10 @@ func ExtractLinkRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig
 			}
 
 			routeVar := &discover.RouteDetails{
-				BaseUrl: routeBaseURL,
-				Path:    routePath,
-				Method:  common.HttpMethodGet, // Link elements are accessed via GET
+				BaseUrl:     routeBaseURL,
+				Path:        routePath,
+				Method:      common.HttpMethodGet, // Link elements are accessed via GET
+				QueryParams: discoverroutehelpers.ParseQueryParams(parsedFullURL),
 			}
 
 			routes = append(routes, routeVar)

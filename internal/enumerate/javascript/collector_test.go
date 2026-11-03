@@ -32,8 +32,12 @@ func TestJavascriptSignalShape(t *testing.T) {
 					Remote: []*enumerate.JavascriptArtifact{{Url: "https://cdn.example.net/chunk.js", Kind: enumerate.JavascriptArtifactKindChunk, SizeBytes: 456}},
 				},
 				Endpoints: []*enumerate.JavascriptEndpoint{{
-					Path:      "/api/orders",
+					Path:      "/api/orders/{orderId}",
 					SourceUrl: "https://app.example.com/main.js",
+					PathParams: []*enumerate.JavascriptEndpointParam{{
+						Name:         "orderId",
+						ExampleValue: &exampleValue,
+					}},
 					QueryParams: []*enumerate.JavascriptEndpointParam{{
 						Name:         "status",
 						ExampleValue: &exampleValue,
@@ -64,7 +68,9 @@ func TestJavascriptSignalShape(t *testing.T) {
 	artifact := bundles["local"].([]any)[0].(map[string]any)
 	assertJSONKeys(t, artifact, "url", "kind", "sizeBytes")
 	endpoint := application["endpoints"].([]any)[0].(map[string]any)
-	assertJSONKeys(t, endpoint, "path", "queryParams", "bodyParams", "sourceUrl")
+	assertJSONKeys(t, endpoint, "path", "pathParams", "queryParams", "bodyParams", "sourceUrl")
+	pathParam := endpoint["pathParams"].([]any)[0].(map[string]any)
+	assertJSONKeys(t, pathParam, "name", "exampleValue")
 	queryParam := endpoint["queryParams"].([]any)[0].(map[string]any)
 	assertJSONKeys(t, queryParam, "name", "exampleValue")
 	bodyParam := endpoint["bodyParams"].([]any)[0].(map[string]any)
@@ -372,6 +378,30 @@ func TestAnalyzeRootsRelativePathsAgainstTheOwningApplication(t *testing.T) {
 	if len(application.Endpoints) != 1 || application.Endpoints[0].Path != "/serviceapi/v1/User/Read" {
 		t.Fatalf("expected the endpoint under the owning application, got %v", application.Endpoints)
 	}
+}
+
+func TestAnalyzeAttachesPathParamExamplesAcrossRootRelativeAndAbsoluteSiblings(t *testing.T) {
+	c := testCollector(0)
+	c.analyzed("https://app.example.com/main.js", enumerate.JavascriptArtifactKindEntry,
+		`const env = { apiUrl: "https://app.example.com/api" };`+
+			`const routes = ["/api/orders/:orderId", "https://app.example.com/api/orders/12"];`,
+		[]string{"https://app.example.com"})
+
+	result := c.analyze(enumerate.EnumerateJavascriptConfig{})
+	if len(result.applications) != 1 {
+		t.Fatalf("expected one application, got %d", len(result.applications))
+	}
+
+	for _, endpoint := range result.applications[0].Endpoints {
+		if endpoint.Path != "/api/orders/{orderId}" {
+			continue
+		}
+		if len(endpoint.PathParams) != 1 || endpoint.PathParams[0].ExampleValue == nil || *endpoint.PathParams[0].ExampleValue != "12" {
+			t.Fatalf("expected the absolute sibling to provide orderId=12, got %v", endpoint.PathParams)
+		}
+		return
+	}
+	t.Fatalf("expected the rooted path template, got %v", result.applications[0].Endpoints)
 }
 
 // A bundle calling an API on a sibling host names an application of its own, rather than filing the

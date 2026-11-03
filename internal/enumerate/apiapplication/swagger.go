@@ -98,6 +98,8 @@ const (
 	swaggerInitialMaxRedirects = 10
 	swaggerProbeMaxRedirects   = 0
 	swaggerSpecURLMaxRedirects = 1
+	maxParamExamples           = 5
+	maxParamExampleBytes       = 256
 )
 
 // generateSpecPaths creates all possible spec paths by combining base paths with extensions
@@ -786,26 +788,26 @@ func getSchemaPropertiesRecursive(schema *base.Schema) []string {
 	return properties
 }
 
-// getQueryParamsV2 extracts query parameters from the operation parameters for Swagger (OpenAPI 2.0)
-func getQueryParamsV2(params []*v2.Parameter) []string {
-	var queryParams []string
+// getQueryParamsV2 extracts query parameters from the operation parameters for Swagger (OpenAPI 2.0).
+func getQueryParamsV2(params []*v2.Parameter) []*enumerateapiapplicationfern.ApiApplicationParam {
+	var declared []string
 	for _, param := range params {
 		if param.In == "query" {
-			queryParams = append(queryParams, param.Name)
+			declared = append(declared, param.Name)
 		}
 	}
-	return queryParams
+	return buildQueryParams(declared, getQueryParamExamplesV2(params))
 }
 
-// getQueryParamsV3 extracts query parameters from the operation parameters for OpenAPI 3.0+
-func getQueryParamsV3(params []*v3.Parameter) []string {
-	var queryParams []string
+// getQueryParamsV3 extracts query parameters from the operation parameters for OpenAPI 3.0+.
+func getQueryParamsV3(params []*v3.Parameter) []*enumerateapiapplicationfern.ApiApplicationParam {
+	var declared []string
 	for _, param := range params {
 		if param.In == "query" {
-			queryParams = append(queryParams, param.Name)
+			declared = append(declared, param.Name)
 		}
 	}
-	return queryParams
+	return buildQueryParams(declared, getQueryParamExamplesV3(params))
 }
 
 // pathParamNamesFromTemplate extracts `{name}` placeholders from a templated path.
@@ -841,25 +843,192 @@ func mergePathParamNames(declared []string, path string) []string {
 }
 
 // getPathParamsV2 extracts path parameters for Swagger (OpenAPI 2.0).
-func getPathParamsV2(pathItemParams []*v2.Parameter, operationParams []*v2.Parameter, path string) []string {
+func getPathParamsV2(pathItemParams []*v2.Parameter, operationParams []*v2.Parameter, path string) []*enumerateapiapplicationfern.ApiApplicationParam {
 	var declared []string
-	for _, param := range append(pathItemParams, operationParams...) {
-		if param.In == "path" {
-			declared = append(declared, param.Name)
-		}
+	for _, param := range effectivePathParamsV2(pathItemParams, operationParams) {
+		declared = append(declared, param.Name)
 	}
-	return mergePathParamNames(declared, path)
+	return buildPathParams(mergePathParamNames(declared, path), getPathParamExamplesV2(pathItemParams, operationParams))
 }
 
 // getPathParamsV3 extracts path parameters for OpenAPI 3.0+.
-func getPathParamsV3(pathItemParams []*v3.Parameter, operationParams []*v3.Parameter, path string) []string {
+func getPathParamsV3(pathItemParams []*v3.Parameter, operationParams []*v3.Parameter, path string) []*enumerateapiapplicationfern.ApiApplicationParam {
 	var declared []string
+	for _, param := range effectivePathParamsV3(pathItemParams, operationParams) {
+		declared = append(declared, param.Name)
+	}
+	return buildPathParams(mergePathParamNames(declared, path), getPathParamExamplesV3(pathItemParams, operationParams))
+}
+
+func buildQueryParams(names []string, examples map[string][]string) []*enumerateapiapplicationfern.ApiApplicationParam {
+	return buildParams(names, examples)
+}
+
+func buildPathParams(names []string, examples map[string][]string) []*enumerateapiapplicationfern.ApiApplicationParam {
+	return buildParams(names, examples)
+}
+
+func buildParams(names []string, examples map[string][]string) []*enumerateapiapplicationfern.ApiApplicationParam {
+	if len(names) == 0 {
+		return nil
+	}
+	params := make([]*enumerateapiapplicationfern.ApiApplicationParam, 0, len(names))
+	for _, name := range names {
+		params = append(params, &enumerateapiapplicationfern.ApiApplicationParam{
+			Name:          name,
+			ExampleValues: examples[name],
+		})
+	}
+	return params
+}
+
+// Operation parameters override path-item parameters with the same name and location.
+func effectivePathParamsV2(pathItemParams []*v2.Parameter, operationParams []*v2.Parameter) []*v2.Parameter {
+	return effectivePathParams(
+		pathItemParams,
+		operationParams,
+		func(param *v2.Parameter) string { return param.Name },
+		func(param *v2.Parameter) bool { return param != nil && param.In == "path" },
+	)
+}
+
+// Operation parameters override path-item parameters with the same name and location.
+func effectivePathParamsV3(pathItemParams []*v3.Parameter, operationParams []*v3.Parameter) []*v3.Parameter {
+	return effectivePathParams(
+		pathItemParams,
+		operationParams,
+		func(param *v3.Parameter) string { return param.Name },
+		func(param *v3.Parameter) bool { return param != nil && param.In == "path" },
+	)
+}
+
+func effectivePathParams[T any](pathItemParams []T, operationParams []T, nameOf func(T) string, isPath func(T) bool) []T {
+	params := make([]T, 0, len(pathItemParams)+len(operationParams))
+	positions := map[string]int{}
 	for _, param := range append(pathItemParams, operationParams...) {
-		if param.In == "path" {
-			declared = append(declared, param.Name)
+		if !isPath(param) {
+			continue
+		}
+		name := nameOf(param)
+		if name == "" {
+			continue
+		}
+		if index, exists := positions[name]; exists {
+			params[index] = param
+			continue
+		}
+		positions[name] = len(params)
+		params = append(params, param)
+	}
+	return params
+}
+
+func getQueryParamExamplesV2(params []*v2.Parameter) map[string][]string {
+	return getParamExamplesV2(filterParamsV2(params, "query"))
+}
+
+func getQueryParamExamplesV3(params []*v3.Parameter) map[string][]string {
+	return getParamExamplesV3(filterParamsV3(params, "query"))
+}
+
+func getPathParamExamplesV2(pathItemParams []*v2.Parameter, operationParams []*v2.Parameter) map[string][]string {
+	return getParamExamplesV2(effectivePathParamsV2(pathItemParams, operationParams))
+}
+
+func getPathParamExamplesV3(pathItemParams []*v3.Parameter, operationParams []*v3.Parameter) map[string][]string {
+	return getParamExamplesV3(effectivePathParamsV3(pathItemParams, operationParams))
+}
+
+func getParamExamplesV2(params []*v2.Parameter) map[string][]string {
+	examples := map[string][]string{}
+	for _, param := range params {
+		values := appendNodeExampleValues(nil, param.Default)
+		values = appendNodeExampleValues(values, param.Enum...)
+		if len(values) > 0 {
+			examples[param.Name] = values
 		}
 	}
-	return mergePathParamNames(declared, path)
+	return nilIfEmpty(examples)
+}
+
+func filterParamsV2(params []*v2.Parameter, location string) []*v2.Parameter {
+	var filtered []*v2.Parameter
+	for _, param := range params {
+		if param != nil && param.In == location {
+			filtered = append(filtered, param)
+		}
+	}
+	return filtered
+}
+
+func filterParamsV3(params []*v3.Parameter, location string) []*v3.Parameter {
+	var filtered []*v3.Parameter
+	for _, param := range params {
+		if param != nil && param.In == location {
+			filtered = append(filtered, param)
+		}
+	}
+	return filtered
+}
+
+func getParamExamplesV3(params []*v3.Parameter) map[string][]string {
+	examples := map[string][]string{}
+	for _, param := range params {
+		values := appendNodeExampleValues(nil, param.Example)
+		if param.Examples != nil {
+			for pair := param.Examples.Oldest(); pair != nil; pair = pair.Next() {
+				if pair.Value != nil {
+					values = appendNodeExampleValues(values, pair.Value.Value)
+				}
+			}
+		}
+		if param.Schema != nil {
+			values = appendSchemaExampleValues(values, param.Schema.Schema())
+		}
+		if len(values) > 0 {
+			examples[param.Name] = values
+		}
+	}
+	return nilIfEmpty(examples)
+}
+
+func appendSchemaExampleValues(values []string, schema *base.Schema) []string {
+	if schema == nil {
+		return values
+	}
+	values = appendNodeExampleValues(values, schema.Example)
+	values = appendNodeExampleValues(values, schema.Examples...)
+	values = appendNodeExampleValues(values, schema.Default)
+	values = appendNodeExampleValues(values, schema.Enum...)
+	return values
+}
+
+func appendNodeExampleValues(values []string, nodes ...*schemayaml.Node) []string {
+	for _, node := range nodes {
+		if len(values) >= maxParamExamples {
+			return values
+		}
+		value, ok := paramExampleValue(node)
+		if !ok || slices.Contains(values, value) {
+			continue
+		}
+		values = append(values, value)
+	}
+	return values
+}
+
+func paramExampleValue(node *schemayaml.Node) (string, bool) {
+	if node == nil || node.Kind != schemayaml.ScalarNode || node.Value == "" || len(node.Value) > maxParamExampleBytes {
+		return "", false
+	}
+	return node.Value, true
+}
+
+func nilIfEmpty(values map[string][]string) map[string][]string {
+	if len(values) == 0 {
+		return nil
+	}
+	return values
 }
 
 func convertSecurityDefinitionsV2(securityDefinitions map[string]*v2.SecurityScheme) map[string]*enumerateapiapplicationfern.SecurityScheme {

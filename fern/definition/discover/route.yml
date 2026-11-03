@@ -25,15 +25,7 @@ types:
       localStorage: optional<map<string, string>>
       sessionStorage: optional<map<string, string>>
   # Report Struct
-  RouteBodyParam:
-    properties:
-      name: string
-      exampleValues: optional<list<string>>
-  RouteQueryParam:
-    properties:
-      name: string
-      exampleValues: optional<list<string>>
-  RoutePathParam:
+  RouteParam:
     properties:
       name: string
       exampleValues: optional<list<string>>
@@ -42,11 +34,9 @@ types:
       baseURL: string
       path: string
       method: http.HttpMethod
-      queryParams: optional<list<RouteQueryParam>>
-      bodyParams: optional<list<RouteBodyParam>>
-      pathParams: optional<list<RoutePathParam>>
+      queryParams: optional<list<RouteParam>>
+      bodyParams: optional<list<RouteParam>>
       evidence: optional<string>
-      pathTemplate: optional<string>
   StaticAssetDetails:
     properties:
       local: optional<list<string>>

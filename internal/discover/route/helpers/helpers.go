@@ -102,14 +102,9 @@ func MergeWebRoutes(routes []*discover.RouteDetails) []*discover.RouteDetails {
 			existingRoute.QueryParams = MergeQueryParams(existingRoute.QueryParams, route.QueryParams)
 			// Merge BodyParams
 			existingRoute.BodyParams = MergeBodyParams(existingRoute.BodyParams, route.BodyParams)
-			// Merge PathParams
-			existingRoute.PathParams = MergePathParams(existingRoute.PathParams, route.PathParams)
 			// Ranked so a stronger tag wins regardless of which arrived first.
 			if EvidenceRank(route.Evidence) > EvidenceRank(existingRoute.Evidence) {
 				existingRoute.Evidence = route.Evidence
-			}
-			if existingRoute.PathTemplate == nil && route.PathTemplate != nil {
-				existingRoute.PathTemplate = route.PathTemplate
 			}
 		} else {
 			// Add new route to the map
@@ -130,8 +125,8 @@ func MergeWebRoutes(routes []*discover.RouteDetails) []*discover.RouteDetails {
 	return mergedRoutes
 }
 
-// MergeQueryParams merges two slices of RouteQueryParam, retaining unique params and merging example values.
-func MergeQueryParams(params1 []*discover.RouteQueryParam, params2 []*discover.RouteQueryParam) []*discover.RouteQueryParam {
+// MergeQueryParams merges two slices of RouteParam, retaining unique params and merging example values.
+func MergeQueryParams(params1 []*discover.RouteParam, params2 []*discover.RouteParam) []*discover.RouteParam {
 	// If either is nil return the other
 	if params1 == nil && params2 == nil {
 		return nil
@@ -142,7 +137,7 @@ func MergeQueryParams(params1 []*discover.RouteQueryParam, params2 []*discover.R
 	}
 
 	// Merge
-	paramMap := make(map[string]*discover.RouteQueryParam)
+	paramMap := make(map[string]*discover.RouteParam)
 	for _, param := range params1 {
 		paramMap[param.Name] = param
 	}
@@ -173,15 +168,15 @@ func MergeQueryParams(params1 []*discover.RouteQueryParam, params2 []*discover.R
 	}
 
 	// Convert map back to slice
-	var mergedParams []*discover.RouteQueryParam
+	var mergedParams []*discover.RouteParam
 	for _, param := range paramMap {
 		mergedParams = append(mergedParams, param)
 	}
 	return mergedParams
 }
 
-// MergeBodyParams merges two slices of RouteBodyParam, retaining unique params and merging example values.
-func MergeBodyParams(params1 []*discover.RouteBodyParam, params2 []*discover.RouteBodyParam) []*discover.RouteBodyParam {
+// MergeBodyParams merges two slices of RouteParam, retaining unique params and merging example values.
+func MergeBodyParams(params1 []*discover.RouteParam, params2 []*discover.RouteParam) []*discover.RouteParam {
 	// If either is nil return the other
 	if params1 == nil && params2 == nil {
 		return nil
@@ -192,7 +187,7 @@ func MergeBodyParams(params1 []*discover.RouteBodyParam, params2 []*discover.Rou
 	}
 
 	// Merge
-	paramMap := make(map[string]*discover.RouteBodyParam)
+	paramMap := make(map[string]*discover.RouteParam)
 	for _, param := range params1 {
 		paramMap[param.Name] = param
 	}
@@ -223,16 +218,16 @@ func MergeBodyParams(params1 []*discover.RouteBodyParam, params2 []*discover.Rou
 	}
 
 	// Convert map back to slice
-	var mergedParams []*discover.RouteBodyParam
+	var mergedParams []*discover.RouteParam
 	for _, param := range paramMap {
 		mergedParams = append(mergedParams, param)
 	}
 	return mergedParams
 }
 
-// ParseQueryParams parses query parameters from a URL into RouteQueryParam structs.
-func ParseQueryParams(reqURL *url.URL) []*discover.RouteQueryParam {
-	var queryParams []*discover.RouteQueryParam
+// ParseQueryParams parses query parameters from a URL into RouteParam structs.
+func ParseQueryParams(reqURL *url.URL) []*discover.RouteParam {
+	var queryParams []*discover.RouteParam
 	for key, values := range reqURL.Query() {
 		if key == "" {
 			continue
@@ -256,7 +251,7 @@ func ParseQueryParams(reqURL *url.URL) []*discover.RouteQueryParam {
 			filteredValues = filteredValues[:5]
 		}
 
-		queryParams = append(queryParams, &discover.RouteQueryParam{
+		queryParams = append(queryParams, &discover.RouteParam{
 			Name:          key,
 			ExampleValues: filteredValues,
 		})
@@ -264,15 +259,34 @@ func ParseQueryParams(reqURL *url.URL) []*discover.RouteQueryParam {
 	return queryParams
 }
 
-// ParseBodyParams parses body parameters from a JSON or form-urlencoded string into RouteBodyParam structs.
-func ParseBodyParams(postData string) ([]*discover.RouteBodyParam, error) {
-	var bodyParams []*discover.RouteBodyParam
+// ParseBodyParams parses body parameters from a JSON or form-urlencoded string into RouteParam structs.
+func ParseBodyParams(postData string) ([]*discover.RouteParam, error) {
+	var bodyParams []*discover.RouteParam
+	jsonBody := strings.TrimSpace(postData)
+	if strings.HasPrefix(jsonBody, "[") {
+		var elements []json.RawMessage
+		if err := json.Unmarshal([]byte(jsonBody), &elements); err != nil {
+			return nil, fmt.Errorf("failed to parse json: %v", err)
+		}
+		for _, element := range elements {
+			objectBody := strings.TrimSpace(string(element))
+			if !strings.HasPrefix(objectBody, "{") {
+				continue
+			}
+			params, err := ParseBodyParams(objectBody)
+			if err != nil {
+				return bodyParams, err
+			}
+			bodyParams = MergeBodyParams(bodyParams, params)
+		}
+		return bodyParams, nil
+	}
 
 	// For simplicity, assume the body is JSON or form-urlencoded
-	if strings.HasPrefix(postData, "{") {
+	if strings.HasPrefix(jsonBody, "{") {
 		// Try to parse JSON
 		var jsonData map[string]interface{}
-		if err := json.Unmarshal([]byte(postData), &jsonData); err == nil {
+		if err := json.Unmarshal([]byte(jsonBody), &jsonData); err == nil {
 			for key, value := range jsonData {
 				if key == "" {
 					continue
@@ -280,7 +294,7 @@ func ParseBodyParams(postData string) ([]*discover.RouteBodyParam, error) {
 				// Stringify the value to ensure it's a string
 				valueStr, err := json.Marshal(value)
 				if err == nil {
-					bodyParams = append(bodyParams, &discover.RouteBodyParam{
+					bodyParams = append(bodyParams, &discover.RouteParam{
 						Name:          key,
 						ExampleValues: []string{string(valueStr)}, // Store as a string
 					})
@@ -308,7 +322,7 @@ func ParseBodyParams(postData string) ([]*discover.RouteBodyParam, error) {
 					}
 					filteredValues = append(filteredValues, value)
 				}
-				bodyParams = append(bodyParams, &discover.RouteBodyParam{
+				bodyParams = append(bodyParams, &discover.RouteParam{
 					Name:          key,
 					ExampleValues: filteredValues,
 				})
@@ -490,7 +504,7 @@ func (signature providerRouteNoiseSignature) matchesRoute(route *discover.RouteD
 	return true
 }
 
-func hasRouteBodyParam(params []*discover.RouteBodyParam, name string) bool {
+func hasRouteBodyParam(params []*discover.RouteParam, name string) bool {
 	for _, param := range params {
 		if param != nil && param.Name == name {
 			return true

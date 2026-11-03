@@ -4,6 +4,7 @@ import (
 	// Standard
 	"encoding/json"
 	"net/url"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -47,7 +48,25 @@ type Endpoint struct {
 // Clone copies an endpoint so an artifact shared by two applications roots once per application.
 func (e *Endpoint) Clone() *Endpoint {
 	details := *e.Details
+	details.PathParams = cloneEndpointParams(e.Details.PathParams)
+	details.QueryParams = cloneEndpointParams(e.Details.QueryParams)
+	details.BodyParams = cloneEndpointParams(e.Details.BodyParams)
 	return &Endpoint{Details: &details, BaseURL: e.BaseURL, Rooted: e.Rooted}
+}
+
+func cloneEndpointParams(params []*enumerate.JavascriptEndpointParam) []*enumerate.JavascriptEndpointParam {
+	if len(params) == 0 {
+		return nil
+	}
+	cloned := make([]*enumerate.JavascriptEndpointParam, 0, len(params))
+	for _, param := range params {
+		if param == nil {
+			continue
+		}
+		copy := *param
+		cloned = append(cloned, &copy)
+	}
+	return cloned
 }
 
 // dataDocumentSuffixes name formats an API serves as readily as a file server does. They are static
@@ -184,6 +203,7 @@ func toEndpoint(found *jsluice.URL, sourceURL string) *Endpoint {
 	details := &enumerate.JavascriptEndpoint{
 		Path:        path,
 		SourceUrl:   sourceURL,
+		PathParams:  pathParams(path),
 		QueryParams: endpointParams(found.QueryParams, literalQueryValues(query)),
 		BodyParams:  endpointParams(found.BodyParams, nil),
 	}
@@ -215,6 +235,7 @@ func toEndpoint(found *jsluice.URL, sourceURL string) *Endpoint {
 		}
 		endpoint.BaseURL = base
 		details.Path = absolutePath
+		details.PathParams = pathParams(details.Path)
 		endpoint.Rooted = true
 		return endpoint
 	}
@@ -546,8 +567,133 @@ func mergeEndpointDetails(existing *Endpoint, incoming *Endpoint) {
 	if existing.Details.ContentType == nil && incoming.Details.ContentType != nil {
 		existing.Details.ContentType = incoming.Details.ContentType
 	}
+	existing.Details.PathParams = mergeEndpointParams(existing.Details.PathParams, incoming.Details.PathParams)
 	existing.Details.QueryParams = mergeEndpointParams(existing.Details.QueryParams, incoming.Details.QueryParams)
 	existing.Details.BodyParams = mergeEndpointParams(existing.Details.BodyParams, incoming.Details.BodyParams)
+}
+
+// embeddedPathParamPattern matches the normalized placeholders that can appear as a full segment
+// (`{id}`) or inside one (`order_{orderId}.pdf`).
+var embeddedPathParamPattern = regexp.MustCompile(`\{([A-Za-z_][A-Za-z0-9_]*)(?:\.\.\.)?\}`)
+
+// pathParams reports the parameters a normalized path template declares.
+func pathParams(path string) []*enumerate.JavascriptEndpointParam {
+	matches := embeddedPathParamPattern.FindAllStringSubmatch(path, -1)
+	if len(matches) == 0 {
+		return nil
+	}
+	seen := map[string]struct{}{}
+	params := make([]*enumerate.JavascriptEndpointParam, 0, len(matches))
+	for _, match := range matches {
+		name := match[1]
+		if _, exists := seen[name]; exists {
+			continue
+		}
+		seen[name] = struct{}{}
+		params = append(params, &enumerate.JavascriptEndpointParam{Name: name})
+	}
+	return params
+}
+
+// AttachPathParamExamples adds concrete values to templates already present in the extracted
+// endpoints. It never invents a template from sibling literals, because doing that merges distinct
+// pages as readily as it finds identifiers.
+func AttachPathParamExamples(endpoints []*Endpoint) []*Endpoint {
+	for _, template := range endpoints {
+		if template == nil || template.Details == nil || len(template.Details.PathParams) == 0 {
+			continue
+		}
+		if !hasLiteralPathSegment(template.Details.Path) {
+			continue
+		}
+		for _, literal := range endpoints {
+			if literal == nil || literal.Details == nil || len(literal.Details.PathParams) > 0 {
+				continue
+			}
+			if template.BaseURL != literal.BaseURL || methodsConflict(template.Details.Method, literal.Details.Method) {
+				continue
+			}
+			values, ok := pathTemplateValues(template.Details.Path, literal.Details.Path)
+			if !ok {
+				continue
+			}
+			for _, param := range template.Details.PathParams {
+				if value, exists := values[param.Name]; exists && len(value) <= MaxQueryParamValueBytes {
+					param.ExampleValue = firstExampleValue(param.ExampleValue, value)
+				}
+			}
+		}
+	}
+	return endpoints
+}
+
+func methodsConflict(first *common.HttpMethod, second *common.HttpMethod) bool {
+	return first != nil && second != nil && *first != *second
+}
+
+func firstExampleValue(existing *string, value string) *string {
+	if existing != nil {
+		return existing
+	}
+	copy := value
+	return &copy
+}
+
+func hasLiteralPathSegment(path string) bool {
+	for _, segment := range strings.Split(path, "/") {
+		if segment != "" && !strings.Contains(segment, "{") {
+			return true
+		}
+	}
+	return false
+}
+
+func pathTemplateValues(template string, literal string) (map[string]string, bool) {
+	templateSegments := strings.Split(template, "/")
+	literalSegments := strings.Split(literal, "/")
+	if len(templateSegments) != len(literalSegments) {
+		return nil, false
+	}
+	values := map[string]string{}
+	for i, segment := range templateSegments {
+		if !matchPathTemplateSegment(segment, literalSegments[i], values) {
+			return nil, false
+		}
+	}
+	return values, true
+}
+
+func matchPathTemplateSegment(template string, literal string, values map[string]string) bool {
+	matches := embeddedPathParamPattern.FindAllStringSubmatchIndex(template, -1)
+	if len(matches) == 0 {
+		return template == literal
+	}
+
+	var names []string
+	var pattern strings.Builder
+	pattern.WriteString("^")
+	previous := 0
+	for _, match := range matches {
+		pattern.WriteString(regexp.QuoteMeta(template[previous:match[0]]))
+		pattern.WriteString("(.+?)")
+		names = append(names, template[match[2]:match[3]])
+		previous = match[1]
+	}
+	pattern.WriteString(regexp.QuoteMeta(template[previous:]))
+	pattern.WriteString("$")
+
+	matcher, err := regexp.Compile(pattern.String())
+	if err != nil {
+		return false
+	}
+	found := matcher.FindStringSubmatch(literal)
+	if found == nil {
+		return false
+	}
+	for i, name := range names {
+		values[name] = found[i+1]
+	}
+	return true
 }
 
 func endpointParams(names []string, values map[string]string) []*enumerate.JavascriptEndpointParam {

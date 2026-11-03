@@ -399,8 +399,13 @@ func TestAnalyzeSourceTemplatesAWhollyComputedPathSegment(t *testing.T) {
 	source := []byte(`$.get('/api/orders/'+id+'/detail');`)
 
 	analysis := enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0)
-	if findEndpointOrNil(analysis.Endpoints, "/api/orders/{param}/detail") == nil {
+	endpoint := findEndpointOrNil(analysis.Endpoints, "/api/orders/{param}/detail")
+	if endpoint == nil {
 		t.Fatalf("expected a computed segment to become a path template, got %v", pathsOf(analysis.Endpoints))
+	}
+	param := findParam(endpoint.Details.PathParams, "param")
+	if param == nil {
+		t.Fatalf("expected the normalized template to expose its path parameter, got %v", endpoint.Details.PathParams)
 	}
 }
 
@@ -427,6 +432,69 @@ func TestAnalyzeSourceNormalizesNamedRouteSyntax(t *testing.T) {
 		if !contains(paths, expected) {
 			t.Fatalf("expected normalized route %s, got %v", expected, paths)
 		}
+	}
+}
+
+func TestAttachPathParamExamplesUsesConcreteSiblingEndpoints(t *testing.T) {
+	source := []byte(`const routes = ["/orders/:orderId/items/:itemId", "/orders/12/items/45"];`)
+
+	analysis := enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0)
+	endpoints := enumeratejavascript.AttachPathParamExamples(analysis.Endpoints)
+	template := findEndpoint(t, endpoints, "/orders/{orderId}/items/{itemId}")
+
+	orderID := findParam(template.Details.PathParams, "orderId")
+	if orderID == nil || orderID.ExampleValue == nil || *orderID.ExampleValue != "12" {
+		t.Fatalf("expected orderId example from the concrete sibling, got %v", template.Details.PathParams)
+	}
+	itemID := findParam(template.Details.PathParams, "itemId")
+	if itemID == nil || itemID.ExampleValue == nil || *itemID.ExampleValue != "45" {
+		t.Fatalf("expected itemId example from the concrete sibling, got %v", template.Details.PathParams)
+	}
+}
+
+func TestAttachPathParamExamplesDoesNotGuessUnanchoredTemplates(t *testing.T) {
+	source := []byte(`const routes = ["/:slug", "/about"];`)
+
+	analysis := enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0)
+	endpoints := enumeratejavascript.AttachPathParamExamples(analysis.Endpoints)
+	template := findEndpoint(t, endpoints, "/{slug}")
+	if param := findParam(template.Details.PathParams, "slug"); param == nil || param.ExampleValue != nil {
+		t.Fatalf("expected an unanchored template to stay without examples, got %v", template.Details.PathParams)
+	}
+}
+
+func TestAttachPathParamExamplesDoesNotCrossMethodsOrBaseURLs(t *testing.T) {
+	get := common.HttpMethodGet
+	post := common.HttpMethodPost
+	template := &enumeratejavascript.Endpoint{
+		BaseURL: "https://api.example.com",
+		Details: &enumerate.JavascriptEndpoint{
+			Path:       "/orders/{orderId}",
+			Method:     &get,
+			PathParams: []*enumerate.JavascriptEndpointParam{{Name: "orderId"}},
+		},
+	}
+	endpoints := []*enumeratejavascript.Endpoint{
+		template,
+		{
+			BaseURL: "https://api.example.com",
+			Details: &enumerate.JavascriptEndpoint{
+				Path:   "/orders/12",
+				Method: &post,
+			},
+		},
+		{
+			BaseURL: "https://other.example.com",
+			Details: &enumerate.JavascriptEndpoint{
+				Path:   "/orders/45",
+				Method: &get,
+			},
+		},
+	}
+
+	enumeratejavascript.AttachPathParamExamples(endpoints)
+	if param := findParam(template.Details.PathParams, "orderId"); param == nil || param.ExampleValue != nil {
+		t.Fatalf("expected mismatched method/base siblings to be ignored, got %v", template.Details.PathParams)
 	}
 }
 

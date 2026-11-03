@@ -64,7 +64,6 @@ types:
       globalTimeout: integer
       userAgent: method.UserAgentPreset
       ignoreCrossDomainRedirects: boolean
-      webServers: optional<list<string>>
   # Application Fingerprint Attempt Struct
   ApplicationFingerprintAttempt:
     properties:

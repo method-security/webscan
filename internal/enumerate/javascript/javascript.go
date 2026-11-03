@@ -454,14 +454,19 @@ func (c *collector) analyze(config enumerate.EnumerateJavascriptConfig) analysis
 		bucket := buckets[owner]
 		bucket.bases = javascripthelpers.BaseCandidatesInScope(sortedSet(bucket.origins), scopeHosts, config.IgnoreCrossDomainEndpoints)
 
-		for _, endpoint := range javascripthelpers.RootEndpoints(dedupeEndpoints(bucket.endpoints), bucket.bases, targetHosts([]string{owner})) {
+		rootedEndpoints := javascripthelpers.RootEndpoints(dedupeEndpoints(bucket.endpoints), bucket.bases, targetHosts([]string{owner}))
+		for _, endpoint := range rootedEndpoints {
+			// A root-relative path resolves against the application that loaded the bundle.
+			// Fill that origin before matching sibling literals so `/orders/{id}` and
+			// `https://app.example.com/orders/12` compare as the same application.
+			if endpoint.Rooted && endpoint.BaseURL == "" {
+				endpoint.BaseURL = owner
+			}
+		}
+		for _, endpoint := range javascripthelpers.AttachPathParamExamples(rootedEndpoints) {
 			if !endpoint.Rooted {
 				unrooted = append(unrooted, endpoint)
 				continue
-			}
-			// A root-relative path resolves against the application that loaded the bundle.
-			if endpoint.BaseURL == "" {
-				endpoint.BaseURL = owner
 			}
 			// An absolute URL to an unrelated host is a link the bundle happens to contain, not an
 			// endpoint of anything being scanned. Left in it would stand up an application per

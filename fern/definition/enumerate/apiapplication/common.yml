@@ -84,12 +84,15 @@ types:
       additionalProperties: optional<RequestSchema>
       enum: optional<list<string>>
       example: optional<string>
+  ApiApplicationPathParam:
+    properties:
+      name: string
+      exampleValues: optional<list<string>>
   ApiApplicationRouteDetails:
     properties:
       path: string
       queryParams: optional<list<string>>
-      pathParams: optional<list<string>>
-      pathParamExamples: optional<map<string, list<string>>>
+      pathParams: optional<list<ApiApplicationPathParam>>
       security: optional<SecurityRequirement>
       method: string
       type: ApiType

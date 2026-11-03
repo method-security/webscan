@@ -40,6 +40,24 @@ func TestGetPathParamExamplesV3UsesParameterExample(t *testing.T) {
 	}
 }
 
+func TestGetPathParamsV3IncludesStructuredExamplesAndTemplateOnlyParams(t *testing.T) {
+	params := getPathParamsV3(nil, []*v3.Parameter{{
+		Name:    "orderId",
+		In:      "path",
+		Example: scalarNode("12"),
+	}}, "/orders/{orderId}/items/{itemId}")
+
+	if len(params) != 2 {
+		t.Fatalf("expected declared and template-only params, got %v", params)
+	}
+	if params[0].Name != "orderId" || len(params[0].ExampleValues) != 1 || params[0].ExampleValues[0] != "12" {
+		t.Fatalf("expected structured orderId examples, got %v", params[0])
+	}
+	if params[1].Name != "itemId" || params[1].ExampleValues != nil {
+		t.Fatalf("expected template-only itemId without examples, got %v", params[1])
+	}
+}
+
 func TestAppendSchemaExampleValuesUsesExplicitSchemaValues(t *testing.T) {
 	values := appendSchemaExampleValues(nil, &base.Schema{
 		Example: scalarNode("dog"),

@@ -115,14 +115,9 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			webServers, err := cmd.Flags().GetStringArray("web-servers")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
 
 			// Create config
-			config, err := getDiscoverApplicationConfig(targets, resourceType, templatePaths, timeout, threads, proxy, verboseLogs, globalRateLimit, globalTimeout, userAgentPreset, ignoreCrossDomainRedirects, webServers)
+			config, err := getDiscoverApplicationConfig(targets, resourceType, templatePaths, timeout, threads, proxy, verboseLogs, globalRateLimit, globalTimeout, userAgentPreset, ignoreCrossDomainRedirects)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -148,7 +143,6 @@ func (a *WebScan) InitDiscoverCommand() {
 	discoverApplicationCmd.Flags().Int("global-rate-limit", 10, "Global rate limit in requests per second")
 	discoverApplicationCmd.Flags().Int("global-timeout", 0, "Maximum total scan time in seconds")
 	discoverApplicationCmd.Flags().String("user-agent", "RANDOM", "User-Agent preset (RANDOM, CHROME, FIREFOX, SAFARI, EDGE)")
-	discoverApplicationCmd.Flags().StringArray("web-servers", []string{}, "WebServer metadata values to pass through (repeatable)")
 
 	// Mark Required Flags
 	_ = discoverApplicationCmd.MarkFlagRequired("targets")
@@ -1580,7 +1574,7 @@ func parseDiscoverRequestFiles(pairs []string) ([]*discover.RequestFile, error) 
 }
 
 // getDiscoverApplicationConfig builds the config for application fingerprinting discovery.
-func getDiscoverApplicationConfig(targets []string, resource string, templatePaths []string, timeout int, threads int, proxy string, verboseLogs bool, globalRateLimit int, globalTimeout int, userAgent common.UserAgentPreset, ignoreCrossDomainRedirects bool, webServers []string) (*discover.DiscoverApplicationConfig, error) {
+func getDiscoverApplicationConfig(targets []string, resource string, templatePaths []string, timeout int, threads int, proxy string, verboseLogs bool, globalRateLimit int, globalTimeout int, userAgent common.UserAgentPreset, ignoreCrossDomainRedirects bool) (*discover.DiscoverApplicationConfig, error) {
 	resourceEnum, err := getDiscoverApplicationResourceConfigTypeFromString(resource)
 	if err != nil {
 		return nil, fmt.Errorf("invalid resource type: %s", resource)
@@ -1598,9 +1592,6 @@ func getDiscoverApplicationConfig(targets []string, resource string, templatePat
 		GlobalTimeout:              max(0, globalTimeout),
 		UserAgent:                  userAgent,
 		IgnoreCrossDomainRedirects: ignoreCrossDomainRedirects,
-	}
-	if len(webServers) > 0 {
-		config.WebServers = webServers
 	}
 
 	return config, nil

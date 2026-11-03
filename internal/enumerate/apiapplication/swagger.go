@@ -642,7 +642,6 @@ func handleSwaggerV2(document libopenapi.Document, report *enumerateapiapplicati
 				Method:             method,
 				QueryParams:        getQueryParamsV2(operation.Parameters),
 				PathParams:         getPathParamsV2(pathItem.Parameters, operation.Parameters, path),
-				PathParamExamples:  getPathParamExamplesV2(pathItem.Parameters, operation.Parameters),
 				Security:           securityRequirements,
 				Type:               enumerateapiapplicationfern.ApiTypeSwaggerV2,
 				Description:        operation.Description,
@@ -757,7 +756,6 @@ func handleOpenAPIV3(document libopenapi.Document, report *enumerateapiapplicati
 				Method:             method,
 				QueryParams:        getQueryParamsV3(operation.Parameters),
 				PathParams:         getPathParamsV3(pathItem.Parameters, operation.Parameters, path),
-				PathParamExamples:  getPathParamExamplesV3(pathItem.Parameters, operation.Parameters),
 				Security:           securityRequirements,
 				Type:               enumerateapiapplicationfern.ApiTypeSwaggerV3,
 				Description:        operation.Description,
@@ -845,21 +843,35 @@ func mergePathParamNames(declared []string, path string) []string {
 }
 
 // getPathParamsV2 extracts path parameters for Swagger (OpenAPI 2.0).
-func getPathParamsV2(pathItemParams []*v2.Parameter, operationParams []*v2.Parameter, path string) []string {
+func getPathParamsV2(pathItemParams []*v2.Parameter, operationParams []*v2.Parameter, path string) []*enumerateapiapplicationfern.ApiApplicationPathParam {
 	var declared []string
 	for _, param := range effectivePathParamsV2(pathItemParams, operationParams) {
 		declared = append(declared, param.Name)
 	}
-	return mergePathParamNames(declared, path)
+	return buildPathParams(mergePathParamNames(declared, path), getPathParamExamplesV2(pathItemParams, operationParams))
 }
 
 // getPathParamsV3 extracts path parameters for OpenAPI 3.0+.
-func getPathParamsV3(pathItemParams []*v3.Parameter, operationParams []*v3.Parameter, path string) []string {
+func getPathParamsV3(pathItemParams []*v3.Parameter, operationParams []*v3.Parameter, path string) []*enumerateapiapplicationfern.ApiApplicationPathParam {
 	var declared []string
 	for _, param := range effectivePathParamsV3(pathItemParams, operationParams) {
 		declared = append(declared, param.Name)
 	}
-	return mergePathParamNames(declared, path)
+	return buildPathParams(mergePathParamNames(declared, path), getPathParamExamplesV3(pathItemParams, operationParams))
+}
+
+func buildPathParams(names []string, examples map[string][]string) []*enumerateapiapplicationfern.ApiApplicationPathParam {
+	if len(names) == 0 {
+		return nil
+	}
+	params := make([]*enumerateapiapplicationfern.ApiApplicationPathParam, 0, len(names))
+	for _, name := range names {
+		params = append(params, &enumerateapiapplicationfern.ApiApplicationPathParam{
+			Name:          name,
+			ExampleValues: examples[name],
+		})
+	}
+	return params
 }
 
 // Operation parameters override path-item parameters with the same name and location.

@@ -268,8 +268,18 @@ func ParseBodyParams(postData string) ([]*discover.RouteParam, error) {
 		if err := json.Unmarshal([]byte(jsonBody), &elements); err != nil {
 			return nil, fmt.Errorf("failed to parse json: %v", err)
 		}
-		// A top-level array has no named fields to report as body parameters.
-		return nil, nil
+		for _, element := range elements {
+			objectBody := strings.TrimSpace(string(element))
+			if !strings.HasPrefix(objectBody, "{") {
+				continue
+			}
+			params, err := ParseBodyParams(objectBody)
+			if err != nil {
+				return bodyParams, err
+			}
+			bodyParams = MergeBodyParams(bodyParams, params)
+		}
+		return bodyParams, nil
 	}
 
 	// For simplicity, assume the body is JSON or form-urlencoded

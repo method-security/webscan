@@ -2,6 +2,7 @@ package discoverroute_test
 
 import (
 	"reflect"
+	"sort"
 	"testing"
 
 	common "github.com/Method-Security/webscan/generated/go/common"
@@ -19,6 +20,29 @@ func TestParseBodyParams(t *testing.T) {
 		{
 			name: "JSON subscription array",
 			body: `[{"id":"4","channel":"/meta/subscribe","subscription":"/sn/meta/channel_redirect/example","clientId":"example"}]`,
+			want: map[string][]string{
+				"id":           {`"4"`},
+				"channel":      {`"/meta/subscribe"`},
+				"subscription": {`"/sn/meta/channel_redirect/example"`},
+				"clientId":     {`"example"`},
+			},
+		},
+		{
+			name: "JSON array merges names and distinct examples",
+			body: `[{"id":"4","channel":"/meta/subscribe"},{"id":"5","clientId":"example"},{"id":"4"}]`,
+			want: map[string][]string{
+				"id":       {`"4"`, `"5"`},
+				"channel":  {`"/meta/subscribe"`},
+				"clientId": {`"example"`},
+			},
+		},
+		{
+			name: "mixed JSON array extracts object fields",
+			body: `[{"id":4,"details":{"enabled":true}},null,5,"text",[{"nested":"ignored"}],{"id":5}]`,
+			want: map[string][]string{
+				"id":      {"4", "5"},
+				"details": {`{"enabled":true}`},
+			},
 		},
 		{
 			name: "JSON array with whitespace",
@@ -59,6 +83,10 @@ func TestParseBodyParams(t *testing.T) {
 				got = make(map[string][]string)
 			}
 			for _, param := range params {
+				if _, exists := got[param.Name]; exists {
+					t.Fatalf("duplicate parameter name %q", param.Name)
+				}
+				sort.Strings(param.ExampleValues)
 				got[param.Name] = param.ExampleValues
 			}
 			if !reflect.DeepEqual(got, tt.want) {

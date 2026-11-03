@@ -1,12 +1,72 @@
 package discoverroute_test
 
 import (
+	"reflect"
 	"testing"
 
 	common "github.com/Method-Security/webscan/generated/go/common"
 	"github.com/Method-Security/webscan/generated/go/discover"
 	discoverroute "github.com/Method-Security/webscan/internal/discover/route/helpers"
 )
+
+func TestParseBodyParams(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		body    string
+		want    map[string][]string
+		wantErr bool
+	}{
+		{
+			name: "JSON subscription array",
+			body: `[{"id":"4","channel":"/meta/subscribe","subscription":"/sn/meta/channel_redirect/example","clientId":"example"}]`,
+		},
+		{
+			name: "JSON array with whitespace",
+			body: " \n\t[1,2,3] \n",
+		},
+		{
+			name: "empty JSON array",
+			body: `[]`,
+		},
+		{
+			name:    "malformed JSON array",
+			body:    `[{"id":"4"}`,
+			wantErr: true,
+		},
+		{
+			name: "JSON object with whitespace",
+			body: " \n" + `{"name":"example","count":2}`,
+			want: map[string][]string{"name": {`"example"`}, "count": {"2"}},
+		},
+		{
+			name: "nested JSON array remains a field value",
+			body: `{"ids":[1,2]}`,
+			want: map[string][]string{"ids": {`[1,2]`}},
+		},
+		{
+			name: "form values including JSON",
+			body: `name=example&ids=%5B1%2C2%5D&flag=`,
+			want: map[string][]string{"name": {"example"}, "ids": {"[1,2]"}, "flag": {}},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			params, err := discoverroute.ParseBodyParams(tt.body)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("ParseBodyParams() error = %v, want error %v", err, tt.wantErr)
+			}
+			var got map[string][]string
+			if len(params) > 0 {
+				got = make(map[string][]string)
+			}
+			for _, param := range params {
+				got[param.Name] = param.ExampleValues
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("ParseBodyParams() = %#v, want %#v", got, tt.want)
+			}
+		})
+	}
+}
 
 func routeAt(path string) *discover.RouteDetails {
 	return &discover.RouteDetails{

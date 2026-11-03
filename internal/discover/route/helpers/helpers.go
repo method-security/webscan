@@ -262,12 +262,21 @@ func ParseQueryParams(reqURL *url.URL) []*discover.RouteParam {
 // ParseBodyParams parses body parameters from a JSON or form-urlencoded string into RouteParam structs.
 func ParseBodyParams(postData string) ([]*discover.RouteParam, error) {
 	var bodyParams []*discover.RouteParam
+	jsonBody := strings.TrimSpace(postData)
+	if strings.HasPrefix(jsonBody, "[") {
+		var elements []json.RawMessage
+		if err := json.Unmarshal([]byte(jsonBody), &elements); err != nil {
+			return nil, fmt.Errorf("failed to parse json: %v", err)
+		}
+		// A top-level array has no named fields to report as body parameters.
+		return nil, nil
+	}
 
 	// For simplicity, assume the body is JSON or form-urlencoded
-	if strings.HasPrefix(postData, "{") {
+	if strings.HasPrefix(jsonBody, "{") {
 		// Try to parse JSON
 		var jsonData map[string]interface{}
-		if err := json.Unmarshal([]byte(postData), &jsonData); err == nil {
+		if err := json.Unmarshal([]byte(jsonBody), &jsonData); err == nil {
 			for key, value := range jsonData {
 				if key == "" {
 					continue

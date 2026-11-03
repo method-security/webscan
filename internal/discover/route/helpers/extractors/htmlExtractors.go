@@ -78,18 +78,18 @@ func ExtractFormRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig
 		routeVar.Method = common.HttpMethod(method)
 
 		// Collect input names
-		var queryParams []*discover.RouteQueryParam
-		var bodyParams []*discover.RouteBodyParam
+		var queryParams []*discover.RouteParam
+		var bodyParams []*discover.RouteParam
 		s.Find("input[name], select[name], textarea[name]").Each(func(_ int, input *goquery.Selection) {
 			name, _ := input.Attr("name")
 			if name != "" {
 				if method == "POST" || method == "PUT" || method == "PATCH" {
 					// For POST, PUT, PATCH methods, add to BodyParams
-					param := &discover.RouteBodyParam{Name: name}
+					param := &discover.RouteParam{Name: name}
 					bodyParams = append(bodyParams, param)
 				} else {
 					// For GET and other methods, add to QueryParams
-					param := &discover.RouteQueryParam{Name: name}
+					param := &discover.RouteParam{Name: name}
 					queryParams = append(queryParams, param)
 				}
 			}
@@ -136,7 +136,7 @@ func ExtractAnchorRoutes(doc *goquery.Document, baseURL string, routeCaptureConf
 			return
 		}
 
-		var queryParams []*discover.RouteQueryParam
+		var queryParams []*discover.RouteParam
 		if parsedFullURL.RawQuery != "" {
 			queryParams = discoverroutehelpers.ParseQueryParams(parsedFullURL)
 		}

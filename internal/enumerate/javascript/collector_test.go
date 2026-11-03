@@ -380,6 +380,30 @@ func TestAnalyzeRootsRelativePathsAgainstTheOwningApplication(t *testing.T) {
 	}
 }
 
+func TestAnalyzeAttachesPathParamExamplesAcrossRootRelativeAndAbsoluteSiblings(t *testing.T) {
+	c := testCollector(0)
+	c.analyzed("https://app.example.com/main.js", enumerate.JavascriptArtifactKindEntry,
+		`const env = { apiUrl: "https://app.example.com/api" };`+
+			`const routes = ["/api/orders/:orderId", "https://app.example.com/api/orders/12"];`,
+		[]string{"https://app.example.com"})
+
+	result := c.analyze(enumerate.EnumerateJavascriptConfig{})
+	if len(result.applications) != 1 {
+		t.Fatalf("expected one application, got %d", len(result.applications))
+	}
+
+	for _, endpoint := range result.applications[0].Endpoints {
+		if endpoint.Path != "/api/orders/{orderId}" {
+			continue
+		}
+		if len(endpoint.PathParams) != 1 || endpoint.PathParams[0].ExampleValue == nil || *endpoint.PathParams[0].ExampleValue != "12" {
+			t.Fatalf("expected the absolute sibling to provide orderId=12, got %v", endpoint.PathParams)
+		}
+		return
+	}
+	t.Fatalf("expected the rooted path template, got %v", result.applications[0].Endpoints)
+}
+
 // A bundle calling an API on a sibling host names an application of its own, rather than filing the
 // endpoint under whichever application happened to load the bundle.
 func TestAnalyzeFilesEndpointsUnderTheHostServingThem(t *testing.T) {

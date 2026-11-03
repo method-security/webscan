@@ -61,6 +61,30 @@ func TestGetPathParamExamplesV3IgnoresNonPathAndNonScalarValues(t *testing.T) {
 	}
 }
 
+func TestGetQueryParamsV2IncludesStructuredExamples(t *testing.T) {
+	params := getQueryParamsV2([]*v2.Parameter{{
+		Name:    "status",
+		In:      "query",
+		Default: scalarNode("available"),
+		Enum:    []*schemayaml.Node{scalarNode("available"), scalarNode("pending")},
+	}})
+
+	if len(params) != 1 {
+		t.Fatalf("expected one query param, got %v", params)
+	}
+	if params[0].Name != "status" || len(params[0].ExampleValues) != 2 || params[0].ExampleValues[0] != "available" || params[0].ExampleValues[1] != "pending" {
+		t.Fatalf("expected structured query examples, got %v", params[0])
+	}
+}
+
+func TestGetQueryParamsV3IncludesStructuredExamples(t *testing.T) {
+	params := getQueryParamsV3([]*v3.Parameter{{Name: "filter", In: "query", Example: scalarNode("active")}})
+
+	if len(params) != 1 || params[0].Name != "filter" || len(params[0].ExampleValues) != 1 || params[0].ExampleValues[0] != "active" {
+		t.Fatalf("expected structured query examples, got %v", params)
+	}
+}
+
 func TestGetPathParamsV3IncludesStructuredExamplesAndTemplateOnlyParams(t *testing.T) {
 	params := getPathParamsV3(nil, []*v3.Parameter{{
 		Name:    "orderId",

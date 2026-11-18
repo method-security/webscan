@@ -10,7 +10,9 @@ import (
 
 	"github.com/Method-Security/pkg/signal"
 	"github.com/Method-Security/pkg/writer"
+	common "github.com/Method-Security/webscan/generated/go/common"
 	"github.com/Method-Security/webscan/internal/config"
+	"github.com/Method-Security/webscan/utils"
 	"github.com/palantir/pkg/datetime"
 	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 	"github.com/spf13/cobra"
@@ -127,4 +129,17 @@ func validateOutputFormat(output string) (writer.Format, error) {
 		return writer.Format{}, errors.New("invalid output format. Valid formats are: json, yaml, signal")
 	}
 	return writer.NewFormat(format), nil
+}
+
+// scopeFromFlags builds the seed scope from --scope-domain and --scope-cidr, or nil when neither is set.
+func scopeFromFlags(cmd *cobra.Command) (*common.Scope, error) {
+	domains, err := cmd.Flags().GetStringSlice("scope-domain")
+	if err != nil {
+		return nil, err
+	}
+	cidrs, err := cmd.Flags().GetStringSlice("scope-cidr")
+	if err != nil {
+		return nil, err
+	}
+	return utils.NewScope(domains, cidrs)
 }

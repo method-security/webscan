@@ -578,12 +578,12 @@ func (b *Requester) sendRequestWithArtifactsOnce(ctx context.Context, config com
 	redirectChainMu.Lock()
 	finalRedirectChain := append([]string(nil), redirectChain...)
 	redirectChainMu.Unlock()
-	if config.IgnoreCrossDomainRedirects && len(finalRedirectChain) > 1 {
+	if len(finalRedirectChain) > 1 {
 		originalURL := finalRedirectChain[0]
 		finalURL := finalRedirectChain[len(finalRedirectChain)-1]
-		if isCrossDomainRedirect(originalURL, finalURL) {
-			log.Info("Cross-domain redirect detected in redirect chain", svc1log.SafeParam("from", originalURL), svc1log.SafeParam("to", finalURL))
-			return common.HttpRequestResponse{Request: config.Request}, screenshot, metadata, fmt.Errorf("cross-domain redirect blocked: %s -> %s", originalURL, finalURL)
+		if isOutOfScopeRedirect(config.Scope, originalURL, finalURL) {
+			log.Info("Out-of-scope redirect detected in redirect chain", svc1log.SafeParam("from", originalURL), svc1log.SafeParam("to", finalURL))
+			return common.HttpRequestResponse{Request: config.Request}, screenshot, metadata, fmt.Errorf("out-of-scope redirect blocked: %s -> %s", originalURL, finalURL)
 		}
 	}
 

@@ -428,24 +428,17 @@ func NormalizeURLForIdentity(rawURL string) string {
 // IsURLAllowed checks if a target URL is allowed based on the scope anchor, host
 // matching, and static-asset policy. When captureStaticAssets is false, static
 // asset URLs (e.g. PDFs, images, archives, and JS bundles) are rejected so they
-// are not recorded as routes or queued for spidering. When ignoreCrossDomain is
-// true, scope is anchored on the full host of scopeURL — which callers set to the
-// original discovery target (config.Target), NOT the per-page post-redirect host —
-// so scope stays tight to the target the user requested: the target host and its
-// subdomains (children) are in scope, while the apex domain and sibling subdomains
-// (e.g. careers.example.com when the target is www.example.com) are treated as out
-// of scope.
-func IsURLAllowed(scopeURL string, targetURL string, ignoreCrossDomain bool, captureStaticAssets bool) bool {
+// are not recorded as routes or queued for spidering. Scope is anchored on the full
+// host of scopeURL, which callers set to config.Target rather than the per-page
+// post-redirect host, and widened by the seeds in scope.
+func IsURLAllowed(scopeURL string, targetURL string, captureStaticAssets bool, scope *common.Scope) bool {
 	if IsKnownProviderNoiseURL(targetURL) {
 		return false
 	}
 	if !captureStaticAssets && utils.IsStaticAsset(targetURL) {
 		return false
 	}
-	if ignoreCrossDomain {
-		return utils.IsHostInScope(scopeURL, targetURL)
-	}
-	return true
+	return utils.HostAllowed(scope, scopeURL, targetURL)
 }
 
 // IsKnownProviderNoiseURL reports URL-only provider infrastructure endpoints
@@ -551,11 +544,11 @@ func isOpaquePathSegment(segment string) bool {
 // surfaces in the StaticAssets output instead. A non-asset URL returns false and
 // is left for the caller to handle as a normal route. scopeURL is the scope anchor
 // (config.Target) used for the in-scope check.
-func CaptureStaticAssetReference(urls map[string]struct{}, scopeURL string, fullURL string, ignoreCrossDomain bool, captureStaticAssets bool) bool {
+func CaptureStaticAssetReference(urls map[string]struct{}, scopeURL string, fullURL string, captureStaticAssets bool, scope *common.Scope) bool {
 	if !utils.IsStaticAsset(fullURL) {
 		return false
 	}
-	if IsURLAllowed(scopeURL, fullURL, ignoreCrossDomain, captureStaticAssets) {
+	if IsURLAllowed(scopeURL, fullURL, captureStaticAssets, scope) {
 		urls[fullURL] = struct{}{}
 	}
 	return true

@@ -104,14 +104,14 @@ func TestAnalyzeSourceDropsStaticAssetReferences(t *testing.T) {
 func TestBaseCandidatesInScopeExcludesThirdPartyOrigins(t *testing.T) {
 	candidates := []string{"https://portal.example.com/serviceapi/v1", "https://identity.other.com/"}
 
-	kept := enumeratejavascript.BaseCandidatesInScope(candidates, []string{"portal.example.com"}, true)
+	kept := enumeratejavascript.BaseCandidatesInScope(candidates, []string{"portal.example.com"}, nil)
 	if len(kept) != 1 || kept[0] != "https://portal.example.com/serviceapi/v1" {
 		t.Fatalf("expected only the in-scope origin, got %v", kept)
 	}
 
-	kept = enumeratejavascript.BaseCandidatesInScope(candidates, []string{"portal.example.com"}, false)
+	kept = enumeratejavascript.BaseCandidatesInScope(candidates, []string{"portal.example.com"}, &common.Scope{Domains: []string{"other.com"}, Cidrs: []string{}})
 	if len(kept) != 2 {
-		t.Fatalf("expected both origins when scoping is off, got %v", kept)
+		t.Fatalf("expected the seeded origin to be kept, got %v", kept)
 	}
 }
 
@@ -259,7 +259,7 @@ func TestBaseCandidatesInScopeSpansEveryAnalyzedHost(t *testing.T) {
 		"https://identity.other.com/auth",
 	}
 
-	kept := enumeratejavascript.BaseCandidatesInScope(candidates, []string{"portal.example.com", "cdn.example.net"}, true)
+	kept := enumeratejavascript.BaseCandidatesInScope(candidates, []string{"portal.example.com", "cdn.example.net"}, nil)
 	if len(kept) != 2 {
 		t.Fatalf("expected both analyzed hosts to stay in scope, got %v", kept)
 	}
@@ -574,5 +574,99 @@ $.ajax({url:'/api/report?scope=team&format=csv'});`)
 	}
 	if len(endpoint.Details.QueryParams) != 2 {
 		t.Fatalf("expected both parameter names to survive the merge, got %v", endpoint.Details.QueryParams)
+	}
+}
+
+func endpointAt(endpoints []*enumeratejavascript.Endpoint, base string, path string) *enumeratejavascript.Endpoint {
+	for _, endpoint := range endpoints {
+		if endpoint.BaseURL == base && endpoint.Details.Path == path {
+			return endpoint
+		}
+	}
+	return nil
+}
+
+func TestAnalyzeSourceRootsConcatenatedPathsOnTheResolvedBase(t *testing.T) {
+	source := []byte(`var A={initialize:function(){var t=null!=CFG.web.gatewayUrl?location.hostname.indexOf(".cn")>0?` +
+		`"https://svc.partner.example.net/gateway":CFG.web.gatewayUrl:"https://dev.svc.partner.example/gateway";` +
+		`this.lookupUrl=t+"/services/LookupService.php?func=Find&",` +
+		`gatewayUrl=null!=CFG.web.gatewayUrl?CFG.web.gatewayUrl:"https://svc.partner.example/gateway"},` +
+		`initPaths:function(){this.downloadUrl=gatewayUrl+"/services/LookupService.php?func=Fetch&"}};`)
+
+	analysis := enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0)
+
+	for _, base := range []string{"https://svc.partner.example.net", "https://dev.svc.partner.example", "https://svc.partner.example"} {
+		endpoint := endpointAt(analysis.Endpoints, base, "/gateway/services/LookupService.php")
+		if endpoint == nil || !endpoint.Rooted {
+			t.Fatalf("expected the lookup service under %s, got %v", base, pathsOf(analysis.Endpoints))
+		}
+	}
+	if endpointAt(analysis.Endpoints, "", "/services/LookupService.php") != nil {
+		t.Fatalf("expected no endpoint filed under the bundle's own host")
+	}
+}
+
+func TestAnalyzeSourceKeepsLocationConcatenationOnTheBundleHost(t *testing.T) {
+	source := []byte(`fetch(window.location.origin+"/api/session/current");`)
+
+	analysis := enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0)
+
+	endpoint := endpointAt(analysis.Endpoints, "", "/api/session/current")
+	if endpoint == nil || !endpoint.Rooted {
+		t.Fatalf("expected a root-relative endpoint on the bundle's host, got %v", pathsOf(analysis.Endpoints))
+	}
+}
+
+func TestAnalyzeSourceLeavesAnUnresolvedBaseConcatenationUnrooted(t *testing.T) {
+	source := []byte(`class S{list(){return fetch(this.cfg.apiBase+"/v1/orders/list")}}`)
+
+	analysis := enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0)
+
+	for _, endpoint := range analysis.Endpoints {
+		if strings.HasSuffix(endpoint.Details.Path, "/v1/orders/list") && endpoint.Rooted {
+			t.Fatalf("expected the path to wait for a base rather than root on the bundle's host, got %+v", endpoint)
+		}
+	}
+	if endpointAt(analysis.Endpoints, "", "/v1/orders/list") == nil {
+		t.Fatalf("expected the unrooted path to be reported, got %v", pathsOf(analysis.Endpoints))
+	}
+}
+
+func TestAnalyzeSourceKeepsAStandaloneLiteralAlongsideTheResolvedBase(t *testing.T) {
+	source := []byte(`fetch("/api/items/all");var apiBase="https://api.example.org/v2";function load(){return fetch(apiBase+"/api/items/all")}`)
+
+	analysis := enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0)
+
+	if endpointAt(analysis.Endpoints, "", "/api/items/all") == nil {
+		t.Fatalf("expected the standalone root-relative call to stay, got %v", pathsOf(analysis.Endpoints))
+	}
+	if endpointAt(analysis.Endpoints, "https://api.example.org", "/v2/api/items/all") == nil {
+		t.Fatalf("expected the concatenated call under its base, got %v", pathsOf(analysis.Endpoints))
+	}
+}
+
+func TestAnalyzeSourceDoesNotResolveAParameterToAGlobal(t *testing.T) {
+	source := []byte(`var t="https://other.example/base";function f(t){return fetch(t+"/x/records/get")}`)
+
+	analysis := enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0)
+
+	if endpointAt(analysis.Endpoints, "https://other.example", "/base/x/records/get") != nil {
+		t.Fatalf("expected the shadowing parameter to block the global base")
+	}
+}
+
+func TestAnalyzeSourceReusesTheBaseResolvedForTheSamePathElsewhere(t *testing.T) {
+	source := []byte(`function init(){var t="https://svc.partner.example/gateway";this.lookup=t+"/services/LookupService.php?func=Lookup&"}` +
+		`function send(){return $.ajax({url:this.cfg.base+"/services/LookupService.php",type:"POST"})}`)
+
+	analysis := enumeratejavascript.AnalyzeSource(source, sourceURL, 0, 0)
+
+	if endpointAt(analysis.Endpoints, "https://svc.partner.example", "/gateway/services/LookupService.php") == nil {
+		t.Fatalf("expected the path under the base resolved elsewhere, got %v", pathsOf(analysis.Endpoints))
+	}
+	for _, endpoint := range analysis.Endpoints {
+		if !endpoint.Rooted && strings.HasSuffix(endpoint.Details.Path, "/services/LookupService.php") {
+			t.Fatalf("expected no base-relative copy left to be guessed, got %+v", endpoint)
+		}
 	}
 }

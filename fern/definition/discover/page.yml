@@ -1,4 +1,5 @@
 imports:
+  scope: ../common/scope.yml
   http: ../common/http.yml
   method: ../common/method.yml
   waf: ../common/waf.yml
@@ -12,7 +13,7 @@ types:
       maxRedirects: integer
       verifyTls: boolean
       timeout: integer
-      ignoreCrossDomainRedirects: boolean
+      scope: optional<scope.Scope>
       userAgent: method.UserAgentPreset
       requestMethod: method.RequestMethod
       headlessConfig: optional<method.HeadlessRequestConfig>

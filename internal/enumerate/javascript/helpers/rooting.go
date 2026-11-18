@@ -6,6 +6,8 @@ import (
 	"sort"
 	"strings"
 
+	// Generated
+	common "github.com/Method-Security/webscan/generated/go/common"
 	// Utils
 	utils "github.com/Method-Security/webscan/utils"
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
@@ -168,13 +170,17 @@ func splitBase(base string) (string, string, error) {
 }
 
 // BaseCandidatesInScope keeps only the origins belonging to an analyzed host or a subdomain of one.
-func BaseCandidatesInScope(candidates []string, targetHosts []string, ignoreCrossDomain bool) []string {
-	if !ignoreCrossDomain || len(targetHosts) == 0 {
+func BaseCandidatesInScope(candidates []string, targetHosts []string, scope *common.Scope) []string {
+	if scope == nil && len(targetHosts) == 0 {
 		return candidates
 	}
 
 	kept := make([]string, 0, len(candidates))
 	for _, candidate := range candidates {
+		if utils.HostInSeedScope(scope, candidate) {
+			kept = append(kept, candidate)
+			continue
+		}
 		parsed, err := url.Parse(candidate)
 		if err != nil {
 			continue

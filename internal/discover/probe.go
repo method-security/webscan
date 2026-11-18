@@ -29,16 +29,16 @@ func createSendHTTPRequestConfig(ctx context.Context, baseURL, path string, quer
 	}
 
 	sendConfig := common.SendHttpRequestConfig{
-		Request:                    &request,
-		MaxRedirects:               config.MaxRedirects,
-		VerifyTls:                  config.VerifyTls,
-		Timeout:                    config.Timeout,
-		IgnoreCrossDomainRedirects: config.IgnoreCrossDomainRedirects,
-		UserAgent:                  config.UserAgent,
-		RequestMethod:              config.RequestMethod,
-		HeadlessConfig:             config.HeadlessConfig,
-		BrowserbaseConfig:          config.BrowserbaseConfig,
-		BrowserbaseSecrets:         browserbaseSecrets,
+		Request:            &request,
+		MaxRedirects:       config.MaxRedirects,
+		VerifyTls:          config.VerifyTls,
+		Timeout:            config.Timeout,
+		Scope:              config.Scope,
+		UserAgent:          config.UserAgent,
+		RequestMethod:      config.RequestMethod,
+		HeadlessConfig:     config.HeadlessConfig,
+		BrowserbaseConfig:  config.BrowserbaseConfig,
+		BrowserbaseSecrets: browserbaseSecrets,
 	}
 
 	// Add proxy settings from context

@@ -66,14 +66,14 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 	// This mirrors the headless transport, which compares the first and last entries of
 	// the redirect chain rather than every hop.
 	finalizeResponse := func(resp *http.Response) (*http.Response, []string, error) {
-		if config.IgnoreCrossDomainRedirects && !utils.IsHostInScope(url, currentURL) {
-			log.Info("Blocking cross-domain redirect", svc1log.SafeParam("from", url), svc1log.SafeParam("to", currentURL))
+		if !utils.HostAllowed(config.Scope, url, currentURL) {
+			log.Info("Blocking out-of-scope redirect", svc1log.SafeParam("from", url), svc1log.SafeParam("to", currentURL))
 			if resp != nil {
 				if closeErr := resp.Body.Close(); closeErr != nil {
 					log.Error("Failed to close response body", svc1log.SafeParam("error", closeErr.Error()))
 				}
 			}
-			return nil, redirectChain, fmt.Errorf("cross-domain redirect blocked: %s -> %s", url, currentURL) // Dont change this comment used for DD metric
+			return nil, redirectChain, fmt.Errorf("out-of-scope redirect blocked: %s -> %s", url, currentURL) // Dont change this comment used for DD metric
 		}
 		return resp, redirectChain, nil
 	}

@@ -67,7 +67,7 @@ func RunNucleiEngine(ctx context.Context, config nuclei.NucleiConfig) ([]*nuclei
 	}
 
 	// Build the report builder and run the nuclei engine
-	builder := report.NewBuilder(config.Targets, config.IgnoreCrossDomainRedirects)
+	builder := report.NewBuilder(config.Targets, config.Scope)
 	return runner.Run(ctx, runnerConfig, builder)
 }
 

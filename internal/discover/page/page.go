@@ -38,21 +38,21 @@ func getHTTPRequestConfig(baseURL string, path string, queryParams map[string]st
 	// the rendered-page output contract; the standard transport ignores both flags.
 	captureBrowserArtifacts := config.RequestMethod == common.RequestMethodHeadless || config.RequestMethod == common.RequestMethodBrowserbase
 	return common.SendHttpRequestConfig{
-		Request:                    &request,
-		MaxRedirects:               config.MaxRedirects,
-		VerifyTls:                  config.VerifyTls,
-		Timeout:                    config.Timeout,
-		IgnoreCrossDomainRedirects: config.IgnoreCrossDomainRedirects,
-		UserAgent:                  config.UserAgent,
-		RequestMethod:              config.RequestMethod,
-		HeadlessConfig:             config.HeadlessConfig,
-		BrowserbaseConfig:          config.BrowserbaseConfig,
-		BrowserbaseSecrets:         browserbaseSecrets,
-		Cookies:                    config.Cookies,
-		LocalStorage:               config.LocalStorage,
-		SessionStorage:             config.SessionStorage,
-		CaptureConsoleLogs:         &captureBrowserArtifacts,
-		CaptureCookies:             &captureBrowserArtifacts,
+		Request:            &request,
+		MaxRedirects:       config.MaxRedirects,
+		VerifyTls:          config.VerifyTls,
+		Timeout:            config.Timeout,
+		Scope:              config.Scope,
+		UserAgent:          config.UserAgent,
+		RequestMethod:      config.RequestMethod,
+		HeadlessConfig:     config.HeadlessConfig,
+		BrowserbaseConfig:  config.BrowserbaseConfig,
+		BrowserbaseSecrets: browserbaseSecrets,
+		Cookies:            config.Cookies,
+		LocalStorage:       config.LocalStorage,
+		SessionStorage:     config.SessionStorage,
+		CaptureConsoleLogs: &captureBrowserArtifacts,
+		CaptureCookies:     &captureBrowserArtifacts,
 	}
 }
 

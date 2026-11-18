@@ -22,9 +22,12 @@ webscan discover [command]
 
 ## Common Flags
 
-The following flag is available on all `discover` subcommands:
+The following flags are available on all `discover` subcommands:
 
-- `--ignore-cross-domain-redirects` (bool, default: `true`) — Do not follow redirects to a different domain and treat them as errors
+- `--scope-domain` (repeatable) — Seed domain; the domain and its subdomains are in scope alongside the target
+- `--scope-cidr` (repeatable) — Seed CIDR or IP; IP-literal hosts inside it are in scope alongside the target
+
+A host outside the target, its subdomains and the seeds is neither followed nor recorded. A blocked redirect fails with `out-of-scope redirect blocked`.
 
 ## Commands
 
@@ -247,8 +250,6 @@ Flags:
       --collect-static-assets           Collect static assets from route discovery
       --headless-path string            Path to headless browser executable
   -h, --help                            help for route
-      --ignore-cross-domain-routes             Ignore discovered routes whose host is not the target host or a subdomain of it (default true)
-      --ignore-cross-domain-static-assets      Ignore discovered static assets whose host is not the target host or a subdomain of it (default true)
       --max-redirects int               Maximum number of redirects to follow (default 10)
       --min-dom-stabalize-time int      Minimum time to wait for DOM stabilization in seconds (default 20)
       --request-method string           Request method to use (standard, headless, browserbase) (default "HEADLESS")
@@ -323,7 +324,6 @@ Usage:
 
 Flags:
   -h, --help                  help for wordlist
-      --ignore-cross-domain   Ignore links that lead to a different domain (default true)
       --include-alt-text      Include words from image alt attributes
       --include-comments      Include words from HTML comments
       --include-metadata      Include words from meta tag content

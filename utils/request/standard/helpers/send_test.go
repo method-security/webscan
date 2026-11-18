@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -46,4 +47,49 @@ func TestSendHTTPRequestReusesContextClientConnections(t *testing.T) {
 	if got := newConnections.Load(); got != 1 {
 		t.Fatalf("expected one reused connection, got %d", got)
 	}
+}
+
+func TestSendHTTPRequestScopeDecidesCrossDomainRedirects(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/landed" {
+			_, _ = io.WriteString(w, "ok")
+			return
+		}
+		http.Redirect(w, r, strings.Replace(serverURL(r), "127.0.0.1", "localhost", 1)+"/landed", http.StatusFound)
+	}))
+	defer server.Close()
+
+	cases := []struct {
+		name    string
+		scope   *common.Scope
+		blocked bool
+	}{
+		{"another host is blocked without seeds", nil, true},
+		{"seeded host is followed", &common.Scope{Domains: []string{"localhost"}, Cidrs: []string{}}, false},
+		{"unseeded host is blocked", &common.Scope{Domains: []string{"other.test"}, Cidrs: []string{}}, true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			config := common.SendHttpRequestConfig{
+				Request:      &common.HttpRequest{Method: common.HttpMethodGet},
+				Timeout:      5,
+				MaxRedirects: 3,
+				Scope:        c.scope,
+			}
+			resp, _, err := standardhelpers.SendHTTPRequest(context.Background(), server.URL+"/start", nil, nil, config)
+			if resp != nil {
+				_ = resp.Body.Close()
+			}
+			if c.blocked && (err == nil || !strings.Contains(err.Error(), "out-of-scope redirect blocked")) {
+				t.Fatalf("expected the redirect to be blocked, got %v", err)
+			}
+			if !c.blocked && err != nil {
+				t.Fatalf("expected the redirect to be followed, got %v", err)
+			}
+		})
+	}
+}
+
+func serverURL(r *http.Request) string {
+	return "http://" + r.Host
 }

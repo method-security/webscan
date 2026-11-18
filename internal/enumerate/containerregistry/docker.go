@@ -143,6 +143,7 @@ func createSendHTTPRequestConfig(baseURL, path string, queryParams map[string]st
 	}
 	return common.SendHttpRequestConfig{
 		Request:            &request,
+		Scope:              utils.UnrestrictedScope(),
 		MaxRedirects:       0,
 		VerifyTls:          verifyTLS,
 		Timeout:            timeout,

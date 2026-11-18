@@ -626,6 +626,7 @@ func fetchResource(ctx context.Context, config enumerate.EnumerateJavascriptConf
 	}
 	sendConfig := common.SendHttpRequestConfig{
 		Request:       &httpRequest,
+		Scope:         utils.UnrestrictedScope(),
 		MaxRedirects:  config.MaxRedirects,
 		VerifyTls:     config.VerifyTls,
 		Timeout:       config.Timeout,

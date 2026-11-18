@@ -482,7 +482,7 @@ func TestAnalyzeRootsAgainstABaseOnAnotherTargetedHost(t *testing.T) {
 	t.Fatalf("expected an application for the serving host, got %v", result.applications)
 }
 
-func TestAnalyzeRootsAgainstABaseOnASeededDomain(t *testing.T) {
+func TestAnalyzeDoesNotGuessASeededBaseForAnUnlinkedPath(t *testing.T) {
 	config := enumerate.EnumerateJavascriptConfig{
 		Targets: []string{"https://www.example.com"},
 		Scope:   &common.Scope{Domains: []string{"example.com", "partner.example"}, Cidrs: []string{}},
@@ -503,9 +503,21 @@ func TestAnalyzeRootsAgainstABaseOnASeededDomain(t *testing.T) {
 		t.Fatalf("expected an unseeded host to be dropped, got %v", byBase["https://facebook.com"])
 	}
 	serving := byBase["https://api.partner.example"]
-	if serving == nil || len(serving.Endpoints) != 1 || serving.Endpoints[0].Path != "/gateway/services/LookupService.php" {
-		t.Fatalf("expected the lookup API under the seeded host, got %v", serving)
+	if serving == nil || !hasEndpointPath(serving, "/gateway") {
+		t.Fatalf("expected the seeded base literal to be kept, got %v", serving)
 	}
+	if hasEndpointPath(serving, "/gateway/services/LookupService.php") {
+		t.Fatalf("expected the unlinked path not to be guessed onto the seeded base, got %v", serving.Endpoints)
+	}
+}
+
+func hasEndpointPath(application *enumerate.JavascriptApplicationDetails, path string) bool {
+	for _, endpoint := range application.Endpoints {
+		if endpoint.Path == path {
+			return true
+		}
+	}
+	return false
 }
 
 func TestAnalyzeDropsTheSeededDomainBaseWithoutScope(t *testing.T) {
@@ -546,7 +558,7 @@ func TestAnalyzeFilesAConcatenatedPathUnderItsSeededBaseNotTheLoader(t *testing.
 			t.Fatalf("scoped=%v: expected nothing filed under the loading host, got %v", scoped, loader.Endpoints)
 		}
 		serving := byBase["https://svc.partner.example"]
-		if scoped && (serving == nil || len(serving.Endpoints) != 1 || serving.Endpoints[0].Path != "/gateway/services/LookupService.php") {
+		if scoped && (serving == nil || !hasEndpointPath(serving, "/gateway/services/LookupService.php")) {
 			t.Fatalf("expected the lookup service under the seeded base, got %v", serving)
 		}
 		if !scoped && serving != nil {

@@ -104,14 +104,9 @@ func TestAnalyzeSourceDropsStaticAssetReferences(t *testing.T) {
 func TestBaseCandidatesInScopeExcludesThirdPartyOrigins(t *testing.T) {
 	candidates := []string{"https://portal.example.com/serviceapi/v1", "https://identity.other.com/"}
 
-	kept := enumeratejavascript.BaseCandidatesInScope(candidates, []string{"portal.example.com"}, nil)
+	kept := enumeratejavascript.BaseCandidatesInScope(candidates, []string{"portal.example.com"})
 	if len(kept) != 1 || kept[0] != "https://portal.example.com/serviceapi/v1" {
 		t.Fatalf("expected only the in-scope origin, got %v", kept)
-	}
-
-	kept = enumeratejavascript.BaseCandidatesInScope(candidates, []string{"portal.example.com"}, &common.Scope{Domains: []string{"other.com"}, Cidrs: []string{}})
-	if len(kept) != 2 {
-		t.Fatalf("expected the seeded origin to be kept, got %v", kept)
 	}
 }
 
@@ -259,7 +254,7 @@ func TestBaseCandidatesInScopeSpansEveryAnalyzedHost(t *testing.T) {
 		"https://identity.other.com/auth",
 	}
 
-	kept := enumeratejavascript.BaseCandidatesInScope(candidates, []string{"portal.example.com", "cdn.example.net"}, nil)
+	kept := enumeratejavascript.BaseCandidatesInScope(candidates, []string{"portal.example.com", "cdn.example.net"})
 	if len(kept) != 2 {
 		t.Fatalf("expected both analyzed hosts to stay in scope, got %v", kept)
 	}

@@ -974,8 +974,6 @@ a deduplicated set before anything is retrieved, so a bundle shared by many page
 	enumerateJavascriptCmd.Flags().Int("max-artifacts", 50, "Maximum number of artifacts to retrieve across the run, targets included (0 = unlimited)")
 	enumerateJavascriptCmd.Flags().Int("analysis-window-bytes", javascripthelpers.DefaultWindowBytes, "Bytes of source analyzed per parse")
 	enumerateJavascriptCmd.Flags().Int("analysis-window-overlap-bytes", javascripthelpers.DefaultWindowOverlapBytes, "Bytes each analysis window overlaps the previous one")
-	enumerateJavascriptCmd.Flags().Bool("ignore-cross-domain-endpoints", true, "Deprecated")
-	_ = enumerateJavascriptCmd.Flags().MarkDeprecated("ignore-cross-domain-endpoints", "has no effect; scope is the target plus --scope-domain and --scope-cidr")
 	enumerateJavascriptCmd.Flags().StringSlice("scope-domain", []string{}, "Seed domain whose host and subdomains are in scope alongside the target; widens scope beyond the target")
 	enumerateJavascriptCmd.Flags().StringSlice("scope-cidr", []string{}, "Seed CIDR or IP whose IP-literal hosts are in scope alongside the target; widens scope beyond the target")
 	enumerateJavascriptCmd.Flags().Int("max-redirects", 3, "Maximum number of redirects to follow")

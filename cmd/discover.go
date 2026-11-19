@@ -42,8 +42,6 @@ func (a *WebScan) InitDiscoverCommand() {
 	}
 
 	// General Discover Flags
-	discoverCmd.PersistentFlags().Bool("ignore-cross-domain-redirects", true, "Deprecated")
-	_ = discoverCmd.PersistentFlags().MarkDeprecated("ignore-cross-domain-redirects", "has no effect; scope is the target plus --scope-domain and --scope-cidr")
 	discoverCmd.PersistentFlags().StringSlice("scope-domain", []string{}, "Seed domain whose host and subdomains are in scope alongside the target; widens scope beyond the target")
 	discoverCmd.PersistentFlags().StringSlice("scope-cidr", []string{}, "Seed CIDR or IP whose IP-literal hosts are in scope alongside the target; widens scope beyond the target")
 
@@ -1060,10 +1058,6 @@ func (a *WebScan) InitDiscoverCommand() {
 	// Target Flags
 	discoverRouteCmd.Flags().String("target", "", "URL target to discover routes from")
 	// Config Flags
-	discoverRouteCmd.Flags().Bool("ignore-cross-domain-routes", true, "Deprecated")
-	_ = discoverRouteCmd.Flags().MarkDeprecated("ignore-cross-domain-routes", "has no effect; scope is the target plus --scope-domain and --scope-cidr")
-	discoverRouteCmd.Flags().Bool("ignore-cross-domain-static-assets", true, "Deprecated")
-	_ = discoverRouteCmd.Flags().MarkDeprecated("ignore-cross-domain-static-assets", "has no effect; scope is the target plus --scope-domain and --scope-cidr")
 	discoverRouteCmd.Flags().Bool("collect-static-assets", false, "Collect static assets from route discovery")
 	discoverRouteCmd.Flags().Int("spider-depth", 1, "Maximum depth for route spidering")
 	discoverRouteCmd.Flags().Int("max-redirects", 10, "Maximum number of redirects to follow")
@@ -1371,8 +1365,6 @@ func (a *WebScan) InitDiscoverCommand() {
 	discoverWordlistCmd.Flags().Bool("include-metadata", false, "Include words from meta tag content")
 	discoverWordlistCmd.Flags().Bool("include-comments", false, "Include words from HTML comments")
 	discoverWordlistCmd.Flags().Bool("include-alt-text", false, "Include words from image alt attributes")
-	discoverWordlistCmd.Flags().Bool("ignore-cross-domain", true, "Deprecated")
-	_ = discoverWordlistCmd.Flags().MarkDeprecated("ignore-cross-domain", "has no effect; scope is the target plus --scope-domain and --scope-cidr")
 	discoverWordlistCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
 	discoverWordlistCmd.Flags().Int("timeout", 30, "Timeout per request in seconds")
 	discoverWordlistCmd.Flags().Int("threads", 5, "Number of concurrent threads for crawling")

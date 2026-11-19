@@ -3,7 +3,6 @@ package utils_test
 import (
 	"testing"
 
-	common "github.com/Method-Security/webscan/generated/go/common"
 	"github.com/Method-Security/webscan/utils"
 )
 
@@ -52,7 +51,7 @@ func TestScopeOfIsNilWithoutDomainsOrCidrs(t *testing.T) {
 }
 
 func TestHostInSeedScope(t *testing.T) {
-	scope := &common.Scope{
+	scope := &utils.Scope{
 		Domains: []string{"example.com", "partner.example"},
 		Cidrs:   []string{"198.51.100.0/24", "2001:db8::/32"},
 	}
@@ -98,7 +97,7 @@ func TestHostAllowedWithoutScopeIsTheAnchor(t *testing.T) {
 
 func TestHostAllowedWithScopeWidensAnchor(t *testing.T) {
 	anchor := "https://www.example.com/"
-	scope := &common.Scope{Domains: []string{"example.com", "partner.example"}, Cidrs: []string{}}
+	scope := &utils.Scope{Domains: []string{"example.com", "partner.example"}, Cidrs: []string{}}
 	if !utils.HostAllowed(scope, anchor, "https://example.com/") {
 		t.Error("seed parent must be allowed")
 	}
@@ -129,7 +128,7 @@ func TestNewScopeRejectsTheUnrestrictedSentinel(t *testing.T) {
 }
 
 func TestScopeWithAnchorAddsTheAnchorHost(t *testing.T) {
-	seeds := &common.Scope{Domains: []string{"partner.example"}, Cidrs: []string{}}
+	seeds := &utils.Scope{Domains: []string{"partner.example"}, Cidrs: []string{}}
 	widened := utils.ScopeWithAnchor(seeds, "https://www.example.com/start")
 	if !utils.HostInSeedScope(widened, "https://app.www.example.com/") || !utils.HostInSeedScope(widened, "https://api.partner.example/") {
 		t.Fatalf("expected the anchor and the seeds, got %+v", widened)

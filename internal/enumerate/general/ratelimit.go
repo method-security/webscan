@@ -66,7 +66,8 @@ func createRateLimitRequestConfig(baseURL, path string, queryParams map[string]s
 	}
 	return common.SendHttpRequestConfig{
 		Request:            &request,
-		Scope:              utils.UnrestrictedScope(),
+		ScopeDomains:       utils.UnrestrictedDomains(),
+		ScopeCidrs:         utils.UnrestrictedCidrs(),
 		MaxRedirects:       0,
 		VerifyTls:          config.VerifyTls,
 		Timeout:            config.Timeout,

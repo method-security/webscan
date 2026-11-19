@@ -4,8 +4,9 @@ import (
 	// Standard
 	"sync"
 	// Generated
-	common "github.com/Method-Security/webscan/generated/go/common"
 	nuclei "github.com/Method-Security/webscan/generated/go/common/nuclei"
+	// Utils
+	utils "github.com/Method-Security/webscan/utils"
 )
 
 // Builder constructs and manages Nuclei scan reports.
@@ -16,11 +17,11 @@ type Builder struct {
 	probeIdx     map[string]*nuclei.NucleiProbe      // template-id → Probe
 	targetIdx    map[string]*nuclei.NucleiTargetInfo // host/baseURL → TargetInfo
 	scopeTargets []string
-	scope        *common.Scope
+	scope        *utils.Scope
 }
 
 // NewBuilder creates and returns a new Builder instance.
-func NewBuilder(scopeTargets []string, scope *common.Scope) *Builder {
+func NewBuilder(scopeTargets []string, scope *utils.Scope) *Builder {
 	return &Builder{
 		targets:      []*nuclei.NucleiTargetInfo{},
 		probeIdx:     make(map[string]*nuclei.NucleiProbe),

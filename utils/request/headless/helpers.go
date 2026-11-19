@@ -875,7 +875,7 @@ func getStatusCodeFromPage(page *rod.Page) int {
 }
 
 // isOutOfScopeRedirect reports whether redirectURL, resolved against originalURL, leaves the scope.
-func isOutOfScopeRedirect(scope *common.Scope, originalURL, redirectURL string) bool {
+func isOutOfScopeRedirect(scope *utils.Scope, originalURL, redirectURL string) bool {
 	parsedOriginal, err := url.Parse(originalURL)
 	if err != nil {
 		return false

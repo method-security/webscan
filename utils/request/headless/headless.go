@@ -15,6 +15,7 @@ import (
 	standardhelpers "github.com/Method-Security/webscan/utils/request/standard/helpers"
 
 	// Utils
+	utils "github.com/Method-Security/webscan/utils"
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
 	useragent "github.com/Method-Security/webscan/utils/useragent"
 
@@ -596,7 +597,7 @@ func (b *Requester) sendRequestWithArtifactsOnce(ctx context.Context, config com
 	if len(finalRedirectChain) > 1 {
 		originalURL := finalRedirectChain[0]
 		finalURL := finalRedirectChain[len(finalRedirectChain)-1]
-		if isOutOfScopeRedirect(config.Scope, originalURL, finalURL) {
+		if isOutOfScopeRedirect(utils.ScopeOf(config.ScopeDomains, config.ScopeCidrs), originalURL, finalURL) {
 			log.Info("Out-of-scope redirect detected in redirect chain", svc1log.SafeParam("from", originalURL), svc1log.SafeParam("to", finalURL))
 			return common.HttpRequestResponse{Request: config.Request}, screenshot, metadata, fmt.Errorf("out-of-scope redirect blocked: %s -> %s", originalURL, finalURL)
 		}

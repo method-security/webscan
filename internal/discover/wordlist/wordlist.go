@@ -53,12 +53,14 @@ func createRequestConfig(rawURL string, config discover.DiscoverWordlistConfig) 
 		},
 	}
 	// Anchored on the crawl target, not the page, so a page redirecting to the target's apex still lands.
+	anchored := utils.ScopeWithAnchor(utils.ScopeOf(config.ScopeDomains, config.ScopeCidrs), config.Target)
 	return common.SendHttpRequestConfig{
 		Request:       httpReq,
 		MaxRedirects:  10,
 		VerifyTls:     config.VerifyTls,
 		Timeout:       config.Timeout,
-		Scope:         utils.ScopeWithAnchor(utils.ScopeOf(config.ScopeDomains, config.ScopeCidrs), config.Target),
+		ScopeDomains:  anchored.Domains,
+		ScopeCidrs:    anchored.Cidrs,
 		RequestMethod: common.RequestMethodStandard,
 		UserAgent:     config.UserAgent,
 	}, nil

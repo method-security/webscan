@@ -431,7 +431,7 @@ func NormalizeURLForIdentity(rawURL string) string {
 // are not recorded as routes or queued for spidering. Scope is anchored on the full
 // host of scopeURL, which callers set to config.Target rather than the per-page
 // post-redirect host, and widened by the seeds in scope.
-func IsURLAllowed(scopeURL string, targetURL string, captureStaticAssets bool, scope *common.Scope) bool {
+func IsURLAllowed(scopeURL string, targetURL string, captureStaticAssets bool, scope *utils.Scope) bool {
 	if IsKnownProviderNoiseURL(targetURL) {
 		return false
 	}
@@ -544,7 +544,7 @@ func isOpaquePathSegment(segment string) bool {
 // surfaces in the StaticAssets output instead. A non-asset URL returns false and
 // is left for the caller to handle as a normal route. scopeURL is the scope anchor
 // (config.Target) used for the in-scope check.
-func CaptureStaticAssetReference(urls map[string]struct{}, scopeURL string, fullURL string, captureStaticAssets bool, scope *common.Scope) bool {
+func CaptureStaticAssetReference(urls map[string]struct{}, scopeURL string, fullURL string, captureStaticAssets bool, scope *utils.Scope) bool {
 	if !utils.IsStaticAsset(fullURL) {
 		return false
 	}

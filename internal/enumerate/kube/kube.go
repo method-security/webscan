@@ -42,7 +42,8 @@ func createSendHTTPRequestConfig(baseURL, path string, verifyTLS bool, timeout i
 	}
 	return common.SendHttpRequestConfig{
 		Request:            &request,
-		Scope:              utils.UnrestrictedScope(),
+		ScopeDomains:       utils.UnrestrictedDomains(),
+		ScopeCidrs:         utils.UnrestrictedCidrs(),
 		MaxRedirects:       0,
 		VerifyTls:          verifyTLS,
 		Timeout:            timeout,

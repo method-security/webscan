@@ -15,7 +15,9 @@ import (
 	discoverroutehelpers "github.com/Method-Security/webscan/internal/discover/route/helpers"
 
 	// Utils
+	utils "github.com/Method-Security/webscan/utils"
 	headless "github.com/Method-Security/webscan/utils/request/headless"
+
 	// External
 	rod "github.com/go-rod/rod"
 	proto "github.com/go-rod/rod/lib/proto"
@@ -27,7 +29,7 @@ import (
 // scope anchor (config.Target) used to keep discovery tight to the original target.
 // scope widens the routes and static assets kept beyond the anchor, matching the HTML/JS extractors.
 // Returns a slice of RouteDetails, a slice of URLs (static assets), and a slice of errors.
-func ExtractNetworkRoutes(ctx context.Context, browser *headless.Requester, target string, scopeURL string, captureStaticAssets bool, verifyTLS bool, scope *common.Scope) ([]*discover.RouteDetails, []string, []string) {
+func ExtractNetworkRoutes(ctx context.Context, browser *headless.Requester, target string, scopeURL string, captureStaticAssets bool, verifyTLS bool, scope *utils.Scope) ([]*discover.RouteDetails, []string, []string) {
 	log := svc1log.FromContext(ctx)
 	const maxNetworkCaptureAttempts = 3
 
@@ -60,7 +62,7 @@ func ExtractNetworkRoutes(ctx context.Context, browser *headless.Requester, targ
 	return lastRoutes, lastUrls, lastErrors
 }
 
-func extractNetworkRoutesOnce(ctx context.Context, browser *headless.Requester, target string, scopeURL string, captureStaticAssets bool, verifyTLS bool, scope *common.Scope) ([]*discover.RouteDetails, []string, []string) {
+func extractNetworkRoutesOnce(ctx context.Context, browser *headless.Requester, target string, scopeURL string, captureStaticAssets bool, verifyTLS bool, scope *utils.Scope) ([]*discover.RouteDetails, []string, []string) {
 	// Get the logger from the context
 	log := svc1log.FromContext(ctx)
 

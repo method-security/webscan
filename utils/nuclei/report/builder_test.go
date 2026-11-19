@@ -3,7 +3,6 @@ package nuclei
 import (
 	"testing"
 
-	common "github.com/Method-Security/webscan/generated/go/common"
 	"github.com/Method-Security/webscan/utils"
 )
 
@@ -17,7 +16,7 @@ func TestBuilderScopeDecidesOffTargetMatches(t *testing.T) {
 	}{
 		{"target match is kept without seeds", NewBuilder(targets, nil), "https://www.example.com/admin", true},
 		{"off-target match is dropped without seeds", NewBuilder(targets, nil), "https://example.com/admin", false},
-		{"seeded match is kept", NewBuilder(targets, &common.Scope{Domains: []string{"example.com"}, Cidrs: []string{}}), "https://example.com/admin", true},
+		{"seeded match is kept", NewBuilder(targets, &utils.Scope{Domains: []string{"example.com"}, Cidrs: []string{}}), "https://example.com/admin", true},
 		{"unrestricted scope keeps any match", NewBuilder(targets, utils.UnrestrictedScope()), "https://cdn.other.test/x", true},
 	}
 	for _, c := range cases {

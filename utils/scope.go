@@ -5,13 +5,17 @@ import (
 	"net/netip"
 	"net/url"
 	"strings"
-
-	common "github.com/Method-Security/webscan/generated/go/common"
 )
 
+// Scope is the seed domains and CIDRs a scan may follow and report beyond its target.
+type Scope struct {
+	Domains []string
+	Cidrs   []string
+}
+
 // NewScope normalizes seed domains and CIDRs, returning nil when both are empty.
-func NewScope(domains []string, cidrs []string) (*common.Scope, error) {
-	scope := &common.Scope{Domains: []string{}, Cidrs: []string{}}
+func NewScope(domains []string, cidrs []string) (*Scope, error) {
+	scope := &Scope{Domains: []string{}, Cidrs: []string{}}
 	for _, raw := range domains {
 		value := strings.TrimSpace(raw)
 		if strings.Contains(value, "://") {
@@ -45,15 +49,15 @@ func NewScope(domains []string, cidrs []string) (*common.Scope, error) {
 }
 
 // ScopeOf returns the seed scope for a config's flat scope fields, or nil when both are empty.
-func ScopeOf(domains []string, cidrs []string) *common.Scope {
+func ScopeOf(domains []string, cidrs []string) *Scope {
 	if len(domains) == 0 && len(cidrs) == 0 {
 		return nil
 	}
-	return &common.Scope{Domains: domains, Cidrs: cidrs}
+	return &Scope{Domains: domains, Cidrs: cidrs}
 }
 
 // HostInSeedScope reports whether candidateURL's host is under a scope domain or inside a scope CIDR.
-func HostInSeedScope(scope *common.Scope, candidateURL string) bool {
+func HostInSeedScope(scope *Scope, candidateURL string) bool {
 	if scope == nil {
 		return false
 	}
@@ -83,7 +87,7 @@ func HostInSeedScope(scope *common.Scope, candidateURL string) bool {
 }
 
 // HostAllowed reports whether candidateURL is the anchor's host, under it, or under a seed.
-func HostAllowed(scope *common.Scope, anchorURL string, candidateURL string) bool {
+func HostAllowed(scope *Scope, anchorURL string, candidateURL string) bool {
 	return IsHostInScope(anchorURL, candidateURL) || HostInSeedScope(scope, candidateURL)
 }
 
@@ -91,13 +95,23 @@ func HostAllowed(scope *common.Scope, anchorURL string, candidateURL string) boo
 const unrestrictedDomain = "*"
 
 // UnrestrictedScope admits every host.
-func UnrestrictedScope() *common.Scope {
-	return &common.Scope{Domains: []string{unrestrictedDomain}, Cidrs: []string{"0.0.0.0/0", "::/0"}}
+func UnrestrictedScope() *Scope {
+	return &Scope{Domains: UnrestrictedDomains(), Cidrs: UnrestrictedCidrs()}
+}
+
+// UnrestrictedDomains is the domain list of UnrestrictedScope, for flat scope fields.
+func UnrestrictedDomains() []string {
+	return []string{unrestrictedDomain}
+}
+
+// UnrestrictedCidrs is the CIDR list of UnrestrictedScope, for flat scope fields.
+func UnrestrictedCidrs() []string {
+	return []string{"0.0.0.0/0", "::/0"}
 }
 
 // ScopeWithAnchor returns scope widened to include the anchor's host and its subdomains.
-func ScopeWithAnchor(scope *common.Scope, anchorURL string) *common.Scope {
-	widened := &common.Scope{Domains: []string{}, Cidrs: []string{}}
+func ScopeWithAnchor(scope *Scope, anchorURL string) *Scope {
+	widened := &Scope{Domains: []string{}, Cidrs: []string{}}
 	if scope != nil {
 		widened.Domains = append(widened.Domains, scope.Domains...)
 		widened.Cidrs = append(widened.Cidrs, scope.Cidrs...)

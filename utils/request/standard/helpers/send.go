@@ -66,7 +66,7 @@ func SendHTTPRequest(ctx context.Context, url string, headers map[string]string,
 	// This mirrors the headless transport, which compares the first and last entries of
 	// the redirect chain rather than every hop.
 	finalizeResponse := func(resp *http.Response) (*http.Response, []string, error) {
-		if !utils.HostAllowed(config.Scope, url, currentURL) {
+		if !utils.HostAllowed(utils.ScopeOf(config.ScopeDomains, config.ScopeCidrs), url, currentURL) {
 			log.Info("Blocking out-of-scope redirect", svc1log.SafeParam("from", url), svc1log.SafeParam("to", currentURL))
 			if resp != nil {
 				if closeErr := resp.Body.Close(); closeErr != nil {

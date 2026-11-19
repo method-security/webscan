@@ -16,7 +16,6 @@ import (
 	discover "github.com/Method-Security/webscan/generated/go/discover"
 
 	// Utils
-	"github.com/Method-Security/webscan/utils"
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
 	retry "github.com/Method-Security/webscan/utils/request/retry"
 
@@ -43,7 +42,8 @@ func createDirectorySendHTTPRequestConfig(ctx context.Context, baseURL, path str
 		MaxRedirects:       MaxRedirects,
 		VerifyTls:          config.VerifyTls,
 		Timeout:            config.Timeout,
-		Scope:              utils.ScopeOf(config.ScopeDomains, config.ScopeCidrs),
+		ScopeDomains:       config.ScopeDomains,
+		ScopeCidrs:         config.ScopeCidrs,
 		UserAgent:          config.UserAgent,
 		RequestMethod:      common.RequestMethodStandard,
 		HeadlessConfig:     nil,

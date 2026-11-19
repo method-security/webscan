@@ -62,13 +62,14 @@ func TestSendHTTPRequestScopeDecidesCrossDomainRedirects(t *testing.T) {
 
 	cases := []struct {
 		name    string
-		scope   *common.Scope
+		domains []string
+		cidrs   []string
 		blocked bool
 	}{
-		{"another host is blocked without seeds", nil, true},
-		{"seeded host is followed", &common.Scope{Domains: []string{"localhost"}, Cidrs: []string{}}, false},
-		{"unseeded host is blocked", &common.Scope{Domains: []string{"other.test"}, Cidrs: []string{}}, true},
-		{"unrestricted scope follows any host", utils.UnrestrictedScope(), false},
+		{"another host is blocked without seeds", nil, nil, true},
+		{"seeded host is followed", []string{"localhost"}, nil, false},
+		{"unseeded host is blocked", []string{"other.test"}, nil, true},
+		{"unrestricted scope follows any host", utils.UnrestrictedDomains(), utils.UnrestrictedCidrs(), false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -76,7 +77,8 @@ func TestSendHTTPRequestScopeDecidesCrossDomainRedirects(t *testing.T) {
 				Request:      &common.HttpRequest{Method: common.HttpMethodGet},
 				Timeout:      5,
 				MaxRedirects: 3,
-				Scope:        c.scope,
+				ScopeDomains: c.domains,
+				ScopeCidrs:   c.cidrs,
 			}
 			resp, _, err := standardhelpers.SendHTTPRequest(context.Background(), server.URL+"/start", nil, nil, config)
 			if resp != nil {

@@ -1,5 +1,4 @@
 imports:
-  scope: ./scope.yml
   method: ./method.yml
   http: ./http.yml
 types:
@@ -10,7 +9,8 @@ types:
       maxRedirects: integer
       verifyTls: boolean
       timeout: integer
-      scope: optional<scope.Scope>
+      scopeDomains: optional<list<string>>
+      scopeCidrs: optional<list<string>>
       requestMethod: method.RequestMethod
       userAgent: method.UserAgentPreset
       headlessConfig: optional<method.HeadlessRequestConfig>

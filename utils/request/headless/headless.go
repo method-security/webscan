@@ -483,6 +483,10 @@ func (b *Requester) sendRequestWithArtifactsOnce(ctx context.Context, config com
 		var responseBody []byte
 		if browserErr == nil && statusCode >= 200 && statusCode < 300 {
 			htmlContent, htmlErr := page.HTML()
+			// MIME-based recovery is opportunistic. If HTML extraction failed,
+			// preserve the existing empty-body behavior unless URL/viewer-based
+			// recovery would already have been attempted.
+			loadNonHTMLResource = loadNonHTMLResource && htmlErr == nil
 			htmlCaptured := false
 			if htmlErr != nil {
 				errStr := htmlErr.Error()

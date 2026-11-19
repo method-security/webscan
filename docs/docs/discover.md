@@ -24,8 +24,8 @@ webscan discover [command]
 
 The following flags are available on all `discover` subcommands:
 
-- `--scope-domain` (repeatable) — Seed domain; the domain and its subdomains are in scope alongside the target
-- `--scope-cidr` (repeatable) — Seed CIDR or IP; IP-literal hosts inside it are in scope alongside the target
+- `--scope-domains` (repeatable) — Seed domain; the domain and its subdomains are in scope alongside the target
+- `--scope-cidrs` (repeatable) — Seed CIDR or IP; IP-literal hosts inside it are in scope alongside the target
 
 A host outside the target, its subdomains and the seeds is neither followed nor recorded. A blocked redirect fails with `out-of-scope redirect blocked`.
 

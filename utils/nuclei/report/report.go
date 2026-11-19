@@ -226,7 +226,7 @@ func (b *Builder) Consume(ev *nout.ResultEvent) {
 	defer b.mu.Unlock()
 
 	targetURL := getTargetURL(ev)
-	if b.ignoreCrossDomainRedirects && !b.isTargetInScope(getMatchedURL(ev)) {
+	if !b.isTargetInScope(getMatchedURL(ev)) {
 		return
 	}
 
@@ -356,6 +356,9 @@ func (b *Builder) Consume(ev *nout.ResultEvent) {
 }
 
 func (b *Builder) isTargetInScope(targetURL string) bool {
+	if utils.HostInSeedScope(b.scope, targetURL) {
+		return true
+	}
 	for _, scopeTarget := range b.scopeTargets {
 		if utils.IsHostInScope(scopeTarget, targetURL) {
 			return true

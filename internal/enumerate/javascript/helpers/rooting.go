@@ -168,8 +168,8 @@ func splitBase(base string) (string, string, error) {
 }
 
 // BaseCandidatesInScope keeps only the origins belonging to an analyzed host or a subdomain of one.
-func BaseCandidatesInScope(candidates []string, targetHosts []string, ignoreCrossDomain bool) []string {
-	if !ignoreCrossDomain || len(targetHosts) == 0 {
+func BaseCandidatesInScope(candidates []string, targetHosts []string) []string {
+	if len(targetHosts) == 0 {
 		return candidates
 	}
 

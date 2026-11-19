@@ -897,11 +897,6 @@ a deduplicated set before anything is retrieved, so a bundle shared by many page
 				a.OutputSignal.AddError(err)
 				return
 			}
-			ignoreCrossDomainEndpoints, err := cmd.Flags().GetBool("ignore-cross-domain-endpoints")
-			if err != nil {
-				a.OutputSignal.AddError(err)
-				return
-			}
 			maxRedirects, err := cmd.Flags().GetInt("max-redirects")
 			if err != nil {
 				a.OutputSignal.AddError(err)
@@ -949,13 +944,18 @@ a deduplicated set before anything is retrieved, so a bundle shared by many page
 			}
 
 			// Generate config
-			config := getEnumerateJavascriptConfig(targets, followChunks, fetchSourceMaps, maxArtifacts, analysisWindowBytes, analysisWindowOverlapBytes, ignoreCrossDomainEndpoints, maxRedirects, verifyTLS, timeout, sleep, jitter, threads, userAgentPreset)
+			config := getEnumerateJavascriptConfig(targets, followChunks, fetchSourceMaps, maxArtifacts, analysisWindowBytes, analysisWindowOverlapBytes, maxRedirects, verifyTLS, timeout, sleep, jitter, threads, userAgentPreset)
 			config.Headers, err = requesthelpers.ParseHeaderPairs(headerPairs)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
 			}
 			config.Cookies, err = requesthelpers.ParseCookiePairs(cookiePairs)
+			if err != nil {
+				a.OutputSignal.AddError(err)
+				return
+			}
+			config.ScopeDomains, config.ScopeCidrs, err = scopeFromFlags(cmd)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -974,7 +974,8 @@ a deduplicated set before anything is retrieved, so a bundle shared by many page
 	enumerateJavascriptCmd.Flags().Int("max-artifacts", 50, "Maximum number of artifacts to retrieve across the run, targets included (0 = unlimited)")
 	enumerateJavascriptCmd.Flags().Int("analysis-window-bytes", javascripthelpers.DefaultWindowBytes, "Bytes of source analyzed per parse")
 	enumerateJavascriptCmd.Flags().Int("analysis-window-overlap-bytes", javascripthelpers.DefaultWindowOverlapBytes, "Bytes each analysis window overlaps the previous one")
-	enumerateJavascriptCmd.Flags().Bool("ignore-cross-domain-endpoints", true, "Ignore API bases whose host is not the target host or a subdomain of it")
+	enumerateJavascriptCmd.Flags().StringSlice("scope-domain", []string{}, "Seed domain whose host and subdomains are in scope alongside the target; widens scope beyond the target")
+	enumerateJavascriptCmd.Flags().StringSlice("scope-cidr", []string{}, "Seed CIDR or IP whose IP-literal hosts are in scope alongside the target; widens scope beyond the target")
 	enumerateJavascriptCmd.Flags().Int("max-redirects", 3, "Maximum number of redirects to follow")
 	enumerateJavascriptCmd.Flags().Bool("verify-tls", false, "Verify TLS certificates when making HTTPS requests")
 	enumerateJavascriptCmd.Flags().Int("timeout", 60, "Timeout per request in seconds")
@@ -1044,7 +1045,7 @@ func getEnumerateGeneralRateLimitConfig(targets []string, maxRequests int, sleep
 
 // getEnumerateDockerConfig builds the config for Docker registry enumeration.
 // getEnumerateJavascriptConfig builds the config for JavaScript enumeration.
-func getEnumerateJavascriptConfig(targets []string, followChunks bool, fetchSourceMaps bool, maxArtifacts int, analysisWindowBytes int, analysisWindowOverlapBytes int, ignoreCrossDomainEndpoints bool, maxRedirects int, verifyTLS bool, timeout int, sleep int, jitter int, threads int, userAgent common.UserAgentPreset) enumeratejavascriptfern.EnumerateJavascriptConfig {
+func getEnumerateJavascriptConfig(targets []string, followChunks bool, fetchSourceMaps bool, maxArtifacts int, analysisWindowBytes int, analysisWindowOverlapBytes int, maxRedirects int, verifyTLS bool, timeout int, sleep int, jitter int, threads int, userAgent common.UserAgentPreset) enumeratejavascriptfern.EnumerateJavascriptConfig {
 	config := enumeratejavascriptfern.EnumerateJavascriptConfig{
 		Targets:                    targets,
 		FollowChunks:               followChunks,
@@ -1052,7 +1053,6 @@ func getEnumerateJavascriptConfig(targets []string, followChunks bool, fetchSour
 		MaxArtifacts:               maxArtifacts,
 		AnalysisWindowBytes:        analysisWindowBytes,
 		AnalysisWindowOverlapBytes: analysisWindowOverlapBytes,
-		IgnoreCrossDomainEndpoints: ignoreCrossDomainEndpoints,
 		MaxRedirects:               maxRedirects,
 		VerifyTls:                  verifyTLS,
 		Timeout:                    max(timeout, 0),

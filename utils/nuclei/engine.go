@@ -12,6 +12,7 @@ import (
 	// Generated
 	nuclei "github.com/Method-Security/webscan/generated/go/common/nuclei"
 	// Utils
+	utils "github.com/Method-Security/webscan/utils"
 	report "github.com/Method-Security/webscan/utils/nuclei/report"
 	runner "github.com/Method-Security/webscan/utils/nuclei/runner"
 	templates "github.com/Method-Security/webscan/utils/nuclei/templates"
@@ -67,7 +68,7 @@ func RunNucleiEngine(ctx context.Context, config nuclei.NucleiConfig) ([]*nuclei
 	}
 
 	// Build the report builder and run the nuclei engine
-	builder := report.NewBuilder(config.Targets, config.IgnoreCrossDomainRedirects)
+	builder := report.NewBuilder(config.Targets, utils.ScopeOf(config.ScopeDomains, config.ScopeCidrs))
 	return runner.Run(ctx, runnerConfig, builder)
 }
 

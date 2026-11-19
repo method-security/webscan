@@ -24,21 +24,22 @@ import (
 // pageConfigFromWitnessConfig converts a DiscoverWitnessConfig to a DiscoverPageConfig for a specific target.
 func pageConfigFromWitnessConfig(target string, config discover.DiscoverWitnessConfig) discover.DiscoverPageConfig {
 	return discover.DiscoverPageConfig{
-		Target:                     target,
-		ResponseCodes:              config.ResponseCodes,
-		Screenshot:                 config.Screenshot,
-		MaxRedirects:               config.MaxRedirects,
-		VerifyTls:                  config.VerifyTls,
-		Timeout:                    config.Timeout,
-		IgnoreCrossDomainRedirects: config.IgnoreCrossDomainRedirects,
-		UserAgent:                  config.UserAgent,
-		RequestMethod:              config.RequestMethod,
-		HeadlessConfig:             config.HeadlessConfig,
-		BrowserbaseConfig:          config.BrowserbaseConfig,
-		Headers:                    config.Headers,
-		Cookies:                    config.Cookies,
-		LocalStorage:               config.LocalStorage,
-		SessionStorage:             config.SessionStorage,
+		Target:            target,
+		ResponseCodes:     config.ResponseCodes,
+		Screenshot:        config.Screenshot,
+		MaxRedirects:      config.MaxRedirects,
+		VerifyTls:         config.VerifyTls,
+		Timeout:           config.Timeout,
+		ScopeDomains:      config.ScopeDomains,
+		ScopeCidrs:        config.ScopeCidrs,
+		UserAgent:         config.UserAgent,
+		RequestMethod:     config.RequestMethod,
+		HeadlessConfig:    config.HeadlessConfig,
+		BrowserbaseConfig: config.BrowserbaseConfig,
+		Headers:           config.Headers,
+		Cookies:           config.Cookies,
+		LocalStorage:      config.LocalStorage,
+		SessionStorage:    config.SessionStorage,
 	}
 }
 
@@ -97,7 +98,7 @@ func processTarget(
 		finalURL = resp.RedirectChain[len(resp.RedirectChain)-1]
 	}
 	faviconURL := witnesshelpers.ExtractFaviconURL(string(bodyBytes), finalURL)
-	if faviconURL != "" && (!config.IgnoreCrossDomainRedirects || utils.IsHostInScope(target, faviconURL)) {
+	if faviconURL != "" && utils.HostAllowed(utils.ScopeOf(config.ScopeDomains, config.ScopeCidrs), target, faviconURL) {
 		if faviconBytes, faviconHash, faviconErr := witnesshelpers.FetchFavicon(ctx, faviconURL, config); faviconErr == nil && len(faviconBytes) > 0 {
 			result.Favicon = &discover.DiscoverWitnessFavicon{
 				Url:    faviconURL,

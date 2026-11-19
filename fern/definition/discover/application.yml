@@ -63,7 +63,8 @@ types:
       globalRateLimit: integer
       globalTimeout: integer
       userAgent: method.UserAgentPreset
-      ignoreCrossDomainRedirects: boolean
+      scopeDomains: optional<list<string>>
+      scopeCidrs: optional<list<string>>
   # Application Fingerprint Attempt Struct
   ApplicationFingerprintAttempt:
     properties:

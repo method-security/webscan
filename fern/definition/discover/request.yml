@@ -39,7 +39,8 @@ types:
       timeout: integer
       retries: integer
       userAgent: method.UserAgentPreset
-      ignoreCrossDomainRedirects: boolean
+      scopeDomains: optional<list<string>>
+      scopeCidrs: optional<list<string>>
 
   DiscoverRequestResult:
     properties:

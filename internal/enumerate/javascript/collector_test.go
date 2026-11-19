@@ -142,7 +142,7 @@ func TestCollectorReleasesATargetTheBudgetRefuses(t *testing.T) {
 }
 
 func testCollector(maxArtifacts int) *collector {
-	return newCollector(enumerate.EnumerateJavascriptConfig{MaxArtifacts: maxArtifacts, Timeout: 1})
+	return newCollector(enumerate.EnumerateJavascriptConfig{Targets: []string{"https://app.example.com"}, MaxArtifacts: maxArtifacts, Timeout: 1})
 }
 
 // Pages share entry bundles, so a bundle named by several pages must be queued once.
@@ -408,6 +408,7 @@ func TestAnalyzeAttachesPathParamExamplesAcrossRootRelativeAndAbsoluteSiblings(t
 // endpoint under whichever application happened to load the bundle.
 func TestAnalyzeFilesEndpointsUnderTheHostServingThem(t *testing.T) {
 	c := testCollector(0)
+	c.config.ScopeDomains = []string{"example.com"}
 	c.analyzed("https://app.example.com/main.js", enumerate.JavascriptArtifactKindEntry,
 		`const env={serviceApiEndpoint:"https://app.example.com/serviceapi/v1"};`+
 			`fetch("https://api.example.com/v1/User/Read");fetch("https://api.example.com/v1/Order/List");`,
@@ -433,10 +434,9 @@ func TestAnalyzeFilesEndpointsUnderTheHostServingThem(t *testing.T) {
 
 // An absolute link to an unrelated host is not an endpoint of anything being scanned, so it must not
 // stand up an application of its own.
-func TestAnalyzeDropsCrossDomainEndpointsWhenAsked(t *testing.T) {
+func TestAnalyzeDropsUnscopedEndpoints(t *testing.T) {
 	c := newCollector(enumerate.EnumerateJavascriptConfig{
-		Targets:                    []string{"https://app.example.com"},
-		IgnoreCrossDomainEndpoints: true,
+		Targets: []string{"https://app.example.com"},
 	})
 	c.analyzed("https://app.example.com/main.js", enumerate.JavascriptArtifactKindEntry,
 		`const env={serviceApiEndpoint:"https://app.example.com/serviceapi/v1"};`+
@@ -444,8 +444,7 @@ func TestAnalyzeDropsCrossDomainEndpointsWhenAsked(t *testing.T) {
 		[]string{"https://app.example.com"})
 
 	result := c.analyze(enumerate.EnumerateJavascriptConfig{
-		Targets:                    []string{"https://app.example.com"},
-		IgnoreCrossDomainEndpoints: true,
+		Targets: []string{"https://app.example.com"},
 	})
 	for _, application := range result.applications {
 		if application.BaseUrl == "https://facebook.com" {
@@ -458,8 +457,7 @@ func TestAnalyzeDropsCrossDomainEndpointsWhenAsked(t *testing.T) {
 // hang off it, the same way an absolute URL to that host is kept.
 func TestAnalyzeRootsAgainstABaseOnAnotherTargetedHost(t *testing.T) {
 	config := enumerate.EnumerateJavascriptConfig{
-		Targets:                    []string{"https://app.example.com", "https://api.example.com"},
-		IgnoreCrossDomainEndpoints: true,
+		Targets: []string{"https://app.example.com", "https://api.example.com"},
 	}
 	c := newCollector(config)
 	c.analyzed("https://app.example.com/main.js", enumerate.JavascriptArtifactKindEntry,
@@ -481,4 +479,89 @@ func TestAnalyzeRootsAgainstABaseOnAnotherTargetedHost(t *testing.T) {
 		return
 	}
 	t.Fatalf("expected an application for the serving host, got %v", result.applications)
+}
+
+func TestAnalyzeDoesNotGuessASeededBaseForAnUnlinkedPath(t *testing.T) {
+	config := enumerate.EnumerateJavascriptConfig{
+		Targets:      []string{"https://www.example.com"},
+		ScopeDomains: []string{"example.com", "partner.example"},
+	}
+	c := newCollector(config)
+	c.analyzed("https://www.example.com/app.js", enumerate.JavascriptArtifactKindEntry,
+		`const env={gatewayUrl:"https://api.partner.example/gateway"};`+
+			`class A{lookup(q){return this.dataService.getRequest("services/LookupService.php?func=Find&"+q)}}`+
+			`fetch("https://facebook.com/example/share");`,
+		[]string{"https://www.example.com"})
+
+	result := c.analyze(config)
+	byBase := map[string]*enumerate.JavascriptApplicationDetails{}
+	for _, application := range result.applications {
+		byBase[application.BaseUrl] = application
+	}
+	if _, exists := byBase["https://facebook.com"]; exists {
+		t.Fatalf("expected an unseeded host to be dropped, got %v", byBase["https://facebook.com"])
+	}
+	serving := byBase["https://api.partner.example"]
+	if serving == nil || !hasEndpointPath(serving, "/gateway") {
+		t.Fatalf("expected the seeded base literal to be kept, got %v", serving)
+	}
+	if hasEndpointPath(serving, "/gateway/services/LookupService.php") {
+		t.Fatalf("expected the unlinked path not to be guessed onto the seeded base, got %v", serving.Endpoints)
+	}
+}
+
+func hasEndpointPath(application *enumerate.JavascriptApplicationDetails, path string) bool {
+	for _, endpoint := range application.Endpoints {
+		if endpoint.Path == path {
+			return true
+		}
+	}
+	return false
+}
+
+func TestAnalyzeDropsTheSeededDomainBaseWithoutScope(t *testing.T) {
+	config := enumerate.EnumerateJavascriptConfig{
+		Targets: []string{"https://www.example.com"},
+	}
+	c := newCollector(config)
+	c.analyzed("https://www.example.com/app.js", enumerate.JavascriptArtifactKindEntry,
+		`const env={gatewayUrl:"https://api.partner.example/gateway"};`+
+			`class A{lookup(q){return this.dataService.getRequest("services/LookupService.php?func=Find&"+q)}}`,
+		[]string{"https://www.example.com"})
+
+	for _, application := range c.analyze(config).applications {
+		if application.BaseUrl == "https://api.partner.example" {
+			t.Fatalf("expected no application on the unscoped host, got %v", application)
+		}
+	}
+}
+
+func TestAnalyzeFilesAConcatenatedPathUnderItsSeededBaseNotTheLoader(t *testing.T) {
+	source := `var A={init:function(){var t=null!=CFG.gatewayUrl?CFG.gatewayUrl:"https://svc.partner.example/gateway";` +
+		`this.lookupUrl=t+"/services/LookupService.php?func=Find&"}};`
+	for _, scoped := range []bool{false, true} {
+		config := enumerate.EnumerateJavascriptConfig{
+			Targets: []string{"https://www.example.com"},
+		}
+		if scoped {
+			config.ScopeDomains = []string{"example.com", "partner.example"}
+		}
+		c := newCollector(config)
+		c.analyzed("https://www.example.com/app.js", enumerate.JavascriptArtifactKindEntry, source, []string{"https://www.example.com"})
+
+		byBase := map[string]*enumerate.JavascriptApplicationDetails{}
+		for _, application := range c.analyze(config).applications {
+			byBase[application.BaseUrl] = application
+		}
+		if loader := byBase["https://www.example.com"]; loader != nil && len(loader.Endpoints) != 0 {
+			t.Fatalf("scoped=%v: expected nothing filed under the loading host, got %v", scoped, loader.Endpoints)
+		}
+		serving := byBase["https://svc.partner.example"]
+		if scoped && (serving == nil || !hasEndpointPath(serving, "/gateway/services/LookupService.php")) {
+			t.Fatalf("expected the lookup service under the seeded base, got %v", serving)
+		}
+		if !scoped && serving != nil {
+			t.Fatalf("expected the unseeded base to be dropped without scope, got %v", serving)
+		}
+	}
 }

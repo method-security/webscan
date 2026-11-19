@@ -68,9 +68,8 @@ func TestFetchFaviconAcceptsSVGImageContentType(t *testing.T) {
 
 func faviconConfig() discover.DiscoverWitnessConfig {
 	return discover.DiscoverWitnessConfig{
-		MaxRedirects:               2,
-		Timeout:                    5,
-		IgnoreCrossDomainRedirects: true,
-		UserAgent:                  common.UserAgentPresetCurl,
+		MaxRedirects: 2,
+		Timeout:      5,
+		UserAgent:    common.UserAgentPresetCurl,
 	}
 }

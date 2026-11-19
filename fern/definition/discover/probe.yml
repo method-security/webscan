@@ -14,7 +14,8 @@ types:
       retries: integer
       sleep: integer
       jitter: integer
-      ignoreCrossDomainRedirects: boolean
+      scopeDomains: optional<list<string>>
+      scopeCidrs: optional<list<string>>
       userAgent: method.UserAgentPreset
       requestMethod: method.RequestMethod
       headlessConfig: optional<method.HeadlessRequestConfig>

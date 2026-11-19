@@ -39,16 +39,15 @@ func createSendHTTPRequestConfig(baseURL, path string, maxRedirects int, config 
 		Params:  &common.HttpRequestParams{},
 	}
 	return common.SendHttpRequestConfig{
-		Request:                    &request,
-		MaxRedirects:               maxRedirects,
-		VerifyTls:                  config.VerifyTls,
-		Timeout:                    config.Timeout,
-		IgnoreCrossDomainRedirects: true,
-		UserAgent:                  config.UserAgent,
-		RequestMethod:              common.RequestMethodStandard,
-		HeadlessConfig:             nil,
-		BrowserbaseConfig:          nil,
-		BrowserbaseSecrets:         nil,
+		Request:            &request,
+		MaxRedirects:       maxRedirects,
+		VerifyTls:          config.VerifyTls,
+		Timeout:            config.Timeout,
+		UserAgent:          config.UserAgent,
+		RequestMethod:      common.RequestMethodStandard,
+		HeadlessConfig:     nil,
+		BrowserbaseConfig:  nil,
+		BrowserbaseSecrets: nil,
 	}
 }
 

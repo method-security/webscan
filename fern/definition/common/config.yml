@@ -9,7 +9,8 @@ types:
       maxRedirects: integer
       verifyTls: boolean
       timeout: integer
-      ignoreCrossDomainRedirects: boolean
+      scopeDomains: optional<list<string>>
+      scopeCidrs: optional<list<string>>
       requestMethod: method.RequestMethod
       userAgent: method.UserAgentPreset
       headlessConfig: optional<method.HeadlessRequestConfig>

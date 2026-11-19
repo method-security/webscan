@@ -34,6 +34,7 @@ import (
 // Scope is anchored on the original target (routeCaptureConfig.Target), not the
 // per-page post-redirect host.
 func ExtractRedirectRoutes(redirectChain []string, routeCaptureConfig discover.DiscoverRouteConfig) ([]*discover.RouteDetails, []string, []string) {
+	scope := utils.ScopeOf(routeCaptureConfig.ScopeDomains, routeCaptureConfig.ScopeCidrs)
 	routes := []*discover.RouteDetails{}
 	urls := make(map[string]struct{})
 	errors := []string{}
@@ -53,12 +54,12 @@ func ExtractRedirectRoutes(redirectChain []string, routeCaptureConfig discover.D
 
 		// Static assets are diverted to the StaticAssets output rather than
 		// recorded as routes.
-		if discoverroutehelpers.CaptureStaticAssetReference(urls, routeCaptureConfig.Target, redirectURL, routeCaptureConfig.IgnoreCrossDomainStaticAssets, routeCaptureConfig.CollectStaticAssets) {
+		if discoverroutehelpers.CaptureStaticAssetReference(urls, routeCaptureConfig.Target, redirectURL, routeCaptureConfig.CollectStaticAssets, scope) {
 			continue
 		}
 
 		// Check if the URL is allowed
-		if !discoverroutehelpers.IsURLAllowed(routeCaptureConfig.Target, redirectURL, routeCaptureConfig.IgnoreCrossDomainRoutes, routeCaptureConfig.CollectStaticAssets) {
+		if !discoverroutehelpers.IsURLAllowed(routeCaptureConfig.Target, redirectURL, routeCaptureConfig.CollectStaticAssets, scope) {
 			continue
 		}
 
@@ -144,21 +145,22 @@ func createSendHTTPRequestConfigWithQuery(ctx context.Context, baseURL, path str
 	// page-capture output contract; the standard transport ignores both flags.
 	captureBrowserArtifacts := config.RequestMethod == common.RequestMethodHeadless
 	sendConfig := common.SendHttpRequestConfig{
-		Request:                    &request,
-		MaxRedirects:               config.MaxRedirects,
-		VerifyTls:                  config.VerifyTls,
-		Timeout:                    config.Timeout,
-		IgnoreCrossDomainRedirects: config.IgnoreCrossDomainRoutes,
-		UserAgent:                  config.UserAgent,
-		RequestMethod:              config.RequestMethod,
-		HeadlessConfig:             config.HeadlessConfig,
-		BrowserbaseConfig:          config.BrowserbaseConfig,
-		BrowserbaseSecrets:         browserbaseSecrets,
-		Cookies:                    config.Cookies,
-		LocalStorage:               config.LocalStorage,
-		SessionStorage:             config.SessionStorage,
-		CaptureConsoleLogs:         &captureBrowserArtifacts,
-		CaptureCookies:             &captureBrowserArtifacts,
+		Request:            &request,
+		MaxRedirects:       config.MaxRedirects,
+		VerifyTls:          config.VerifyTls,
+		Timeout:            config.Timeout,
+		ScopeDomains:       config.ScopeDomains,
+		ScopeCidrs:         config.ScopeCidrs,
+		UserAgent:          config.UserAgent,
+		RequestMethod:      config.RequestMethod,
+		HeadlessConfig:     config.HeadlessConfig,
+		BrowserbaseConfig:  config.BrowserbaseConfig,
+		BrowserbaseSecrets: browserbaseSecrets,
+		Cookies:            config.Cookies,
+		LocalStorage:       config.LocalStorage,
+		SessionStorage:     config.SessionStorage,
+		CaptureConsoleLogs: &captureBrowserArtifacts,
+		CaptureCookies:     &captureBrowserArtifacts,
 	}
 
 	// Add proxy settings from context
@@ -168,6 +170,7 @@ func createSendHTTPRequestConfigWithQuery(ctx context.Context, baseURL, path str
 }
 
 func extractRoutes(ctx context.Context, httpRequestResponse *common.HttpRequestResponse, requestConfig common.SendHttpRequestConfig, routeCaptureConfig discover.DiscoverRouteConfig) ([]*discover.RouteDetails, []string, []string) {
+	scope := utils.ScopeOf(routeCaptureConfig.ScopeDomains, routeCaptureConfig.ScopeCidrs)
 	log := svc1log.FromContext(ctx)
 	routes := []*discover.RouteDetails{}
 	urls := make(map[string]struct{})
@@ -258,7 +261,7 @@ func extractRoutes(ctx context.Context, httpRequestResponse *common.HttpRequestR
 		}
 
 		fullRedirectedURL := redirectedURL
-		networkRoutes, networkUrls, networkErrors := capturerouteextractors.ExtractNetworkRoutes(networkRouteCtx, browser, fullRedirectedURL, routeCaptureConfig.Target, routeCaptureConfig.IgnoreCrossDomainRoutes, routeCaptureConfig.IgnoreCrossDomainStaticAssets, routeCaptureConfig.CollectStaticAssets, routeCaptureConfig.VerifyTls)
+		networkRoutes, networkUrls, networkErrors := capturerouteextractors.ExtractNetworkRoutes(networkRouteCtx, browser, fullRedirectedURL, routeCaptureConfig.Target, routeCaptureConfig.CollectStaticAssets, routeCaptureConfig.VerifyTls, scope)
 		routes = append(routes, networkRoutes...)
 		urls = discoverroutehelpers.AddListToSetString(urls, networkUrls)
 		errors = append(errors, networkErrors...)
@@ -272,7 +275,7 @@ func extractRoutes(ctx context.Context, httpRequestResponse *common.HttpRequestR
 	staticAssets := make(map[string]struct{})
 	for url := range urls {
 		if routeCaptureConfig.CollectStaticAssets && utils.IsStaticAsset(url) {
-			if !routeCaptureConfig.IgnoreCrossDomainStaticAssets || utils.IsHostInScope(routeCaptureConfig.Target, url) {
+			if utils.HostAllowed(scope, routeCaptureConfig.Target, url) {
 				staticAssets[url] = struct{}{}
 			}
 		}

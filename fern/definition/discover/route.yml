@@ -7,8 +7,8 @@ types:
     properties:
       target: string
       collectStaticAssets: boolean
-      ignoreCrossDomainRoutes: boolean
-      ignoreCrossDomainStaticAssets: boolean
+      scopeDomains: optional<list<string>>
+      scopeCidrs: optional<list<string>>
       spiderDepth: integer
       maxRedirects: integer
       verifyTls: boolean

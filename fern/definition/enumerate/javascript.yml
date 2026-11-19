@@ -11,7 +11,8 @@ types:
       maxArtifacts: integer
       analysisWindowBytes: integer
       analysisWindowOverlapBytes: integer
-      ignoreCrossDomainEndpoints: boolean
+      scopeDomains: optional<list<string>>
+      scopeCidrs: optional<list<string>>
       maxRedirects: integer
       verifyTls: boolean
       timeout: integer

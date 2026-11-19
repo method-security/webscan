@@ -11,6 +11,7 @@ import (
 	"github.com/Method-Security/pkg/signal"
 	"github.com/Method-Security/pkg/writer"
 	"github.com/Method-Security/webscan/internal/config"
+	"github.com/Method-Security/webscan/utils"
 	"github.com/palantir/pkg/datetime"
 	"github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 	"github.com/spf13/cobra"
@@ -127,4 +128,21 @@ func validateOutputFormat(output string) (writer.Format, error) {
 		return writer.Format{}, errors.New("invalid output format. Valid formats are: json, yaml, signal")
 	}
 	return writer.NewFormat(format), nil
+}
+
+// scopeFromFlags returns the normalized --scope-domain and --scope-cidr values.
+func scopeFromFlags(cmd *cobra.Command) ([]string, []string, error) {
+	domains, err := cmd.Flags().GetStringSlice("scope-domain")
+	if err != nil {
+		return nil, nil, err
+	}
+	cidrs, err := cmd.Flags().GetStringSlice("scope-cidr")
+	if err != nil {
+		return nil, nil, err
+	}
+	scope, err := utils.NewScope(domains, cidrs)
+	if err != nil || scope == nil {
+		return nil, nil, err
+	}
+	return scope.Domains, scope.Cidrs, nil
 }

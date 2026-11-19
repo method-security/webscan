@@ -9,7 +9,8 @@ types:
       includeMetadata: boolean
       includeComments: boolean
       includeAltText: boolean
-      ignoreCrossDomain: boolean
+      scopeDomains: optional<list<string>>
+      scopeCidrs: optional<list<string>>
       verifyTls: boolean
       timeout: integer
       threads: integer

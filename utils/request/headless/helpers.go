@@ -30,6 +30,7 @@ import (
 // NetworkHeaderCapture stores captured response headers
 type NetworkHeaderCapture struct {
 	Headers map[string][]string
+	URL     string
 	mutex   sync.RWMutex
 }
 
@@ -52,6 +53,12 @@ func (n *NetworkHeaderCapture) GetHeaders() map[string][]string {
 	n.mutex.RLock()
 	defer n.mutex.RUnlock()
 	return cloneHeaders(n.Headers)
+}
+
+func (n *NetworkHeaderCapture) getURL() string {
+	n.mutex.RLock()
+	defer n.mutex.RUnlock()
+	return n.URL
 }
 
 // setupHeaderInterception sets up network event monitoring to capture response headers
@@ -79,7 +86,10 @@ func setupHeaderInterception(page *rod.Page, log svc1log.Logger) *NetworkHeaderC
 					// Convert gson.JSON to string
 					headers[key] = []string{value.Str()}
 				}
-				headerCapture.SetHeaders(headers)
+				headerCapture.mutex.Lock()
+				headerCapture.Headers = cloneHeaders(headers)
+				headerCapture.URL = e.Response.URL
+				headerCapture.mutex.Unlock()
 			}
 		},
 	)()
@@ -608,8 +618,18 @@ func shouldLoadStaticResource(htmlContent, constructedURL, finalURL string) bool
 	return isChromeStaticAssetViewerHTML(htmlContent) || isChromeTextDocumentViewerHTML(htmlContent)
 }
 
+// An empty browser document is not the content of the requested resource.
+func isEmptyHTMLShell(content string) bool {
+	return strings.TrimSpace(content) == "<html><head></head><body></body></html>"
+}
+
+func isNonHTMLResponse(headers map[string][]string) bool {
+	contentType := strings.ToLower(strings.TrimSpace(strings.Split(requesthelpers.GetContentTypeFromHeaderMap(headers), ";")[0]))
+	return contentType != "" && contentType != "text/html" && contentType != "application/xhtml+xml"
+}
+
 func isValidStaticResourceBody(body []byte) bool {
-	return len(body) > 0
+	return len(body) > 0 && !isEmptyHTMLShell(string(body))
 }
 
 func headersForLoadedStaticResource(existingHeaders, loadedHeaders map[string][]string, body []byte) map[string][]string {

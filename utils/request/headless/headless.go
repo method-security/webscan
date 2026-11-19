@@ -477,6 +477,7 @@ func (b *Requester) sendRequestWithArtifactsOnce(ctx context.Context, config com
 		// Use the latest captured main-document headers after stabilization so
 		// headers, finalURL, and HTML describe the same terminal document.
 		responseHeaders := getResponseHeaders(ctx, page, headerCapture)
+		loadNonHTMLResource := isNonHTMLResponse(responseHeaders)
 
 		// Extract response body
 		var responseBody []byte
@@ -500,8 +501,13 @@ func (b *Requester) sendRequestWithArtifactsOnce(ctx context.Context, config com
 			if jsonBody, ok := extractChromeJSONDocumentViewerBody(htmlContent); ok {
 				responseBody = jsonBody
 				responseHeaders = cloneHeadersWithBodyMetadata(responseHeaders, jsonBody)
-			} else if shouldLoadStaticResource(htmlContent, *constructedURL, finalURL) {
+			} else if loadNonHTMLResource || shouldLoadStaticResource(htmlContent, *constructedURL, finalURL) {
 				resourceURL := finalURL
+				// Downloads may leave window.location at about:blank or the
+				// original URL. Use the URL belonging to the captured response.
+				if capturedURL := headerCapture.getURL(); capturedURL != "" {
+					resourceURL = capturedURL
+				}
 				if resourceURL == "" || isInternalBrowserURL(resourceURL) {
 					resourceURL = *constructedURL
 				}
@@ -536,6 +542,11 @@ func (b *Requester) sendRequestWithArtifactsOnce(ctx context.Context, config com
 			responseHeaders,
 			responseBody,
 		)
+		if len(responseBody) == 0 || isEmptyHTMLShell(string(responseBody)) {
+			response.ResponseBody = nil
+			zero := 0
+			response.SizeBytes = &zero
+		}
 
 		// Attach captured console logs and page cookies when requested.
 		if console != nil {

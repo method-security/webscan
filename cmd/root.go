@@ -130,13 +130,13 @@ func validateOutputFormat(output string) (writer.Format, error) {
 	return writer.NewFormat(format), nil
 }
 
-// scopeFromFlags returns the normalized --scope-domain and --scope-cidr values.
+// scopeFromFlags returns the normalized --scope-domains and --scope-cidrs values.
 func scopeFromFlags(cmd *cobra.Command) ([]string, []string, error) {
-	domains, err := cmd.Flags().GetStringSlice("scope-domain")
+	domains, err := cmd.Flags().GetStringSlice("scope-domains")
 	if err != nil {
 		return nil, nil, err
 	}
-	cidrs, err := cmd.Flags().GetStringSlice("scope-cidr")
+	cidrs, err := cmd.Flags().GetStringSlice("scope-cidrs")
 	if err != nil {
 		return nil, nil, err
 	}

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/netip"
 	"net/url"
+	"slices"
 	"strings"
 )
 
@@ -61,6 +62,9 @@ func HostInSeedScope(scope *Scope, candidateURL string) bool {
 	if scope == nil {
 		return false
 	}
+	if slices.Contains(scope.Domains, unrestrictedDomain) {
+		return true
+	}
 	parsed, err := url.Parse(candidateURL)
 	if err != nil {
 		return false
@@ -79,7 +83,7 @@ func HostInSeedScope(scope *Scope, candidateURL string) bool {
 		return false
 	}
 	for _, domain := range scope.Domains {
-		if domain == unrestrictedDomain || host == domain || strings.HasSuffix(host, "."+domain) {
+		if host == domain || strings.HasSuffix(host, "."+domain) {
 			return true
 		}
 	}

@@ -114,7 +114,7 @@ func TestHostAllowedWithScopeWidensAnchor(t *testing.T) {
 
 func TestUnrestrictedScopeAdmitsEveryHost(t *testing.T) {
 	scope := utils.UnrestrictedScope()
-	for _, candidate := range []string{"https://bucket.s3.amazonaws.example/", "http://198.51.100.9/", "http://[2001:db8::9]/"} {
+	for _, candidate := range []string{"https://bucket.s3.amazonaws.example/", "http://198.51.100.9/", "http://[2001:db8::9]/", "db.example.net:5432", "/relative", ""} {
 		if !utils.HostAllowed(scope, "https://www.example.com/", candidate) {
 			t.Errorf("expected %s to be allowed", candidate)
 		}

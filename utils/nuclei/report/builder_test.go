@@ -18,6 +18,8 @@ func TestBuilderScopeDecidesOffTargetMatches(t *testing.T) {
 		{"off-target match is dropped without seeds", NewBuilder(targets, nil), "https://example.com/admin", false},
 		{"seeded match is kept", NewBuilder(targets, &utils.Scope{Domains: []string{"example.com"}, Cidrs: []string{}}), "https://example.com/admin", true},
 		{"unrestricted scope keeps any match", NewBuilder(targets, utils.UnrestrictedScope()), "https://cdn.other.test/x", true},
+		{"unrestricted scope keeps a hostless network match", NewBuilder(targets, utils.UnrestrictedScope()), "db.example.net:5432", true},
+		{"hostless match is dropped without seeds", NewBuilder(targets, nil), "db.example.net:5432", false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

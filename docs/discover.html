@@ -1594,10 +1594,12 @@
 <li><strong>wordlist</strong>: Generate a wordlist from web content</li>
 </ul>
 <h2 id="common-flags">Common Flags<a class="headerlink" href="#common-flags" title="Permanent link">#</a></h2>
-<p>The following flag is available on all <code>discover</code> subcommands:</p>
+<p>The following flags are available on all <code>discover</code> subcommands:</p>
 <ul>
-<li><code>--ignore-cross-domain-redirects</code> (bool, default: <code>true</code>) — Do not follow redirects to a different domain and treat them as errors</li>
+<li><code>--scope-domain</code> (repeatable) — Seed domain; the domain and its subdomains are in scope alongside the target</li>
+<li><code>--scope-cidr</code> (repeatable) — Seed CIDR or IP; IP-literal hosts inside it are in scope alongside the target</li>
 </ul>
+<p>A host outside the target, its subdomains and the seeds is neither followed nor recorded. A blocked redirect fails with <code>out-of-scope redirect blocked</code>.</p>
 <h2 id="commands">Commands<a class="headerlink" href="#commands" title="Permanent link">#</a></h2>
 <h3 id="application">Application<a class="headerlink" href="#application" title="Permanent link">#</a></h3>
 <p>Identify technologies and services running on a set of targets.</p>
@@ -1783,8 +1785,6 @@ Flags:
 <span class="w">      </span>--collect-static-assets<span class="w">           </span>Collect<span class="w"> </span>static<span class="w"> </span>assets<span class="w"> </span>from<span class="w"> </span>route<span class="w"> </span>discovery
 <span class="w">      </span>--headless-path<span class="w"> </span>string<span class="w">            </span>Path<span class="w"> </span>to<span class="w"> </span>headless<span class="w"> </span>browser<span class="w"> </span>executable
 <span class="w">  </span>-h,<span class="w"> </span>--help<span class="w">                            </span><span class="nb">help</span><span class="w"> </span><span class="k">for</span><span class="w"> </span>route
-<span class="w">      </span>--ignore-cross-domain-routes<span class="w">             </span>Ignore<span class="w"> </span>discovered<span class="w"> </span>routes<span class="w"> </span>whose<span class="w"> </span>host<span class="w"> </span>is<span class="w"> </span>not<span class="w"> </span>the<span class="w"> </span>target<span class="w"> </span>host<span class="w"> </span>or<span class="w"> </span>a<span class="w"> </span>subdomain<span class="w"> </span>of<span class="w"> </span>it<span class="w"> </span><span class="o">(</span>default<span class="w"> </span><span class="nb">true</span><span class="o">)</span>
-<span class="w">      </span>--ignore-cross-domain-static-assets<span class="w">      </span>Ignore<span class="w"> </span>discovered<span class="w"> </span>static<span class="w"> </span>assets<span class="w"> </span>whose<span class="w"> </span>host<span class="w"> </span>is<span class="w"> </span>not<span class="w"> </span>the<span class="w"> </span>target<span class="w"> </span>host<span class="w"> </span>or<span class="w"> </span>a<span class="w"> </span>subdomain<span class="w"> </span>of<span class="w"> </span>it<span class="w"> </span><span class="o">(</span>default<span class="w"> </span><span class="nb">true</span><span class="o">)</span>
 <span class="w">      </span>--max-redirects<span class="w"> </span>int<span class="w">               </span>Maximum<span class="w"> </span>number<span class="w"> </span>of<span class="w"> </span>redirects<span class="w"> </span>to<span class="w"> </span>follow<span class="w"> </span><span class="o">(</span>default<span class="w"> </span><span class="m">10</span><span class="o">)</span>
 <span class="w">      </span>--min-dom-stabalize-time<span class="w"> </span>int<span class="w">      </span>Minimum<span class="w"> </span><span class="nb">time</span><span class="w"> </span>to<span class="w"> </span><span class="nb">wait</span><span class="w"> </span><span class="k">for</span><span class="w"> </span>DOM<span class="w"> </span>stabilization<span class="w"> </span><span class="k">in</span><span class="w"> </span>seconds<span class="w"> </span><span class="o">(</span>default<span class="w"> </span><span class="m">20</span><span class="o">)</span>
 <span class="w">      </span>--request-method<span class="w"> </span>string<span class="w">           </span>Request<span class="w"> </span>method<span class="w"> </span>to<span class="w"> </span>use<span class="w"> </span><span class="o">(</span>standard,<span class="w"> </span>headless,<span class="w"> </span>browserbase<span class="o">)</span><span class="w"> </span><span class="o">(</span>default<span class="w"> </span><span class="s2">"HEADLESS"</span><span class="o">)</span>
@@ -1847,7 +1847,6 @@ Usage:
 
 Flags:
 <span class="w">  </span>-h,<span class="w"> </span>--help<span class="w">                  </span><span class="nb">help</span><span class="w"> </span><span class="k">for</span><span class="w"> </span>wordlist
-<span class="w">      </span>--ignore-cross-domain<span class="w">   </span>Ignore<span class="w"> </span>links<span class="w"> </span>that<span class="w"> </span>lead<span class="w"> </span>to<span class="w"> </span>a<span class="w"> </span>different<span class="w"> </span>domain<span class="w"> </span><span class="o">(</span>default<span class="w"> </span><span class="nb">true</span><span class="o">)</span>
 <span class="w">      </span>--include-alt-text<span class="w">      </span>Include<span class="w"> </span>words<span class="w"> </span>from<span class="w"> </span>image<span class="w"> </span>alt<span class="w"> </span>attributes
 <span class="w">      </span>--include-comments<span class="w">      </span>Include<span class="w"> </span>words<span class="w"> </span>from<span class="w"> </span>HTML<span class="w"> </span>comments
 <span class="w">      </span>--include-metadata<span class="w">      </span>Include<span class="w"> </span>words<span class="w"> </span>from<span class="w"> </span>meta<span class="w"> </span>tag<span class="w"> </span>content

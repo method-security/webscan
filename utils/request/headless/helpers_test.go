@@ -5,6 +5,39 @@ import (
 	"testing"
 )
 
+func TestEmptyHTMLShellIsNotResourceContent(t *testing.T) {
+	for _, content := range []string{
+		"<html><head></head><body></body></html>",
+		"\n<html><head></head><body></body></html>\n",
+	} {
+		if !isEmptyHTMLShell(content) || isValidStaticResourceBody([]byte(content)) {
+			t.Fatalf("empty browser shell accepted as resource content: %q", content)
+		}
+	}
+	for _, content := range []string{
+		"%PDF-1.7\n",
+		"<html><head></head><body>Hello</body></html>",
+		"<html><head><script>loadApp()</script></head><body></body></html>",
+	} {
+		if isEmptyHTMLShell(content) || !isValidStaticResourceBody([]byte(content)) {
+			t.Fatalf("nonempty content rejected: %q", content)
+		}
+	}
+}
+
+func TestNonHTMLResponseTriggersResourceRecoveryWithoutFileExtension(t *testing.T) {
+	for _, contentType := range []string{"application/pdf", "application/octet-stream", "Application/PDF; charset=binary", "text/plain"} {
+		if !isNonHTMLResponse(map[string][]string{"Content-Type": {contentType}}) {
+			t.Fatalf("expected resource recovery for %q", contentType)
+		}
+	}
+	for _, contentType := range []string{"", "text/html", "text/html; charset=utf-8", "application/xhtml+xml"} {
+		if isNonHTMLResponse(map[string][]string{"Content-Type": {contentType}}) {
+			t.Fatalf("unexpected resource recovery for %q", contentType)
+		}
+	}
+}
+
 func TestIsChromeTextDocumentViewerHTMLAllowsLargeJSONDocuments(t *testing.T) {
 	payload := `{"items":[` + strings.Repeat(`{"id":1},`, 40000) + `{"id":2}]}`
 	htmlContent := `<html><head><meta name="color-scheme" content="light dark"><meta charset="utf-8"></head><body><pre>` + payload + `</pre></body></html>`

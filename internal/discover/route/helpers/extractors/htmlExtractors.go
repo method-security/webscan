@@ -12,6 +12,8 @@ import (
 
 	// Internal
 	discoverroutehelpers "github.com/Method-Security/webscan/internal/discover/route/helpers"
+	"github.com/Method-Security/webscan/utils"
+
 	// External
 	goquery "github.com/PuerkitoBio/goquery"
 )
@@ -24,6 +26,7 @@ var windowOpenLiteralRegex = regexp.MustCompile(`(?i)\bwindow\.open\s*\(\s*(?:"(
 // It returns a slice of WebRoutes, a slice of URLs and a slice of errors
 // WebRoutes are merged to only return unique routes
 func ExtractFormRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig discover.DiscoverRouteConfig) ([]*discover.RouteDetails, []string, []string) {
+	scope := utils.ScopeOf(routeCaptureConfig.ScopeDomains, routeCaptureConfig.ScopeCidrs)
 	routes := []*discover.RouteDetails{}
 	urls := make(map[string]struct{})
 	errors := []string{}
@@ -44,12 +47,12 @@ func ExtractFormRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig
 		// Static assets are diverted to the StaticAssets output rather than
 		// recorded as routes. Scope is anchored on the original target, not the
 		// per-page (post-redirect) base URL.
-		if discoverroutehelpers.CaptureStaticAssetReference(urls, routeCaptureConfig.Target, fullURL, routeCaptureConfig.CollectStaticAssets, routeCaptureConfig.Scope) {
+		if discoverroutehelpers.CaptureStaticAssetReference(urls, routeCaptureConfig.Target, fullURL, routeCaptureConfig.CollectStaticAssets, scope) {
 			return
 		}
 
 		// Check if the URL is allowed
-		if !discoverroutehelpers.IsURLAllowed(routeCaptureConfig.Target, fullURL, routeCaptureConfig.CollectStaticAssets, routeCaptureConfig.Scope) {
+		if !discoverroutehelpers.IsURLAllowed(routeCaptureConfig.Target, fullURL, routeCaptureConfig.CollectStaticAssets, scope) {
 			return
 		}
 
@@ -113,6 +116,7 @@ func ExtractFormRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig
 // ExtractAnchorRoutes extracts WebRoutes from anchor (<a>) elements in the HTML document.
 // Returns a slice of RouteDetails, a slice of URLs, and a slice of errors.
 func ExtractAnchorRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig discover.DiscoverRouteConfig) ([]*discover.RouteDetails, []string, []string) {
+	scope := utils.ScopeOf(routeCaptureConfig.ScopeDomains, routeCaptureConfig.ScopeCidrs)
 	routes := []*discover.RouteDetails{}
 	urls := make(map[string]struct{})
 	errors := []string{}
@@ -127,7 +131,7 @@ func ExtractAnchorRoutes(doc *goquery.Document, baseURL string, routeCaptureConf
 		// Static assets are diverted to the StaticAssets output rather than
 		// recorded as routes. Scope is anchored on the original target, not the
 		// per-page (post-redirect) base URL.
-		if discoverroutehelpers.CaptureStaticAssetReference(urls, routeCaptureConfig.Target, fullURL, routeCaptureConfig.CollectStaticAssets, routeCaptureConfig.Scope) {
+		if discoverroutehelpers.CaptureStaticAssetReference(urls, routeCaptureConfig.Target, fullURL, routeCaptureConfig.CollectStaticAssets, scope) {
 			return
 		}
 
@@ -150,7 +154,7 @@ func ExtractAnchorRoutes(doc *goquery.Document, baseURL string, routeCaptureConf
 			return
 		}
 
-		if !discoverroutehelpers.IsURLAllowed(routeCaptureConfig.Target, fullURL, routeCaptureConfig.CollectStaticAssets, routeCaptureConfig.Scope) {
+		if !discoverroutehelpers.IsURLAllowed(routeCaptureConfig.Target, fullURL, routeCaptureConfig.CollectStaticAssets, scope) {
 			return
 		}
 		urls[urlNoQuery] = struct{}{}
@@ -199,6 +203,7 @@ func ExtractAnchorRoutes(doc *goquery.Document, baseURL string, routeCaptureConf
 // ExtractLinkRoutes extracts WebRoutes from link (<link>) elements in the HTML document.
 // Returns a slice of RouteDetails, a slice of URLs, and a slice of errors.
 func ExtractLinkRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig discover.DiscoverRouteConfig) ([]*discover.RouteDetails, []string, []string) {
+	scope := utils.ScopeOf(routeCaptureConfig.ScopeDomains, routeCaptureConfig.ScopeCidrs)
 	routes := []*discover.RouteDetails{}
 	urls := make(map[string]struct{})
 	errors := []string{}
@@ -211,7 +216,7 @@ func ExtractLinkRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig
 			// Static assets are diverted to the StaticAssets output rather than
 			// recorded as routes. Scope is anchored on the original target, not the
 			// per-page (post-redirect) base URL.
-			if discoverroutehelpers.CaptureStaticAssetReference(urls, routeCaptureConfig.Target, fullURL, routeCaptureConfig.CollectStaticAssets, routeCaptureConfig.Scope) {
+			if discoverroutehelpers.CaptureStaticAssetReference(urls, routeCaptureConfig.Target, fullURL, routeCaptureConfig.CollectStaticAssets, scope) {
 				return
 			}
 			// Stylesheets can use application paths instead of a .css extension.
@@ -235,7 +240,7 @@ func ExtractLinkRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig
 			}
 
 			// Check if the URL is allowed
-			if !discoverroutehelpers.IsURLAllowed(routeCaptureConfig.Target, fullURL, routeCaptureConfig.CollectStaticAssets, routeCaptureConfig.Scope) {
+			if !discoverroutehelpers.IsURLAllowed(routeCaptureConfig.Target, fullURL, routeCaptureConfig.CollectStaticAssets, scope) {
 				return
 			}
 
@@ -265,6 +270,7 @@ func ExtractLinkRoutes(doc *goquery.Document, baseURL string, routeCaptureConfig
 // ExtractScriptAssets records the JavaScript bundles a document references, so they are reported as
 // static assets rather than mined here. Returns a slice of URLs and a slice of errors.
 func ExtractScriptAssets(doc *goquery.Document, baseURL string, routeCaptureConfig discover.DiscoverRouteConfig) ([]string, []string) {
+	scope := utils.ScopeOf(routeCaptureConfig.ScopeDomains, routeCaptureConfig.ScopeCidrs)
 	urls := make(map[string]struct{})
 	errors := []string{}
 
@@ -281,7 +287,7 @@ func ExtractScriptAssets(doc *goquery.Document, baseURL string, routeCaptureConf
 			return
 		}
 
-		discoverroutehelpers.CaptureStaticAssetReference(urls, routeCaptureConfig.Target, urlNoQuery, routeCaptureConfig.CollectStaticAssets, routeCaptureConfig.Scope)
+		discoverroutehelpers.CaptureStaticAssetReference(urls, routeCaptureConfig.Target, urlNoQuery, routeCaptureConfig.CollectStaticAssets, scope)
 	})
 
 	return discoverroutehelpers.SetToListString(urls), errors

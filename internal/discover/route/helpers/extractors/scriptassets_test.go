@@ -5,17 +5,16 @@ import (
 	"strings"
 	"testing"
 
-	common "github.com/Method-Security/webscan/generated/go/common"
 	"github.com/Method-Security/webscan/generated/go/discover"
 	capturerouteextractors "github.com/Method-Security/webscan/internal/discover/route/helpers/extractors"
 	"github.com/PuerkitoBio/goquery"
 )
 
-func scriptAssetConfig(collectStaticAssets bool, scope *common.Scope) discover.DiscoverRouteConfig {
+func scriptAssetConfig(collectStaticAssets bool, scopeDomains []string) discover.DiscoverRouteConfig {
 	return discover.DiscoverRouteConfig{
 		Target:              "https://app.example.com",
 		CollectStaticAssets: collectStaticAssets,
-		Scope:               scope,
+		ScopeDomains:        scopeDomains,
 	}
 }
 
@@ -77,7 +76,7 @@ func TestExtractScriptAssetsExcludesCrossDomainBundles(t *testing.T) {
 		t.Fatalf("expected only the in-scope bundle, got %v", urls)
 	}
 
-	urls, _ = capturerouteextractors.ExtractScriptAssets(doc, "https://app.example.com/", scriptAssetConfig(true, &common.Scope{Domains: []string{"other.com"}, Cidrs: []string{}}))
+	urls, _ = capturerouteextractors.ExtractScriptAssets(doc, "https://app.example.com/", scriptAssetConfig(true, []string{"other.com"}))
 	if len(urls) != 2 {
 		t.Fatalf("expected the seeded bundle host to be kept, got %v", urls)
 	}

@@ -1,5 +1,4 @@
 imports:
-  scope: ../common/scope.yml
   method: ../common/method.yml
 types:
   DiscoverWordlistConfig:
@@ -10,7 +9,8 @@ types:
       includeMetadata: boolean
       includeComments: boolean
       includeAltText: boolean
-      scope: optional<scope.Scope>
+      scopeDomains: optional<list<string>>
+      scopeCidrs: optional<list<string>>
       verifyTls: boolean
       timeout: integer
       threads: integer

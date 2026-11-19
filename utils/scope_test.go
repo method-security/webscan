@@ -41,6 +41,16 @@ func TestNewScopeRejectsInvalid(t *testing.T) {
 	}
 }
 
+func TestScopeOfIsNilWithoutDomainsOrCidrs(t *testing.T) {
+	if utils.ScopeOf(nil, []string{}) != nil {
+		t.Fatal("expected no scope from empty fields")
+	}
+	scope := utils.ScopeOf(nil, []string{"198.51.100.0/24"})
+	if scope == nil || !utils.HostInSeedScope(scope, "http://198.51.100.20/") {
+		t.Fatalf("expected a CIDR-only scope, got %+v", scope)
+	}
+}
+
 func TestHostInSeedScope(t *testing.T) {
 	scope := &common.Scope{
 		Domains: []string{"example.com", "partner.example"},

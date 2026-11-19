@@ -10,7 +10,9 @@ import (
 	"github.com/Method-Security/webscan/generated/go/discover"
 
 	// Utils
+	"github.com/Method-Security/webscan/utils"
 	nucleiutils "github.com/Method-Security/webscan/utils/nuclei"
+
 	// External
 	svc1log "github.com/palantir/witchcraft-go-logging/wlog/svclog/svc1log"
 )
@@ -108,7 +110,7 @@ func createDiscoverApplicationNucleiConfig(ctx context.Context, config *discover
 		GlobalRateLimit: config.GlobalRateLimit,
 		GlobalTimeout:   config.GlobalTimeout,
 		UserAgent:       config.UserAgent,
-		Scope:           config.Scope,
+		Scope:           utils.ScopeOf(config.ScopeDomains, config.ScopeCidrs),
 	}, nil
 }
 

@@ -1,5 +1,4 @@
 imports:
-  scope: ../common/scope.yml
   http: ../common/http.yml
   method: ../common/method.yml
 types:
@@ -12,7 +11,8 @@ types:
       maxArtifacts: integer
       analysisWindowBytes: integer
       analysisWindowOverlapBytes: integer
-      scope: optional<scope.Scope>
+      scopeDomains: optional<list<string>>
+      scopeCidrs: optional<list<string>>
       maxRedirects: integer
       verifyTls: boolean
       timeout: integer

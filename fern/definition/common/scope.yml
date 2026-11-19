@@ -3,8 +3,8 @@ types:
     docs: Hosts the environment owns; widens cross-domain scope beyond the target.
     properties:
       domains:
-        type: list<string>
+        type: optional<list<string>>
         docs: Matches the domain and its subdomains.
       cidrs:
-        type: list<string>
+        type: optional<list<string>>
         docs: Matches IP-literal hosts inside these ranges.

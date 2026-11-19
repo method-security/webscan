@@ -955,7 +955,7 @@ a deduplicated set before anything is retrieved, so a bundle shared by many page
 				a.OutputSignal.AddError(err)
 				return
 			}
-			config.Scope, err = scopeFromFlags(cmd)
+			config.ScopeDomains, config.ScopeCidrs, err = scopeFromFlags(cmd)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return

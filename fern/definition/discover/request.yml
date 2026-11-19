@@ -1,5 +1,4 @@
 imports:
-  scope: ../common/scope.yml
   http: ../common/http.yml
   method: ../common/method.yml
   waf: ../common/waf.yml
@@ -40,7 +39,8 @@ types:
       timeout: integer
       retries: integer
       userAgent: method.UserAgentPreset
-      scope: optional<scope.Scope>
+      scopeDomains: optional<list<string>>
+      scopeCidrs: optional<list<string>>
 
   DiscoverRequestResult:
     properties:

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"testing"
 
-	common "github.com/Method-Security/webscan/generated/go/common"
 	"github.com/Method-Security/webscan/generated/go/enumerate"
 )
 
@@ -409,7 +408,7 @@ func TestAnalyzeAttachesPathParamExamplesAcrossRootRelativeAndAbsoluteSiblings(t
 // endpoint under whichever application happened to load the bundle.
 func TestAnalyzeFilesEndpointsUnderTheHostServingThem(t *testing.T) {
 	c := testCollector(0)
-	c.config.Scope = &common.Scope{Domains: []string{"example.com"}, Cidrs: []string{}}
+	c.config.ScopeDomains = []string{"example.com"}
 	c.analyzed("https://app.example.com/main.js", enumerate.JavascriptArtifactKindEntry,
 		`const env={serviceApiEndpoint:"https://app.example.com/serviceapi/v1"};`+
 			`fetch("https://api.example.com/v1/User/Read");fetch("https://api.example.com/v1/Order/List");`,
@@ -484,8 +483,8 @@ func TestAnalyzeRootsAgainstABaseOnAnotherTargetedHost(t *testing.T) {
 
 func TestAnalyzeDoesNotGuessASeededBaseForAnUnlinkedPath(t *testing.T) {
 	config := enumerate.EnumerateJavascriptConfig{
-		Targets: []string{"https://www.example.com"},
-		Scope:   &common.Scope{Domains: []string{"example.com", "partner.example"}, Cidrs: []string{}},
+		Targets:      []string{"https://www.example.com"},
+		ScopeDomains: []string{"example.com", "partner.example"},
 	}
 	c := newCollector(config)
 	c.analyzed("https://www.example.com/app.js", enumerate.JavascriptArtifactKindEntry,
@@ -545,7 +544,7 @@ func TestAnalyzeFilesAConcatenatedPathUnderItsSeededBaseNotTheLoader(t *testing.
 			Targets: []string{"https://www.example.com"},
 		}
 		if scoped {
-			config.Scope = &common.Scope{Domains: []string{"example.com", "partner.example"}, Cidrs: []string{}}
+			config.ScopeDomains = []string{"example.com", "partner.example"}
 		}
 		c := newCollector(config)
 		c.analyzed("https://www.example.com/app.js", enumerate.JavascriptArtifactKindEntry, source, []string{"https://www.example.com"})

@@ -1,5 +1,4 @@
 imports:
-  scope: ../common/scope.yml
   http: ../common/http.yml
   method: ../common/method.yml
 types:
@@ -8,7 +7,8 @@ types:
     properties:
       target: string
       collectStaticAssets: boolean
-      scope: optional<scope.Scope>
+      scopeDomains: optional<list<string>>
+      scopeCidrs: optional<list<string>>
       spiderDepth: integer
       maxRedirects: integer
       verifyTls: boolean

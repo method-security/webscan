@@ -44,6 +44,14 @@ func NewScope(domains []string, cidrs []string) (*common.Scope, error) {
 	return scope, nil
 }
 
+// ScopeOf returns the seed scope for a config's flat scope fields, or nil when both are empty.
+func ScopeOf(domains []string, cidrs []string) *common.Scope {
+	if len(domains) == 0 && len(cidrs) == 0 {
+		return nil
+	}
+	return &common.Scope{Domains: domains, Cidrs: cidrs}
+}
+
 // HostInSeedScope reports whether candidateURL's host is under a scope domain or inside a scope CIDR.
 func HostInSeedScope(scope *common.Scope, candidateURL string) bool {
 	if scope == nil {

@@ -42,7 +42,7 @@ func getHTTPRequestConfig(baseURL string, path string, queryParams map[string]st
 		MaxRedirects:       config.MaxRedirects,
 		VerifyTls:          config.VerifyTls,
 		Timeout:            config.Timeout,
-		Scope:              config.Scope,
+		Scope:              utils.ScopeOf(config.ScopeDomains, config.ScopeCidrs),
 		UserAgent:          config.UserAgent,
 		RequestMethod:      config.RequestMethod,
 		HeadlessConfig:     config.HeadlessConfig,

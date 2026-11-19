@@ -120,7 +120,7 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			config.Scope, err = scopeFromFlags(cmd)
+			config.ScopeDomains, config.ScopeCidrs, err = scopeFromFlags(cmd)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -340,7 +340,7 @@ func (a *WebScan) InitDiscoverCommand() {
 
 			// Set config
 			config := getDiscoverDirectoryConfig(targets, paths, wordlistType, wordlistSize, extensions, addSlash, recursionDepth, recursionStatusCodes, httpMethods, responseCodes, enableCommonResponseFilters, verifyTLS, threshold, timeout, globalRateLimit, maxRedirectsBaselineRequest, threads, globalTimeout, retries, sleep, jitter, userAgentPreset)
-			config.Scope, err = scopeFromFlags(cmd)
+			config.ScopeDomains, config.ScopeCidrs, err = scopeFromFlags(cmd)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -497,7 +497,7 @@ func (a *WebScan) InitDiscoverCommand() {
 
 			// Set Config
 			config := getDiscoverPageConfig(target, responseCodes, maxRedirects, verifyTLS, timeout, takeScreenshot, userAgentPreset, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
-			config.Scope, err = scopeFromFlags(cmd)
+			config.ScopeDomains, config.ScopeCidrs, err = scopeFromFlags(cmd)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -744,7 +744,7 @@ func (a *WebScan) InitDiscoverCommand() {
 			}
 
 			// Generate report
-			config.Scope, err = scopeFromFlags(cmd)
+			config.ScopeDomains, config.ScopeCidrs, err = scopeFromFlags(cmd)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -873,7 +873,7 @@ func (a *WebScan) InitDiscoverCommand() {
 				a.OutputSignal.AddError(err)
 				return
 			}
-			config.Scope, err = scopeFromFlags(cmd)
+			config.ScopeDomains, config.ScopeCidrs, err = scopeFromFlags(cmd)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -1026,7 +1026,7 @@ func (a *WebScan) InitDiscoverCommand() {
 
 			// Set Config
 			config := getDiscoverRouteConfig(target, collectStaticAssets, spiderDepth, maxRedirects, verifyTLS, timeout, sleep, jitter, threads, userAgentPreset, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
-			config.Scope, err = scopeFromFlags(cmd)
+			config.ScopeDomains, config.ScopeCidrs, err = scopeFromFlags(cmd)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -1352,7 +1352,7 @@ func (a *WebScan) InitDiscoverCommand() {
 
 			// Set Config
 			config := getDiscoverWordlistConfig(target, minWordLength, spiderDepth, includeMetadata, includeComments, includeAltText, verifyTLS, timeout, threads, sleep, jitter, userAgentPreset)
-			config.Scope, err = scopeFromFlags(cmd)
+			config.ScopeDomains, config.ScopeCidrs, err = scopeFromFlags(cmd)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return
@@ -1477,7 +1477,7 @@ func (a *WebScan) InitDiscoverCommand() {
 
 			// Set Config
 			config := getDiscoverWitnessConfig(target, responseCodes, takeScreenshot, maxRedirects, verifyTLS, timeout, userAgentPreset, requestMethodConfig.RequestMethodEnum, requestMethodConfig.HeadlessConfig, requestMethodConfig.BrowserbaseConfig)
-			config.Scope, err = scopeFromFlags(cmd)
+			config.ScopeDomains, config.ScopeCidrs, err = scopeFromFlags(cmd)
 			if err != nil {
 				a.OutputSignal.AddError(err)
 				return

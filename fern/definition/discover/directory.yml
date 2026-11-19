@@ -1,5 +1,4 @@
 imports:
-  scope: ../common/scope.yml
   http: ../common/http.yml
   method: ../common/method.yml
   waf: ../common/waf.yml
@@ -39,7 +38,8 @@ types:
       threshold: float
       timeout: integer
       globalRateLimit: integer
-      scope: optional<scope.Scope>
+      scopeDomains: optional<list<string>>
+      scopeCidrs: optional<list<string>>
       maxRedirectsBaselineRequest: integer
       globalTimeout: integer
       retries: integer

@@ -18,6 +18,7 @@ import (
 	// Internal
 	internalcommon "github.com/Method-Security/webscan/internal/common"
 	// Utils
+	"github.com/Method-Security/webscan/utils"
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
 	retry "github.com/Method-Security/webscan/utils/request/retry"
 	standardhelpers "github.com/Method-Security/webscan/utils/request/standard/helpers"
@@ -203,7 +204,7 @@ func PerformRequest(ctx context.Context, config discover.DiscoverRequestConfig) 
 		MaxRedirects:  maxRedirects,
 		VerifyTls:     config.VerifyTls,
 		Timeout:       config.Timeout,
-		Scope:         config.Scope,
+		Scope:         utils.ScopeOf(config.ScopeDomains, config.ScopeCidrs),
 		UserAgent:     config.UserAgent,
 		RequestMethod: common.RequestMethodStandard,
 	}

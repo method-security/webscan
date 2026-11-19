@@ -578,7 +578,7 @@ func hasFileEnding(raw string) bool {
 
 // inScope reports a URL served by a target's host or a subdomain of it.
 func (c *collector) inScope(target string) bool {
-	if utils.HostInSeedScope(c.config.Scope, target) {
+	if utils.HostInSeedScope(utils.ScopeOf(c.config.ScopeDomains, c.config.ScopeCidrs), target) {
 		return true
 	}
 	for _, configured := range c.config.Targets {

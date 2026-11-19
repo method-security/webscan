@@ -1,5 +1,4 @@
 imports:
-  scope: ../common/scope.yml
   http: ../common/http.yml
   method: ../common/method.yml
 types:
@@ -64,7 +63,8 @@ types:
       globalRateLimit: integer
       globalTimeout: integer
       userAgent: method.UserAgentPreset
-      scope: optional<scope.Scope>
+      scopeDomains: optional<list<string>>
+      scopeCidrs: optional<list<string>>
   # Application Fingerprint Attempt Struct
   ApplicationFingerprintAttempt:
     properties:

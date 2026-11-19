@@ -30,7 +30,8 @@ func pageConfigFromWitnessConfig(target string, config discover.DiscoverWitnessC
 		MaxRedirects:      config.MaxRedirects,
 		VerifyTls:         config.VerifyTls,
 		Timeout:           config.Timeout,
-		Scope:             config.Scope,
+		ScopeDomains:      config.ScopeDomains,
+		ScopeCidrs:        config.ScopeCidrs,
 		UserAgent:         config.UserAgent,
 		RequestMethod:     config.RequestMethod,
 		HeadlessConfig:    config.HeadlessConfig,
@@ -97,7 +98,7 @@ func processTarget(
 		finalURL = resp.RedirectChain[len(resp.RedirectChain)-1]
 	}
 	faviconURL := witnesshelpers.ExtractFaviconURL(string(bodyBytes), finalURL)
-	if faviconURL != "" && utils.HostAllowed(config.Scope, target, faviconURL) {
+	if faviconURL != "" && utils.HostAllowed(utils.ScopeOf(config.ScopeDomains, config.ScopeCidrs), target, faviconURL) {
 		if faviconBytes, faviconHash, faviconErr := witnesshelpers.FetchFavicon(ctx, faviconURL, config); faviconErr == nil && len(faviconBytes) > 0 {
 			result.Favicon = &discover.DiscoverWitnessFavicon{
 				Url:    faviconURL,

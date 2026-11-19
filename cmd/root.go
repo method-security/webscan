@@ -10,7 +10,6 @@ import (
 
 	"github.com/Method-Security/pkg/signal"
 	"github.com/Method-Security/pkg/writer"
-	common "github.com/Method-Security/webscan/generated/go/common"
 	"github.com/Method-Security/webscan/internal/config"
 	"github.com/Method-Security/webscan/utils"
 	"github.com/palantir/pkg/datetime"
@@ -131,15 +130,19 @@ func validateOutputFormat(output string) (writer.Format, error) {
 	return writer.NewFormat(format), nil
 }
 
-// scopeFromFlags builds the seed scope from --scope-domain and --scope-cidr, or nil when neither is set.
-func scopeFromFlags(cmd *cobra.Command) (*common.Scope, error) {
+// scopeFromFlags returns the normalized --scope-domain and --scope-cidr values.
+func scopeFromFlags(cmd *cobra.Command) ([]string, []string, error) {
 	domains, err := cmd.Flags().GetStringSlice("scope-domain")
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	cidrs, err := cmd.Flags().GetStringSlice("scope-cidr")
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return utils.NewScope(domains, cidrs)
+	scope, err := utils.NewScope(domains, cidrs)
+	if err != nil || scope == nil {
+		return nil, nil, err
+	}
+	return scope.Domains, scope.Cidrs, nil
 }

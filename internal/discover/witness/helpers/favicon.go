@@ -13,6 +13,7 @@ import (
 	discover "github.com/Method-Security/webscan/generated/go/discover"
 
 	// Utils
+	"github.com/Method-Security/webscan/utils"
 	request "github.com/Method-Security/webscan/utils/request"
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
 
@@ -96,7 +97,7 @@ func FetchFavicon(ctx context.Context, faviconURL string, config discover.Discov
 		MaxRedirects:  config.MaxRedirects,
 		VerifyTls:     config.VerifyTls,
 		Timeout:       config.Timeout,
-		Scope:         config.Scope,
+		Scope:         utils.ScopeOf(config.ScopeDomains, config.ScopeCidrs),
 		UserAgent:     config.UserAgent,
 		RequestMethod: common.RequestMethodStandard,
 	}

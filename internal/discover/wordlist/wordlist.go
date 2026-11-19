@@ -58,7 +58,7 @@ func createRequestConfig(rawURL string, config discover.DiscoverWordlistConfig) 
 		MaxRedirects:  10,
 		VerifyTls:     config.VerifyTls,
 		Timeout:       config.Timeout,
-		Scope:         utils.ScopeWithAnchor(config.Scope, config.Target),
+		Scope:         utils.ScopeWithAnchor(utils.ScopeOf(config.ScopeDomains, config.ScopeCidrs), config.Target),
 		RequestMethod: common.RequestMethodStandard,
 		UserAgent:     config.UserAgent,
 	}, nil
@@ -161,7 +161,7 @@ func extractLinks(htmlContent, pageURL string, config discover.DiscoverWordlistC
 		resolved = strings.TrimRight(resolved, "/")
 
 		// Anchored on config.Target, never pageURL, which can be an off-scope landing.
-		if !utils.HostAllowed(config.Scope, config.Target, resolved) {
+		if !utils.HostAllowed(utils.ScopeOf(config.ScopeDomains, config.ScopeCidrs), config.Target, resolved) {
 			return
 		}
 
@@ -297,7 +297,7 @@ func PerformWordlistCapture(ctx context.Context, config discover.DiscoverWordlis
 				}
 				mu.Unlock()
 
-				isInScope := utils.HostAllowed(config.Scope, config.Target, finalURL)
+				isInScope := utils.HostAllowed(utils.ScopeOf(config.ScopeDomains, config.ScopeCidrs), config.Target, finalURL)
 
 				if isInScope {
 					words := extractWords(bodyStr, config)

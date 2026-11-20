@@ -1599,7 +1599,7 @@
 <li><code>--scope-domains</code> (repeatable) — Seed domain; the domain and its subdomains are in scope alongside the target</li>
 <li><code>--scope-cidrs</code> (repeatable) — Seed CIDR or IP; IP-literal hosts inside it are in scope alongside the target</li>
 </ul>
-<p>A host outside the target, its subdomains and the seeds is neither followed nor recorded. A blocked redirect fails with <code>out-of-scope redirect blocked</code>.</p>
+<p>With no <code>--scope-*</code> flags, redirects and discovered hosts are not restricted. With any of them, a host outside the target, its subdomains and the seeds is neither followed nor recorded, and a blocked redirect fails with <code>out-of-scope redirect blocked</code>.</p>
 <h2 id="commands">Commands<a class="headerlink" href="#commands" title="Permanent link">#</a></h2>
 <h3 id="application">Application<a class="headerlink" href="#application" title="Permanent link">#</a></h3>
 <p>Identify technologies and services running on a set of targets.</p>

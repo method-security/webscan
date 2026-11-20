@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/netip"
 	"net/url"
-	"slices"
 	"strings"
 )
 
@@ -27,7 +26,7 @@ func NewScope(domains []string, cidrs []string) (*Scope, error) {
 			value = parsed.Hostname()
 		}
 		value = strings.TrimPrefix(normalizeHost(value), "*.")
-		if value == "" {
+		if value == "" || strings.Contains(value, "*") {
 			return nil, fmt.Errorf("invalid scope domain %q", raw)
 		}
 		if addr, err := netip.ParseAddr(value); err == nil {
@@ -62,9 +61,6 @@ func HostInSeedScope(scope *Scope, candidateURL string) bool {
 	if scope == nil {
 		return false
 	}
-	if slices.Contains(scope.Domains, unrestrictedDomain) {
-		return true
-	}
 	parsed, err := url.Parse(candidateURL)
 	if err != nil {
 		return false
@@ -90,27 +86,18 @@ func HostInSeedScope(scope *Scope, candidateURL string) bool {
 	return false
 }
 
-// HostAllowed reports whether candidateURL is the anchor's host, under it, or under a seed.
+// HostAllowed reports whether candidateURL may be followed: any host without a scope, else the anchor's host, its subdomains, or a seed.
 func HostAllowed(scope *Scope, anchorURL string, candidateURL string) bool {
+	if scope == nil {
+		return true
+	}
 	return IsHostInScope(anchorURL, candidateURL) || HostInSeedScope(scope, candidateURL)
 }
 
-// unrestrictedDomain admits every host.
-const unrestrictedDomain = "*"
-
-// UnrestrictedScope admits every host.
-func UnrestrictedScope() *Scope {
-	return &Scope{Domains: UnrestrictedDomains(), Cidrs: UnrestrictedCidrs()}
-}
-
-// UnrestrictedDomains is the domain list of UnrestrictedScope, for flat scope fields.
-func UnrestrictedDomains() []string {
-	return []string{unrestrictedDomain}
-}
-
-// UnrestrictedCidrs is the CIDR list of UnrestrictedScope, for flat scope fields.
-func UnrestrictedCidrs() []string {
-	return []string{"0.0.0.0/0", "::/0"}
+// AnchorScope returns flat scope fields that admit only anchorURL's host and its subdomains.
+func AnchorScope(anchorURL string) ([]string, []string) {
+	scope := ScopeWithAnchor(nil, anchorURL)
+	return scope.Domains, scope.Cidrs
 }
 
 // ScopeWithAnchor returns scope widened to include the anchor's host and its subdomains.

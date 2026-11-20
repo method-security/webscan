@@ -38,9 +38,12 @@ func createSendHTTPRequestConfig(baseURL, path string, maxRedirects int, config 
 		Method:  common.HttpMethodGet,
 		Params:  &common.HttpRequestParams{},
 	}
+	scopeDomains, scopeCidrs := utils.AnchorScope(baseURL)
 	return common.SendHttpRequestConfig{
 		Request:            &request,
 		MaxRedirects:       maxRedirects,
+		ScopeDomains:       scopeDomains,
+		ScopeCidrs:         scopeCidrs,
 		VerifyTls:          config.VerifyTls,
 		Timeout:            config.Timeout,
 		UserAgent:          config.UserAgent,

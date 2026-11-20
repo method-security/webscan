@@ -436,7 +436,8 @@ func TestAnalyzeFilesEndpointsUnderTheHostServingThem(t *testing.T) {
 // stand up an application of its own.
 func TestAnalyzeDropsUnscopedEndpoints(t *testing.T) {
 	c := newCollector(enumerate.EnumerateJavascriptConfig{
-		Targets: []string{"https://app.example.com"},
+		Targets:      []string{"https://app.example.com"},
+		ScopeDomains: []string{"partner.example"},
 	})
 	c.analyzed("https://app.example.com/main.js", enumerate.JavascriptArtifactKindEntry,
 		`const env={serviceApiEndpoint:"https://app.example.com/serviceapi/v1"};`+
@@ -444,7 +445,8 @@ func TestAnalyzeDropsUnscopedEndpoints(t *testing.T) {
 		[]string{"https://app.example.com"})
 
 	result := c.analyze(enumerate.EnumerateJavascriptConfig{
-		Targets: []string{"https://app.example.com"},
+		Targets:      []string{"https://app.example.com"},
+		ScopeDomains: []string{"partner.example"},
 	})
 	for _, application := range result.applications {
 		if application.BaseUrl == "https://facebook.com" {
@@ -519,9 +521,10 @@ func hasEndpointPath(application *enumerate.JavascriptApplicationDetails, path s
 	return false
 }
 
-func TestAnalyzeDropsTheSeededDomainBaseWithoutScope(t *testing.T) {
+func TestAnalyzeDropsAnUnseededDomainBase(t *testing.T) {
 	config := enumerate.EnumerateJavascriptConfig{
-		Targets: []string{"https://www.example.com"},
+		Targets:      []string{"https://www.example.com"},
+		ScopeDomains: []string{"example.com"},
 	}
 	c := newCollector(config)
 	c.analyzed("https://www.example.com/app.js", enumerate.JavascriptArtifactKindEntry,
@@ -531,7 +534,7 @@ func TestAnalyzeDropsTheSeededDomainBaseWithoutScope(t *testing.T) {
 
 	for _, application := range c.analyze(config).applications {
 		if application.BaseUrl == "https://api.partner.example" {
-			t.Fatalf("expected no application on the unscoped host, got %v", application)
+			t.Fatalf("expected no application on the unseeded host, got %v", application)
 		}
 	}
 }
@@ -541,10 +544,11 @@ func TestAnalyzeFilesAConcatenatedPathUnderItsSeededBaseNotTheLoader(t *testing.
 		`this.lookupUrl=t+"/services/LookupService.php?func=Find&"}};`
 	for _, scoped := range []bool{false, true} {
 		config := enumerate.EnumerateJavascriptConfig{
-			Targets: []string{"https://www.example.com"},
+			Targets:      []string{"https://www.example.com"},
+			ScopeDomains: []string{"example.com"},
 		}
 		if scoped {
-			config.ScopeDomains = []string{"example.com", "partner.example"}
+			config.ScopeDomains = append(config.ScopeDomains, "partner.example")
 		}
 		c := newCollector(config)
 		c.analyzed("https://www.example.com/app.js", enumerate.JavascriptArtifactKindEntry, source, []string{"https://www.example.com"})
@@ -561,7 +565,7 @@ func TestAnalyzeFilesAConcatenatedPathUnderItsSeededBaseNotTheLoader(t *testing.
 			t.Fatalf("expected the lookup service under the seeded base, got %v", serving)
 		}
 		if !scoped && serving != nil {
-			t.Fatalf("expected the unseeded base to be dropped without scope, got %v", serving)
+			t.Fatalf("expected the unseeded base to be dropped, got %v", serving)
 		}
 	}
 }

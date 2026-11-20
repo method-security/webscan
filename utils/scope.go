@@ -27,7 +27,7 @@ func NewScope(domains []string, cidrs []string) (*Scope, error) {
 			value = parsed.Hostname()
 		}
 		value = strings.TrimPrefix(normalizeHost(value), "*.")
-		if value == "" || value == unrestrictedDomain {
+		if value == "" {
 			return nil, fmt.Errorf("invalid scope domain %q", raw)
 		}
 		if addr, err := netip.ParseAddr(value); err == nil {
@@ -95,7 +95,7 @@ func HostAllowed(scope *Scope, anchorURL string, candidateURL string) bool {
 	return IsHostInScope(anchorURL, candidateURL) || HostInSeedScope(scope, candidateURL)
 }
 
-// unrestrictedDomain admits every host; only checks that exist to inspect third-party references use it.
+// unrestrictedDomain admits every host.
 const unrestrictedDomain = "*"
 
 // UnrestrictedScope admits every host.

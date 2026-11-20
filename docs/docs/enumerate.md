@@ -122,7 +122,7 @@ Flags:
       --max-artifacts int                   Maximum number of artifacts to retrieve across the run, targets included (0 = unlimited) (default 50)
       --max-redirects int                   Maximum number of redirects to follow (default 3)
       --scope-cidrs strings                 Seed CIDR or IP whose IP-literal hosts are in scope alongside the target
-      --scope-domains strings               Seed domain whose host and subdomains are in scope alongside the target
+      --scope-domains strings               Seed domain whose host and subdomains are in scope alongside the target; "*" admits every host
       --sleep int                           Number of seconds to sleep between requests
       --targets strings                     Page or JavaScript bundle URLs to analyze as one application
       --threads int                         Number of concurrent chunk fetches

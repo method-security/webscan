@@ -121,9 +121,15 @@ func TestUnrestrictedScopeAdmitsEveryHost(t *testing.T) {
 	}
 }
 
-func TestNewScopeRejectsTheUnrestrictedSentinel(t *testing.T) {
-	if _, err := utils.NewScope([]string{"*"}, nil); err == nil {
-		t.Error("expected the CLI to refuse an unrestricted scope")
+func TestNewScopeAcceptsTheUnrestrictedSentinel(t *testing.T) {
+	scope, err := utils.NewScope([]string{"*"}, nil)
+	if err != nil {
+		t.Fatalf("NewScope(*): %v", err)
+	}
+	for _, candidate := range []string{"https://login.identity.test/", "http://10.9.8.7/", "http://[2001:db8::9]/"} {
+		if !utils.HostAllowed(scope, "https://www.example.com/", candidate) {
+			t.Errorf("expected %s to be allowed", candidate)
+		}
 	}
 }
 

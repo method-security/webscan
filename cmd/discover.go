@@ -42,7 +42,7 @@ func (a *WebScan) InitDiscoverCommand() {
 	}
 
 	// General Discover Flags
-	discoverCmd.PersistentFlags().StringSlice("scope-domains", []string{}, "Seed domain whose host and subdomains are in scope alongside the target; widens scope beyond the target")
+	discoverCmd.PersistentFlags().StringSlice("scope-domains", []string{}, "Seed domain whose host and subdomains are in scope alongside the target; \"*\" admits every host")
 	discoverCmd.PersistentFlags().StringSlice("scope-cidrs", []string{}, "Seed CIDR or IP whose IP-literal hosts are in scope alongside the target; widens scope beyond the target")
 
 	// Application Command

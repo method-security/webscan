@@ -11,7 +11,6 @@ import (
 	"testing"
 
 	common "github.com/Method-Security/webscan/generated/go/common"
-	"github.com/Method-Security/webscan/utils"
 	standardhelpers "github.com/Method-Security/webscan/utils/request/standard/helpers"
 )
 
@@ -66,10 +65,9 @@ func TestSendHTTPRequestScopeDecidesCrossDomainRedirects(t *testing.T) {
 		cidrs   []string
 		blocked bool
 	}{
-		{"another host is blocked without seeds", nil, nil, true},
+		{"any host is followed without a scope", nil, nil, false},
 		{"seeded host is followed", []string{"localhost"}, nil, false},
 		{"unseeded host is blocked", []string{"other.test"}, nil, true},
-		{"unrestricted scope follows any host", utils.UnrestrictedDomains(), utils.UnrestrictedCidrs(), false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

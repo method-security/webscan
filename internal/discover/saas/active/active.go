@@ -39,8 +39,6 @@ func createSendHTTPRequestConfig(baseURL, path string, config discover.DiscoverS
 
 	return common.SendHttpRequestConfig{
 		Request:            &request,
-		ScopeDomains:       utils.UnrestrictedDomains(),
-		ScopeCidrs:         utils.UnrestrictedCidrs(),
 		MaxRedirects:       config.MaxRedirects,
 		VerifyTls:          config.VerifyTls,
 		Timeout:            config.Timeout,

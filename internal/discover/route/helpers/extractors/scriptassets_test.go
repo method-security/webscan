@@ -71,9 +71,14 @@ func TestExtractScriptAssetsExcludesCrossDomainBundles(t *testing.T) {
 		<script src="/main.abc.js"></script>
 	</head></html>`)
 
-	urls, _ := capturerouteextractors.ExtractScriptAssets(doc, "https://app.example.com/", scriptAssetConfig(true, nil))
+	urls, _ := capturerouteextractors.ExtractScriptAssets(doc, "https://app.example.com/", scriptAssetConfig(true, []string{"partner.example"}))
 	if len(urls) != 1 || urls[0] != "https://app.example.com/main.abc.js" {
 		t.Fatalf("expected only the in-scope bundle, got %v", urls)
+	}
+
+	urls, _ = capturerouteextractors.ExtractScriptAssets(doc, "https://app.example.com/", scriptAssetConfig(true, nil))
+	if len(urls) != 2 {
+		t.Fatalf("expected every bundle without a scope, got %v", urls)
 	}
 
 	urls, _ = capturerouteextractors.ExtractScriptAssets(doc, "https://app.example.com/", scriptAssetConfig(true, []string{"other.com"}))

@@ -121,8 +121,8 @@ Flags:
       --jitter int                          Jitter percentage (0-100) to apply random variance to sleep delay
       --max-artifacts int                   Maximum number of artifacts to retrieve across the run, targets included (0 = unlimited) (default 50)
       --max-redirects int                   Maximum number of redirects to follow (default 3)
-      --scope-cidrs strings                 Seed CIDR or IP whose IP-literal hosts are in scope alongside the target
-      --scope-domains strings               Seed domain whose host and subdomains are in scope alongside the target
+      --scope-cidrs strings                 Restrict to the target plus IP-literal hosts in this seed CIDR or IP; with no --scope-* flags any host is followed
+      --scope-domains strings               Restrict to the target plus this seed domain and its subdomains; with no --scope-* flags any host is followed
       --sleep int                           Number of seconds to sleep between requests
       --targets strings                     Page or JavaScript bundle URLs to analyze as one application
       --threads int                         Number of concurrent chunk fetches

@@ -123,12 +123,16 @@ func generateSpecPaths() []string {
 	return paths
 }
 
-func createSendHTTPRequestConfig(baseURL, path string, maxRedirects int, scopeDomains []string, scopeCidrs []string, timeout int, verifyTls bool, userAgent common.UserAgentPreset, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, headers map[string][]string) common.SendHttpRequestConfig {
+func createSendHTTPRequestConfig(baseURL, path string, maxRedirects int, anchored bool, timeout int, verifyTls bool, userAgent common.UserAgentPreset, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, headers map[string][]string) common.SendHttpRequestConfig {
 	request := common.HttpRequest{
 		BaseUrl: baseURL,
 		Path:    path,
 		Method:  common.HttpMethodGet,
 		Params:  &common.HttpRequestParams{Headers: headers},
+	}
+	var scopeDomains, scopeCidrs []string
+	if anchored {
+		scopeDomains, scopeCidrs = utils.AnchorScope(baseURL)
 	}
 	return common.SendHttpRequestConfig{
 		Request:            &request,
@@ -279,7 +283,7 @@ func findOpenAPISpec(ctx context.Context, target string, timeout int, verifyTls 
 	}
 
 	// STEP 1: Make a standard request to check if target is a Swagger UI page
-	requestConfig := createSendHTTPRequestConfig(baseURL, parsedTargetPath, swaggerInitialMaxRedirects, nil, nil, timeout, verifyTls, userAgent, common.RequestMethodStandard, nil, headers)
+	requestConfig := createSendHTTPRequestConfig(baseURL, parsedTargetPath, swaggerInitialMaxRedirects, true, timeout, verifyTls, userAgent, common.RequestMethodStandard, nil, headers)
 	response, err := request.SendRequest(ctx, requestConfig)
 	canonicalTarget := target
 	if err == nil {
@@ -305,7 +309,7 @@ func findOpenAPISpec(ctx context.Context, target string, timeout int, verifyTls 
 					MinDomStabalizeTime: 5,
 				}
 
-				headlessRequestConfig := createSendHTTPRequestConfig(baseURL, parsedTargetPath, swaggerInitialMaxRedirects, nil, nil, timeout, verifyTls, userAgent, common.RequestMethodHeadless, headlessConfig, headers)
+				headlessRequestConfig := createSendHTTPRequestConfig(baseURL, parsedTargetPath, swaggerInitialMaxRedirects, true, timeout, verifyTls, userAgent, common.RequestMethodHeadless, headlessConfig, headers)
 				headlessResponse, err := request.SendRequest(ctx, headlessRequestConfig)
 
 				if err == nil && headlessResponse.Response != nil && headlessResponse.Response.StatusCode != nil &&
@@ -330,7 +334,7 @@ func findOpenAPISpec(ctx context.Context, target string, timeout int, verifyTls 
 							}
 
 							// Make request to the extracted spec URL
-							specRequestConfig := createSendHTTPRequestConfig(baseURL, specPath, swaggerProbeMaxRedirects, nil, nil, timeout, verifyTls, userAgent, common.RequestMethodStandard, nil, headers)
+							specRequestConfig := createSendHTTPRequestConfig(baseURL, specPath, swaggerProbeMaxRedirects, true, timeout, verifyTls, userAgent, common.RequestMethodStandard, nil, headers)
 							specResponse, err := request.SendRequest(ctx, specRequestConfig)
 							if err != nil {
 								continue
@@ -357,7 +361,7 @@ func findOpenAPISpec(ctx context.Context, target string, timeout int, verifyTls 
 						for _, path := range specPaths {
 							for _, probeBasePath := range probeBasePaths {
 								probePath := joinSwaggerProbePath(probeBasePath, path)
-								specRequestConfig := createSendHTTPRequestConfig(baseURL, probePath, swaggerProbeMaxRedirects, nil, nil, timeout, verifyTls, userAgent, common.RequestMethodStandard, nil, headers)
+								specRequestConfig := createSendHTTPRequestConfig(baseURL, probePath, swaggerProbeMaxRedirects, true, timeout, verifyTls, userAgent, common.RequestMethodStandard, nil, headers)
 								specResponse, err := request.SendRequest(ctx, specRequestConfig)
 								if err != nil {
 									continue
@@ -396,7 +400,7 @@ func findOpenAPISpec(ctx context.Context, target string, timeout int, verifyTls 
 		// Create a request config for the Swagger/OpenAPI spec and send the request
 		for _, probeBasePath := range probeBasePaths {
 			probePath := joinSwaggerProbePath(probeBasePath, path)
-			requestConfig := createSendHTTPRequestConfig(baseURL, probePath, swaggerProbeMaxRedirects, nil, nil, timeout, verifyTls, userAgent, common.RequestMethodStandard, nil, headers)
+			requestConfig := createSendHTTPRequestConfig(baseURL, probePath, swaggerProbeMaxRedirects, true, timeout, verifyTls, userAgent, common.RequestMethodStandard, nil, headers)
 			request, err := request.SendRequest(ctx, requestConfig)
 			if err != nil {
 				continue // Try next path on request failure
@@ -471,7 +475,7 @@ func PerformAppEnumerateSwagger(ctx context.Context, config enumerateapiapplicat
 			report.Errors = append(report.Errors, fmt.Sprintf("invalid specUrl: %v", err))
 			return report
 		}
-		requestConfig := createSendHTTPRequestConfig(baseURL, specPath, swaggerSpecURLMaxRedirects, utils.UnrestrictedDomains(), utils.UnrestrictedCidrs(), config.Timeout, config.VerifyTls, config.UserAgent, common.RequestMethodStandard, nil, headers)
+		requestConfig := createSendHTTPRequestConfig(baseURL, specPath, swaggerSpecURLMaxRedirects, false, config.Timeout, config.VerifyTls, config.UserAgent, common.RequestMethodStandard, nil, headers)
 		// Preserve query parameters from specUrl (e.g., ?format=openapi) — SplitTargetURL strips them.
 		if len(queryParams) > 0 {
 			if requestConfig.Request.Params == nil {

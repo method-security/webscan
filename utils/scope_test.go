@@ -82,16 +82,25 @@ func TestHostInSeedScope(t *testing.T) {
 	}
 }
 
-func TestHostAllowedWithoutScopeIsTheAnchor(t *testing.T) {
-	anchor := "https://www.example.com/"
-	if !utils.HostAllowed(nil, anchor, "https://app.www.example.com/") {
+func TestHostAllowedWithoutScopeAdmitsEveryHost(t *testing.T) {
+	for _, candidate := range []string{"https://login.identity.test/", "https://example.com/", "http://10.9.8.7/", "http://[2001:db8::9]/", "db.example.net:5432", "/relative", ""} {
+		if !utils.HostAllowed(nil, "https://www.example.com/", candidate) {
+			t.Errorf("expected %q to be allowed without a scope", candidate)
+		}
+	}
+}
+
+func TestAnchorScopeKeepsOnlyTheAnchor(t *testing.T) {
+	anchor := "https://www.example.com/start"
+	scope := utils.ScopeOf(utils.AnchorScope(anchor))
+	if !utils.HostAllowed(scope, anchor, "https://app.www.example.com/") {
 		t.Error("child of the anchor must be allowed")
 	}
-	if utils.HostAllowed(nil, anchor, "https://example.com/") {
-		t.Error("parent of the anchor must be blocked without seeds")
+	if utils.HostAllowed(scope, anchor, "https://example.com/") {
+		t.Error("parent of the anchor must be blocked")
 	}
-	if utils.HostAllowed(nil, anchor, "https://login.identity.test/") {
-		t.Error("an unrelated host must be blocked without seeds")
+	if utils.HostAllowed(scope, anchor, "https://login.identity.test/") {
+		t.Error("an unrelated host must be blocked")
 	}
 }
 
@@ -112,18 +121,12 @@ func TestHostAllowedWithScopeWidensAnchor(t *testing.T) {
 	}
 }
 
-func TestUnrestrictedScopeAdmitsEveryHost(t *testing.T) {
-	scope := utils.UnrestrictedScope()
-	for _, candidate := range []string{"https://bucket.s3.amazonaws.example/", "http://198.51.100.9/", "http://[2001:db8::9]/", "db.example.net:5432", "/relative", ""} {
-		if !utils.HostAllowed(scope, "https://www.example.com/", candidate) {
-			t.Errorf("expected %s to be allowed", candidate)
-		}
-	}
-}
-
-func TestNewScopeRejectsTheUnrestrictedSentinel(t *testing.T) {
+func TestNewScopeRejectsWildcards(t *testing.T) {
 	if _, err := utils.NewScope([]string{"*"}, nil); err == nil {
-		t.Error("expected the CLI to refuse an unrestricted scope")
+		t.Error("expected a bare wildcard to be rejected")
+	}
+	if _, err := utils.NewScope([]string{"*.corp.example.net"}, nil); err != nil {
+		t.Errorf("expected a leading wildcard label to be accepted, got %v", err)
 	}
 }
 

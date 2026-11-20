@@ -356,7 +356,7 @@ func (b *Builder) Consume(ev *nout.ResultEvent) {
 }
 
 func (b *Builder) isTargetInScope(targetURL string) bool {
-	if utils.HostInSeedScope(b.scope, targetURL) {
+	if b.scope == nil || utils.HostInSeedScope(b.scope, targetURL) {
 		return true
 	}
 	for _, scopeTarget := range b.scopeTargets {

@@ -42,8 +42,8 @@ func (a *WebScan) InitDiscoverCommand() {
 	}
 
 	// General Discover Flags
-	discoverCmd.PersistentFlags().StringSlice("scope-domains", []string{}, "Seed domain whose host and subdomains are in scope alongside the target; widens scope beyond the target")
-	discoverCmd.PersistentFlags().StringSlice("scope-cidrs", []string{}, "Seed CIDR or IP whose IP-literal hosts are in scope alongside the target; widens scope beyond the target")
+	discoverCmd.PersistentFlags().StringSlice("scope-domains", []string{}, "Restrict to the target plus this seed domain and its subdomains; with no --scope-* flags any host is followed")
+	discoverCmd.PersistentFlags().StringSlice("scope-cidrs", []string{}, "Restrict to the target plus IP-literal hosts in this seed CIDR or IP; with no --scope-* flags any host is followed")
 
 	// Application Command
 	discoverApplicationCmd := &cobra.Command{

@@ -17,7 +17,7 @@ func TestExtractFormRoutesDeduplicatesFieldNames(t *testing.T) {
 				<input name="email">
 				<textarea name="message"></textarea>
 			</form>`)
-			config := discover.DiscoverRouteConfig{Target: "https://example.com"}
+			config := discover.DiscoverRouteConfig{Target: "https://example.com", IgnoreCrossDomainRoutes: true}
 			routes, _, errors := extractors.ExtractFormRoutes(doc, config.Target, config)
 			if len(errors) != 0 || len(routes) != 1 {
 				t.Fatalf("routes = %v, errors = %v", routes, errors)
@@ -40,7 +40,7 @@ func TestExtractFormRoutesDeduplicatesFieldNames(t *testing.T) {
 func TestExtractLinkRoutesPreservesQueryParameters(t *testing.T) {
 	doc := documentFrom(t, `<link rel="alternate" href="/api/embed?url=https%3A%2F%2Fexample.com%2Fpage">
 		<link rel="alternate" href="/api/embed?url=https%3A%2F%2Fexample.com%2Fpage&amp;format=xml">`)
-	config := discover.DiscoverRouteConfig{Target: "https://example.com"}
+	config := discover.DiscoverRouteConfig{Target: "https://example.com", IgnoreCrossDomainRoutes: true}
 	routes, _, errors := extractors.ExtractLinkRoutes(doc, config.Target, config)
 	if len(errors) != 0 || len(routes) != 1 {
 		t.Fatalf("routes = %v, errors = %v", routes, errors)
@@ -62,7 +62,7 @@ func TestExtractLinkRoutesExcludesDeclaredStylesheets(t *testing.T) {
 	doc := documentFrom(t, `<link rel="stylesheet" href="/styles/theme.cssx?v=1">
 		<link rel="alternate StyleSheet" href="/dynamic-style.do?theme=dark">
 		<link rel="alternate" href="/api/render?format=html">`)
-	config := discover.DiscoverRouteConfig{Target: "https://example.com"}
+	config := discover.DiscoverRouteConfig{Target: "https://example.com", IgnoreCrossDomainRoutes: true}
 	routes, _, errors := extractors.ExtractLinkRoutes(doc, config.Target, config)
 	if len(errors) != 0 || len(routes) != 1 {
 		t.Fatalf("routes = %v, errors = %v", routes, errors)

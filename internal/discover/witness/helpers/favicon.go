@@ -62,9 +62,10 @@ func ExtractFaviconURL(html, finalURL string) string {
 // FetchFavicon downloads the favicon at faviconURL through the shared request
 // helper (request.SendRequest) so the fetch honors the same config the rest of
 // the witness scan runs under - most importantly MaxRedirects and
-// Scope, but also VerifyTls, Timeout, UserAgent, and any
+// IgnoreCrossDomainRedirects, but also VerifyTls, Timeout, UserAgent, and any
 // proxy settings carried on the context. A favicon that 3xx-redirects to a
-// host outside the scope is therefore dropped rather than silently followed.
+// different host is therefore dropped (rather than silently followed) when
+// cross-domain redirects are disabled.
 //
 // The favicon fetch is pinned to the STANDARD request method regardless of the
 // witness config's RequestMethod: favicons are binary assets and the standard
@@ -93,13 +94,12 @@ func FetchFavicon(ctx context.Context, faviconURL string, config discover.Discov
 				Query: queryParams,
 			},
 		},
-		MaxRedirects:  config.MaxRedirects,
-		VerifyTls:     config.VerifyTls,
-		Timeout:       config.Timeout,
-		ScopeDomains:  config.ScopeDomains,
-		ScopeCidrs:    config.ScopeCidrs,
-		UserAgent:     config.UserAgent,
-		RequestMethod: common.RequestMethodStandard,
+		MaxRedirects:               config.MaxRedirects,
+		VerifyTls:                  config.VerifyTls,
+		Timeout:                    config.Timeout,
+		IgnoreCrossDomainRedirects: config.IgnoreCrossDomainRedirects,
+		UserAgent:                  config.UserAgent,
+		RequestMethod:              common.RequestMethodStandard,
 	}
 
 	// Carry proxy settings from the context, matching the other discover flows.

@@ -54,19 +54,17 @@ func createDrupalSendHTTPRequestConfig(baseURL, path string, method common.HttpM
 		Method:  method,
 		Params:  &common.HttpRequestParams{},
 	}
-	scopeDomains, scopeCidrs := utils.AnchorScope(baseURL)
 	return common.SendHttpRequestConfig{
-		Request:            &request,
-		MaxRedirects:       maxRedirects,
-		ScopeDomains:       scopeDomains,
-		ScopeCidrs:         scopeCidrs,
-		VerifyTls:          config.VerifyTls,
-		Timeout:            config.Timeout,
-		UserAgent:          config.UserAgent,
-		RequestMethod:      common.RequestMethodStandard,
-		HeadlessConfig:     nil,
-		BrowserbaseConfig:  nil,
-		BrowserbaseSecrets: nil,
+		Request:                    &request,
+		MaxRedirects:               maxRedirects,
+		VerifyTls:                  config.VerifyTls,
+		Timeout:                    config.Timeout,
+		IgnoreCrossDomainRedirects: true,
+		UserAgent:                  config.UserAgent,
+		RequestMethod:              common.RequestMethodStandard,
+		HeadlessConfig:             nil,
+		BrowserbaseConfig:          nil,
+		BrowserbaseSecrets:         nil,
 	}
 }
 

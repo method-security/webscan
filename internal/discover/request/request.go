@@ -199,14 +199,13 @@ func PerformRequest(ctx context.Context, config discover.DiscoverRequestConfig) 
 
 	// Build SendHttpRequestConfig
 	sendConfig := common.SendHttpRequestConfig{
-		Request:       request,
-		MaxRedirects:  maxRedirects,
-		VerifyTls:     config.VerifyTls,
-		Timeout:       config.Timeout,
-		ScopeDomains:  config.ScopeDomains,
-		ScopeCidrs:    config.ScopeCidrs,
-		UserAgent:     config.UserAgent,
-		RequestMethod: common.RequestMethodStandard,
+		Request:                    request,
+		MaxRedirects:               maxRedirects,
+		VerifyTls:                  config.VerifyTls,
+		Timeout:                    config.Timeout,
+		IgnoreCrossDomainRedirects: config.IgnoreCrossDomainRedirects,
+		UserAgent:                  config.UserAgent,
+		RequestMethod:              common.RequestMethodStandard,
 	}
 
 	// Add proxy settings from context

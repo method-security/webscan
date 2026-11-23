@@ -19,7 +19,6 @@ import (
 	enumerateapiapplicationfern "github.com/Method-Security/webscan/generated/go/enumerate/apiapplication"
 
 	// Utils
-	"github.com/Method-Security/webscan/utils"
 	request "github.com/Method-Security/webscan/utils/request"
 	requesthelpers "github.com/Method-Security/webscan/utils/request/helpers"
 
@@ -123,29 +122,24 @@ func generateSpecPaths() []string {
 	return paths
 }
 
-func createSendHTTPRequestConfig(baseURL, path string, maxRedirects int, anchored bool, timeout int, verifyTls bool, userAgent common.UserAgentPreset, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, headers map[string][]string) common.SendHttpRequestConfig {
+func createSendHTTPRequestConfig(baseURL, path string, maxRedirects int, ignoreCrossDomainRedirects bool, timeout int, verifyTls bool, userAgent common.UserAgentPreset, requestMethod common.RequestMethod, headlessConfig *common.HeadlessRequestConfig, headers map[string][]string) common.SendHttpRequestConfig {
 	request := common.HttpRequest{
 		BaseUrl: baseURL,
 		Path:    path,
 		Method:  common.HttpMethodGet,
 		Params:  &common.HttpRequestParams{Headers: headers},
 	}
-	var scopeDomains, scopeCidrs []string
-	if anchored {
-		scopeDomains, scopeCidrs = utils.AnchorScope(baseURL)
-	}
 	return common.SendHttpRequestConfig{
-		Request:            &request,
-		MaxRedirects:       maxRedirects,
-		ScopeDomains:       scopeDomains,
-		ScopeCidrs:         scopeCidrs,
-		VerifyTls:          verifyTls,
-		Timeout:            timeout,
-		UserAgent:          userAgent,
-		RequestMethod:      requestMethod,
-		HeadlessConfig:     headlessConfig,
-		BrowserbaseConfig:  nil,
-		BrowserbaseSecrets: nil,
+		Request:                    &request,
+		MaxRedirects:               maxRedirects,
+		VerifyTls:                  verifyTls,
+		Timeout:                    timeout,
+		IgnoreCrossDomainRedirects: ignoreCrossDomainRedirects,
+		UserAgent:                  userAgent,
+		RequestMethod:              requestMethod,
+		HeadlessConfig:             headlessConfig,
+		BrowserbaseConfig:          nil,
+		BrowserbaseSecrets:         nil,
 	}
 }
 

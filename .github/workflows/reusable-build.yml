@@ -13,39 +13,23 @@ on:
         type: string
 
 env:
+  FERN_USE_SDK_GEN_API: "false"
   GO_VERSION: "1.27"
 
 jobs:
-  generate-code:
-    name: Generate build sources
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # ratchet:actions/checkout@v6.0.2
-      - name: Generate Fern Go Code
-        run: |
-          npm install -g fern-api
-          fern generate --local --group local
-        env:
-          FERN_TOKEN: ${{ secrets.FERN_TOKEN }}
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # ratchet:actions/upload-artifact@v7
-        with:
-          name: fern-build-sources
-          path: generated/
-          retention-days: 3
-
   prepare-linux-arm:
-    needs: generate-code
     name: Prepare Linux (arm64)
     runs-on: ubuntu-22.04-arm
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # ratchet:actions/checkout@v6.0.2
         with:
           fetch-depth: 0
-      - name: Download Fern Go Code
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # ratchet:actions/download-artifact@v8
-        with:
-          name: fern-build-sources
-          path: generated/
+      - name: Generate Fern Go Code
+        run: |
+          npm install -g fern-api
+          fern generate --group local --retry-rate-limited
+        env:
+          FERN_TOKEN: ${{ secrets.FERN_TOKEN }}
       - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # ratchet:actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
@@ -72,7 +56,6 @@ jobs:
           retention-days: 7
 
   prepare-linux-amd64:
-    needs: generate-code
     name: Prepare Linux (amd64)
     runs-on: ubuntu-latest
     env:
@@ -94,11 +77,12 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # ratchet:actions/checkout@v6.0.2
         with:
           fetch-depth: 0
-      - name: Download Fern Go Code
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # ratchet:actions/download-artifact@v8
-        with:
-          name: fern-build-sources
-          path: generated/
+      - name: Generate Fern Go Code
+        run: |
+          npm install -g fern-api
+          fern generate --group local --retry-rate-limited
+        env:
+          FERN_TOKEN: ${{ secrets.FERN_TOKEN }}
       - name: Setup Go
         uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # ratchet:actions/setup-go@v6
         with:
@@ -130,7 +114,6 @@ jobs:
           retention-days: 7
 
   prepare:
-    needs: generate-code
     name: Prepare
     strategy:
       fail-fast: false
@@ -166,11 +149,12 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # ratchet:actions/checkout@v6.0.2
         with:
           fetch-depth: 0
-      - name: Download Fern Go Code
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # ratchet:actions/download-artifact@v8
-        with:
-          name: fern-build-sources
-          path: generated/
+      - name: Generate Fern Go Code
+        run: |
+          npm install -g fern-api
+          fern generate --group local --retry-rate-limited
+        env:
+          FERN_TOKEN: ${{ secrets.FERN_TOKEN }}
       - name: Setup Go
         uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # ratchet:actions/setup-go@v6
         with:
@@ -234,11 +218,12 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # ratchet:actions/checkout@v6.0.2
         with:
           fetch-depth: 0
-      - name: Download Fern Go Code
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # ratchet:actions/download-artifact@v8
-        with:
-          name: fern-build-sources
-          path: generated/
+      - name: Generate Fern Go Code
+        run: |
+          npm install -g fern-api
+          fern generate --group local --retry-rate-limited
+        env:
+          FERN_TOKEN: ${{ secrets.FERN_TOKEN }}
       - name: Setup Go
         uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # ratchet:actions/setup-go@v6
         with:

@@ -6,6 +6,9 @@ on:
 permissions:
   contents: read
 
+env:
+  FERN_USE_SDK_GEN_API: "false"
+
 jobs:
   test_fern_publish:
     name: Test Fern Python Publish
@@ -21,45 +24,8 @@ jobs:
       - name: Install Fern CLI
         run: npm install -g fern-api
 
-      - name: Set up Python
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # ratchet:actions/setup-python@v6
-        with:
-          python-version: "3.13"
-
-      # Fern Definition generation now runs locally; package upload is explicit.
-      - name: Generate and build Python package
+      - name: Generate Fern to Test PyPI
+        run: fern generate --group pypi-test --version 0.0.${{ github.run_id }}.${{ github.run_attempt }} --retry-rate-limited
         env:
           FERN_TOKEN: ${{ secrets.FERN_TOKEN }}
           TEST_PYPI_TOKEN: ${{ secrets.TEST_PYPI_TOKEN }}
-          PACKAGE_NAME: methodwebscan
-          PACKAGE_VERSION: "0.0.0.dev${{ github.run_id }}${{ github.run_attempt }}"
-        run: |
-          python3 -m pip install build==1.6.1 twine==7.0.0
-          fern generate --local --preview --group pypi-test --output generated/python-package
-          python3 - <<'PYTHON'
-          import os
-          import re
-          from pathlib import Path
-
-          path = Path("generated/python-package/fern-pydantic-model/pyproject.toml")
-          content = path.read_text()
-          content, names = re.subn(r'^name = ".*"$', 'name = "' + os.environ["PACKAGE_NAME"] + '"', content, flags=re.MULTILINE)
-          content, versions = re.subn(r'^version = ".*"$', 'version = "' + os.environ["PACKAGE_VERSION"].removeprefix("v") + '"', content, flags=re.MULTILINE)
-          if (names, versions) != (2, 1):
-              raise RuntimeError("Unexpected generated Python package metadata")
-          content = content.replace("Repository = ''", 'Repository = "https://github.com/method-security/webscan"')
-          path.write_text(content)
-          path.with_name("README.md").write_text(
-              "# " + os.environ["PACKAGE_NAME"] + "\n\n"
-              "Python data models generated from the "
-              "[Method Security webscan definitions](https://github.com/method-security/webscan).\n"
-          )
-          PYTHON
-          python3 -m build --outdir generated/python-dist generated/python-package/fern-pydantic-model
-          python3 -m twine check generated/python-dist/*
-
-      - name: Upload Python package
-        run: python3 -m twine upload --verbose --non-interactive --repository-url https://test.pypi.org/legacy/ generated/python-dist/*
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.TEST_PYPI_TOKEN }}

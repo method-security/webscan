@@ -6,6 +6,9 @@ on:
 permissions:
   contents: read
 
+env:
+  FERN_USE_SDK_GEN_API: "false"
+
 jobs:
   generate_fern_go:
     name: Generate Fern Code And Embedded Assets
@@ -26,7 +29,7 @@ jobs:
         run: npm install -g fern-api
 
       - name: Generate Fern Go Code
-        run: fern generate --local --group local --retry-rate-limited
+        run: fern generate --group local --retry-rate-limited
         env:
           FERN_TOKEN: ${{ secrets.FERN_TOKEN }}
 

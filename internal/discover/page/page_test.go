@@ -20,12 +20,13 @@ func TestPageCaptureCapturesFilteredWafResponse(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	report := discoverpage.PerformPageCapture(context.Background(), discover.DiscoverPageConfig{
-		Target:        server.URL,
-		ResponseCodes: "200-299",
-		MaxRedirects:  5,
-		Timeout:       10,
-		UserAgent:     common.UserAgentPresetCurl,
-		RequestMethod: common.RequestMethodStandard,
+		Target:                     server.URL,
+		ResponseCodes:              "200-299",
+		MaxRedirects:               5,
+		Timeout:                    10,
+		IgnoreCrossDomainRedirects: true,
+		UserAgent:                  common.UserAgentPresetCurl,
+		RequestMethod:              common.RequestMethodStandard,
 	}, nil)
 
 	if report.Result.Request != nil {

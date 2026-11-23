@@ -84,6 +84,7 @@ func directoryConfig(target string, addSlash bool, recursionDepth int) discover.
 		Threshold:                   0.25,
 		Timeout:                     10,
 		GlobalRateLimit:             0,
+		IgnoreCrossDomainRedirects:  true,
 		MaxRedirectsBaselineRequest: 5,
 		GlobalTimeout:               60,
 		Retries:                     0,

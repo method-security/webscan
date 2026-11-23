@@ -452,7 +452,7 @@ func (c *collector) analyze(config enumerate.EnumerateJavascriptConfig) analysis
 	sort.Strings(order)
 	for _, owner := range order {
 		bucket := buckets[owner]
-		bucket.bases = javascripthelpers.BaseCandidatesInScope(sortedSet(bucket.origins), scopeHosts)
+		bucket.bases = javascripthelpers.BaseCandidatesInScope(sortedSet(bucket.origins), scopeHosts, config.IgnoreCrossDomainEndpoints)
 
 		rootedEndpoints := javascripthelpers.RootEndpoints(dedupeEndpoints(bucket.endpoints), bucket.bases, targetHosts([]string{owner}))
 		for _, endpoint := range rootedEndpoints {
@@ -471,7 +471,7 @@ func (c *collector) analyze(config enumerate.EnumerateJavascriptConfig) analysis
 			// An absolute URL to an unrelated host is a link the bundle happens to contain, not an
 			// endpoint of anything being scanned. Left in it would stand up an application per
 			// social network the page links to.
-			if !c.inScope(endpoint.BaseURL) {
+			if config.IgnoreCrossDomainEndpoints && !c.inScope(endpoint.BaseURL) {
 				continue
 			}
 			served[endpoint.BaseURL] = append(served[endpoint.BaseURL], endpoint)
@@ -578,10 +578,6 @@ func hasFileEnding(raw string) bool {
 
 // inScope reports a URL served by a target's host or a subdomain of it.
 func (c *collector) inScope(target string) bool {
-	scope := utils.ScopeOf(c.config.ScopeDomains, c.config.ScopeCidrs)
-	if scope == nil || utils.HostInSeedScope(scope, target) {
-		return true
-	}
 	for _, configured := range c.config.Targets {
 		if base := applicationBaseURL(configured); base != "" && utils.IsHostInScope(base, target) {
 			return true

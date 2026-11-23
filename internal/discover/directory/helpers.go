@@ -38,17 +38,16 @@ func createDirectorySendHTTPRequestConfig(ctx context.Context, baseURL, path str
 		Params:  &requestParams,
 	}
 	sendConfig := common.SendHttpRequestConfig{
-		Request:            &request,
-		MaxRedirects:       MaxRedirects,
-		VerifyTls:          config.VerifyTls,
-		Timeout:            config.Timeout,
-		ScopeDomains:       config.ScopeDomains,
-		ScopeCidrs:         config.ScopeCidrs,
-		UserAgent:          config.UserAgent,
-		RequestMethod:      common.RequestMethodStandard,
-		HeadlessConfig:     nil,
-		BrowserbaseConfig:  nil,
-		BrowserbaseSecrets: nil,
+		Request:                    &request,
+		MaxRedirects:               MaxRedirects,
+		VerifyTls:                  config.VerifyTls,
+		Timeout:                    config.Timeout,
+		IgnoreCrossDomainRedirects: config.IgnoreCrossDomainRedirects,
+		UserAgent:                  config.UserAgent,
+		RequestMethod:              common.RequestMethodStandard,
+		HeadlessConfig:             nil,
+		BrowserbaseConfig:          nil,
+		BrowserbaseSecrets:         nil,
 	}
 
 	// Add proxy settings from context

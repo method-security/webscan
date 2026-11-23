@@ -26,5 +26,4 @@ types:
       globalRateLimit: integer
       globalTimeout: integer
       userAgent: method.UserAgentPreset
-      scopeDomains: optional<list<string>>
-      scopeCidrs: optional<list<string>>
+      ignoreCrossDomainRedirects: boolean

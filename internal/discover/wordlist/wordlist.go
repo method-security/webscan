@@ -52,21 +52,19 @@ func createRequestConfig(rawURL string, config discover.DiscoverWordlistConfig) 
 			Query: queryParams,
 		},
 	}
-	// Anchored on the crawl target, not the page, so a page redirecting to the target's apex still lands.
-	var scopeDomains, scopeCidrs []string
-	if scope := utils.ScopeOf(config.ScopeDomains, config.ScopeCidrs); scope != nil {
-		anchored := utils.ScopeWithAnchor(scope, config.Target)
-		scopeDomains, scopeCidrs = anchored.Domains, anchored.Cidrs
-	}
+	// IgnoreCrossDomainRedirects is always false: the HTTP layer uses exact
+	// hostname matching for redirects, which would block canonical redirects
+	// (e.g. example.com → www.example.com) and drop in-scope pages even when
+	// IgnoreCrossDomain is enabled. Cross-domain filtering is handled after
+	// redirect resolution, at the link-enqueueing stage via utils.IsHostInScope.
 	return common.SendHttpRequestConfig{
-		Request:       httpReq,
-		MaxRedirects:  10,
-		VerifyTls:     config.VerifyTls,
-		Timeout:       config.Timeout,
-		ScopeDomains:  scopeDomains,
-		ScopeCidrs:    scopeCidrs,
-		RequestMethod: common.RequestMethodStandard,
-		UserAgent:     config.UserAgent,
+		Request:                    httpReq,
+		MaxRedirects:               10,
+		VerifyTls:                  config.VerifyTls,
+		Timeout:                    config.Timeout,
+		IgnoreCrossDomainRedirects: false,
+		RequestMethod:              common.RequestMethodStandard,
+		UserAgent:                  config.UserAgent,
 	}, nil
 }
 
@@ -166,8 +164,15 @@ func extractLinks(htmlContent, pageURL string, config discover.DiscoverWordlistC
 		// as the same URL and not fetched twice (consistent with route discovery).
 		resolved = strings.TrimRight(resolved, "/")
 
-		// Anchored on config.Target, never pageURL, which can be an off-scope landing.
-		if !utils.HostAllowed(utils.ScopeOf(config.ScopeDomains, config.ScopeCidrs), config.Target, resolved) {
+		// Cross-domain check: only enqueue links whose host is the crawl seed's
+		// host (config.Target) or a subdomain of it. utils.IsHostInScope anchors on the
+		// full target host, so the target host and its children are accepted while
+		// the apex and sibling subdomains are excluded. pageURL must NOT be used as
+		// a secondary scope anchor here — when a redirect lands on another host,
+		// pageURL is that off-scope host, and allowing links in scope with pageURL
+		// would cause the entire off-scope site to be crawled despite
+		// IgnoreCrossDomain being set.
+		if config.IgnoreCrossDomain && !utils.IsHostInScope(config.Target, resolved) {
 			return
 		}
 
@@ -303,7 +308,13 @@ func PerformWordlistCapture(ctx context.Context, config discover.DiscoverWordlis
 				}
 				mu.Unlock()
 
-				isInScope := utils.HostAllowed(utils.ScopeOf(config.ScopeDomains, config.ScopeCidrs), config.Target, finalURL)
+				// isInScope is true when the final page is within the crawl scope:
+				// either IgnoreCrossDomain is off (crawl anything) or the final
+				// URL is on the same host as config.Target or a subdomain of it.
+				// utils.IsHostInScope anchors on the full target host, so the target host
+				// and its children are accepted while the apex and sibling
+				// subdomains are excluded.
+				isInScope := !config.IgnoreCrossDomain || utils.IsHostInScope(config.Target, finalURL)
 
 				if isInScope {
 					words := extractWords(bodyStr, config)
@@ -314,6 +325,12 @@ func PerformWordlistCapture(ctx context.Context, config discover.DiscoverWordlis
 					mu.Unlock()
 				}
 
+				// Skip link extraction for off-scope pages: when IgnoreCrossDomain
+				// is enabled and the response landed on a different registrable
+				// domain, we should not enqueue links found on that page even
+				// though extractLinks would filter them against config.Target.
+				// Trusting link discovery from external pages could introduce
+				// unexpected crawl paths.
 				if !isInScope {
 					return
 				}

@@ -38,8 +38,7 @@ types:
       threshold: float
       timeout: integer
       globalRateLimit: integer
-      scopeDomains: optional<list<string>>
-      scopeCidrs: optional<list<string>>
+      ignoreCrossDomainRedirects: boolean
       maxRedirectsBaselineRequest: integer
       globalTimeout: integer
       retries: integer

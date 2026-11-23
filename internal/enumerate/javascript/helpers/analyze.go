@@ -109,7 +109,6 @@ func AnalyzeSource(source []byte, sourceURL string, windowBytes int, overlapByte
 	for _, window := range windowsOf(len(source), windowBytes, overlapBytes) {
 		analyzer := jsluice.NewAnalyzer(source[window[0]:window[1]])
 		analyzer.AddSecretMatcher(CredentialMatcher())
-		fragments := collectConcatFragments(analyzer)
 
 		for _, found := range analyzer.GetURLs() {
 			if found == nil {
@@ -118,15 +117,17 @@ func AnalyzeSource(source []byte, sourceURL string, windowBytes int, overlapByte
 			if base, ok := absoluteBase(found.URL); ok {
 				bases[base] = struct{}{}
 			}
-			for _, endpoint := range endpointsFor(found, sourceURL, fragments) {
-				key := endpointKey(endpoint)
-				if existing, exists := endpoints[key]; exists {
-					// One call site may state a parameter another omits, and windows overlap, so a
-					// repeat is extra evidence about the same endpoint rather than a duplicate to drop.
-					mergeEndpointDetails(existing, endpoint)
-				} else {
-					endpoints[key] = endpoint
-				}
+			endpoint := toEndpoint(found, sourceURL)
+			if endpoint == nil {
+				continue
+			}
+			key := endpointKey(endpoint)
+			if existing, exists := endpoints[key]; exists {
+				// One call site may state a parameter another omits, and windows overlap, so a
+				// repeat is extra evidence about the same endpoint rather than a duplicate to drop.
+				mergeEndpointDetails(existing, endpoint)
+			} else {
+				endpoints[key] = endpoint
 			}
 		}
 

@@ -101,7 +101,8 @@ func IsStaticAsset(url string) bool {
 // the apex domain and sibling subdomains are excluded. For a base of
 // www.example.com this admits www.example.com and app.www.example.com, but not
 // example.com (parent) or careers.example.com (sibling). IP addresses have no
-// subdomain hierarchy, so they require an exact match.
+// subdomain hierarchy, so they require an exact match. This is the shared
+// scoping check used by the ignore-cross-domain flag across discovery commands.
 func IsHostInScope(baseURL string, targetURL string) bool {
 	base, err := url.Parse(baseURL)
 	if err != nil {

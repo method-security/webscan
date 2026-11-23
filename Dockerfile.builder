@@ -1,7 +1,7 @@
 # Dockerfile used for the compilation of the statically compiled webscan binary.
 # GO_VERSION defaults to the minor line so local builds float with the latest
-# 1.26.x image; CI passes the exact patch resolved by actions/setup-go.
-ARG GO_VERSION=1.26
+# 1.27.x image; CI passes the exact patch resolved by actions/setup-go.
+ARG GO_VERSION=1.27
 FROM golang:${GO_VERSION}-alpine3.23 AS base
 ARG GORELEASER_VERSION="v2.0.1"
 ARG CLI_NAME="webscan"

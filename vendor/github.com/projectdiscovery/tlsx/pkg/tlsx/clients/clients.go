@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/pem"
 	"math"
+	"net"
 	"strings"
 	"time"
 
@@ -90,6 +91,8 @@ type Options struct {
 	Ports goflags.StringSlice
 	// Ciphers is a list of custom ciphers to use for connection
 	Ciphers goflags.StringSlice
+	// TLSGroups is a list of key exchange groups to offer (ctls scan mode only)
+	TLSGroups goflags.StringSlice
 	// CACertificate is the CA certificate for connection
 	CACertificate string
 	// MinVersion is the minimum tls version that is acceptable
@@ -98,7 +101,8 @@ type Options struct {
 	MaxVersion string
 	// Resolvers contains custom resolvers for the tlsx client
 	Resolvers goflags.StringSlice
-	// ScanMode is the tls connection mode to use
+	// ScanMode is the tls connection mode to use: ctls, ztls, openssl or auto.
+	// An empty value means ctls; any other value makes tlsx.New fail.
 	ScanMode string
 	// VerifyServerCertificate enables optional verification of server certificates
 	VerifyServerCertificate bool
@@ -214,6 +218,9 @@ type Response struct {
 	// can audit post-quantum readiness and classical-curve usage.
 	// Populated from Go 1.25+ which sets CurveID after the handshake.
 	KeyExchange string `json:"key_exchange,omitempty"`
+	// ConfiguredGroups is the list of key exchange groups the client was
+	// restricted to with the tls-groups option.
+	ConfiguredGroups []string `json:"configured_groups,omitempty"`
 	// CertificateResponse is the leaf certificate embedded in json
 	*CertificateResponse `json:",inline"`
 	// TLSConnection is the client used for TLS connection
@@ -403,7 +410,7 @@ func IsMisMatchedCert(host string, alternativeNames []string) bool {
 	for _, alternativeName := range alternativeNames {
 		// if not wildcard, return false if name matches the host
 		if !strings.Contains(alternativeName, "*") {
-			if strings.EqualFold(alternativeName, host) {
+			if strings.EqualFold(alternativeName, host) || isSameIP(alternativeName, host) {
 				return false
 			}
 		} else {
@@ -479,6 +486,29 @@ func IsZTLSUntrustedCA(certs []ztls.SimpleCertificate) bool {
 		}
 	}
 	return false
+}
+
+// isSameIP returns true if both names are IP addresses and they are equal
+func isSameIP(name, host string) bool {
+	hostIP := hostAsIP(host)
+	return hostIP != nil && hostIP.Equal(hostAsIP(name))
+}
+
+// hostAsIP parses a host that may be a raw IP, a bracketed IPv6 address, or an IPv6 address with a zone.
+func hostAsIP(host string) net.IP {
+	if ip := net.ParseIP(host); ip != nil {
+		return ip
+	}
+	unwrapped := host
+	if strings.HasPrefix(unwrapped, "[") {
+		if end := strings.IndexByte(unwrapped, ']'); end > 1 {
+			unwrapped = unwrapped[1:end]
+		}
+	}
+	if zone := strings.IndexByte(unwrapped, '%'); zone >= 0 {
+		unwrapped = unwrapped[:zone]
+	}
+	return net.ParseIP(unwrapped)
 }
 
 // matchWildCardToken matches the wildcardName token and host token

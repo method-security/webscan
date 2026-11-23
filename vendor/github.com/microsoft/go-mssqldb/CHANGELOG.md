@@ -1,4 +1,64 @@
 # Changelog
+## [1.12.0](https://github.com/microsoft/go-mssqldb/compare/v1.11.2...v1.12.0) (2026-11-05)
+
+
+### Features
+
+* add ADO.Net Authentication connection string synonym and spaced value names ([#368](https://github.com/microsoft/go-mssqldb/issues/368)) ([8708412](https://github.com/microsoft/go-mssqldb/commit/8708412fc6d1cb34032962a53a80a540617bd2bb))
+
+
+### Bug Fixes
+
+* **deps:** switch gokrb5 to the community-maintained fork ([6c346b7](https://github.com/microsoft/go-mssqldb/commit/6c346b78c201e490ca2585f0987ddd8f6b4f06a3))
+
+## [1.11.2](https://github.com/microsoft/go-mssqldb/compare/v1.11.1...v1.11.2) (2026-09-23)
+
+
+### Bug Fixes
+
+* accept yes/no for boolean connection string keywords ([#468](https://github.com/microsoft/go-mssqldb/issues/468)) ([0ad75cd](https://github.com/microsoft/go-mssqldb/commit/0ad75cd1f92cbfdd4c148b2369332ace4f208160))
+
+## [1.11.1](https://github.com/microsoft/go-mssqldb/compare/v1.11.0...v1.11.1) (2026-09-23)
+
+
+### Bug Fixes
+
+* drain response tokens on query error to prevent Tx.Query hang ([#407](https://github.com/microsoft/go-mssqldb/issues/407)) ([#410](https://github.com/microsoft/go-mssqldb/issues/410)) ([1f52296](https://github.com/microsoft/go-mssqldb/commit/1f5229662c8006ab3f2ff8bee49d24faa95287b8))
+* preserve strict encryption in DSN URLs ([#452](https://github.com/microsoft/go-mssqldb/issues/452)) ([ae21d6a](https://github.com/microsoft/go-mssqldb/commit/ae21d6a9a7b0d88e22a0ddb957ad792205c4cfdc))
+
+
+### Reverts
+
+* undo response-cleanup changes from [#410](https://github.com/microsoft/go-mssqldb/issues/410) ([#469](https://github.com/microsoft/go-mssqldb/issues/469)) ([46dbf85](https://github.com/microsoft/go-mssqldb/commit/46dbf85941c5f2bba0cbde962fc0b113834cac9a))
+
+## [1.11.0](https://github.com/microsoft/go-mssqldb/compare/v1.10.0...v1.11.0) (2026-08-23)
+
+
+### Features
+
+* add ADO.Net connection string synonyms ([#374](https://github.com/microsoft/go-mssqldb/issues/374)) ([d72f750](https://github.com/microsoft/go-mssqldb/commit/d72f750358c4370852fc73cdda9f7f83b53903ff))
+
+
+### Bug Fixes
+
+* clarify NTLM URL encoding for URL DSNs ([#378](https://github.com/microsoft/go-mssqldb/issues/378)) ([551d622](https://github.com/microsoft/go-mssqldb/commit/551d62231613700aca651cb5b778cdc1db584893))
+* close TCP connection on all connect() error paths ([#367](https://github.com/microsoft/go-mssqldb/issues/367)) ([0e13fee](https://github.com/microsoft/go-mssqldb/commit/0e13fee2c0bf0efd38803976171cb30d1bc961ad))
+* **isProc:** add `REVERT` builtin command ([#393](https://github.com/microsoft/go-mssqldb/issues/393)) ([31a9659](https://github.com/microsoft/go-mssqldb/commit/31a9659ac4763e622fc9fbae6fcff44f30760164))
+* prevent NTLM challenge out-of-bounds panic (DoS) ([#411](https://github.com/microsoft/go-mssqldb/issues/411)) ([81df983](https://github.com/microsoft/go-mssqldb/commit/81df9834c92c7709cdc180c92f8d9a06b9710981))
+* prevent panic on overflowing PRELOGIN option offset and length ([#415](https://github.com/microsoft/go-mssqldb/issues/415)) ([802d9f1](https://github.com/microsoft/go-mssqldb/commit/802d9f154ab83d7fb88d56f135f20787f5871f15))
+* prevent SQL Browser DAC response parsing panic (DoS) ([#414](https://github.com/microsoft/go-mssqldb/issues/414)) ([bc4cbf2](https://github.com/microsoft/go-mssqldb/commit/bc4cbf28590fba2f19fb0dfe7cf77891dddb1e1d))
+* quote table name and ORDER columns in bulk copy ([#416](https://github.com/microsoft/go-mssqldb/issues/416)) ([f925c53](https://github.com/microsoft/go-mssqldb/commit/f925c5343a0fda33276785b765e5571dead35e15))
+* replace deprecated reflect.SliceHeader with unsafe.Slice ([#366](https://github.com/microsoft/go-mssqldb/issues/366)) ([836048a](https://github.com/microsoft/go-mssqldb/commit/836048ac320da5b92d1c0f7038ba5ac562768f10)), closes [#272](https://github.com/microsoft/go-mssqldb/issues/272)
+* return float64 for REAL columns in readFixedType ([#381](https://github.com/microsoft/go-mssqldb/issues/381)) ([abddba8](https://github.com/microsoft/go-mssqldb/commit/abddba82884f2b672b88088a1849cb547194a27d))
+* strip port from AKV URLs for AllowedLocations and endpoint ([#369](https://github.com/microsoft/go-mssqldb/issues/369)) ([7fab98a](https://github.com/microsoft/go-mssqldb/commit/7fab98a2b5b3d57b933a554b6abe15114b5857b3))
+* **types:** cap initial PLP buffer allocation ([#409](https://github.com/microsoft/go-mssqldb/issues/409)) ([f088291](https://github.com/microsoft/go-mssqldb/commit/f0882915fbf71953d3251bd7482325dd62924050))
+
+
+### Performance Improvements
+
+* add comprehensive benchmark suite with CI regression detection ([#376](https://github.com/microsoft/go-mssqldb/issues/376)) ([b935441](https://github.com/microsoft/go-mssqldb/commit/b9354415013929850e1a48856661d1109be661a9))
+* fast path for pure ASCII decoding in CharsetToUTF8 ([#431](https://github.com/microsoft/go-mssqldb/issues/431)) ([db51796](https://github.com/microsoft/go-mssqldb/commit/db5179626672ada427888117b399963d2c3a642b))
+
 ## [1.10.0](https://github.com/microsoft/go-mssqldb/compare/v1.9.8...v1.10.0) (2026-04-25)
 
 

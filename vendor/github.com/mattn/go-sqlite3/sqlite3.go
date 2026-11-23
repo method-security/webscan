@@ -144,10 +144,11 @@ extern int _sqlite3_prepare_v2_blocking(sqlite3 *db, const char *zSql, int nByte
 // Combined prepare+step+finalize for simple exec without parameters.
 // Reduces CGO crossings from ~6 to 1 for the common no-args exec case.
 static int
-_sqlite3_exec_no_args(sqlite3* db, const char* zSql, int nBytes, long long* rowid, long long* changes, const char** pzTail)
+_sqlite3_exec_no_args(sqlite3* db, const char* zSql, int nBytes, long long* rowid, long long* changes, const char** pzTail, int* nParams)
 {
   sqlite3_stmt *stmt = 0;
   const char *tail = 0;
+  *nParams = 0;
 #ifdef SQLITE_ENABLE_UNLOCK_NOTIFY
   int rv = _sqlite3_prepare_v2_blocking(db, zSql, nBytes, &stmt, &tail);
 #else
@@ -162,6 +163,14 @@ _sqlite3_exec_no_args(sqlite3* db, const char* zSql, int nBytes, long long* rowi
     *rowid = 0;
     *changes = 0;
     *pzTail = tail;
+    return SQLITE_OK;
+  }
+  // Leave a statement with parameters unexecuted, the caller reports the
+  // missing arguments.
+  *nParams = sqlite3_bind_parameter_count(stmt);
+  if (*nParams > 0) {
+    sqlite3_finalize(stmt);
+    *pzTail = 0;
     return SQLITE_OK;
   }
 #ifdef SQLITE_ENABLE_UNLOCK_NOTIFY
@@ -219,6 +228,98 @@ _sqlite3_prepare_v2_internal(sqlite3 *db, const char *zSql, int nBytes, sqlite3_
   return sqlite3_prepare_v2(db, zSql, nBytes, ppStmt, pzTail);
 }
 #endif
+
+// Step and fetch the current row in one CGO crossing. Column pointers
+// remain valid until the next step/reset and are copied by readStepResult.
+static int
+_sqlite3_step_values(sqlite3_stmt* stmt, int ncol, sqlite3_go_col* cols)
+{
+  int rv = _sqlite3_step_internal(stmt);
+  if (rv == SQLITE_ROW) {
+    _sqlite3_column_values(stmt, ncol, cols);
+  }
+  return rv;
+}
+
+// Resets a statement, binds positional arguments, takes the first step
+// and reports the post-step column count and cumulative re-prepare
+// count, all in a single CGO crossing. Arguments arrive as
+// sqlite3_go_col records whose typ selects the bind: SQLITE_INTEGER,
+// SQLITE_FLOAT, SQLITE_TEXT and SQLITE_BLOB bind the respective field
+// (ptr points into C memory owned by the Go side and bound with
+// SQLITE_STATIC), anything else binds NULL. Returns the bind error
+// code with *ncol == -1 when a bind fails.
+static int
+_sqlite3_bind_step_columns(sqlite3_stmt* stmt, sqlite3_go_col* args, int nargs, int* ncol, int* repreps, sqlite3_go_col* cols, int colcap, int* filled)
+{
+  int i;
+  int rv = sqlite3_reset(stmt);
+  *filled = 0;
+  if (rv != SQLITE_OK && rv != SQLITE_ROW && rv != SQLITE_DONE) {
+    *ncol = -1;
+    return rv;
+  }
+  sqlite3_clear_bindings(stmt);
+  for (i = 0; i < nargs; i++) {
+    sqlite3_go_col* a = &args[i];
+    switch (a->typ) {
+    case SQLITE_INTEGER:
+      rv = sqlite3_bind_int64(stmt, i+1, a->i64);
+      break;
+    case SQLITE_FLOAT:
+      rv = sqlite3_bind_double(stmt, i+1, a->f64);
+      break;
+    case SQLITE_TEXT:
+      rv = sqlite3_bind_text64(stmt, i+1, (const char*)a->ptr, a->n, SQLITE_STATIC, SQLITE_UTF8);
+      break;
+    case SQLITE_BLOB:
+      rv = sqlite3_bind_blob64(stmt, i+1, a->ptr, a->n, SQLITE_STATIC);
+      break;
+    default:
+      rv = sqlite3_bind_null(stmt, i+1);
+      break;
+    }
+    if (rv != SQLITE_OK) {
+      *ncol = -1;
+      return rv;
+    }
+  }
+  rv = _sqlite3_step_internal(stmt);
+  *ncol = sqlite3_column_count(stmt);
+#ifdef SQLITE_STMTSTATUS_REPREPARE
+  *repreps = sqlite3_stmt_status(stmt, SQLITE_STMTSTATUS_REPREPARE, 0);
+#else
+  *repreps = -1;
+#endif
+  // When the row buffer is already large enough, deliver the first
+  // row's values in the same crossing.
+  if (rv == SQLITE_ROW && cols != 0 && *ncol <= colcap) {
+    _sqlite3_column_values(stmt, *ncol, cols);
+    *filled = 1;
+  } else {
+    *filled = 0;
+  }
+  return rv;
+}
+
+// Steps a statement once and reports the post-step column count and the
+// cumulative re-prepare count, in a single CGO crossing. Used for the
+// eager first step of cached statements: only after the first step is an
+// expired statement guaranteed to have been re-prepared following a
+// schema change, so only then do the column count and metadata describe
+// the current schema.
+static int
+_sqlite3_step_columns(sqlite3_stmt* stmt, int* ncol, int* repreps)
+{
+  int rv = _sqlite3_step_internal(stmt);
+  *ncol = sqlite3_column_count(stmt);
+#ifdef SQLITE_STMTSTATUS_REPREPARE
+  *repreps = sqlite3_stmt_status(stmt, SQLITE_STMTSTATUS_REPREPARE, 0);
+#else
+  *repreps = -1;
+#endif
+  return rv;
+}
 
 void _sqlite3_result_text(sqlite3_context* ctx, const char* s, int n) {
   sqlite3_result_text(ctx, s, n, &free);
@@ -445,12 +546,20 @@ type SQLiteDriver struct {
 
 // SQLiteConn implements driver.Conn.
 type SQLiteConn struct {
-	mu          sync.Mutex
-	db          *C.sqlite3
+	mu sync.Mutex
+	db *C.sqlite3
+	// activeRows identifies the cancellable Rows currently calling sqlite3_step.
+	// It is guarded by mu so a stale cancellation cannot interrupt later work.
+	activeRows  *SQLiteRows
 	loc         *time.Location
 	txlock      string
 	funcs       []*functionInfo
 	aggregators []*aggInfo
+	// authorizerMu guards authorizerHandle. It is deliberately not c.mu:
+	// sqlite3_set_authorizer takes db->mutex, while the cancellation path
+	// takes c.mu, so holding c.mu here would invert the lock order.
+	authorizerMu     sync.Mutex
+	authorizerHandle unsafe.Pointer
 	// Prepared-statement cache. The slice is allocated at Open with a
 	// fixed capacity equal to the configured cache size; cap bounds the
 	// cache, len is the live count, and entries are ordered LRU-first
@@ -474,9 +583,32 @@ type SQLiteStmt struct {
 	t           string
 	closed      bool
 	cls         bool // True if the statement was created by SQLiteConn.Query
+	numInput    int32
 	namedParams map[string][3]int
 	cacheKey    string
 	metadata    *sqliteStmtMetadata
+	// repreps is the statement's cumulative re-prepare count observed
+	// at the last eager first step; a change means SQLite re-prepared
+	// the statement after a schema change and metadata must be rebuilt.
+	repreps C.int
+	// argBuf is C memory owned by the statement holding the bytes of
+	// text/blob/time arguments for the fused bind path; the bytes are
+	// bound with SQLITE_STATIC and stay valid until the next bind or
+	// finalize. colvals is the statement-owned row buffer reused by
+	// every SQLiteRows of this statement.
+	argBuf     unsafe.Pointer
+	argBufCap  int
+	colvals    *C.sqlite3_go_col
+	colvalsCap int32
+	// cargs is reused across queries of this statement to avoid a
+	// per-query allocation; a statement has at most one query binding
+	// at a time.
+	cargs []C.sqlite3_go_col
+	// Reuse the C output parameters under mu instead of allocating
+	// escaping local variables on every query.
+	stepResult struct {
+		ncol, repreps, filled C.int
+	}
 }
 
 type sqliteStmtMetadata struct {
@@ -492,14 +624,20 @@ type SQLiteResult struct {
 
 // SQLiteRows implements driver.Rows.
 type SQLiteRows struct {
-	s        *SQLiteStmt
-	nc       int32 // Number of columns
-	cls      bool  // True if we need to close the parent statement in Close
-	cols     []string
-	decltype []string
-	colvals  *C.sqlite3_go_col
-	ctx      context.Context // no better alternative to pass context into Next() method
-	closemu  sync.Mutex
+	s                *SQLiteStmt
+	nc               int32 // Number of columns
+	cls              bool  // True if we need to close the parent statement in Close
+	cols             []string
+	decltype         []string
+	colvals          *C.sqlite3_go_col
+	ctx              context.Context // no better alternative to pass context into Next() method
+	stopCancellation func() bool
+	// pendingStep buffers the result of the eager first step taken in
+	// query(); -1 when no step is buffered. pendingFilled reports that
+	// the buffered row's column values are already in colvals.
+	pendingStep   C.int
+	pendingFilled bool
+	closemu       sync.Mutex
 }
 
 type functionInfo struct {
@@ -623,6 +761,12 @@ func (tx *SQLiteTx) Rollback() error {
 	return err
 }
 
+// errConnClosed is returned by methods called on a connection whose
+// Close has already run. SQLite dereferences the connection handle
+// without checking it, so calling into it with a released handle
+// crashes the process instead of reporting an error.
+var errConnClosed = errors.New("sqlite connection is already closed")
+
 // RegisterCollation makes a Go function available as a collation.
 //
 // cmp receives two UTF-8 strings, a and b. The result should be 0 if
@@ -636,6 +780,9 @@ func (tx *SQLiteTx) Rollback() error {
 // If cmp does not obey these constraints, sqlite3's behavior is
 // undefined when the collation is used.
 func (c *SQLiteConn) RegisterCollation(name string, cmp func(string, string) int) error {
+	if !c.dbConnOpen() {
+		return errConnClosed
+	}
 	handle := newHandle(c, cmp)
 	cname := C.CString(name)
 	defer C.free(unsafe.Pointer(cname))
@@ -653,7 +800,12 @@ func (c *SQLiteConn) RegisterCollation(name string, cmp func(string, string) int
 // If there is an existing commit hook for this connection, it will be
 // removed. If callback is nil the existing hook (if any) will be removed
 // without creating a new one.
+//
+// The call is a no-op once the connection has been closed.
 func (c *SQLiteConn) RegisterCommitHook(callback func() int) {
+	if !c.dbConnOpen() {
+		return
+	}
 	if callback == nil {
 		C.sqlite3_commit_hook(c.db, nil, nil)
 	} else {
@@ -666,7 +818,12 @@ func (c *SQLiteConn) RegisterCommitHook(callback func() int) {
 // If there is an existing rollback hook for this connection, it will be
 // removed. If callback is nil the existing hook (if any) will be removed
 // without creating a new one.
+//
+// The call is a no-op once the connection has been closed.
 func (c *SQLiteConn) RegisterRollbackHook(callback func()) {
+	if !c.dbConnOpen() {
+		return
+	}
 	if callback == nil {
 		C.sqlite3_rollback_hook(c.db, nil, nil)
 	} else {
@@ -683,7 +840,12 @@ func (c *SQLiteConn) RegisterRollbackHook(callback func()) {
 // If there is an existing update hook for this connection, it will be
 // removed. If callback is nil the existing hook (if any) will be removed
 // without creating a new one.
+//
+// The call is a no-op once the connection has been closed.
 func (c *SQLiteConn) RegisterUpdateHook(callback func(int, string, string, int64)) {
+	if !c.dbConnOpen() {
+		return
+	}
 	if callback == nil {
 		C.sqlite3_update_hook(c.db, nil, nil)
 	} else {
@@ -697,12 +859,28 @@ func (c *SQLiteConn) RegisterUpdateHook(callback func(int, string, string, int64
 // SQLITE_INSERT, SQLITE_DELETE, or SQLITE_UPDATE), and 1 to 3 arguments,
 // depending on operation. More details see:
 // https://www.sqlite.org/c3ref/c_alter_table.html
+//
+// The call is a no-op once the connection has been closed.
 func (c *SQLiteConn) RegisterAuthorizer(callback func(int, string, string, string) int) {
-	if callback == nil {
-		C.sqlite3_set_authorizer(c.db, nil, nil)
-	} else {
-		C.sqlite3_set_authorizer(c.db, (*[0]byte)(C.authorizerTrampoline), newHandle(c, callback))
+	if !c.dbConnOpen() {
+		return
 	}
+	c.authorizerMu.Lock()
+	defer c.authorizerMu.Unlock()
+
+	var handle unsafe.Pointer
+	var trampoline *[0]byte
+	if callback != nil {
+		handle = newHandle(c, callback)
+		trampoline = (*[0]byte)(C.authorizerTrampoline)
+	}
+	if C.sqlite3_set_authorizer(c.db, trampoline, handle) != C.SQLITE_OK {
+		deleteHandle(handle)
+		return
+	}
+	// SQLite no longer uses the previous callback after replacing it.
+	deleteHandle(c.authorizerHandle)
+	c.authorizerHandle = handle
 }
 
 // RegisterFunc makes a Go function available as a SQLite function.
@@ -721,6 +899,9 @@ func (c *SQLiteConn) RegisterAuthorizer(callback func(int, string, string, strin
 //
 // See _example/go_custom_funcs for a detailed example.
 func (c *SQLiteConn) RegisterFunc(name string, impl any, pure bool) error {
+	if !c.dbConnOpen() {
+		return errConnClosed
+	}
 	var fi functionInfo
 	fi.f = reflect.ValueOf(impl)
 	t := fi.f.Type()
@@ -803,6 +984,9 @@ func sqlite3CreateFunction(db *C.sqlite3, zFunctionName *C.char, nArg C.int, eTe
 //
 // See _example/go_custom_funcs for a detailed example.
 func (c *SQLiteConn) RegisterAggregator(name string, impl any, pure bool) error {
+	if !c.dbConnOpen() {
+		return errConnClosed
+	}
 	var ai aggInfo
 	ai.constructor = reflect.ValueOf(impl)
 	t := ai.constructor.Type()
@@ -911,9 +1095,13 @@ func (c *SQLiteConn) RegisterAggregator(name string, impl any, pure bool) error 
 }
 
 // AutoCommit return which currently auto commit or not.
+// It reports false once the connection has been closed.
 func (c *SQLiteConn) AutoCommit() bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	if c.db == nil {
+		return false
+	}
 	return int(C.sqlite3_get_autocommit(c.db)) != 0
 }
 
@@ -968,7 +1156,7 @@ func (c *SQLiteConn) exec(ctx context.Context, query string, args []driver.Named
 			na := s.NumInput()
 			if len(args)-start < na {
 				s.Close()
-				return nil, fmt.Errorf("not enough args to execute query: want %d got %d", na, len(args))
+				return nil, fmt.Errorf("not enough args to execute query: want %d got %d", na, len(args)-start)
 			}
 			stmtArgs := stmtArgs(args, start, na)
 			res, err = s.(*SQLiteStmt).exec(ctx, stmtArgs)
@@ -997,8 +1185,13 @@ func (c *SQLiteConn) execNoArgs(query string) (driver.Result, error) {
 	for len(query) > 0 {
 		var rowid, changes C.longlong
 		var tail *C.char
+		var nParams C.int
 		pquery := C.CString(query)
-		rv := C._sqlite3_exec_no_args(c.db, pquery, C.int(len(query)), &rowid, &changes, &tail)
+		rv := C._sqlite3_exec_no_args(c.db, pquery, C.int(len(query)), &rowid, &changes, &tail, &nParams)
+		if nParams > 0 {
+			C.free(unsafe.Pointer(pquery))
+			return nil, fmt.Errorf("not enough args to execute query: want %d got 0", nParams)
+		}
 		if tail != nil && *tail != '\000' {
 			query = strings.TrimSpace(C.GoString(tail))
 		} else {
@@ -1609,6 +1802,18 @@ func (d *SQLiteDriver) Open(dsn string) (driver.Conn, error) {
 		return nil, err
 	}
 
+	if conn.stmtCacheEnabled && int(C.sqlite3_libversion_number()) < 3020000 {
+		// Schema-change detection for cached statements relies on
+		// SQLITE_STMTSTATUS_REPREPARE (3.20.0); with an older runtime
+		// library run without the cache rather than risk serving
+		// statements whose metadata a schema change has expired. The
+		// compile-time check in _sqlite3_step_columns is not enough:
+		// with USE_LIBSQLITE3 the header and the runtime library can
+		// differ.
+		conn.stmtCache = nil
+		conn.stmtCacheEnabled = false
+	}
+
 	exec := func(s string) error {
 		cs := C.CString(s)
 		rv := C.sqlite3_exec(db, cs, nil, nil, nil)
@@ -1908,6 +2113,10 @@ func (c *SQLiteConn) Close() error {
 		return lastError(c.db)
 	}
 	deleteHandles(c)
+	// Lock order is c.mu -> authorizerMu; RegisterAuthorizer never takes c.mu.
+	c.authorizerMu.Lock()
+	c.authorizerHandle = nil
+	c.authorizerMu.Unlock()
 	c.db = nil
 	return nil
 }
@@ -1999,6 +2208,7 @@ func finalizeCachedStmt(s *SQLiteStmt) {
 		return
 	}
 	runtime.SetFinalizer(s, nil)
+	s.freeScratch()
 	if s.s != nil {
 		C.sqlite3_finalize(s.s)
 		s.s = nil
@@ -2026,6 +2236,9 @@ func (c *SQLiteConn) prepare(ctx context.Context, query string) (driver.Stmt, er
 		t = strings.TrimSpace(C.GoString(tail))
 	}
 	ss := &SQLiteStmt{c: c, s: s, t: t}
+	if s != nil {
+		ss.numInput = int32(C.sqlite3_bind_parameter_count(s))
+	}
 	runtime.SetFinalizer(ss, (*SQLiteStmt).Close)
 	return ss, nil
 }
@@ -2065,8 +2278,12 @@ const (
 // GetFilename returns the absolute path to the file containing
 // the requested schema. When passed an empty string, it will
 // instead use the database's default schema: "main".
+// It returns an empty string once the connection has been closed.
 // See: sqlite3_db_filename, https://www.sqlite.org/c3ref/db_filename.html
 func (c *SQLiteConn) GetFilename(schemaName string) string {
+	if !c.dbConnOpen() {
+		return ""
+	}
 	if schemaName == "" {
 		schemaName = "main"
 	}
@@ -2076,15 +2293,23 @@ func (c *SQLiteConn) GetFilename(schemaName string) string {
 }
 
 // GetLimit returns the current value of a run-time limit.
+// It returns -1 once the connection has been closed.
 // See: sqlite3_limit, http://www.sqlite.org/c3ref/limit.html
 func (c *SQLiteConn) GetLimit(id int) int {
+	if !c.dbConnOpen() {
+		return -1
+	}
 	return int(C._sqlite3_limit(c.db, C.int(id), C.int(-1)))
 }
 
 // SetLimit changes the value of a run-time limits.
 // Then this method returns the prior value of the limit.
+// It returns -1 once the connection has been closed.
 // See: sqlite3_limit, http://www.sqlite.org/c3ref/limit.html
 func (c *SQLiteConn) SetLimit(id int, newVal int) int {
+	if !c.dbConnOpen() {
+		return -1
+	}
 	return int(C._sqlite3_limit(c.db, C.int(id), C.int(newVal)))
 }
 
@@ -2101,6 +2326,9 @@ func (c *SQLiteConn) SetLimit(id int, newVal int) int {
 //
 // See: sqlite3_file_control, https://www.sqlite.org/c3ref/file_control.html
 func (c *SQLiteConn) SetFileControlInt(dbName string, op int, arg int) error {
+	if !c.dbConnOpen() {
+		return errConnClosed
+	}
 	if dbName == "" {
 		dbName = "main"
 	}
@@ -2129,6 +2357,9 @@ func (c *SQLiteConn) SetFileControlInt(dbName string, op int, arg int) error {
 //
 // See: sqlite3_file_control, https://www.sqlite.org/c3ref/file_control.html
 func (c *SQLiteConn) SetFileControlInt64(dbName string, op int, arg int64) error {
+	if !c.dbConnOpen() {
+		return errConnClosed
+	}
 	if dbName == "" {
 		dbName = "main"
 	}
@@ -2142,6 +2373,20 @@ func (c *SQLiteConn) SetFileControlInt64(dbName string, op int, arg int64) error
 		return c.lastError()
 	}
 	return nil
+}
+
+// freeScratch releases the statement-owned argument and row buffers.
+func (s *SQLiteStmt) freeScratch() {
+	if s.argBuf != nil {
+		C.free(s.argBuf)
+		s.argBuf = nil
+		s.argBufCap = 0
+	}
+	if s.colvals != nil {
+		C.free(unsafe.Pointer(s.colvals))
+		s.colvals = nil
+		s.colvalsCap = 0
+	}
 }
 
 // Close the statement.
@@ -2175,6 +2420,7 @@ func (s *SQLiteStmt) Close() error {
 	}
 	s.s = nil
 	s.c = nil
+	s.freeScratch()
 	rv := C.sqlite3_finalize(stmt)
 	if rv != C.SQLITE_OK {
 		return conn.lastError()
@@ -2184,7 +2430,7 @@ func (s *SQLiteStmt) Close() error {
 
 // NumInput return a number of parameters.
 func (s *SQLiteStmt) NumInput() int {
-	return int(C.sqlite3_bind_parameter_count(s.s))
+	return int(s.numInput)
 }
 
 var placeHolder = []byte{0}
@@ -2349,27 +2595,117 @@ func (s *SQLiteStmt) Query(args []driver.Value) (driver.Rows, error) {
 }
 
 func (s *SQLiteStmt) query(ctx context.Context, args []driver.NamedValue) (driver.Rows, error) {
-	if err := s.bind(args); err != nil {
+	rows := &SQLiteRows{
+		s:           s,
+		cls:         s.cls,
+		ctx:         ctx,
+		pendingStep: -1,
+	}
+	// The first step is taken eagerly (it was going to run at the first
+	// Next anyway): only after it are the column count and metadata of a
+	// statement expired by a schema change guaranteed to describe the
+	// current schema, and folding reset, bind and step into one CGO
+	// crossing removes most of the per-query CGO overhead. Note that a
+	// data-modifying statement issued through Query therefore executes
+	// even if Next is never called.
+	rv, err := rows.bindAndFirstStepLocked(args)
+	if err != nil {
 		return nil, err
 	}
-
-	rows := &SQLiteRows{
-		s:        s,
-		nc:       int32(C.sqlite3_column_count(s.s)),
-		cls:      s.cls,
-		cols:     nil,
-		decltype: nil,
-		colvals:  nil,
-		ctx:      ctx,
-	}
-	if rows.nc > 0 {
-		rows.colvals = (*C.sqlite3_go_col)(C.malloc(C.size_t(rows.nc) * C.size_t(unsafe.Sizeof(C.sqlite3_go_col{}))))
-		if rows.colvals == nil {
-			return nil, errors.New("sqlite3: failed to allocate row buffer")
-		}
-	}
+	rows.pendingStep = rv
 
 	return rows, nil
+}
+
+// marshalFusedArgs converts positional arguments into sqlite3_go_col
+// records for _sqlite3_bind_step_columns. Text, blob and time arguments
+// are copied into the statement-owned C scratch buffer so the records
+// contain no Go pointers and the bytes can be bound with SQLITE_STATIC.
+// It reports false when the arguments need the generic bind path.
+func (s *SQLiteStmt) marshalFusedArgs(args []driver.NamedValue, cargs []C.sqlite3_go_col) bool {
+	need := 0
+	for i := range args {
+		if args[i].Name != "" || args[i].Ordinal != i+1 {
+			return false
+		}
+		switch v := args[i].Value.(type) {
+		case string:
+			need += len(v)
+		case []byte:
+			need += len(v)
+		case time.Time:
+			need += len(SQLiteTimestampFormats[0]) + 16
+		}
+	}
+	if need > s.argBufCap {
+		if s.argBuf != nil {
+			C.free(s.argBuf)
+		}
+		s.argBuf = C.malloc(C.size_t(need))
+		if s.argBuf == nil {
+			s.argBufCap = 0
+			panic("sqlite3: failed to allocate argument buffer")
+		}
+		s.argBufCap = need
+	}
+	var buf []byte
+	if s.argBufCap > 0 {
+		buf = unsafe.Slice((*byte)(s.argBuf), s.argBufCap)
+	}
+	off := 0
+	putBytes := func(a *C.sqlite3_go_col, b []byte) {
+		// A NULL pointer would bind SQL NULL, so empty values point at
+		// the buffer base (the C side never dereferences n == 0).
+		a.ptr = s.argBuf
+		if len(b) > 0 {
+			a.ptr = unsafe.Add(s.argBuf, off)
+			off += copy(buf[off:], b)
+		}
+		a.n = C.int(len(b))
+	}
+	for i := range args {
+		a := &cargs[i]
+		switch v := args[i].Value.(type) {
+		case nil:
+			a.typ = C.SQLITE_NULL
+		case int64:
+			a.typ = C.SQLITE_INTEGER
+			a.i64 = C.sqlite3_int64(v)
+		case bool:
+			a.typ = C.SQLITE_INTEGER
+			if v {
+				a.i64 = 1
+			} else {
+				a.i64 = 0
+			}
+		case float64:
+			a.typ = C.SQLITE_FLOAT
+			a.f64 = C.double(v)
+		case string:
+			if s.argBuf == nil {
+				return false
+			}
+			a.typ = C.SQLITE_TEXT
+			putBytes(a, unsafe.Slice(unsafe.StringData(v), len(v)))
+		case []byte:
+			if v == nil {
+				a.typ = C.SQLITE_NULL
+				break
+			}
+			if s.argBuf == nil {
+				return false
+			}
+			a.typ = C.SQLITE_BLOB
+			putBytes(a, v)
+		case time.Time:
+			var tmp [64]byte
+			a.typ = C.SQLITE_TEXT
+			putBytes(a, v.AppendFormat(tmp[:0], SQLiteTimestampFormats[0]))
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 // LastInsertId return last inserted ID.
@@ -2466,19 +2802,14 @@ func (s *SQLiteStmt) Readonly() bool {
 func (rc *SQLiteRows) Close() error {
 	rc.closemu.Lock()
 	defer rc.closemu.Unlock()
+	rc.stopWatchingCancellation()
 	s := rc.s
 	if s == nil {
-		if rc.colvals != nil {
-			C.free(unsafe.Pointer(rc.colvals))
-			rc.colvals = nil
-		}
 		return nil
 	}
 	rc.s = nil // remove reference to SQLiteStmt
-	if rc.colvals != nil {
-		C.free(unsafe.Pointer(rc.colvals))
-		rc.colvals = nil
-	}
+	// rc.colvals is owned by the statement and released with it.
+	rc.colvals = nil
 	s.mu.Lock()
 	if s.closed {
 		s.mu.Unlock()
@@ -2495,6 +2826,40 @@ func (rc *SQLiteRows) Close() error {
 	}
 	s.mu.Unlock()
 	return nil
+}
+
+func (c *SQLiteConn) interruptActiveRows(rows *SQLiteRows) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.activeRows == rows && c.db != nil {
+		C.sqlite3_interrupt(c.db)
+	}
+}
+
+func (rc *SQLiteRows) stopWatchingCancellation() {
+	if rc.stopCancellation == nil {
+		return
+	}
+	// A false return is harmless: a callback already in progress can interrupt
+	// only while rc owns conn.activeRows, which is guarded by conn.mu.
+	rc.stopCancellation()
+	rc.stopCancellation = nil
+}
+
+func (rc *SQLiteRows) startStepping() {
+	conn := rc.s.c
+	conn.mu.Lock()
+	conn.activeRows = rc
+	conn.mu.Unlock()
+}
+
+func (rc *SQLiteRows) finishStepping() {
+	conn := rc.s.c
+	conn.mu.Lock()
+	if conn.activeRows == rc {
+		conn.activeRows = nil
+	}
+	conn.mu.Unlock()
 }
 
 func (s *SQLiteStmt) cacheMetadata() bool {
@@ -2583,33 +2948,142 @@ func (rc *SQLiteRows) Next(dest []driver.Value) error {
 		return io.EOF
 	}
 
-	if rc.ctx.Done() == nil {
-		return rc.nextSyncLocked(dest)
+	if rv := rc.pendingStep; rv >= 0 {
+		rc.pendingStep = -1
+		filled := rc.pendingFilled
+		rc.pendingFilled = false
+		return rc.readStepResult(dest, rv, filled)
 	}
-	sema := make(chan struct{})
-	var err error
-	go func() {
-		err = rc.nextSyncLocked(dest)
-		close(sema)
-	}()
-	select {
-	case <-sema:
-		return err
-	case <-rc.ctx.Done():
-		select {
-		case <-sema: // no need to interrupt
-		default:
-			// this is still racy and can be no-op if executed between sqlite3_* calls in nextSyncLocked.
-			C.sqlite3_interrupt(rc.s.c.db)
-			<-sema // ensure goroutine completed
+
+	if rc.stopCancellation == nil {
+		if rc.ctx.Done() == nil {
+			rv := C._sqlite3_step_values(rc.s.s, C.int(len(dest)), rc.colvals)
+			return rc.readStepResult(dest, rv, true)
 		}
-		return rc.ctx.Err()
+		conn := rc.s.c
+		rc.stopCancellation = context.AfterFunc(rc.ctx, func() {
+			conn.interruptActiveRows(rc)
+		})
 	}
+	if err := rc.ctx.Err(); err != nil {
+		return err
+	}
+	rv := rc.stepCancellableLocked(len(dest))
+	err := rc.readStepResult(dest, rv, true)
+	if ctxErr := rc.ctx.Err(); ctxErr != nil {
+		return ctxErr
+	}
+	return err
 }
 
-// nextSyncLocked moves cursor to next; must be called with locked mutex.
-func (rc *SQLiteRows) nextSyncLocked(dest []driver.Value) error {
-	rv := C._sqlite3_step_internal(rc.s.s)
+// eagerFirstStepLocked performs the first step of a cached statement
+// under the same cancellation rules as Next, records the post-step
+// column count, and drops the statement's cached metadata when SQLite
+// re-prepared it after a schema change. Note that this runs the first
+// step at query time, so a data-modifying statement issued through
+// Query executes even if Next is never called.
+// bindAndFirstStepLocked binds the arguments and takes the statement's
+// first step under the same cancellation rules as Next, records the
+// post-step column count, and drops the statement's cached metadata
+// when SQLite re-prepared it after a schema change. The common case
+// (positional arguments of the standard types) runs reset, bind and
+// step in a single CGO crossing.
+func (rc *SQLiteRows) bindAndFirstStepLocked(args []driver.NamedValue) (C.int, error) {
+	s := rc.s
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	var cargs []C.sqlite3_go_col
+	fused := true
+	if len(args) > 0 {
+		if cap(s.cargs) < len(args) {
+			s.cargs = make([]C.sqlite3_go_col, len(args))
+		}
+		cargs = s.cargs[:len(args)]
+		fused = s.marshalFusedArgs(args, cargs)
+	}
+	if !fused {
+		if err := s.bind(args); err != nil {
+			return 0, err
+		}
+	}
+
+	if rc.ctx.Done() != nil && rc.stopCancellation == nil {
+		conn := s.c
+		rc.stopCancellation = context.AfterFunc(rc.ctx, func() {
+			conn.interruptActiveRows(rc)
+		})
+	}
+	if err := rc.ctx.Err(); err != nil {
+		rc.stopWatchingCancellation()
+		return 0, err
+	}
+	result := &s.stepResult
+	result.filled = 0
+	step := func() C.int {
+		if fused {
+			var argp *C.sqlite3_go_col
+			if len(cargs) > 0 {
+				argp = &cargs[0]
+			}
+			return C._sqlite3_bind_step_columns(s.s, argp, C.int(len(cargs)), &result.ncol, &result.repreps, s.colvals, C.int(s.colvalsCap), &result.filled)
+		}
+		return C._sqlite3_step_columns(s.s, &result.ncol, &result.repreps)
+	}
+	var rv C.int
+	if rc.ctx.Done() == nil {
+		rv = step()
+	} else {
+		rv = func() C.int {
+			rc.startStepping()
+			defer rc.finishStepping()
+			return step()
+		}()
+	}
+	if err := rc.ctx.Err(); err != nil {
+		rc.stopWatchingCancellation()
+		C._sqlite3_reset_clear(s.s)
+		return 0, err
+	}
+	if rv != C.SQLITE_ROW && rv != C.SQLITE_DONE {
+		rc.stopWatchingCancellation()
+		err := s.c.lastError()
+		C._sqlite3_reset_clear(s.s)
+		return 0, err
+	}
+	rc.nc = int32(result.ncol)
+	rc.pendingFilled = result.filled != 0
+	if result.repreps != s.repreps {
+		s.repreps = result.repreps
+		s.metadata = nil
+	}
+	if rc.nc > 0 {
+		// s.mu is still held here; the statement-owned row buffer must
+		// only be touched under it.
+		if rc.nc > s.colvalsCap {
+			if s.colvals != nil {
+				C.free(unsafe.Pointer(s.colvals))
+			}
+			s.colvals = (*C.sqlite3_go_col)(C.malloc(C.size_t(rc.nc) * C.size_t(unsafe.Sizeof(C.sqlite3_go_col{}))))
+			if s.colvals == nil {
+				s.colvalsCap = 0
+				C._sqlite3_reset_clear(s.s)
+				return 0, errors.New("sqlite3: failed to allocate row buffer")
+			}
+			s.colvalsCap = rc.nc
+		}
+		rc.colvals = s.colvals
+	}
+	return rv, nil
+}
+
+func (rc *SQLiteRows) stepCancellableLocked(ncol int) C.int {
+	rc.startStepping()
+	defer rc.finishStepping()
+	return C._sqlite3_step_values(rc.s.s, C.int(ncol), rc.colvals)
+}
+
+func (rc *SQLiteRows) readStepResult(dest []driver.Value, rv C.int, filled bool) error {
 	if rv == C.SQLITE_DONE {
 		return io.EOF
 	}
@@ -2625,7 +3099,9 @@ func (rc *SQLiteRows) nextSyncLocked(dest []driver.Value) error {
 	if len(dest) == 0 {
 		return nil
 	}
-	C._sqlite3_column_values(rc.s.s, C.int(len(dest)), rc.colvals)
+	if !filled {
+		C._sqlite3_column_values(rc.s.s, C.int(len(dest)), rc.colvals)
+	}
 	colvals := (*[(math.MaxInt32 - 1) / unsafe.Sizeof(C.sqlite3_go_col{})]C.sqlite3_go_col)(unsafe.Pointer(rc.colvals))[:len(dest):len(dest)]
 
 	decltype := rc.decltype

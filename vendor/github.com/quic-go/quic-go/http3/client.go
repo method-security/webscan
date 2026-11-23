@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/http/httptrace"
 	"net/textproto"
@@ -14,7 +15,6 @@ import (
 
 	"github.com/quic-go/qpack"
 	"github.com/quic-go/quic-go"
-	"github.com/quic-go/quic-go/http3/qlog"
 	"github.com/quic-go/quic-go/qlogwriter"
 )
 
@@ -90,7 +90,7 @@ func newClientConn(
 	logger *slog.Logger,
 ) *ClientConn {
 	var qlogger qlogwriter.Recorder
-	if qlogTrace := conn.QlogTrace(); qlogTrace != nil && qlogTrace.SupportsSchemas(qlog.EventSchema) {
+	if qlogTrace := conn.QlogTrace(); qlogTrace != nil {
 		qlogger = qlogTrace.AddProducer()
 	}
 	c := &ClientConn{
@@ -163,7 +163,7 @@ func (c *ClientConn) openRequestStream(
 		if context.Cause(openCtx) == errGoAway {
 			return nil, errGoAway
 		}
-		return nil, err
+		return nil, maybeReplaceError(err)
 	}
 
 	// Check again in case GOAWAY raced with OpenStreamSync.
@@ -202,8 +202,12 @@ func (c *ClientConn) handleControlStream(str *quic.ReceiveStream, fp *frameParse
 	for {
 		f, err := fp.ParseNext(c.qlogger)
 		if err != nil {
-			var serr *quic.StreamError
-			if err == io.EOF || errors.As(err, &serr) {
+			if errors.Is(err, errPriorityUpdateForPush) {
+				c.conn.CloseWithError(quic.ApplicationErrorCode(ErrCodeFrameUnexpected), "")
+				return
+			}
+			_, isStreamError := errors.AsType[*quic.StreamError](err)
+			if err == io.EOF || isStreamError {
 				c.conn.CloseWithError(quic.ApplicationErrorCode(ErrCodeClosedCriticalStream), "")
 				return
 			}
@@ -293,11 +297,16 @@ func (c *ClientConn) roundTrip(req *http.Request) (*http.Response, error) {
 		case <-c.rawConn.ReceivedSettings():
 		case <-connCtx.Done():
 			return nil, context.Cause(connCtx)
+		case <-req.Context().Done():
+			return nil, req.Context().Err()
 		}
 		if !c.rawConn.Settings().EnableExtendedConnect {
 			return nil, errors.New("http3: server didn't enable Extended CONNECT")
 		}
 	}
+
+	c.rawConn.AddQlogProducer()
+	defer c.rawConn.RemoveQlogProducer()
 
 	reqDone := make(chan struct{})
 	str, err := c.openRequestStream(
@@ -329,19 +338,19 @@ func (c *ClientConn) roundTrip(req *http.Request) (*http.Response, error) {
 	if err != nil { // if any error occurred
 		close(reqDone)
 		<-done
-		return nil, maybeReplaceError(err)
+		return nil, err
 	}
-	return rsp, maybeReplaceError(err)
+	return rsp, nil
 }
 
 // ReceivedSettings returns a channel that is closed once the server's HTTP/3 settings were received.
-// Settings can be obtained from the Settings method after the channel was closed.
+// The settings can be obtained from [ClientConn.Settings] after the channel is closed.
 func (c *ClientConn) ReceivedSettings() <-chan struct{} {
 	return c.rawConn.ReceivedSettings()
 }
 
 // Settings returns the HTTP/3 settings for this connection.
-// It is only valid to call this function after the channel returned by ReceivedSettings was closed.
+// It is only valid to call this method after the channel returned by [ClientConn.ReceivedSettings] is closed.
 func (c *ClientConn) Settings() *Settings {
 	return c.rawConn.Settings()
 }
@@ -355,6 +364,16 @@ func (c *ClientConn) CloseWithError(code quic.ApplicationErrorCode, msg string) 
 // Context returns a context that is cancelled when the connection is closed.
 func (c *ClientConn) Context() context.Context {
 	return c.conn.Context()
+}
+
+// LocalAddr returns the local address of the underlying QUIC connection.
+func (c *ClientConn) LocalAddr() net.Addr {
+	return c.conn.LocalAddr()
+}
+
+// RemoteAddr returns the remote address of the underlying QUIC connection.
+func (c *ClientConn) RemoteAddr() net.Addr {
+	return c.conn.RemoteAddr()
 }
 
 // cancelingReader reads from the io.Reader.

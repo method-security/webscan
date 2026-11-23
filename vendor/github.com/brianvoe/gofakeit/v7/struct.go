@@ -33,27 +33,30 @@ func structFunc(f *Faker, v any) error {
 	return r(f, reflect.TypeOf(v), reflect.ValueOf(v), "", 0, 0)
 }
 
+// isJSONRawMessage reports whether t is encoding/json.RawMessage.
+func isJSONRawMessage(t reflect.Type) bool {
+	if t.PkgPath() == "encoding/json" && t.Name() == "RawMessage" {
+		return true
+	}
+	return t.PkgPath() == "encoding/json/jsontext" && t.Name() == "Value" && t.Kind() == reflect.Slice && t.Elem().Kind() == reflect.Uint8
+}
+
 func r(f *Faker, t reflect.Type, v reflect.Value, tag string, size int, depth int) error {
 	// Handle special types
 
-	if t.PkgPath() == "encoding/json" {
-		// encoding/json has two special types:
-		// - RawMessage
-		// - Number
-
-		switch t.Name() {
-		case "RawMessage":
-			return rJsonRawMessage(f, v, tag)
-		case "Number":
-			return rJsonNumber(f, v, tag)
-		default:
-			return errors.New("unknown encoding/json type: " + t.Name())
-		}
+	// encoding/json has two special types: RawMessage and Number.
+	// As of Go 1.27, RawMessage is an alias of encoding/json/jsontext.Value,
+	// so reflect reports that name instead of RawMessage.
+	if isJSONRawMessage(t) {
+		return rJsonRawMessage(f, v, tag)
+	}
+	if t.PkgPath() == "encoding/json" && t.Name() == "Number" {
+		return rJsonNumber(f, v, tag)
 	}
 
 	// Handle generic types
 	switch t.Kind() {
-	case reflect.Ptr:
+	case reflect.Pointer:
 		return rPointer(f, t, v, tag, size, depth)
 	case reflect.Struct:
 		return rStruct(f, t, v, tag, depth)
@@ -109,7 +112,7 @@ func rCustom(f *Faker, v reflect.Value, tag string) error {
 	// Check if element is pointer if so
 	// grab the underlying value
 	fieldElem := field.Elem()
-	if fieldElem.Kind() == reflect.Ptr {
+	if fieldElem.Kind() == reflect.Pointer {
 		fieldElem = fieldElem.Elem()
 	}
 
@@ -151,7 +154,7 @@ func rStruct(f *Faker, t reflect.Type, v reflect.Value, tag string, depth int) e
 
 	// Loop through all the fields of the struct
 	n := t.NumField()
-	for i := 0; i < n; i++ {
+	for i := range n {
 		elementT := t.Field(i)
 		elementV := v.Field(i)
 		fakeTag, ok := elementT.Tag.Lookup("fake")
@@ -373,7 +376,7 @@ func rMap(f *Faker, t reflect.Type, v reflect.Value, tag string, size int, depth
 	}
 
 	// Set newMap into struct field
-	if t.Kind() == reflect.Ptr {
+	if t.Kind() == reflect.Pointer {
 		v.Set(newMap.Elem())
 	} else {
 		v.Set(newMap)
@@ -621,14 +624,7 @@ func rTime(f *Faker, t reflect.StructField, v reflect.Value, tag string) error {
 			}
 		}
 
-		// If output is larger than format cut the output
-		// This helps us avoid errors from time.Parse
-		if len(timeOutput) > len(timeFormat) {
-			timeOutput = timeOutput[:len(timeFormat)]
-		}
-
-		// Attempt to parse the time
-		timeStruct, err := time.Parse(timeFormat, timeOutput)
+		timeStruct, err := parseStructTime(timeFormat, timeOutput)
 		if err != nil {
 			return err
 		}
@@ -639,4 +635,40 @@ func rTime(f *Faker, t reflect.StructField, v reflect.Value, tag string) error {
 
 	v.Set(reflect.ValueOf(date(f)))
 	return nil
+}
+
+// parseStructTime parses value with format. It retries with one-or-two-digit
+// numeric fields, then with the value cut to the format length. The length cut
+// is last so a long month name is not trimmed before a real parse.
+func parseStructTime(format, value string) (time.Time, error) {
+	if parsed, err := time.Parse(format, value); err == nil {
+		return parsed, nil
+	} else if parsed, ok := parseUnpaddedTime(format, value); ok {
+		return parsed, nil
+	}
+
+	if len(value) > len(format) {
+		prefix := value[:len(format)]
+		if parsed, err := time.Parse(format, prefix); err == nil {
+			return parsed, nil
+		}
+		if parsed, ok := parseUnpaddedTime(format, prefix); ok {
+			return parsed, nil
+		}
+	}
+
+	parsed, err := time.Parse(format, value)
+	return parsed, err
+}
+
+func parseUnpaddedTime(format, value string) (time.Time, bool) {
+	flexible, ok := unpaddedTimeFormat(format)
+	if !ok {
+		return time.Time{}, false
+	}
+	parsed, err := time.Parse(flexible, value)
+	if err != nil {
+		return time.Time{}, false
+	}
+	return parsed, true
 }

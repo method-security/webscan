@@ -29,11 +29,48 @@ jobs:
       - name: Install Fern
         run: npm install -g fern-api
 
-      - name: Generate Fern
-        run: fern generate --group pypi --version ${{ github.ref_name }} --retry-rate-limited
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # ratchet:actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      # Fern Definition generation now runs locally; package upload is explicit.
+      - name: Generate and build Python package
         env:
           FERN_TOKEN: ${{ secrets.FERN_TOKEN }}
           PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
+          PACKAGE_NAME: methodwebscan
+          PACKAGE_VERSION: "${{ github.ref_name }}"
+        run: |
+          python3 -m pip install build==1.6.1 twine==7.0.0
+          fern generate --local --preview --group pypi --output generated/python-package
+          python3 - <<'PYTHON'
+          import os
+          import re
+          from pathlib import Path
+
+          path = Path("generated/python-package/fern-pydantic-model/pyproject.toml")
+          content = path.read_text()
+          content, names = re.subn(r'^name = ".*"$', 'name = "' + os.environ["PACKAGE_NAME"] + '"', content, flags=re.MULTILINE)
+          content, versions = re.subn(r'^version = ".*"$', 'version = "' + os.environ["PACKAGE_VERSION"].removeprefix("v") + '"', content, flags=re.MULTILINE)
+          if (names, versions) != (2, 1):
+              raise RuntimeError("Unexpected generated Python package metadata")
+          content = content.replace("Repository = ''", 'Repository = "https://github.com/method-security/webscan"')
+          path.write_text(content)
+          path.with_name("README.md").write_text(
+              "# " + os.environ["PACKAGE_NAME"] + "\n\n"
+              "Python data models generated from the "
+              "[Method Security webscan definitions](https://github.com/method-security/webscan).\n"
+          )
+          PYTHON
+          python3 -m build --outdir generated/python-dist generated/python-package/fern-pydantic-model
+          python3 -m twine check generated/python-dist/*
+
+      - name: Upload Python package
+        run: python3 -m twine upload --verbose --non-interactive --repository-url https://upload.pypi.org/legacy/ generated/python-dist/*
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
 
     permissions:
       id-token: write # For cosign

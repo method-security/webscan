@@ -1,11 +1,14 @@
 package fastdialer
 
 import (
+	"context"
+	"crypto/tls"
 	"log"
 	"net"
 	"time"
 
 	"github.com/projectdiscovery/networkpolicy"
+	ztls "github.com/zmap/zcrypto/tls"
 	"golang.org/x/net/proxy"
 )
 
@@ -40,7 +43,9 @@ type Options struct {
 	EnableFallback           bool
 	Allow                    []string
 	Deny                     []string
+	// Deprecated: has no effect, the dialer validates hosts and IPs, not URLs.
 	AllowSchemeList          []string
+	// Deprecated: has no effect, the dialer validates hosts and IPs, not URLs.
 	DenySchemeList           []string
 	AllowPortList            []int
 	DenyPortList             []int
@@ -91,6 +96,18 @@ type Options struct {
 	//
 	// Default is [DefaultNdots].
 	Ndots int
+
+	// OnDialResult is called after each connection attempt with the caller's
+	// context and the error, nil on success. Targets that fail before a
+	// connection is attempted (resolution, policy) are not reported.
+	OnDialResult func(ctx context.Context, hostname, port string, err error)
+
+	// TLSConfig is the config of DialTLS. Default is [DefaultTLSConfig].
+	// Configs passed to the WithConfig dial methods are used as given.
+	TLSConfig *tls.Config
+	// ZTLSConfig is the config of DialZTLS, and of DialTLS when WithZTLS is
+	// set. Default is [DefaultZTLSConfig].
+	ZTLSConfig *ztls.Config
 }
 
 // DefaultOptions of the cache

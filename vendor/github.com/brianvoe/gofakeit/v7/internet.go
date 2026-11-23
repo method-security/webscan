@@ -40,7 +40,7 @@ func url(f *Faker) string {
 	// Slugs
 	num := number(f, 1, 4)
 	slug := make([]string, num)
-	for i := 0; i < num; i++ {
+	for i := range num {
 		slug[i] = bs(f)
 	}
 
@@ -66,7 +66,13 @@ func urlSlug(f *Faker, words int) string {
 
 	slug := make([]string, words)
 	for i := 0; i < words; i++ {
-		slug[i] = strings.ToLower(word(f))
+		// The word list has "e.g.", "i.e." and "(space)" in it, a slug keeps the letters and digits
+		slug[i] = strings.Map(func(r rune) rune {
+			if r >= 'a' && r <= 'z' || r >= '0' && r <= '9' {
+				return r
+			}
+			return -1
+		}, strings.ToLower(word(f)))
 	}
 
 	return strings.Join(slug, "-")
@@ -113,7 +119,7 @@ func MacAddress() string { return macAddress(GlobalFaker) }
 func (f *Faker) MacAddress() string { return macAddress(f) }
 
 func macAddress(f *Faker) string {
-	num := 255
+	num := 256
 
 	return fmt.Sprintf("%02x:%02x:%02x:%02x:%02x:%02x", f.IntN(num), f.IntN(num), f.IntN(num), f.IntN(num), f.IntN(num), f.IntN(num))
 }

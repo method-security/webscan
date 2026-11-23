@@ -109,10 +109,44 @@ func readNNormalizeRespBody(rc *ResponseChain, body *bytes.Buffer) (err error) {
 		// skip normalization if body is nil
 		return nil
 	}
+	if rc.rawBody != nil {
+		rawBuf := &limitedBuffer{buf: rc.rawBody, maxCap: int(rc.maxBodySize)}
+		_, rawErr := rawBuf.ReadFrom(origBody)
+		_ = origBody.Close()
+		if rawErr != nil && !stringsutil.ContainsAnyI(rawErr.Error(), "unexpected EOF", "read: connection reset by peer", "user canceled", "http: request body too large") {
+			return errors.Wrap(rawErr, "could not read raw response body")
+		}
+		if rawErr != nil {
+			if response.Header == nil {
+				response.Header = make(http.Header)
+			}
+			response.Header.Set("x-nuclei-ignore-error", rawErr.Error())
+		}
+		response.Body = io.NopCloser(bytes.NewReader(rc.rawBody.Bytes()))
+		origBody = response.Body
+	}
+	// a decoder reads ahead before rejecting a body, so keep what it read to
+	// fall back on
+	var head *headReader
+	if rc.rawBody == nil {
+		head = &headReader{Reader: origBody, head: &bytes.Buffer{}}
+		response.Body = io.NopCloser(head)
+	}
 	// wrap with decode if applicable
 	wrapped, err := wrapDecodeReader(response)
+	if head != nil {
+		response.Body = origBody
+	}
 	if err != nil {
-		wrapped = origBody
+		if rc.rawBody != nil {
+			response.Body = io.NopCloser(bytes.NewReader(rc.rawBody.Bytes()))
+			wrapped = response.Body
+			origBody = wrapped
+		} else {
+			wrapped = io.NopCloser(io.MultiReader(head.head, origBody))
+		}
+	} else if head != nil {
+		head.head = nil
 	}
 	limitReader := io.LimitReader(wrapped, rc.maxBodySize)
 
@@ -124,7 +158,12 @@ func readNNormalizeRespBody(rc *ResponseChain, body *bytes.Buffer) (err error) {
 	if err != nil {
 		if strings.Contains(err.Error(), "gzip: invalid header") {
 			// its invalid gzip but we will still use it from original body
-			_, gErr := body.ReadFrom(origBody)
+			reader := io.Reader(origBody)
+			if rc.rawBody != nil {
+				body.Reset()
+				reader = bytes.NewReader(rc.rawBody.Bytes())
+			}
+			_, gErr := body.ReadFrom(reader)
 			if gErr != nil {
 				return errors.Wrap(gErr, "could not read response body after gzip error")
 			}
@@ -142,10 +181,24 @@ func readNNormalizeRespBody(rc *ResponseChain, body *bytes.Buffer) (err error) {
 	return nil
 }
 
+// headReader records what is read while head is not nil.
+type headReader struct {
+	io.Reader
+	head *bytes.Buffer
+}
+
+func (h *headReader) Read(p []byte) (int, error) {
+	n, err := h.Reader.Read(p)
+	if h.head != nil {
+		h.head.Write(p[:n])
+	}
+	return n, err
+}
+
 // wrapDecodeReader wraps a decompression reader around the response body if it's compressed
 // using gzip or deflate.
 func wrapDecodeReader(resp *http.Response) (rc io.ReadCloser, err error) {
-	switch resp.Header.Get("Content-Encoding") {
+	switch strings.ToLower(resp.Header.Get("Content-Encoding")) {
 	case "gzip":
 		rc, err = gzip.NewReader(resp.Body)
 	case "deflate":
@@ -154,7 +207,9 @@ func wrapDecodeReader(resp *http.Response) (rc io.ReadCloser, err error) {
 		rc, err = brotli.NewReader(resp.Body, nil)
 	case "zstd":
 		var zstdReader *zstd.Decoder
-		zstdReader, err = zstd.NewReader(resp.Body)
+		// A bounded read can stop before EOF. Decode synchronously so no
+		// background workers retain the abandoned stream and its buffers.
+		zstdReader, err = zstd.NewReader(resp.Body, zstd.WithDecoderConcurrency(1))
 		if err != nil {
 			return nil, err
 		}

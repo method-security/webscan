@@ -2,6 +2,7 @@ package messages
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jcmturner/gofork/encoding/asn1"
@@ -182,6 +183,13 @@ func (a *APReq) Verify(kt *keytab.Keytab, d time.Duration, cAddr types.HostAddre
 	err = a.DecryptAuthenticator(a.Ticket.DecryptedEncPart.Key)
 	if err != nil {
 		return false, NewKRBError(a.Ticket.SName, a.Ticket.Realm, errorcode.KRB_AP_ERR_BAD_INTEGRITY, "could not decrypt authenticator")
+	}
+
+	// Check CRealm in authenticator is the same as that in the ticket encrypted part.
+	if a.Authenticator.CRealm != "" && a.Ticket.DecryptedEncPart.CRealm != "" {
+		if !strings.EqualFold(a.Authenticator.CRealm, a.Ticket.DecryptedEncPart.CRealm) {
+			return false, NewKRBError(a.Ticket.SName, a.Ticket.Realm, errorcode.KRB_AP_ERR_BADMATCH, "CRealm in Authenticator does not match that in service ticket")
+		}
 	}
 
 	// Check CName in authenticator is the same as that in the ticket

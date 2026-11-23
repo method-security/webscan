@@ -9,11 +9,11 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/golang/protobuf/proto"              //lint:ignore SA1019 we have to import these because some of their types appear in exported API
-	"github.com/jhump/protoreflect/desc"            //lint:ignore SA1019 same as above
-	"github.com/jhump/protoreflect/desc/protoparse" //lint:ignore SA1019 same as above
+	"github.com/golang/protobuf/proto"
+	"github.com/jhump/protoreflect/desc"
+	"github.com/jhump/protoreflect/desc/protoparse"
 	"github.com/jhump/protoreflect/desc/protoprint"
-	"github.com/jhump/protoreflect/dynamic" //lint:ignore SA1019 same as above
+	"github.com/jhump/protoreflect/dynamic"
 	"github.com/jhump/protoreflect/grpcreflect"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -309,24 +309,37 @@ func WriteProtoFiles(outProtoDirPath string, descSource DescriptorSource, symbol
 	for _, filename := range filenames {
 		allFileDescriptors = addFilesToFileDescriptorList(allFileDescriptors, expandedFiles, fds[filename])
 	}
+	return writeProtoFiles(outProtoDirPath, allFileDescriptors)
+}
+
+func writeProtoFiles(outProtoDirPath string, allFileDescriptors []*desc.FileDescriptor) error {
+	if err := os.MkdirAll(outProtoDirPath, 0755); err != nil {
+		return fmt.Errorf("failed to create output directory %q: %w", outProtoDirPath, err)
+	}
+	root, err := os.OpenRoot(outProtoDirPath)
+	if err != nil {
+		return fmt.Errorf("failed to open output directory %q: %w", outProtoDirPath, err)
+	}
+	defer root.Close()
 	pr := protoprint.Printer{}
 	// now we can serialize to files
 	for i := range allFileDescriptors {
-		if err := writeProtoFile(outProtoDirPath, allFileDescriptors[i], &pr); err != nil {
+		if err := writeProtoFile(root, allFileDescriptors[i], &pr); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func writeProtoFile(outProtoDirPath string, fd *desc.FileDescriptor, pr *protoprint.Printer) error {
-	outFile := filepath.Join(outProtoDirPath, fd.GetFullyQualifiedName())
-	outDir := filepath.Dir(outFile)
-	if err := os.MkdirAll(outDir, 0777); err != nil {
-		return fmt.Errorf("failed to create directory %q: %w", outDir, err)
+func writeProtoFile(root *os.Root, fd *desc.FileDescriptor, pr *protoprint.Printer) error {
+	// root confines all path operations to the output directory, so a
+	// malicious file name (e.g. "../escape.proto") cannot write outside it
+	outFile := fd.GetFullyQualifiedName()
+	if err := root.MkdirAll(filepath.Dir(outFile), 0755); err != nil {
+		return fmt.Errorf("failed to create directory for %q: %w", outFile, err)
 	}
 
-	f, err := os.Create(outFile)
+	f, err := root.Create(outFile)
 	if err != nil {
 		return fmt.Errorf("failed to create proto file %q: %w", outFile, err)
 	}

@@ -1,6 +1,7 @@
 # gRPCurl
 [![Build Status](https://circleci.com/gh/fullstorydev/grpcurl/tree/master.svg?style=svg)](https://circleci.com/gh/fullstorydev/grpcurl/tree/master)
 [![Go Report Card](https://goreportcard.com/badge/github.com/fullstorydev/grpcurl)](https://goreportcard.com/report/github.com/fullstorydev/grpcurl)
+[![Snap Release Status](https://snapcraft.io/grpcurl/badge.svg)](https://snapcraft.io/grpcurl)
 
 `grpcurl` is a command-line tool that lets you interact with gRPC servers. It's
 basically `curl` for gRPC servers.
@@ -61,9 +62,9 @@ brew install grpcurl
 For platforms that support Docker, you can download an image that lets you run `grpcurl`:
 ```shell
 # Download image
-docker pull fullstorydev/grpcurl:latest
+docker pull ghcr.io/fullstorydev/grpcurl:latest
 # Run the tool
-docker run fullstorydev/grpcurl api.grpc.me:443 list
+docker run ghcr.io/fullstorydev/grpcurl api.grpc.me:443 list
 ```
 Note that there are some pitfalls when using docker:
 - If you need to interact with a server listening on the host's loopback network, you must specify the host as `host.docker.internal` instead of `localhost` (for Mac or Windows) _OR_ have the container use the host network with `-network="host"` (Linux only).
@@ -78,6 +79,12 @@ of environments, including Windows and myriad Linux distributions.
 
 You can see more details and the full list of other packages for `grpcurl` at _repology.org_:
 https://repology.org/project/grpcurl/information
+
+### Snap
+
+You can install `grpcurl` using the snap package:
+
+`snap install grpcurl`
 
 ### From Source
 If you already have the [Go SDK](https://golang.org/doc/install) installed, you can use the `go`
@@ -139,7 +146,7 @@ grpcurl -d @ grpc.server.com:443 my.custom.server.Service/Method <<EOM
 {
   "id": 1234,
   "tags": [
-    "foor",
+    "foo",
     "bar"
   ]
 }

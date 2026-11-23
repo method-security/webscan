@@ -97,11 +97,15 @@ func csvFunc(f *Faker, co *CSVOptions) ([]byte, error) {
 				value = v
 			}
 
+			// An error is written as its message instead of {}, and a time without the quotes of json
+			value, err = fieldValue(value)
+			if err != nil {
+				return nil, err
+			}
+
 			// If the value is a list of possible values, marsha it into a string
-			if reflect.TypeOf(value).Kind() == reflect.Struct ||
-				reflect.TypeOf(value).Kind() == reflect.Ptr ||
-				reflect.TypeOf(value).Kind() == reflect.Map ||
-				reflect.TypeOf(value).Kind() == reflect.Slice {
+			switch reflect.ValueOf(value).Kind() {
+			case reflect.Struct, reflect.Pointer, reflect.Map, reflect.Slice:
 				b, err := json.Marshal(value)
 				if err != nil {
 					return nil, err

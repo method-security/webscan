@@ -116,18 +116,22 @@ func jsonFunc(f *Faker, jo *JSONOptions) ([]byte, error) {
 				value = val
 			}
 
+			// An error is written as its message instead of {}
+			value, err = fieldValue(value)
+			if err != nil {
+				return nil, err
+			}
+
 			v[i] = &jsonKeyVal{Key: field.Name, Value: value}
 
 		}
 
 		// Marshal into bytes
 		if jo.Indent {
-			j, _ := json.MarshalIndent(v, "", "    ")
-			return j, nil
+			return json.MarshalIndent(v, "", "    ")
 		}
 
-		j, _ := json.Marshal(v)
-		return j, nil
+		return json.Marshal(v)
 	}
 
 	if jo.Type == "array" {
@@ -170,6 +174,12 @@ func jsonFunc(f *Faker, jo *JSONOptions) ([]byte, error) {
 					value = val
 				}
 
+				// An error is written as its message instead of {}
+				value, err = fieldValue(value)
+				if err != nil {
+					return nil, err
+				}
+
 				vr[ii] = &jsonKeyVal{Key: field.Name, Value: value}
 			}
 
@@ -178,12 +188,10 @@ func jsonFunc(f *Faker, jo *JSONOptions) ([]byte, error) {
 
 		// Marshal into bytes
 		if jo.Indent {
-			j, _ := json.MarshalIndent(v, "", "    ")
-			return j, nil
+			return json.MarshalIndent(v, "", "    ")
 		}
 
-		j, _ := json.Marshal(v)
-		return j, nil
+		return json.Marshal(v)
 	}
 
 	return nil, errors.New("invalid type, must be array or object")

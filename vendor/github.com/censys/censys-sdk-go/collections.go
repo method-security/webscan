@@ -233,7 +233,7 @@ func (s *Collections) List(ctx context.Context, request operations.V3Collections
 
 			var out sdkerrors.AuthenticationError
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -256,7 +256,7 @@ func (s *Collections) List(ctx context.Context, request operations.V3Collections
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -277,7 +277,7 @@ func (s *Collections) List(ctx context.Context, request operations.V3Collections
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -313,7 +313,7 @@ func (s *Collections) List(ctx context.Context, request operations.V3Collections
 }
 
 // Create a collection
-// Create a new collection.<br><br>This endpoint does not cost credits to execute.
+// Create a new [collection](https://docs.censys.com/docs/platform-collections).<br><br>In a SOC environment, use this endpoint to save a query as a dynamic asset group, such as all internet-facing RDP hosts or a threat's footprint, so SOC monitoring and reporting stay scoped as assets change.<br><br>This endpoint does not cost credits to execute.
 func (s *Collections) Create(ctx context.Context, request operations.V3CollectionsCrudCreateRequest, opts ...operations.Option) (*operations.V3CollectionsCrudCreateResponse, error) {
 	globals := operations.V3CollectionsCrudCreateGlobals{
 		OrganizationID: s.sdkConfiguration.Globals.OrganizationID,
@@ -520,7 +520,7 @@ func (s *Collections) Create(ctx context.Context, request operations.V3Collectio
 
 			var out sdkerrors.AuthenticationError
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -549,7 +549,7 @@ func (s *Collections) Create(ctx context.Context, request operations.V3Collectio
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -570,7 +570,7 @@ func (s *Collections) Create(ctx context.Context, request operations.V3Collectio
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -793,7 +793,7 @@ func (s *Collections) Delete(ctx context.Context, request operations.V3Collectio
 
 			var out sdkerrors.AuthenticationError
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -818,7 +818,7 @@ func (s *Collections) Delete(ctx context.Context, request operations.V3Collectio
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -839,7 +839,7 @@ func (s *Collections) Delete(ctx context.Context, request operations.V3Collectio
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -875,7 +875,7 @@ func (s *Collections) Delete(ctx context.Context, request operations.V3Collectio
 }
 
 // Get a collection
-// Retrieve information about a collection. Retrieved information includes its name, query, description, status, and asset count.<br><br>This endpoint does not cost credits to execute.
+// Retrieve information about a collection. Retrieved information includes its name, query, description, status, and asset count. Use it to confirm it still reflects the scope you intend to monitor.<br><br>This endpoint does not cost credits to execute.
 func (s *Collections) Get(ctx context.Context, request operations.V3CollectionsCrudGetRequest, opts ...operations.Option) (*operations.V3CollectionsCrudGetResponse, error) {
 	globals := operations.V3CollectionsCrudGetGlobals{
 		OrganizationID: s.sdkConfiguration.Globals.OrganizationID,
@@ -1075,7 +1075,7 @@ func (s *Collections) Get(ctx context.Context, request operations.V3CollectionsC
 
 			var out sdkerrors.AuthenticationError
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -1100,7 +1100,7 @@ func (s *Collections) Get(ctx context.Context, request operations.V3CollectionsC
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -1121,7 +1121,7 @@ func (s *Collections) Get(ctx context.Context, request operations.V3CollectionsC
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -1157,7 +1157,7 @@ func (s *Collections) Get(ctx context.Context, request operations.V3CollectionsC
 }
 
 // Update a collection
-// Update a collection's name, description, and/or query.<br><br>This endpoint does not cost credits to execute.
+// Update a collection's name, description, query, and/or privacy.<br><br>This endpoint does not cost credits to execute.
 func (s *Collections) Update(ctx context.Context, request operations.V3CollectionsCrudUpdateRequest, opts ...operations.Option) (*operations.V3CollectionsCrudUpdateResponse, error) {
 	globals := operations.V3CollectionsCrudUpdateGlobals{
 		OrganizationID: s.sdkConfiguration.Globals.OrganizationID,
@@ -1364,7 +1364,7 @@ func (s *Collections) Update(ctx context.Context, request operations.V3Collectio
 
 			var out sdkerrors.AuthenticationError
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -1391,7 +1391,7 @@ func (s *Collections) Update(ctx context.Context, request operations.V3Collectio
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -1412,7 +1412,7 @@ func (s *Collections) Update(ctx context.Context, request operations.V3Collectio
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -1448,7 +1448,7 @@ func (s *Collections) Update(ctx context.Context, request operations.V3Collectio
 }
 
 // ListEvents - Get a collection's events
-// Retrieve the event history for a collection. This includes the addition or removal of assets as well as collection status changes.<br><br>This endpoint does not cost credits to execute.
+// Retrieve the event history for a collection. This includes the addition or removal of assets as well as collection status changes.<br><br>In a SOC environment, use this endpoint to see which assets were added or removed and when, to catch new exposure or unexpected changes in a monitored scope.<br><br>This endpoint does not cost credits to execute.
 func (s *Collections) ListEvents(ctx context.Context, request operations.V3CollectionsListEventsRequest, opts ...operations.Option) (*operations.V3CollectionsListEventsResponse, error) {
 	globals := operations.V3CollectionsListEventsGlobals{
 		OrganizationID: s.sdkConfiguration.Globals.OrganizationID,
@@ -1648,7 +1648,7 @@ func (s *Collections) ListEvents(ctx context.Context, request operations.V3Colle
 
 			var out sdkerrors.AuthenticationError
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -1675,7 +1675,7 @@ func (s *Collections) ListEvents(ctx context.Context, request operations.V3Colle
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -1696,7 +1696,7 @@ func (s *Collections) ListEvents(ctx context.Context, request operations.V3Colle
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -1732,7 +1732,7 @@ func (s *Collections) ListEvents(ctx context.Context, request operations.V3Colle
 }
 
 // Aggregate results for a search query within a collection
-// Aggregate results for a Platform search query that targets a collection's assets. This functionality is equivalent to the [Report Builder](https://docs.censys.com/docs/platform-report-builder#/) in the Platform web UI.
+// Aggregate results for a Platform search query that targets a collection's assets. This functionality is equivalent to the [Report Builder](https://docs.censys.com/docs/platform-report-builder#/) in the Platform web UI.<br><br>In a SOC environment, use this endpoint to count and bucket matches by field, such as port, country, or software, inside a collection so you can spot exposure trends without pulling every asset.
 func (s *Collections) Aggregate(ctx context.Context, request operations.V3CollectionsSearchAggregateRequest, opts ...operations.Option) (*operations.V3CollectionsSearchAggregateResponse, error) {
 	globals := operations.V3CollectionsSearchAggregateGlobals{
 		OrganizationID: s.sdkConfiguration.Globals.OrganizationID,
@@ -1939,7 +1939,7 @@ func (s *Collections) Aggregate(ctx context.Context, request operations.V3Collec
 
 			var out sdkerrors.AuthenticationError
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -1966,7 +1966,7 @@ func (s *Collections) Aggregate(ctx context.Context, request operations.V3Collec
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -1987,7 +1987,7 @@ func (s *Collections) Aggregate(ctx context.Context, request operations.V3Collec
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -2023,7 +2023,7 @@ func (s *Collections) Aggregate(ctx context.Context, request operations.V3Collec
 }
 
 // Search - Run a search query within a collection
-// Run a search query across a collection's assets. Reference the [documentation on Censys Query Language](https://docs.censys.com/docs/censys-query-language#/) for information about query syntax. Host services that match your search criteria will be returned in a `matched_services` object.
+// Run a search query across a collection's assets. Reference the [documentation on Censys Query Language](https://docs.censys.com/docs/censys-query-language#/) for information about query syntax. Host services that match your search criteria will be returned in a `matched_services` object.<br><br>In a SOC environment, use this endpoint to search only within the defined scope of a collection, so triage and hunting results stay relevant instead of covering the whole internet.
 func (s *Collections) Search(ctx context.Context, request operations.V3CollectionsSearchQueryRequest, opts ...operations.Option) (*operations.V3CollectionsSearchQueryResponse, error) {
 	globals := operations.V3CollectionsSearchQueryGlobals{
 		OrganizationID: s.sdkConfiguration.Globals.OrganizationID,
@@ -2230,7 +2230,7 @@ func (s *Collections) Search(ctx context.Context, request operations.V3Collectio
 
 			var out sdkerrors.AuthenticationError
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -2257,7 +2257,7 @@ func (s *Collections) Search(ctx context.Context, request operations.V3Collectio
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -2278,7 +2278,7 @@ func (s *Collections) Search(ctx context.Context, request operations.V3Collectio
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out

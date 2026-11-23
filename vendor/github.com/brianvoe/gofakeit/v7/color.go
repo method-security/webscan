@@ -37,13 +37,17 @@ func HexColor() string { return hexColor(GlobalFaker) }
 func (f *Faker) HexColor() string { return hexColor(f) }
 
 func hexColor(f *Faker) string {
-	color := make([]byte, 6)
-	hashQuestion := []byte("?#")
-	for i := 0; i < 6; i++ {
-		color[i] = hashQuestion[f.IntN(2)]
+	// 24 random bits, so each of the 16,777,216 colors is equally likely, #000000 and #00ff00 included
+	const digits = "0123456789abcdef"
+	n := f.IntN(1 << 24)
+
+	color := [7]byte{'#'}
+	for i := 6; i > 0; i-- {
+		color[i] = digits[n&0xf]
+		n >>= 4
 	}
 
-	return "#" + replaceWithHexLetters(f, replaceWithNumbers(f, string(color)))
+	return string(color[:])
 }
 
 // RGBColor will generate a random int slice color
@@ -54,6 +58,17 @@ func (f *Faker) RGBColor() []int { return rgbColor(f) }
 
 func rgbColor(f *Faker) []int {
 	return []int{randIntRange(f, 0, 255), randIntRange(f, 0, 255), randIntRange(f, 0, 255)}
+}
+
+// HSLColor will generate a random HSL color slice [hue, saturation, lightness]
+func HSLColor() []int { return hslColor(GlobalFaker) }
+
+// HSLColor will generate a random HSL color slice [hue, saturation, lightness]
+func (f *Faker) HSLColor() []int { return hslColor(f) }
+
+func hslColor(f *Faker) []int {
+	// Hue is 0-360, Saturation and Lightness are 0-100%
+	return []int{randIntRange(f, 0, 360), randIntRange(f, 0, 100), randIntRange(f, 0, 100)}
 }
 
 func addColorLookup() {
@@ -121,6 +136,19 @@ func addColorLookup() {
 		Keywords:    []string{"rgb", "color", "red", "green", "blue", "triplet", "digital", "screen", "display", "primary", "additive", "value", "css"},
 		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
 			return rgbColor(f), nil
+		},
+	})
+	AddFuncLookup("hslcolor", Info{
+		Display:     "HSL Color",
+		Category:    "color",
+		Description: "Color defined by hue, saturation, and lightness values",
+		Example:     "[210, 85, 50]",
+		Output:      "[]int",
+		ContentType: "application/json",
+		Aliases:     []string{"hsl triplet", "hsl array", "hsl value", "hue saturation lightness"},
+		Keywords:    []string{"hsl", "color", "hue", "saturation", "lightness", "brightness", "triplet", "palette", "css"},
+		Generate: func(f *Faker, m *MapParams, info *Info) (any, error) {
+			return hslColor(f), nil
 		},
 	})
 

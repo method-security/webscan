@@ -90,15 +90,24 @@ func QuerySelectorAll(top *html.Node, selector *xpath.Expr) []*html.Node {
 	return elems
 }
 
-// LoadURL loads the HTML document from the specified URL. Default enabling gzip on a HTTP request.
+// LoadURL loads the HTML document from the specified URL. Default HTTP Client.
 func LoadURL(url string) (*html.Node, error) {
+	return LoadURLWithClient(url, http.DefaultClient)
+}
+
+// LoadURLWithCustomClient loads the HTML document from the specified URL. Default enabling gzip on a HTTP request.
+// Custom HTTP Client.
+func LoadURLWithClient(url string, client *http.Client)(*html.Node, error){
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
+	if client == nil{
+		client = http.DefaultClient
+	}
 	// Enable gzip compression.
 	req.Header.Add("Accept-Encoding", "gzip")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}

@@ -290,6 +290,17 @@ func setupTLSServerCertificateOnly(config *tls.Config, pemData []byte) error {
 	return nil
 }
 
+// parseBoolParam also accepts the ODBC "yes"/"no" spelling that Encrypt already allows.
+func parseBoolParam(value string) (bool, error) {
+	if strings.EqualFold(value, "yes") {
+		return true, nil
+	}
+	if strings.EqualFold(value, "no") {
+		return false, nil
+	}
+	return strconv.ParseBool(value)
+}
+
 // parseTLS parses encryption parameters and returns the TLS configuration and trustServerCertificate value.
 func parseTLS(params map[string]string, host string) (Encryption, *tls.Config, bool, error) {
 	trustServerCert := false
@@ -317,7 +328,7 @@ func parseTLS(params map[string]string, host string) (Encryption, *tls.Config, b
 	trust, ok := params[TrustServerCertificate]
 	if ok {
 		var err error
-		trustServerCert, err = strconv.ParseBool(trust)
+		trustServerCert, err = parseBoolParam(trust)
 		if err != nil {
 			f := "invalid trust server certificate '%s': %s"
 			return encryption, nil, false, fmt.Errorf(f, trust, err.Error())
@@ -440,7 +451,7 @@ func Parse(dsn string) (Config, error) {
 		}
 	}
 
-	// https://docs.microsoft.com/en-us/sql/database-engine/configure-windows/configure-the-network-packet-size-server-configuration-option\
+	// https://docs.microsoft.com/sql/database-engine/configure-windows/configure-the-network-packet-size-server-configuration-option
 	strpsize, ok := params[PacketSize]
 	if ok {
 		var err error
@@ -462,7 +473,7 @@ func Parse(dsn string) (Config, error) {
 		}
 	}
 
-	// https://msdn.microsoft.com/en-us/library/dd341108.aspx
+	// https://msdn.microsoft.com/library/dd341108.aspx
 	//
 	// Do not set a connection timeout. Use Context to manage such things.
 	// Default to zero, but still allow it to be set.
@@ -476,7 +487,7 @@ func Parse(dsn string) (Config, error) {
 	}
 
 	// default keep alive should be 30 seconds according to spec:
-	// https://msdn.microsoft.com/en-us/library/dd341108.aspx
+	// https://msdn.microsoft.com/library/dd341108.aspx
 	p.KeepAlive = 30 * time.Second
 	if keepAlive, ok := params[KeepAlive]; ok {
 		timeout, err := strconv.ParseUint(keepAlive, 10, 64)
@@ -541,7 +552,7 @@ func Parse(dsn string) (Config, error) {
 	disableRetry, ok := params[DisableRetry]
 	if ok {
 		var err error
-		p.DisableRetry, err = strconv.ParseBool(disableRetry)
+		p.DisableRetry, err = parseBoolParam(disableRetry)
 		if err != nil {
 			f := "invalid disableRetry '%s': %s"
 			return p, fmt.Errorf(f, disableRetry, err.Error())
@@ -601,7 +612,7 @@ func Parse(dsn string) (Config, error) {
 	}
 
 	if c, ok := params["columnencryption"]; ok {
-		columnEncryption, err := strconv.ParseBool(c)
+		columnEncryption, err := parseBoolParam(c)
 		if err != nil {
 			if strings.EqualFold(c, "Enabled") {
 				columnEncryption = true
@@ -616,7 +627,7 @@ func Parse(dsn string) (Config, error) {
 
 	msf, ok := params[MultiSubnetFailover]
 	if ok {
-		multiSubnetFailover, err := strconv.ParseBool(msf)
+		multiSubnetFailover, err := parseBoolParam(msf)
 		if err != nil {
 			if strings.EqualFold(msf, "Enabled") {
 				multiSubnetFailover = true
@@ -633,7 +644,7 @@ func Parse(dsn string) (Config, error) {
 	}
 	nti, ok := params[NoTraceID]
 	if ok {
-		notraceid, err := strconv.ParseBool(nti)
+		notraceid, err := parseBoolParam(nti)
 		if err == nil {
 			p.NoTraceID = notraceid
 		}
@@ -642,7 +653,7 @@ func Parse(dsn string) (Config, error) {
 	guidConversion, ok := params[GuidConversion]
 	if ok {
 		var err error
-		p.Encoding.GuidConversion, err = strconv.ParseBool(guidConversion)
+		p.Encoding.GuidConversion, err = parseBoolParam(guidConversion)
 		if err != nil {
 			f := "invalid guid conversion '%s': %s"
 			return p, fmt.Errorf(f, guidConversion, err.Error())
@@ -658,7 +669,7 @@ func Parse(dsn string) (Config, error) {
 		epaString = os.Getenv("MSSQL_USE_EPA")
 	}
 	if epaString != "" {
-		epaEnabled, err := strconv.ParseBool(epaString)
+		epaEnabled, err := parseBoolParam(epaString)
 		if err != nil {
 			return p, fmt.Errorf("invalid epa enabled value '%s': %v", epaString, err)
 		}
@@ -722,6 +733,8 @@ func (p Config) URL() *url.URL {
 		q.Add(Encrypt, "DISABLE")
 	case EncryptionRequired:
 		q.Add(Encrypt, "true")
+	case EncryptionStrict:
+		q.Add(Encrypt, "strict")
 	}
 	// Only include TrustServerCertificate if it was explicitly set in the original connection string
 	if _, ok := p.Parameters[TrustServerCertificate]; ok {
@@ -759,8 +772,10 @@ func (p Config) URL() *url.URL {
 	return &res
 }
 
-// ADO connection string keywords at https://github.com/dotnet/SqlClient/blob/main/src/Microsoft.Data.SqlClient/src/Microsoft/Data/Common/DbConnectionStringCommon.cs
+// adoSynonyms maps ADO.Net alternate keyword forms to this driver's canonical keys.
+// See https://learn.microsoft.com/dotnet/api/microsoft.data.sqlclient.sqlconnection.connectionstring
 var adoSynonyms = map[string]string{
+	"app":                       AppName,
 	"application name":          AppName,
 	"data source":               Server,
 	"address":                   Server,
@@ -770,7 +785,19 @@ var adoSynonyms = map[string]string{
 	"uid":                       UserID,
 	"pwd":                       Password,
 	"initial catalog":           Database,
+	"connect timeout":           ConnectionTimeout,
+	"timeout":                   ConnectionTimeout,
+	"failover partner":          FailoverPartner,
+	"failover partner spn":      FailoverPartnerSpn,
+	"application intent":        ApplicationIntent,
+	"trust server certificate":  TrustServerCertificate,
+	"multi subnet failover":     MultiSubnetFailover,
+	"host name in certificate":  HostNameInCertificate,
+	"server spn":                ServerSpn,
+	"server certificate":        ServerCertificate,
+	"wsid":                      WorkstationID,
 	"column encryption setting": "columnencryption",
+	"authentication":            "fedauth",
 }
 
 func splitConnectionString(dsn string) (res map[string]string) {

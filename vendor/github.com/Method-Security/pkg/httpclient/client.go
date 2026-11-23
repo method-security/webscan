@@ -9,8 +9,10 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"strings"
@@ -37,6 +39,8 @@ type Options struct {
 	DefaultHeaders            map[string]string
 	HTTPProxy                 string
 	SOCKSProxy                string
+	Transport                 *http.Transport
+	MaxResponseBodyBytes      int64
 }
 
 // Option is a functional option for configuring the HTTP client.
@@ -49,10 +53,31 @@ func WithTimeout(d time.Duration) Option {
 	}
 }
 
-// WithTLSVerify controls whether TLS certificate verification is enabled.
+// WithTLSVerify controls certificate verification for the default transport.
+// WithTransport takes precedence over this option.
 func WithTLSVerify(verify bool) Option {
 	return func(o *Options) {
 		o.VerifyTLS = verify
+	}
+}
+
+// WithTransport supplies a transport to clone for this client's exclusive use.
+// Its dialing, TLS, HTTP/2, and connection settings replace the defaults, including
+// WithTLSVerify. Explicit proxy options still apply; SOCKS replaces DialContext.
+// A nil transport selects the default transport. Do not mutate the supplied
+// transport's configuration while New is cloning it.
+func WithTransport(transport *http.Transport) Option {
+	return func(o *Options) {
+		o.Transport = transport
+	}
+}
+
+// WithMaxResponseBodyBytes limits buffered response bodies. Non-positive values
+// retain the default unlimited buffering. Oversized responses return the bounded
+// body and ErrResponseBodyTooLarge.
+func WithMaxResponseBodyBytes(n int64) Option {
+	return func(o *Options) {
+		o.MaxResponseBodyBytes = n
 	}
 }
 
@@ -128,6 +153,9 @@ func New(opts ...Option) *Client {
 			InsecureSkipVerify: !options.VerifyTLS, //nolint:gosec // configurable by caller
 		},
 	}
+	if options.Transport != nil {
+		transport = options.Transport.Clone()
+	}
 
 	proxyConfigErr := configureProxy(transport, &options)
 
@@ -147,6 +175,12 @@ func New(opts ...Option) *Client {
 		defaultHeaders: options.DefaultHeaders,
 		proxyConfigErr: proxyConfigErr,
 	}
+}
+
+// CloseIdleConnections closes this client's idle connections without interrupting
+// active requests. The transport supplied to WithTransport is not affected.
+func (c *Client) CloseIdleConnections() {
+	c.httpClient.CloseIdleConnections()
 }
 
 // configureProxy sets up proxy configuration on the transport.
@@ -315,10 +349,24 @@ func (c *Client) Request(ctx context.Context, method, requestURL string, body io
 	return c.Do(req)
 }
 
+// ErrResponseBodyTooLarge indicates that a configured response body limit was exceeded.
+var ErrResponseBodyTooLarge = errors.New("HTTP response body exceeds configured limit")
+
 // readResponse reads the body and constructs a Response.
-func readResponse(resp *http.Response, redirectChain []RedirectHop) (*Response, error) {
-	body, readErr := io.ReadAll(resp.Body)
-	_ = resp.Body.Close()
+func (c *Client) readResponse(resp *http.Response, redirectChain []RedirectHop) (*Response, error) {
+	defer func() { _ = resp.Body.Close() }()
+	var reader io.Reader = resp.Body
+	limit := c.options.MaxResponseBodyBytes
+	if limit > 0 && limit < math.MaxInt64 {
+		reader = io.LimitReader(reader, limit+1)
+	}
+	body, readErr := io.ReadAll(reader)
+	if limit > 0 && int64(len(body)) > limit {
+		return &Response{
+			StatusCode: resp.StatusCode, Headers: resp.Header,
+			Body: body[:limit], RedirectChain: redirectChain,
+		}, ErrResponseBodyTooLarge
+	}
 	if readErr != nil {
 		return nil, fmt.Errorf("failed to read response body: %w", readErr)
 	}
@@ -367,7 +415,7 @@ func (c *Client) Do(req *http.Request) (*Response, error) {
 			resp.StatusCode == http.StatusPermanentRedirect
 
 		if !isRedirect || redirects >= c.options.MaxRedirects {
-			return readResponse(resp, redirectChain)
+			return c.readResponse(resp, redirectChain)
 		}
 
 		// It's a redirect. Record the hop if tracking.
@@ -382,7 +430,7 @@ func (c *Client) Do(req *http.Request) (*Response, error) {
 		location := resp.Header.Get("Location")
 		if location == "" {
 			// Redirect with no Location — return the response as-is.
-			return readResponse(resp, redirectChain)
+			return c.readResponse(resp, redirectChain)
 		}
 		_ = resp.Body.Close()
 
@@ -462,7 +510,7 @@ func (c *Client) PostJSON(ctx context.Context, url string, body any, dest any) (
 // IsAlive checks if a URL responds with a non-404/502 status code.
 func (c *Client) IsAlive(ctx context.Context, url string) bool {
 	resp, err := c.Get(ctx, url)
-	if err != nil {
+	if resp == nil || (err != nil && !errors.Is(err, ErrResponseBodyTooLarge)) {
 		return false
 	}
 	return resp.StatusCode != http.StatusNotFound && resp.StatusCode != http.StatusBadGateway

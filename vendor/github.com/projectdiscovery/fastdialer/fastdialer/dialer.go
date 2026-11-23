@@ -22,7 +22,6 @@ import (
 	"github.com/projectdiscovery/retryabledns"
 	cryptoutil "github.com/projectdiscovery/utils/crypto"
 	"github.com/projectdiscovery/utils/env"
-	"github.com/projectdiscovery/utils/errkit"
 	"github.com/zmap/zcrypto/encoding/asn1"
 	ztls "github.com/zmap/zcrypto/tls"
 	"golang.org/x/net/proxy"
@@ -165,7 +164,6 @@ func NewDialer(options Options) (*Dialer, error) {
 		dialer = &net.Dialer{
 			Timeout:   options.DialerTimeout,
 			KeepAlive: options.DialerKeepAlive,
-			DualStack: true,
 		}
 	}
 
@@ -260,25 +258,42 @@ func (d *Dialer) Dial(ctx context.Context, network, address string) (conn net.Co
 	})
 }
 
-// DialTLS with encrypted connection
+// DialTLS with encrypted connection, using Options.TLSConfig, or
+// Options.ZTLSConfig when Options.WithZTLS is set.
 //
-// Note that this configuration is included for compatibility with the Go
-// version <1.22, and is not intended to be secure. It is recommended to use the
-// DialTLSWithConfig or DialTLSWithConfigImpersonate methods instead.
+// Note that the default configuration, used when those are nil, skips
+// certificate verification and is not intended to be secure. Set
+// Options.TLSConfig, or use the DialTLSWithConfig or
+// DialTLSWithConfigImpersonate methods instead.
 func (d *Dialer) DialTLS(ctx context.Context, network, address string) (conn net.Conn, err error) {
 	if d.options.WithZTLS {
-		return d.DialZTLSWithConfig(ctx, network, address, DefaultZTLSConfig)
+		return d.DialZTLSWithConfig(ctx, network, address, d.defaultZTLSConfig())
 	}
-	return d.DialTLSWithConfig(ctx, network, address, DefaultTLSConfig)
+	return d.DialTLSWithConfig(ctx, network, address, d.defaultTLSConfig())
 }
 
-// DialZTLS with encrypted connection using ztls
+// DialZTLS with encrypted connection using ztls and Options.ZTLSConfig
 //
-// Note that this configuration is included for compatibility with the Go
-// version <1.22, and is not intended to be secure. It is recommended to use the
+// Note that the default configuration, used when Options.ZTLSConfig is nil,
+// is included for compatibility with the Go version <1.22, and is not
+// intended to be secure. Set Options.ZTLSConfig, or use the
 // DialZTLSWithConfig method instead.
 func (d *Dialer) DialZTLS(ctx context.Context, network, address string) (conn net.Conn, err error) {
-	return d.DialZTLSWithConfig(ctx, network, address, DefaultZTLSConfig)
+	return d.DialZTLSWithConfig(ctx, network, address, d.defaultZTLSConfig())
+}
+
+func (d *Dialer) defaultTLSConfig() *tls.Config {
+	if d.options.TLSConfig != nil {
+		return d.options.TLSConfig
+	}
+	return DefaultTLSConfig
+}
+
+func (d *Dialer) defaultZTLSConfig() *ztls.Config {
+	if d.options.ZTLSConfig != nil {
+		return d.options.ZTLSConfig
+	}
+	return DefaultZTLSConfig
 }
 
 // DialTLS with encrypted connection
@@ -296,6 +311,23 @@ func (d *Dialer) DialTLSWithConfig(ctx context.Context, network, address string,
 }
 
 // DialTLSWithConfigImpersonate dials tls with impersonation
+//
+// The config applies as in DialTLSWithConfig, except that the impersonated
+// ClientHello decides what it offers, such as cipher suites and curves. Only
+// TLS 1.3 sessions are stored in config.ClientSessionCache, and they resume
+// only when the ClientHello has a pre_shared_key extension. utls can't resume
+// a session when the server asks for another key share, so that dial fails
+// and drops the session.
+//
+// If config.NextProtos is set, it replaces the protocols in the ALPN extension
+// of the impersonated ClientHello, which can change its JA4 fingerprint but not
+// its JA3 one. A ClientHello without ALPN still sends none. If NextProtos is
+// empty, the ClientHello keeps its own protocols.
+//
+// config.MinVersion and config.MaxVersion limit the version that the server
+// may select, but the ClientHello still offers its own versions, so the dial
+// fails when the server selects one outside them. A zero MinVersion or
+// MaxVersion leaves that limit to the ClientHello.
 func (d *Dialer) DialTLSWithConfigImpersonate(ctx context.Context, network, address string, config *tls.Config, impersonate impersonate.Strategy, identity *impersonate.Identity) (conn net.Conn, err error) {
 	return d.dial(ctx, &dialOptions{
 		network:             network,
@@ -311,23 +343,6 @@ func (d *Dialer) DialTLSWithConfigImpersonate(ctx context.Context, network, addr
 
 // DialZTLSWithConfig dials ztls with config
 func (d *Dialer) DialZTLSWithConfig(ctx context.Context, network, address string, config *ztls.Config) (conn net.Conn, err error) {
-	// ztls doesn't support tls13
-	if IsTLS13(config) {
-		stdTLSConfig, err := AsTLSConfig(config)
-		if err != nil {
-			return nil, errkit.Wrap(err, "could not convert ztls config to tls config")
-		}
-		return d.dial(ctx, &dialOptions{
-			network:             network,
-			address:             address,
-			shouldUseTLS:        true,
-			shouldUseZTLS:       false,
-			tlsconfig:           stdTLSConfig,
-			ztlsconfig:          nil,
-			impersonateStrategy: impersonate.None,
-			impersonateIdentity: nil,
-		})
-	}
 	return d.dial(ctx, &dialOptions{
 		network:             network,
 		address:             address,

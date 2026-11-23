@@ -129,7 +129,7 @@ type Config struct {
 	// OnExpiredSync will be called inside the same transaction that is
 	// performing the deletion of expired items. If OnExpired is present then
 	// this callback will not be called. If this callback is present, then the
-	// deletion of the timeed-out item is the explicit responsibility of this
+	// deletion of the timed-out item is the explicit responsibility of this
 	// callback.
 	OnExpiredSync func(key, value string, tx *Tx) error
 }
@@ -631,6 +631,20 @@ func (db *DB) backgroundManager() {
 	}
 }
 
+// Sync will synchronously persist the database file to disk. This
+// should only be used when [SyncPolicy] is set to [Never].
+func (db *DB) Sync() error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	if db.closed {
+		return ErrDatabaseClosed
+	}
+	if !db.persist {
+		return nil
+	}
+	return db.file.Sync()
+}
+
 // Shrink will make the database file smaller by removing redundant
 // log entries. This operation does not block the database.
 func (db *DB) Shrink() error {
@@ -745,6 +759,9 @@ func (db *DB) Shrink() error {
 		}
 		// Close all files
 		if err := aof.Close(); err != nil {
+			return err
+		}
+		if err := f.Sync(); err != nil {
 			return err
 		}
 		if err := f.Close(); err != nil {

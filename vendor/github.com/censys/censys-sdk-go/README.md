@@ -65,7 +65,7 @@ func main() {
 	ctx := context.Background()
 
 	s := censyssdkgo.New(
-		censyssdkgo.WithOrganizationID("11111111-2222-3333-4444-555555555555"),
+		censyssdkgo.WithOrganizationID("<id>"),
 		censyssdkgo.WithSecurity("<YOUR_BEARER_TOKEN_HERE>"),
 	)
 
@@ -101,10 +101,12 @@ func main() {
 * [GetOrganizationCredits](docs/sdks/accountmanagement/README.md#getorganizationcredits) - Get organization credit balance
 * [GetOrganizationCreditUsage](docs/sdks/accountmanagement/README.md#getorganizationcreditusage) - Get organization credit usage
 * [InviteUserToOrganization](docs/sdks/accountmanagement/README.md#inviteusertoorganization) - Invite user to organization
-* [ListOrganizationMembers](docs/sdks/accountmanagement/README.md#listorganizationmembers) - List organization members
-* [RemoveOrganizationMember](docs/sdks/accountmanagement/README.md#removeorganizationmember) - Remove member from organization
-* [UpdateOrganizationMember](docs/sdks/accountmanagement/README.md#updateorganizationmember) - Update a member's roles in an organization
-* [GetMemberCreditUsage](docs/sdks/accountmanagement/README.md#getmembercreditusage) - Get organization member credit usage
+* [ListOrganizationMembers](docs/sdks/accountmanagement/README.md#listorganizationmembers) - List organization users
+* [RemoveOrganizationMember](docs/sdks/accountmanagement/README.md#removeorganizationmember) - Remove user from organization
+* [UpdateOrganizationMember](docs/sdks/accountmanagement/README.md#updateorganizationmember) - Update a user's Platform-wide roles in an organization
+* [GetMemberCreditUsage](docs/sdks/accountmanagement/README.md#getmembercreditusage) - Get organization user credit usage
+* [RemoveOrganizationMemberModule](docs/sdks/accountmanagement/README.md#removeorganizationmembermodule) - Remove a user's module access
+* [SetOrganizationMemberModuleRole](docs/sdks/accountmanagement/README.md#setorganizationmembermodulerole) - Set a user's module role
 * [GetUserCredits](docs/sdks/accountmanagement/README.md#getusercredits) - Get Free user credit balance
 * [GetUserCreditsUsage](docs/sdks/accountmanagement/README.md#getusercreditsusage) - Get Free user credit usage
 
@@ -114,6 +116,12 @@ func main() {
 * [GetCenseyeJob](docs/sdks/adversaryinvestigation/README.md#getcenseyejob) - CensEye: Get job status
 * [GetCenseyeJobResults](docs/sdks/adversaryinvestigation/README.md#getcenseyejobresults) - CensEye: Get job results
 * [GetHostObservationsWithCertificate](docs/sdks/adversaryinvestigation/README.md#gethostobservationswithcertificate) - Get host history for a certificate
+* [CreateInvestigationFileUpload](docs/sdks/adversaryinvestigation/README.md#createinvestigationfileupload) - Investigations: Create file upload
+* [ListInvestigationJobs](docs/sdks/adversaryinvestigation/README.md#listinvestigationjobs) - Investigations: List jobs
+* [CreateInvestigationJob](docs/sdks/adversaryinvestigation/README.md#createinvestigationjob) - Investigations: Create job
+* [GetInvestigationJob](docs/sdks/adversaryinvestigation/README.md#getinvestigationjob) - Investigations: Get job status
+* [GetInvestigationJobResults](docs/sdks/adversaryinvestigation/README.md#getinvestigationjobresults) - Investigations: Get job results
+* [GetInvestigationUsage](docs/sdks/adversaryinvestigation/README.md#getinvestigationusage) - Investigations: Get usage
 * [CreateTrackedScan](docs/sdks/adversaryinvestigation/README.md#createtrackedscan) - Live Discovery: Initiate a new scan
 * [ListThreats](docs/sdks/adversaryinvestigation/README.md#listthreats) - List active threats
 * [ValueCounts](docs/sdks/adversaryinvestigation/README.md#valuecounts) - CensEye: Retrieve value counts to discover pivots
@@ -180,6 +188,12 @@ func main() {
 * [GetCenseyeJob](docs/sdks/threathunting/README.md#getcenseyejob) - CensEye: Get job status
 * [GetCenseyeJobResults](docs/sdks/threathunting/README.md#getcenseyejobresults) - CensEye: Get job results
 * [GetHostObservationsWithCertificate](docs/sdks/threathunting/README.md#gethostobservationswithcertificate) - Get host history for a certificate
+* [CreateInvestigationFileUpload](docs/sdks/threathunting/README.md#createinvestigationfileupload) - Investigations: Create file upload
+* [ListInvestigationJobs](docs/sdks/threathunting/README.md#listinvestigationjobs) - Investigations: List jobs
+* [CreateInvestigationJob](docs/sdks/threathunting/README.md#createinvestigationjob) - Investigations: Create job
+* [GetInvestigationJob](docs/sdks/threathunting/README.md#getinvestigationjob) - Investigations: Get job status
+* [GetInvestigationJobResults](docs/sdks/threathunting/README.md#getinvestigationjobresults) - Investigations: Get job results
+* [GetInvestigationUsage](docs/sdks/threathunting/README.md#getinvestigationusage) - Investigations: Get usage
 * [CreateTrackedScan](docs/sdks/threathunting/README.md#createtrackedscan) - Live Discovery: Initiate a new scan
 * [GetTrackedScanThreatHunting](docs/sdks/threathunting/README.md#gettrackedscanthreathunting) - Get scan status
 * [ListThreats](docs/sdks/threathunting/README.md#listthreats) - List active threats

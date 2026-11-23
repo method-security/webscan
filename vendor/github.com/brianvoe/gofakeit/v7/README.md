@@ -157,7 +157,7 @@ type Foo struct {
 	Skip          *string        `fake:"skip"`                // Set to "skip" to not generate data for
 	SkipAlt       *string        `fake:"-"`                   // Set to "-" to not generate data for
 	Created       time.Time                                   // Can take in a fake tag as well as a format tag
-	CreatedFormat time.Time      `fake:"{year}-{month}-{day}" format:"2006-01-02"`
+	CreatedFormat time.Time      `fake:"{date:2006-01-02}" format:"2006-01-02"`
 }
 
 type Bar struct {
@@ -432,6 +432,8 @@ Ethnicity() string
 SSN() string
 EIN() string
 Hobby() string
+SocialMedia() string
+Bio() string
 Contact() *ContactInfo
 Email() string
 Phone() string
@@ -447,6 +449,12 @@ Slice(v any)
 Map() map[string]any
 Generate(value string) string
 Regex(value string) string
+```
+
+### Database
+
+```go
+SQL(so *SQLOptions) (string, error)
 ```
 
 ### Auth
@@ -476,6 +484,18 @@ Latitude() float64
 LatitudeInRange(min, max float64) (float64, error)
 Longitude() float64
 LongitudeInRange(min, max float64) (float64, error)
+```
+
+### Airline
+
+```go
+AirlineAircraftType() string
+AirlineAirplane() string
+AirlineAirport() string
+AirlineAirportIATA() string
+AirlineFlightNumber() string
+AirlineRecordLocator() string
+AirlineSeat() string
 ```
 
 ### Game
@@ -522,12 +542,16 @@ NounCollectiveAnimal() string
 NounCollectiveThing() string
 NounCountable() string
 NounUncountable() string
+NounProper() string
+NounDeterminer() string
 
 // Verbs
 Verb() string
 VerbAction() string
 VerbLinking() string
 VerbHelping() string
+VerbTransitive() string
+VerbIntransitive() string
 
 // Adverbs
 Adverb() string
@@ -564,6 +588,7 @@ PronounReflective() string
 PronounDemonstrative() string
 PronounInterrogative() string
 PronounRelative() string
+PronounIndefinite() string
 
 // Connectives
 Connective() string
@@ -576,6 +601,7 @@ ConnectiveExamplify() string
 
 // Words
 Word() string
+Interjection() string
 
 // Text
 Sentence() string
@@ -586,6 +612,11 @@ LoremIpsumParagraph(paragraphCount int, sentenceCount int, wordCount int, separa
 Question() string
 Quote() string
 Phrase() string
+PhraseNoun() string
+PhraseVerb() string
+PhraseAdverb() string
+PhrasePreposition() string
+Comment() string
 ```
 
 ### Foods
@@ -598,6 +629,7 @@ Lunch() string
 Dinner() string
 Snack() string
 Dessert() string
+Drink() string
 ```
 
 ### Misc
@@ -616,6 +648,7 @@ ShuffleAnySlice(v any)
 Color() string
 HexColor() string
 RGBColor() []int
+HSLColor() []int
 SafeColor() string
 NiceColors() string
 ```
@@ -728,7 +761,7 @@ Slogan() string
 ```go
 HackerAbbreviation() string
 HackerAdjective() string
-Hackeringverb() string
+HackeringVerb() string
 HackerNoun() string
 HackerPhrase() string
 HackerVerb() string
@@ -796,6 +829,7 @@ EmojiSentence() string
 ```go
 Language() string
 LanguageAbbreviation() string
+LanguageBCP() string
 ProgrammingLanguage() string
 ```
 
@@ -809,18 +843,21 @@ Int8() int8
 Int16() int16
 Int32() int32
 Int64() int64
+IntRange(min, max int) int
 Uint() uint
 UintN(n uint) uint
 Uint8() uint8
 Uint16() uint16
 Uint32() uint32
 Uint64() uint64
+UintRange(min, max uint) uint
 Float32() float32
 Float32Range(min, max float32) float32
 Float64() float64
 Float64Range(min, max float64) float64
 ShuffleInts(a []int)
 RandomInt(i []int) int
+RandomUint(u []uint) uint
 HexUint(bitsize int) string
 ```
 
@@ -831,6 +868,7 @@ Digit() string
 DigitN(n uint) string
 Letter() string
 LetterN(n uint) string
+Vowel() string
 Lexify(str string) string
 Numerify(str string) string
 ShuffleStrings(a []string)
@@ -889,12 +927,14 @@ MovieGenre() string
 
 ```go
 Error() error
+ErrorObject() error
 ErrorDatabase() error
 ErrorGRPC() error
 ErrorHTTP() error
 ErrorHTTPClient() error
 ErrorHTTPServer() error
 ErrorRuntime() error
+ErrorValidation() error
 ```
 
 ### School

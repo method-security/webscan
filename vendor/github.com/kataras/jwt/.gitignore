@@ -1,5 +1,28 @@
 .vscode
+.idea
+.DS_Store
 /_examples/test-*
 /_examples/issue-*
 /_examples/feature-*
 cov.out
+
+# Local agent configuration, all of it. The .claude entry below covers the directory; these
+# are kept so the intent survives if that entry is ever narrowed again.
+.claude/skills/
+.claude/.*-sync-state.json
+.claude/settings.local.json
+
+# go doc dumps. Useful while writing, never worth committing.
+canonical.txt
+
+# book/output/ is tracked, on purpose. The rendered HTML and PDF are what people read, and
+# a repository where the book is a build step nobody runs is a repository with no book.
+*.exe
+
+.claude
+.plexon
+CLAUDE.md
+
+# Release notes are written to be pasted into the GitHub release form, not committed.
+# CHANGELOG.md is the copy that lives in the repository.
+RELEASE-NOTES-*.md

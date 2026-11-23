@@ -17,14 +17,18 @@ import (
 	"net"
 	"os"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
+	"sync"
+	"time"
 
-	"github.com/golang/protobuf/proto"   //lint:ignore SA1019 we have to import these because some of their types appear in exported API
-	"github.com/jhump/protoreflect/desc" //lint:ignore SA1019 same as above
+	"github.com/golang/protobuf/proto"
+	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/desc/protoprint"
-	"github.com/jhump/protoreflect/dynamic" //lint:ignore SA1019 same as above
+	"github.com/jhump/protoreflect/dynamic"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	xdsCredentials "google.golang.org/grpc/credentials/xds"
@@ -450,11 +454,9 @@ func makeTemplate(md *desc.MessageDescriptor, path []*desc.MessageDescriptor) pr
 	dm := dynamic.NewMessage(md)
 
 	// if the message is a recursive structure, we don't want to blow the stack
-	for _, seen := range path {
-		if seen == md {
-			// already visited this type; avoid infinite recursion
-			return dm
-		}
+	if slices.Contains(path, md) {
+		// already visited this type; avoid infinite recursion
+		return dm
 	}
 	path = append(path, dm.GetMessageDescriptor())
 
@@ -568,9 +570,6 @@ func ClientTLSConfig(insecureSkipVerify bool, cacertFile, clientCertFile, client
 // client certs. The serverCertFile and serverKeyFile must both not be blank.
 func ServerTransportCredentials(cacertFile, serverCertFile, serverKeyFile string, requireClientCerts bool) (credentials.TransportCredentials, error) {
 	var tlsConf tls.Config
-	// TODO(jh): Remove this line once https://github.com/golang/go/issues/28779 is fixed
-	// in Go tip. Until then, the recently merged TLS 1.3 support breaks the TLS tests.
-	tlsConf.MaxVersion = tls.VersionTLS12
 
 	// Load the server certificates from disk
 	certificate, err := tls.LoadX509KeyPair(serverCertFile, serverKeyFile)
@@ -609,14 +608,16 @@ func ServerTransportCredentials(cacertFile, serverCertFile, serverKeyFile string
 // BlockingDial is a helper method to dial the given address, using optional TLS credentials,
 // and blocking until the returned connection is ready. If the given credentials are nil, the
 // connection will be insecure (plain-text).
+// The network parameter should be left empty in most cases when your address is a RFC 3986
+// compliant URI. The resolver from grpc-go will resolve the correct network type.
 func BlockingDial(ctx context.Context, network, address string, creds credentials.TransportCredentials, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
 	if creds == nil {
 		creds = insecure.NewCredentials()
 	}
 
 	var err error
-	if strings.HasPrefix(address, "xds:///") {
-		// The xds:/// prefix is used to signal to the gRPC client to use an xDS server to resolve the
+	if strings.HasPrefix(address, "xds://") {
+		// The xds:// prefix is used to signal to the gRPC client to use an xDS server to resolve the
 		// target. The relevant credentials will be automatically pulled from the GRPC_XDS_BOOTSTRAP or
 		// GRPC_XDS_BOOTSTRAP_CONFIG env vars.
 		creds, err = xdsCredentials.NewClientCredentials(xdsCredentials.ClientOptions{FallbackCreds: creds})
@@ -630,7 +631,16 @@ func BlockingDial(ctx context.Context, network, address string, creds credential
 	// custom dialer that can provide that info. That means we manage the TLS handshake.
 	result := make(chan interface{}, 1)
 
+	// dialCompleted is closed once the outcome of the dial (ready connection
+	// or error) is known, so that connection teardown no longer needs to wait
+	// for a pending TLS alert to be read.
+	dialCompleted := make(chan struct{})
+	var dialCompletedOnce sync.Once
+	completeDial := func() { dialCompletedOnce.Do(func() { close(dialCompleted) }) }
+	defer completeDial()
+
 	writeResult := func(res interface{}) {
+		completeDial()
 		// non-blocking write: we only need the first result
 		select {
 		case result <- res:
@@ -643,28 +653,72 @@ func BlockingDial(ctx context.Context, network, address string, creds credential
 	creds = &errSignalingCreds{
 		TransportCredentials: creds,
 		writeResult:          writeResult,
+		dialCompleted:        dialCompleted,
 	}
 
-	// Even with grpc.FailOnNonTempDialError, this call will usually timeout in
-	// the face of TLS handshake errors. So we can't rely on grpc.WithBlock() to
-	// know when we're done. So we run it in a goroutine and then use result
-	// channel to either get the connection or fail-fast.
-	go func() {
-		// We put grpc.FailOnNonTempDialError *before* the explicitly provided
-		// options so that it could be overridden.
-		opts = append([]grpc.DialOption{grpc.FailOnNonTempDialError(true)}, opts...)
-		// But we don't want caller to be able to override these two, so we put
-		// them *after* the explicitly provided options.
-		opts = append(opts, grpc.WithBlock(), grpc.WithTransportCredentials(creds))
-
-		conn, err := grpc.DialContext(ctx, address, opts...)
-		var res interface{}
-		if err != nil {
-			res = err
-		} else {
-			res = conn
+	switch network {
+	case "":
+		// no-op, use address as-is
+	case "tcp":
+		if strings.HasPrefix(address, "unix://") {
+			return nil, fmt.Errorf("tcp network type cannot use unix address %s", address)
 		}
-		writeResult(res)
+	case "unix":
+		if !strings.HasPrefix(address, "unix://") {
+			// prepend unix:// to the address if it's not already there
+			// this is to maintain backwards compatibility because the custom dialer is replaced by
+			// the default dialer in grpc-go.
+			// https://github.com/fullstorydev/grpcurl/pull/480
+			address = "unix://" + address
+		}
+	default:
+		// custom dialer for other networks
+		dialer := func(ctx context.Context, address string) (net.Conn, error) {
+			conn, err := (&net.Dialer{}).DialContext(ctx, network, address)
+			if err != nil {
+				// capture the error so we can provide a better message
+				writeResult(err)
+			}
+			return conn, err
+		}
+		opts = append([]grpc.DialOption{grpc.WithContextDialer(dialer)}, opts...)
+	}
+
+	// grpc.NewClient does not connect immediately, so we use conn.Connect()
+	// to trigger eager connection and then poll connectivity state to block
+	// until ready. The errSignalingCreds wrapper will capture TLS handshake
+	// errors and write them to the result channel for fail-fast behavior.
+
+	// Normalize address for NewClient which defaults to "dns" resolver.
+	// Bare host:port addresses need "passthrough:///" to preserve the old
+	// grpc.Dial behavior.
+	if !strings.Contains(address, "://") {
+		address = "passthrough:///" + address
+	}
+
+	opts = append(opts, grpc.WithTransportCredentials(creds))
+
+	conn, err := grpc.NewClient(address, opts...)
+	if err != nil {
+		return nil, err
+	}
+	conn.Connect()
+
+	go func() {
+		for {
+			s := conn.GetState()
+			if s == connectivity.Ready {
+				writeResult(conn)
+				return
+			}
+			if s == connectivity.Shutdown {
+				return
+			}
+			if !conn.WaitForStateChange(ctx, s) {
+				// Context expired
+				return
+			}
+		}
 	}()
 
 	select {
@@ -682,13 +736,72 @@ func BlockingDial(ctx context.Context, network, address string, creds credential
 // it will use the writeResult function to notify on error.
 type errSignalingCreds struct {
 	credentials.TransportCredentials
-	writeResult func(res interface{})
+	writeResult   func(res interface{})
+	dialCompleted <-chan struct{}
 }
 
 func (c *errSignalingCreds) ClientHandshake(ctx context.Context, addr string, rawConn net.Conn) (net.Conn, credentials.AuthInfo, error) {
 	conn, auth, err := c.TransportCredentials.ClientHandshake(ctx, addr, rawConn)
 	if err != nil {
 		c.writeResult(err)
+		return conn, auth, err
 	}
-	return conn, auth, err
+	// Wrap the connection to capture post-handshake errors, e.g.:
+	// - TLS 1.3 client cert rejection (server sends alert after handshake)
+	// - Plaintext client to TLS server (server closes conn immediately)
+	return &errSignalingConn{Conn: conn, writeResult: c.writeResult, dialCompleted: c.dialCompleted}, auth, nil
+}
+
+// maxTLSAlertWait is an upper bound on how long a failing dial's connection
+// teardown waits for a pending TLS alert to be read. It is a heuristic: long
+// enough for the reader goroutine to be scheduled even on a loaded machine,
+// short enough to not noticeably delay a failing dial.
+const maxTLSAlertWait = 50 * time.Millisecond
+
+// errSignalingConn wraps a net.Conn to capture read errors and report
+// them via writeResult. Close is delayed until the dial has completed to
+// give the reader a chance to read a pending TLS alert before the
+// connection is closed.
+type errSignalingConn struct {
+	net.Conn
+	writeResult   func(res interface{})
+	dialCompleted <-chan struct{}
+}
+
+func (c *errSignalingConn) Read(b []byte) (int, error) {
+	n, err := c.Conn.Read(b)
+	if err != nil {
+		c.writeResult(err)
+	}
+	return n, err
+}
+
+func (c *errSignalingConn) Close() error {
+	// With TLS 1.3, the server may reject the connection *after* the
+	// handshake completes (e.g. a missing client cert), by sending an alert.
+	// If the transport closes the connection before that alert is read, the
+	// caller sees a less useful error (e.g. "use of closed network
+	// connection") instead of the TLS alert. So while the outcome of the
+	// dial is still undecided, give the reader a brief window to read a
+	// pending alert before closing the connection.
+	select {
+	case <-c.dialCompleted:
+	case <-time.After(maxTLSAlertWait):
+	}
+	return c.Conn.Close()
+}
+
+// UsesXDS forwards the optional UsesXDS marker of the wrapped credentials. The
+// xDS credentials returned for "xds://" targets implement this method, and
+// grpc-go's cds balancer relies on a type assertion for it to decide whether to
+// apply the security configuration (e.g. UpstreamTlsContext) delivered by the
+// management server. Because errSignalingCreds embeds the TransportCredentials
+// interface, that extra method is not promoted automatically, so we forward it
+// explicitly. Without this, xDS-supplied mTLS is silently ignored and the
+// connection falls back to the plain credentials.
+func (c *errSignalingCreds) UsesXDS() bool {
+	if x, ok := c.TransportCredentials.(interface{ UsesXDS() bool }); ok {
+		return x.UsesXDS()
+	}
+	return false
 }

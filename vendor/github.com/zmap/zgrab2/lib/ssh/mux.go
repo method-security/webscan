@@ -71,8 +71,7 @@ func (c *chanList) remove(id uint32) {
 func (c *chanList) dropAll() []*channel {
 	c.Lock()
 	defer c.Unlock()
-	var r []*channel
-
+	r := make([]*channel, 0, len(c.chans))
 	for _, ch := range c.chans {
 		if ch == nil {
 			continue
@@ -92,7 +91,7 @@ type mux struct {
 	incomingChannels chan NewChannel
 
 	globalSentMu     sync.Mutex
-	globalResponses  chan interface{}
+	globalResponses  chan any
 	incomingRequests chan *Request
 
 	errCond *sync.Cond
@@ -116,9 +115,9 @@ func (m *mux) Wait() error {
 func newMux(p packetConn) *mux {
 	m := &mux{
 		conn:             p,
-		incomingChannels: make(chan NewChannel, 16),
-		globalResponses:  make(chan interface{}, 1),
-		incomingRequests: make(chan *Request, 16),
+		incomingChannels: make(chan NewChannel, chanSize),
+		globalResponses:  make(chan any, 1),
+		incomingRequests: make(chan *Request, chanSize),
 		errCond:          newCond(),
 	}
 	if debugMux {
@@ -129,7 +128,7 @@ func newMux(p packetConn) *mux {
 	return m
 }
 
-func (m *mux) sendMessage(msg interface{}) error {
+func (m *mux) sendMessage(msg any) error {
 	p := Marshal(msg)
 	if debugMux {
 		log.Printf("send global(%d): %#v", m.chanList.offset, msg)
@@ -240,7 +239,7 @@ func (m *mux) onePacket() error {
 	id := binary.BigEndian.Uint32(packet[1:])
 	ch := m.chanList.getChan(id)
 	if ch == nil {
-		return fmt.Errorf("ssh: invalid channel %d", id)
+		return m.handleUnknownChannelPacket(id, packet)
 	}
 
 	return ch.handlePacket(packet)
@@ -278,7 +277,7 @@ func (m *mux) handleChannelOpen(packet []byte) error {
 
 	if msg.MaxPacketSize < minPacketLength || msg.MaxPacketSize > 1<<31 {
 		failMsg := channelOpenFailureMsg{
-			PeersId:  msg.PeersId,
+			PeersID:  msg.PeersID,
 			Reason:   ConnectionFailed,
 			Message:  "invalid request",
 			Language: "en_US.UTF-8",
@@ -287,7 +286,7 @@ func (m *mux) handleChannelOpen(packet []byte) error {
 	}
 
 	c := m.newChannel(msg.ChanType, channelInbound, msg.TypeSpecificData)
-	c.remoteId = msg.PeersId
+	c.remoteId = msg.PeersID
 	c.maxRemotePayload = msg.MaxPacketSize
 	c.remoteWin.add(msg.PeersWindow)
 	m.incomingChannels <- c
@@ -313,7 +312,7 @@ func (m *mux) openChannel(chanType string, extra []byte) (*channel, error) {
 		PeersWindow:      ch.myWindow,
 		MaxPacketSize:    ch.maxIncomingPayload,
 		TypeSpecificData: extra,
-		PeersId:          ch.localId,
+		PeersID:          ch.localId,
 	}
 	if err := m.sendMessage(open); err != nil {
 		return nil, err
@@ -326,5 +325,26 @@ func (m *mux) openChannel(chanType string, extra []byte) (*channel, error) {
 		return nil, &OpenChannelError{msg.Reason, msg.Message}
 	default:
 		return nil, fmt.Errorf("ssh: unexpected packet in response to channel open: %T", msg)
+	}
+}
+
+func (m *mux) handleUnknownChannelPacket(id uint32, packet []byte) error {
+	msg, err := decode(packet)
+	if err != nil {
+		return err
+	}
+
+	switch msg := msg.(type) {
+	// RFC 4254 section 5.4 says unrecognized channel requests should
+	// receive a failure response.
+	case *channelRequestMsg:
+		if msg.WantReply {
+			return m.sendMessage(channelRequestFailureMsg{
+				PeersID: msg.PeersID,
+			})
+		}
+		return nil
+	default:
+		return fmt.Errorf("ssh: invalid channel %d", id)
 	}
 }

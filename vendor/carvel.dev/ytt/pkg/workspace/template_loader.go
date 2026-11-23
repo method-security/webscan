@@ -4,10 +4,12 @@
 package workspace
 
 import (
+	"bytes"
 	"fmt"
 	"strings"
 
 	"carvel.dev/ytt/pkg/cmd/ui"
+	"carvel.dev/ytt/pkg/filepos"
 	"carvel.dev/ytt/pkg/files"
 	"carvel.dev/ytt/pkg/template"
 	"carvel.dev/ytt/pkg/template/core"
@@ -168,22 +170,18 @@ func (l *TemplateLoader) EvalYAML(libraryCtx LibraryExecutionContext, file *file
 		return nil, nil, err
 	}
 
-	l.ui.Debugf("### ast ")
-
 	// is this plain YAML?
 	if !file.IsTemplate() && !file.IsLibrary() || !yamltemplate.HasTemplating(docSet) {
 		// YAML spec requires map keys to be unique.
 		// Tools retain just the last instance: each subsequent map item overrides the value of any previous.
 		docSet.OverrideMapKeys()
 
-		l.ui.Debugf("(plain)\n")
-		docSet.Print(l.ui.DebugWriter())
+		l.ui.Debugf("### ast (plain)\n%s", debugAST{docSet})
 
 		return nil, docSet, nil
 	}
 
-	l.ui.Debugf("(templated)\n")
-	docSet.Print(l.ui.DebugWriter())
+	l.ui.Debugf("### ast (templated)\n%s", debugAST{docSet})
 
 	tplOpts := yamltemplate.TemplateOpts{
 		IgnoreUnknownComments:   l.opts.IgnoreUnknownComments,
@@ -196,7 +194,6 @@ func (l *TemplateLoader) EvalYAML(libraryCtx LibraryExecutionContext, file *file
 	}
 
 	l.addCompiledTemplate(file.RelativePath(), compiledTemplate)
-	l.ui.Debugf("### template\n%s", compiledTemplate.DebugCodeAsString())
 
 	yttLibrary := yttlibrary.NewAPI(compiledTemplate.TplReplaceNode,
 		yttlibrary.NewDataModule(l.values, DataLoader{libraryCtx}),
@@ -227,6 +224,8 @@ func (l *TemplateLoader) EvalText(libraryCtx LibraryExecutionContext, file *file
 		return nil, plainRootNode, nil
 	}
 
+	fileBs = files.TrimUTF8BOM(fileBs)
+
 	textRoot, err := texttemplate.NewParser().Parse(fileBs, file.RelativePath())
 	if err != nil {
 		return nil, nil, fmt.Errorf("Parsing text template '%s': %s", file.RelativePath(), err)
@@ -238,7 +237,6 @@ func (l *TemplateLoader) EvalText(libraryCtx LibraryExecutionContext, file *file
 	}
 
 	l.addCompiledTemplate(file.RelativePath(), compiledTemplate)
-	l.ui.Debugf("### template\n%s", compiledTemplate.DebugCodeAsString())
 
 	yttLibrary := yttlibrary.NewAPI(compiledTemplate.TplReplaceNode,
 		yttlibrary.NewDataModule(l.values, DataLoader{libraryCtx}),
@@ -262,13 +260,17 @@ func (l *TemplateLoader) EvalStarlark(libraryCtx LibraryExecutionContext, file *
 
 	l.ui.Debugf("## file %s\n", file.RelativePath())
 
+	fileBs = files.TrimUTF8BOM(fileBs)
+
 	instructions := template.NewInstructionSet()
 	compiledTemplate := template.NewCompiledTemplate(
-		file.RelativePath(), template.NewCodeFromBytes(fileBs, instructions),
+		file.RelativePath(), template.NewCodeFromBytesAtPosition(
+			fileBs,
+			filepos.NewPositionInFile(1, file.RelativePath()),
+			instructions),
 		instructions, template.NewNodes(), template.EvaluationCtxDialects{})
 
 	l.addCompiledTemplate(file.RelativePath(), compiledTemplate)
-	l.ui.Debugf("### template\n%s", compiledTemplate.DebugCodeAsString())
 
 	yttLibrary := yttlibrary.NewAPI(compiledTemplate.TplReplaceNode,
 		yttlibrary.NewDataModule(l.values, DataLoader{libraryCtx}),
@@ -338,6 +340,7 @@ func (l *TemplateLoader) newThread(libraryCtx LibraryExecutionContext,
 
 func (l *TemplateLoader) addCompiledTemplate(path string, ct *template.CompiledTemplate) {
 	l.compiledTemplates[path] = ct
+	l.ui.Debugf("### template\n%s", debugCode{ct})
 }
 
 func (opts TemplateLoaderOpts) Merge(overrides TemplateLoaderOptsOverrides) TemplateLoaderOpts {
@@ -352,4 +355,20 @@ func (opts TemplateLoaderOpts) Merge(overrides TemplateLoaderOptsOverrides) Temp
 		optsCopy.StrictYAML = *overrides.StrictYAML
 	}
 	return optsCopy
+}
+
+// debugCode defers building the compiled template dump until it is formatted,
+// so the work is skipped when debug output is disabled.
+type debugCode struct{ t *template.CompiledTemplate }
+
+func (d debugCode) String() string { return d.t.DebugCodeAsString() }
+
+// debugAST defers printing the parsed document set until it is formatted,
+// so the work is skipped when debug output is disabled.
+type debugAST struct{ ds *yamlmeta.DocumentSet }
+
+func (d debugAST) String() string {
+	var buf bytes.Buffer
+	d.ds.Print(&buf)
+	return buf.String()
 }

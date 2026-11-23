@@ -199,7 +199,7 @@ func templateFuncMap(f *Faker, fm *template.FuncMap) *template.FuncMap {
 	funcMap["IntRange"] = func(start, end int) []int {
 		n := end - start + 1
 		result := make([]int, n)
-		for i := 0; i < n; i++ {
+		for i := range n {
 			result[i] = start + i
 		}
 		return result
@@ -364,10 +364,8 @@ Markus Moen`,
 				return nil, err
 			}
 
-			data, err := info.GetAny(m, "data")
-			if err != nil {
-				return nil, err
-			}
+			// The data is optional, a missing one is the same as an empty one
+			data, _ := info.GetAny(m, "data")
 
 			templateOut, err := templateFunc(tpl, templateFuncMap(f, nil), &TemplateOptions{Data: data})
 			if err != nil {

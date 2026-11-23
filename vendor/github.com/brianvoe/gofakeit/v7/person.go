@@ -1,8 +1,9 @@
 package gofakeit
 
 import (
-	"math"
+	"fmt"
 	"strconv"
+	"strings"
 )
 
 // PersonInfo is a struct of person information
@@ -112,7 +113,15 @@ func SSN() string { return ssn(GlobalFaker) }
 // SSN will generate a random Social Security Number
 func (f *Faker) SSN() string { return ssn(f) }
 
-func ssn(f *Faker) string { return strconv.Itoa(randIntRange(f, 100000000, 999999999)) }
+func ssn(f *Faker) string {
+	// The SSA does not issue area numbers 000, 666 and 900 to 999, group 00 or serial 0000
+	area := randIntRange(f, 1, 898)
+	if area >= 666 {
+		area++ // skip 666
+	}
+
+	return fmt.Sprintf("%03d%02d%04d", area, randIntRange(f, 1, 99), randIntRange(f, 1, 9999))
+}
 
 // EIN will generate a random Employer Identification Number
 func EIN() string { return ein(GlobalFaker) }
@@ -120,19 +129,33 @@ func EIN() string { return ein(GlobalFaker) }
 // EIN will generate a random Employer Identification Number
 func (f *Faker) EIN() string { return ein(f) }
 
+// einPrefixes are the prefixes the IRS assigns to employer identification numbers.
+// 07 to 09, 17 to 19, 28, 29, 49, 69, 70, 78, 79, 89, 96 and 97 are not used.
+var einPrefixes = []string{
+	"01", "02", "03", "04", "05", "06",
+	"10", "11", "12", "13", "14", "15", "16",
+	"20", "21", "22", "23", "24", "25", "26", "27",
+	"30", "31", "32", "33", "34", "35", "36", "37", "38", "39",
+	"40", "41", "42", "43", "44", "45", "46", "47", "48",
+	"50", "51", "52", "53", "54", "55", "56", "57", "58", "59",
+	"60", "61", "62", "63", "64", "65", "66", "67", "68",
+	"71", "72", "73", "74", "75", "76", "77",
+	"80", "81", "82", "83", "84", "85", "86", "87", "88",
+	"90", "91", "92", "93", "94", "95", "98", "99",
+}
+
 func ein(f *Faker) string {
 	// EIN format: XX-XXXXXXX (2 digits, dash, 7 digits)
 	// First two digits have specific valid prefixes
-	prefixes := []string{"10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31", "32", "33", "34", "35", "36", "37", "38", "39", "40", "41", "42", "43", "44", "45", "46", "47", "48", "49", "50", "51", "52", "53", "54", "55", "56", "57", "58", "59", "60", "61", "62", "63", "64", "65", "66", "67", "68", "69", "70", "71", "72", "73", "74", "75", "76", "77", "78", "79", "80", "81", "82", "83", "84", "85", "86", "87", "88", "89", "90", "91", "92", "93", "94", "95", "96", "97", "98", "99"}
-	prefix := prefixes[f.IntN(len(prefixes))]
+	prefix := einPrefixes[f.IntN(len(einPrefixes))]
 
 	// Generate 7 random digits
-	sevenDigits := ""
-	for i := 0; i < 7; i++ {
-		sevenDigits += string(rune('0' + f.IntN(10)))
+	var sevenDigits strings.Builder
+	for range 7 {
+		sevenDigits.WriteString(string(rune('0' + f.IntN(10))))
 	}
 
-	return prefix + "-" + sevenDigits
+	return prefix + "-" + sevenDigits.String()
 }
 
 // Gender will generate a random gender string
@@ -220,7 +243,7 @@ func Phone() string { return phone(GlobalFaker) }
 // Phone will generate a random phone number string
 func (f *Faker) Phone() string { return phone(f) }
 
-func phone(f *Faker) string { return replaceWithNumbers(f, "##########") }
+func phone(f *Faker) string { return string(phoneDigits(f)) }
 
 // PhoneFormatted will generate a random phone number string
 func PhoneFormatted() string { return phoneFormatted(GlobalFaker) }
@@ -229,7 +252,49 @@ func PhoneFormatted() string { return phoneFormatted(GlobalFaker) }
 func (f *Faker) PhoneFormatted() string { return phoneFormatted(f) }
 
 func phoneFormatted(f *Faker) string {
-	return replaceWithNumbers(f, getRandValue(f, []string{"person", "phone"}))
+	format := []byte(getRandValue(f, []string{"person", "phone"}))
+
+	// The first ten # are the digits of a number that follows the numbering plan, any more are random
+	digits := phoneDigits(f)
+	next := 0
+	for i := range format {
+		if format[i] != hashtag {
+			continue
+		}
+
+		if next < len(digits) {
+			format[i] = digits[next]
+			next++
+		} else {
+			format[i] = byte(randDigit(f))
+		}
+	}
+
+	return string(format)
+}
+
+// phoneDigits returns the ten digits of a number from the North American numbering plan, NXX NXX XXXX:
+// the area code and the exchange start with 2 to 9 and neither of them is N11
+func phoneDigits(f *Faker) []byte {
+	digits := make([]byte, 10)
+
+	for _, start := range []int{0, 3} {
+		digits[start] = byte(f.IntN(8)+2) + '0'
+
+		// The other two digits are anything but 11, pick one of the 99 values and skip 11
+		xx := f.IntN(99)
+		if xx >= 11 {
+			xx++
+		}
+		digits[start+1] = byte(xx/10) + '0'
+		digits[start+2] = byte(xx%10) + '0'
+	}
+
+	for i := 6; i < len(digits); i++ {
+		digits[i] = byte(randDigit(f))
+	}
+
+	return digits
 }
 
 // Email will generate a random email string
@@ -329,16 +394,26 @@ func teams(f *Faker, people []string, teams []string) map[string][]string {
 		shuffleStrings(f, people)
 	}
 
-	peopleIndex := 0
 	teamsOutput := make(map[string][]string)
-	numPer := math.Ceil(float64(len(people)) / float64(len(teams)))
-	for _, team := range teams {
+	if len(teams) == 0 {
+		return teamsOutput
+	}
+
+	// The first len(people) % len(teams) teams get one person more, so no team is
+	// more than one person smaller than another
+	perTeam, extra := len(people)/len(teams), len(people)%len(teams)
+
+	peopleIndex := 0
+	for i, team := range teams {
+		numPer := perTeam
+		if i < extra {
+			numPer++
+		}
+
 		teamsOutput[team] = []string{}
-		for i := 0.00; i < numPer; i++ {
-			if peopleIndex < len(people) {
-				teamsOutput[team] = append(teamsOutput[team], people[peopleIndex])
-				peopleIndex++
-			}
+		for range numPer {
+			teamsOutput[team] = append(teamsOutput[team], people[peopleIndex])
+			peopleIndex++
 		}
 	}
 
@@ -379,7 +454,7 @@ func addPersonLookup() {
 		"email": "lamarkoelpin@heaney.biz"
 	},
 	"credit_card": {
-		"type": "Maestro",
+		"type": "Diners Club",
 		"number": "39800889982276",
 		"exp": "01/29",
 		"cvv": "932"
@@ -777,7 +852,7 @@ func addPersonLookup() {
 		Display:     "Phone Formatted",
 		Category:    "person",
 		Description: "Formatted phone number of a person",
-		Example:     "136-459-9489",
+		Example:     "613-645-9948",
 		Output:      "string",
 		Aliases: []string{
 			"formatted phone",

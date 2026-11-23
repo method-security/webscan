@@ -2,14 +2,13 @@ package goflags
 
 import (
 	"encoding/json"
-	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
 	_ "embed"
 
 	mapsutil "github.com/projectdiscovery/utils/maps"
-	stringsutil "github.com/projectdiscovery/utils/strings"
 	"golang.org/x/exp/maps"
 )
 
@@ -37,14 +36,27 @@ type Port struct {
 
 func (port Port) String() string {
 	defaultBuilder := &strings.Builder{}
+	defaultBuilder.Grow(len(port.kv)*6 + 2)
 	defaultBuilder.WriteString("(")
 
-	var items string
-	for k := range port.kv {
-		items += fmt.Sprintf("%d,", k)
+	keys := make([]int, 0, len(port.kv))
+	for key := range port.kv {
+		keys = append(keys, key)
 	}
-	defaultBuilder.WriteString(stringsutil.TrimSuffixAny(items, ",", "="))
+
+	sort.Ints(keys)
+	var number [20]byte
+
+	for i, key := range keys {
+		if i > 0 {
+			defaultBuilder.WriteByte(',')
+		}
+
+		defaultBuilder.Write(strconv.AppendInt(number[:0], int64(key), 10))
+	}
+
 	defaultBuilder.WriteString(")")
+
 	return defaultBuilder.String()
 }
 
@@ -90,18 +102,21 @@ func (port *Port) AsPorts() []int {
 //	ftp* => ports: 20, 21, 574, 989, 990, 8021
 //	U:53,T:25 => ports: 53 udp, 25 tcp
 func (port *Port) normalizePortValue(portsMap map[int]struct{}, value string) {
-	// Handle top-xxx/*/- cases
-	switch value {
-	case "full", "-", "*":
-		value = portsFull
-	case "top-100":
-		value = portsNmapTop100
-	case "top-1000":
-		value = portsNmapTop1000
-	}
-
 	values := strings.Split(value, ",")
 	for _, item := range values {
+		// Handle top-xxx/*/- cases as individual list items.
+		switch item {
+		case "full", "-", "*":
+			port.normalizePortValue(portsMap, portsFull)
+			continue
+		case "top-100":
+			port.normalizePortValue(portsMap, portsNmapTop100)
+			continue
+		case "top-1000":
+			port.normalizePortValue(portsMap, portsNmapTop1000)
+			continue
+		}
+
 		if ports, ok := servicesMap[item]; ok {
 			// Handle ftp,http,etc service names
 			port.appendPortsToKV(portsMap, ports)

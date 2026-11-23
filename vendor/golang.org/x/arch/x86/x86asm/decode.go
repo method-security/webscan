@@ -481,6 +481,14 @@ ReadPrefixes:
 	opshift = 24
 
 	if vex != 0 {
+		// The VEX.W bit selects 64 bit registers.
+		switch vex & 0xFF {
+		case PrefixVEX3Bytes, PrefixEVEX:
+			if inst.Prefix[vexIndex+2]&0x80 != 0 {
+				dataMode = 64
+			}
+		}
+		inst.DataSize = dataMode
 		return decodeAVX(src, pos, vex, vexIndex, inst, mode)
 	}
 
@@ -536,7 +544,7 @@ Decode:
 						if pos+2 > len(src) {
 							return truncated(src, mode)
 						}
-						mem.Disp = int64(binary.LittleEndian.Uint16(src[pos:]))
+						mem.Disp = int64(int16(binary.LittleEndian.Uint16(src[pos:])))
 						pos += 2
 					}
 
@@ -607,7 +615,7 @@ Decode:
 					}
 					dispoff = pos
 					displen = 4
-					mem.Disp = int64(binary.LittleEndian.Uint32(src[pos:]))
+					mem.Disp = int64(int32(binary.LittleEndian.Uint32(src[pos:])))
 					pos += 4
 				}
 

@@ -5,18 +5,19 @@ package model
 
 import (
 	"github.com/pb33f/libopenapi/datamodel/low"
-	"github.com/pb33f/libopenapi/datamodel/low/v3"
+	v3 "github.com/pb33f/libopenapi/datamodel/low/v3"
 )
 
 // MediaTypeChanges represent changes made between two OpenAPI MediaType instances.
 type MediaTypeChanges struct {
 	*PropertyChanges
-	SchemaChanges       *SchemaChanges              `json:"schemas,omitempty" yaml:"schemas,omitempty"`
-	ItemSchemaChanges   *SchemaChanges              `json:"itemSchemas,omitempty" yaml:"itemSchemas,omitempty"`
-	ExtensionChanges    *ExtensionChanges           `json:"extensions,omitempty" yaml:"extensions,omitempty"`
-	ExampleChanges      map[string]*ExampleChanges  `json:"examples,omitempty" yaml:"examples,omitempty"`
-	EncodingChanges     map[string]*EncodingChanges `json:"encoding,omitempty" yaml:"encoding,omitempty"`
-	ItemEncodingChanges map[string]*EncodingChanges `json:"itemEncoding,omitempty" yaml:"itemEncoding,omitempty"`
+	SchemaChanges         *SchemaChanges              `json:"schemas,omitempty" yaml:"schemas,omitempty"`
+	ItemSchemaChanges     *SchemaChanges              `json:"itemSchemas,omitempty" yaml:"itemSchemas,omitempty"`
+	ExtensionChanges      *ExtensionChanges           `json:"extensions,omitempty" yaml:"extensions,omitempty"`
+	ExampleChanges        map[string]*ExampleChanges  `json:"examples,omitempty" yaml:"examples,omitempty"`
+	EncodingChanges       map[string]*EncodingChanges `json:"encoding,omitempty" yaml:"encoding,omitempty"`
+	PrefixEncodingChanges []*EncodingChanges          `json:"prefixEncoding,omitempty" yaml:"prefixEncoding,omitempty"`
+	ItemEncodingChanges   *EncodingChanges            `json:"itemEncoding,omitempty" yaml:"itemEncoding,omitempty"`
 }
 
 // GetAllChanges returns a slice of all changes made between MediaType objects
@@ -38,9 +39,10 @@ func (m *MediaTypeChanges) GetAllChanges() []*Change {
 	for k := range m.EncodingChanges {
 		changes = append(changes, m.EncodingChanges[k].GetAllChanges()...)
 	}
-	for k := range m.ItemEncodingChanges {
-		changes = append(changes, m.ItemEncodingChanges[k].GetAllChanges()...)
+	for k := range m.PrefixEncodingChanges {
+		changes = append(changes, m.PrefixEncodingChanges[k].GetAllChanges()...)
 	}
+	changes = append(changes, m.ItemEncodingChanges.GetAllChanges()...)
 	if m.ExtensionChanges != nil {
 		changes = append(changes, m.ExtensionChanges.GetAllChanges()...)
 	}
@@ -67,11 +69,10 @@ func (m *MediaTypeChanges) TotalChanges() int {
 			c += m.EncodingChanges[i].TotalChanges()
 		}
 	}
-	if len(m.ItemEncodingChanges) > 0 {
-		for i := range m.ItemEncodingChanges {
-			c += m.ItemEncodingChanges[i].TotalChanges()
-		}
+	for i := range m.PrefixEncodingChanges {
+		c += m.PrefixEncodingChanges[i].TotalChanges()
 	}
+	c += m.ItemEncodingChanges.TotalChanges()
 	if m.ExtensionChanges != nil {
 		c += m.ExtensionChanges.TotalChanges()
 	}
@@ -95,17 +96,21 @@ func (m *MediaTypeChanges) TotalBreakingChanges() int {
 			c += m.EncodingChanges[i].TotalBreakingChanges()
 		}
 	}
-	if len(m.ItemEncodingChanges) > 0 {
-		for i := range m.ItemEncodingChanges {
-			c += m.ItemEncodingChanges[i].TotalBreakingChanges()
-		}
+	for i := range m.PrefixEncodingChanges {
+		c += m.PrefixEncodingChanges[i].TotalBreakingChanges()
 	}
+	c += m.ItemEncodingChanges.TotalBreakingChanges()
+	c += m.ExtensionChanges.TotalBreakingChanges()
 	return c
 }
 
 // CompareMediaTypes compares a left and a right MediaType object for any changes. If found, a pointer to a
 // MediaTypeChanges instance is returned; otherwise nothing is returned.
 func CompareMediaTypes(l, r *v3.MediaType) *MediaTypeChanges {
+	return documentComparison{}.compareMediaTypes(l, r)
+}
+
+func (d documentComparison) compareMediaTypes(l, r *v3.MediaType) *MediaTypeChanges {
 	var props []*PropertyCheck
 	var changes []*Change
 
@@ -128,7 +133,7 @@ func CompareMediaTypes(l, r *v3.MediaType) *MediaTypeChanges {
 
 	// schema
 	if !l.Schema.IsEmpty() && !r.Schema.IsEmpty() {
-		mc.SchemaChanges = CompareSchemas(l.Schema.Value, r.Schema.Value)
+		mc.SchemaChanges = d.compareSchemas(l.Schema.Value, r.Schema.Value)
 	}
 	if !l.Schema.IsEmpty() && r.Schema.IsEmpty() {
 		CreateChange(&changes, ObjectRemoved, v3.SchemaLabel, l.Schema.ValueNode,
@@ -143,13 +148,14 @@ func CompareMediaTypes(l, r *v3.MediaType) *MediaTypeChanges {
 	mc.ExampleChanges = CheckExampleMapForChangesWithNilSupportAndRules(l.Examples.Value, r.Examples.Value,
 		&changes, v3.ExamplesLabel, CompMediaType, PropExamples)
 
-	// encoding
-	mc.EncodingChanges = CheckMapForChanges(l.Encoding.Value, r.Encoding.Value,
-		&changes, v3.EncodingLabel, CompareEncoding)
+	// encoding, prefixEncoding, itemEncoding
+	mc.EncodingChanges, mc.PrefixEncodingChanges, mc.ItemEncodingChanges = d.compareEncodingFields(
+		CompMediaType, l.Encoding.Value, r.Encoding.Value, l.PrefixEncoding, r.PrefixEncoding,
+		l.ItemEncoding, r.ItemEncoding, &changes, false)
 
 	// itemSchema
 	if !l.ItemSchema.IsEmpty() && !r.ItemSchema.IsEmpty() {
-		mc.ItemSchemaChanges = CompareSchemas(l.ItemSchema.Value, r.ItemSchema.Value)
+		mc.ItemSchemaChanges = d.compareSchemas(l.ItemSchema.Value, r.ItemSchema.Value)
 	}
 	if !l.ItemSchema.IsEmpty() && r.ItemSchema.IsEmpty() {
 		CreateChange(&changes, ObjectRemoved, v3.ItemSchemaLabel, l.ItemSchema.ValueNode,
@@ -159,10 +165,6 @@ func CompareMediaTypes(l, r *v3.MediaType) *MediaTypeChanges {
 		CreateChange(&changes, ObjectAdded, v3.ItemSchemaLabel, nil,
 			r.ItemSchema.ValueNode, BreakingAdded(CompMediaType, PropItemSchema), nil, r.ItemSchema.Value)
 	}
-
-	// itemEncoding
-	mc.ItemEncodingChanges = CheckMapForChanges(l.ItemEncoding.Value, r.ItemEncoding.Value,
-		&changes, v3.ItemEncodingLabel, CompareEncoding)
 
 	mc.ExtensionChanges = CompareExtensions(l.Extensions, r.Extensions)
 	mc.PropertyChanges = NewPropertyChanges(changes)

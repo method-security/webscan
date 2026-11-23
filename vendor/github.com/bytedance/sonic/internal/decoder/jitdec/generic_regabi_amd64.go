@@ -1,5 +1,5 @@
-//go:build go1.17 && !go1.27
-// +build go1.17,!go1.27
+//go:build go1.17 && !go1.28
+// +build go1.17,!go1.28
 
 /*
  * Copyright 2021 ByteDance Inc.
@@ -124,6 +124,7 @@ func (self *_ValueDecoder) call_go(fn obj.Addr) {
 func (self *_ValueDecoder) callc(fn obj.Addr) {
 	self.save(_IP)
 	self.call(fn)
+	self.Emit("XORPS", _X15, _X15)
 	self.load(_IP)
 }
 

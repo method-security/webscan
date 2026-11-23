@@ -33,7 +33,7 @@ func newGlobalData(rootSDK *SDK, sdkConfig config.SDKConfiguration, hooks *hooks
 }
 
 // GetCertificates - Retrieve multiple certificates
-// Retrieve information about multiple certificates. You can retrieve up to 1,000 certificates per call. A certificate ID is its SHA-256 fingerprint in the Censys dataset.
+// Retrieve information about multiple certificates. You can retrieve up to 1,000 certificates per call. A certificate ID is its SHA-256 fingerprint.<br><br>In a SOC environment, use this endpoint to bulk-check multiple certificates from network telemetry for self-signed, newly issued, or lookalike certs.
 func (s *GlobalData) GetCertificates(ctx context.Context, request operations.V3GlobaldataAssetCertificateListPostRequest, opts ...operations.Option) (*operations.V3GlobaldataAssetCertificateListPostResponse, error) {
 	globals := operations.V3GlobaldataAssetCertificateListPostGlobals{
 		OrganizationID: s.sdkConfiguration.Globals.OrganizationID,
@@ -240,7 +240,7 @@ func (s *GlobalData) GetCertificates(ctx context.Context, request operations.V3G
 
 			var out sdkerrors.AuthenticationError
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -265,7 +265,7 @@ func (s *GlobalData) GetCertificates(ctx context.Context, request operations.V3G
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -286,7 +286,7 @@ func (s *GlobalData) GetCertificates(ctx context.Context, request operations.V3G
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -322,7 +322,7 @@ func (s *GlobalData) GetCertificates(ctx context.Context, request operations.V3G
 }
 
 // GetCertificatesRaw - Retrieve multiple certificates in PEM format
-// Retrieve the raw PEM-encoded format for multiple certificates. You can retrieve up to 1,000 certificates per call. A certificate ID is its SHA-256 fingerprint in the Censys dataset.
+// Retrieve the raw PEM-encoded format for multiple certificates. You can retrieve up to 1,000 certificates per call. A certificate ID is its SHA-256 fingerprint.<br><br>Use this endpoint to export raw PEMs for multiple certificates at once, for bulk analysis or sharing with your detection pipeline.
 func (s *GlobalData) GetCertificatesRaw(ctx context.Context, request operations.V3GlobaldataAssetCertificateListRawPostRequest, opts ...operations.Option) (*operations.V3GlobaldataAssetCertificateListRawPostResponse, error) {
 	globals := operations.V3GlobaldataAssetCertificateListRawPostGlobals{
 		OrganizationID: s.sdkConfiguration.Globals.OrganizationID,
@@ -529,7 +529,7 @@ func (s *GlobalData) GetCertificatesRaw(ctx context.Context, request operations.
 
 			var out sdkerrors.AuthenticationError
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -554,7 +554,7 @@ func (s *GlobalData) GetCertificatesRaw(ctx context.Context, request operations.
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -575,7 +575,7 @@ func (s *GlobalData) GetCertificatesRaw(ctx context.Context, request operations.
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -611,7 +611,7 @@ func (s *GlobalData) GetCertificatesRaw(ctx context.Context, request operations.
 }
 
 // GetCertificate - Get a certificate
-// Retrieve information about a single certificate. A certificate ID is its SHA-256 fingerprint in the Censys dataset.
+// Retrieve information about a single certificate. A certificate ID is its SHA-256 fingerprint. Use `fields` to include specific fields in the response. Use `exclude_fields` to omit specific fields from the response.<br><br>In a SOC environment, use this endpoint to look up a certificate by SHA-256 fingerprint to see its subject, issuer, and validity, so you can vet certs seen in TLS logs or alerts.
 func (s *GlobalData) GetCertificate(ctx context.Context, request operations.V3GlobaldataAssetCertificateRequest, opts ...operations.Option) (*operations.V3GlobaldataAssetCertificateResponse, error) {
 	globals := operations.V3GlobaldataAssetCertificateGlobals{
 		OrganizationID: s.sdkConfiguration.Globals.OrganizationID,
@@ -811,7 +811,7 @@ func (s *GlobalData) GetCertificate(ctx context.Context, request operations.V3Gl
 
 			var out sdkerrors.AuthenticationError
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -827,6 +827,8 @@ func (s *GlobalData) GetCertificate(ctx context.Context, request operations.V3Gl
 	case httpRes.StatusCode == 403:
 		fallthrough
 	case httpRes.StatusCode == 404:
+		fallthrough
+	case httpRes.StatusCode == 422:
 		switch {
 		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/problem+json`):
 			rawBody, err := utils.ConsumeRawBody(httpRes)
@@ -836,7 +838,7 @@ func (s *GlobalData) GetCertificate(ctx context.Context, request operations.V3Gl
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -857,7 +859,7 @@ func (s *GlobalData) GetCertificate(ctx context.Context, request operations.V3Gl
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -893,7 +895,7 @@ func (s *GlobalData) GetCertificate(ctx context.Context, request operations.V3Gl
 }
 
 // GetCertificateRaw - Get a certificate in PEM format
-// Retrieve the raw PEM-encoded format of a certificate. A certificate ID is its SHA-256 fingerprint in the Censys dataset.
+// Retrieve the raw PEM-encoded format of a certificate. A certificate ID is its SHA-256 fingerprint.<br><br>Use this endpoint to retrieve the raw PEM of a suspicious certificate for offline analysis or to feed other tooling.
 func (s *GlobalData) GetCertificateRaw(ctx context.Context, request operations.V3GlobaldataAssetCertificateRawRequest, opts ...operations.Option) (*operations.V3GlobaldataAssetCertificateRawResponse, error) {
 	globals := operations.V3GlobaldataAssetCertificateRawGlobals{
 		OrganizationID: s.sdkConfiguration.Globals.OrganizationID,
@@ -936,10 +938,17 @@ func (s *GlobalData) GetCertificateRaw(ctx context.Context, request operations.V
 		timeout = s.sdkConfiguration.Timeout
 	}
 
+	var streamCancel context.CancelFunc
+
 	if timeout != nil {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, *timeout)
-		defer cancel()
+		streamCancel = cancel
+		defer func() {
+			if streamCancel != nil {
+				streamCancel()
+			}
+		}()
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "GET", opURL, nil)
@@ -1065,6 +1074,8 @@ func (s *GlobalData) GetCertificateRaw(ctx context.Context, request operations.V
 
 		switch {
 		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/x-pem-file`):
+			httpRes.Body = utils.BodyWithCancel(httpRes.Body, streamCancel)
+			streamCancel = nil
 			res.ResponseStream = httpRes.Body
 
 			return res, nil
@@ -1085,7 +1096,7 @@ func (s *GlobalData) GetCertificateRaw(ctx context.Context, request operations.V
 
 			var out sdkerrors.AuthenticationError
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -1110,7 +1121,7 @@ func (s *GlobalData) GetCertificateRaw(ctx context.Context, request operations.V
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -1131,7 +1142,7 @@ func (s *GlobalData) GetCertificateRaw(ctx context.Context, request operations.V
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -1167,7 +1178,7 @@ func (s *GlobalData) GetCertificateRaw(ctx context.Context, request operations.V
 }
 
 // GetHostEnrichment - Get host enrichment
-// Retrieve enrichment data for a single host. This endpoint is optimized for high-volume SOC enrichment use cases.<br><br>This endpoint does not consume standard Censys credits. Core organizations may perform up to 20,000 enrichment calls per day. Core + Unlimited Enrichment organizations may perform an unlimited amount of enrichment calls per day.<br><br>[Learn more about the enrichment API here](https://docs.censys.com/docs/host-enrichment).
+// Retrieve enrichment data for a single host. This endpoint is optimized for high-volume SOC enrichment use cases.<br><br>Use this endpoint to add Censys context (location, ASN, labels, reputation, and more) to IPs in your SIEM or SOAR at high volume, without spending standard credits.<br><br>Use `fields` to include specific fields in the response. Use `exclude_fields` to omit specific fields from the response.<br><br>This endpoint does not consume standard Censys credits. Core organizations may perform up to 20,000 enrichment calls per day. Core + Unlimited Enrichment organizations may perform an unlimited amount of enrichment calls per day.<br><br>[Learn more about the enrichment API here](https://docs.censys.com/docs/host-enrichment).
 func (s *GlobalData) GetHostEnrichment(ctx context.Context, request operations.V3GlobaldataAssetHostEnrichmentRequest, opts ...operations.Option) (*operations.V3GlobaldataAssetHostEnrichmentResponse, error) {
 	globals := operations.V3GlobaldataAssetHostEnrichmentGlobals{
 		OrganizationID: s.sdkConfiguration.Globals.OrganizationID,
@@ -1367,7 +1378,7 @@ func (s *GlobalData) GetHostEnrichment(ctx context.Context, request operations.V
 
 			var out sdkerrors.AuthenticationError
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -1385,6 +1396,8 @@ func (s *GlobalData) GetHostEnrichment(ctx context.Context, request operations.V
 	case httpRes.StatusCode == 404:
 		fallthrough
 	case httpRes.StatusCode == 409:
+		fallthrough
+	case httpRes.StatusCode == 422:
 		switch {
 		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/problem+json`):
 			rawBody, err := utils.ConsumeRawBody(httpRes)
@@ -1394,7 +1407,7 @@ func (s *GlobalData) GetHostEnrichment(ctx context.Context, request operations.V
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -1417,7 +1430,7 @@ func (s *GlobalData) GetHostEnrichment(ctx context.Context, request operations.V
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -1438,7 +1451,7 @@ func (s *GlobalData) GetHostEnrichment(ctx context.Context, request operations.V
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -1474,7 +1487,7 @@ func (s *GlobalData) GetHostEnrichment(ctx context.Context, request operations.V
 }
 
 // GetHosts - Retrieve multiple hosts
-// Retrieve information about multiple hosts. You can retrieve up to 100 hosts per call. A host ID is its IP address.
+// Retrieve information about multiple hosts. You can retrieve up to 100 hosts per call. A host ID is its IP address.<br><br>In a SOC environment, use this endpoint to look up multiple IPs from an alert, log, or threat feed in one call, so you can triage a whole indicator list quickly.
 func (s *GlobalData) GetHosts(ctx context.Context, request operations.V3GlobaldataAssetHostListPostRequest, opts ...operations.Option) (*operations.V3GlobaldataAssetHostListPostResponse, error) {
 	globals := operations.V3GlobaldataAssetHostListPostGlobals{
 		OrganizationID: s.sdkConfiguration.Globals.OrganizationID,
@@ -1681,7 +1694,7 @@ func (s *GlobalData) GetHosts(ctx context.Context, request operations.V3Globalda
 
 			var out sdkerrors.AuthenticationError
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -1706,7 +1719,7 @@ func (s *GlobalData) GetHosts(ctx context.Context, request operations.V3Globalda
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -1727,7 +1740,7 @@ func (s *GlobalData) GetHosts(ctx context.Context, request operations.V3Globalda
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -1763,7 +1776,7 @@ func (s *GlobalData) GetHosts(ctx context.Context, request operations.V3Globalda
 }
 
 // GetHost - Get a host
-// Retrieve information about a single host. A host ID is its IP address.
+// Retrieve information about a single host. A host ID is its IP address. Use `fields` to include specific fields in the response. Use `exclude_fields` to omit specific fields from the response.<br><br>In a SOC environment, use this endpoint to pull the current services, software, certificates, and labels on an IP from an alert, so you can quickly judge whether it is malicious or benign.
 func (s *GlobalData) GetHost(ctx context.Context, request operations.V3GlobaldataAssetHostRequest, opts ...operations.Option) (*operations.V3GlobaldataAssetHostResponse, error) {
 	globals := operations.V3GlobaldataAssetHostGlobals{
 		OrganizationID: s.sdkConfiguration.Globals.OrganizationID,
@@ -1963,7 +1976,7 @@ func (s *GlobalData) GetHost(ctx context.Context, request operations.V3Globaldat
 
 			var out sdkerrors.AuthenticationError
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -1979,6 +1992,8 @@ func (s *GlobalData) GetHost(ctx context.Context, request operations.V3Globaldat
 	case httpRes.StatusCode == 403:
 		fallthrough
 	case httpRes.StatusCode == 404:
+		fallthrough
+	case httpRes.StatusCode == 422:
 		switch {
 		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/problem+json`):
 			rawBody, err := utils.ConsumeRawBody(httpRes)
@@ -1988,7 +2003,7 @@ func (s *GlobalData) GetHost(ctx context.Context, request operations.V3Globaldat
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -2009,7 +2024,7 @@ func (s *GlobalData) GetHost(ctx context.Context, request operations.V3Globaldat
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -2045,7 +2060,7 @@ func (s *GlobalData) GetHost(ctx context.Context, request operations.V3Globaldat
 }
 
 // ListServicesOnHost - Get service history for a host
-// Retrieve historical service observations for a host. This endpoint returns time ranges during which services were detected on the host.<br><br>You can define a specific time frame of interest. If you do not specify a time frame, this endpoint will search the historical dataset that is available to your account.<br><br>You can filter by port number, protocol, and transport protocol.
+// Retrieve historical service observations for a host. This endpoint returns time ranges during which services were detected on the host.<br><br>You can define a specific time frame of interest. If you do not specify a time frame, this endpoint will search the historical dataset that is available to your account.<br><br>You can filter by port number, protocol, and transport protocol.<br><br>In a SOC environment, use this endpoint to see when a specific service was exposed on an IP, so you can check whether it was live during the window of a suspected incident.
 func (s *GlobalData) ListServicesOnHost(ctx context.Context, request operations.V3GlobaldataServiceOnHostRequest, opts ...operations.Option) (*operations.V3GlobaldataServiceOnHostResponse, error) {
 	globals := operations.V3GlobaldataServiceOnHostGlobals{
 		OrganizationID: s.sdkConfiguration.Globals.OrganizationID,
@@ -2245,7 +2260,7 @@ func (s *GlobalData) ListServicesOnHost(ctx context.Context, request operations.
 
 			var out sdkerrors.AuthenticationError
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -2272,7 +2287,7 @@ func (s *GlobalData) ListServicesOnHost(ctx context.Context, request operations.
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -2293,7 +2308,7 @@ func (s *GlobalData) ListServicesOnHost(ctx context.Context, request operations.
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -2329,7 +2344,7 @@ func (s *GlobalData) ListServicesOnHost(ctx context.Context, request operations.
 }
 
 // GetHostTimeline - Get host event history
-// Retrieve event history for a host. A host ID is its IP address.<br><br>Note that when a service protocol changes after a new scan (for example, from `UNKNOWN` to `NETBIOS`), this information will be reflected in the `scan` object.
+// Retrieve event history for a host. A host ID is its IP address.<br><br>Note that when a service protocol changes after a new scan (for example, from `UNKNOWN` to `NETBIOS`), this information will be reflected in the `scan` object.<br><br>In a SOC environment, use this endpoint to see what changed on an IP over time, such as new services, certificate swaps, and software changes, to reconstruct when attacker infrastructure was stood up or modified.
 func (s *GlobalData) GetHostTimeline(ctx context.Context, request operations.V3GlobaldataAssetHostTimelineRequest, opts ...operations.Option) (*operations.V3GlobaldataAssetHostTimelineResponse, error) {
 	globals := operations.V3GlobaldataAssetHostTimelineGlobals{
 		OrganizationID: s.sdkConfiguration.Globals.OrganizationID,
@@ -2529,7 +2544,7 @@ func (s *GlobalData) GetHostTimeline(ctx context.Context, request operations.V3G
 
 			var out sdkerrors.AuthenticationError
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -2554,7 +2569,7 @@ func (s *GlobalData) GetHostTimeline(ctx context.Context, request operations.V3G
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -2575,7 +2590,7 @@ func (s *GlobalData) GetHostTimeline(ctx context.Context, request operations.V3G
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -2611,7 +2626,7 @@ func (s *GlobalData) GetHostTimeline(ctx context.Context, request operations.V3G
 }
 
 // GetWebProperties - Retrieve multiple web properties
-// Retrieve information about multiple web properties. You can retrieve up to 100 web properties per call. Web properties are identified using a combination of a hostname and port joined with a colon, such as `platform.censys.io:80`.
+// Retrieve information about multiple web properties. You can retrieve up to 100 web properties per call. Web properties are identified using a combination of a hostname and port joined with a colon, such as `platform.censys.io:80`.<br><br>In a SOC environment, use this endpoint to check up to 100 suspicious hostnames at once, such as domains from phishing reports or proxy logs, to find the live and malicious ones.
 func (s *GlobalData) GetWebProperties(ctx context.Context, request operations.V3GlobaldataAssetWebpropertyListPostRequest, opts ...operations.Option) (*operations.V3GlobaldataAssetWebpropertyListPostResponse, error) {
 	globals := operations.V3GlobaldataAssetWebpropertyListPostGlobals{
 		OrganizationID: s.sdkConfiguration.Globals.OrganizationID,
@@ -2818,7 +2833,7 @@ func (s *GlobalData) GetWebProperties(ctx context.Context, request operations.V3
 
 			var out sdkerrors.AuthenticationError
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -2843,7 +2858,7 @@ func (s *GlobalData) GetWebProperties(ctx context.Context, request operations.V3
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -2864,7 +2879,7 @@ func (s *GlobalData) GetWebProperties(ctx context.Context, request operations.V3
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -2900,7 +2915,7 @@ func (s *GlobalData) GetWebProperties(ctx context.Context, request operations.V3
 }
 
 // GetWebProperty - Get a web property
-// Retrieve information about a single web property. Web properties are identified using a combination of a hostname and port joined with a colon, such as `platform.censys.io:80`.
+// Retrieve information about a single web property. Web properties are identified using a combination of a hostname and port joined with a colon, such as `platform.censys.io:80`. Use `fields` to include specific fields in the response. Use `exclude_fields` to omit specific fields from the response.<br><br>In a SOC environment, use this endpoint to inspect the current content, technologies, and certificate for a hostname and port from a phishing or C2 alert.
 func (s *GlobalData) GetWebProperty(ctx context.Context, request operations.V3GlobaldataAssetWebpropertyRequest, opts ...operations.Option) (*operations.V3GlobaldataAssetWebpropertyResponse, error) {
 	globals := operations.V3GlobaldataAssetWebpropertyGlobals{
 		OrganizationID: s.sdkConfiguration.Globals.OrganizationID,
@@ -3100,7 +3115,7 @@ func (s *GlobalData) GetWebProperty(ctx context.Context, request operations.V3Gl
 
 			var out sdkerrors.AuthenticationError
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -3127,7 +3142,7 @@ func (s *GlobalData) GetWebProperty(ctx context.Context, request operations.V3Gl
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -3148,7 +3163,7 @@ func (s *GlobalData) GetWebProperty(ctx context.Context, request operations.V3Gl
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -3384,7 +3399,7 @@ func (s *GlobalData) GetWebPropertyTimeline(ctx context.Context, request operati
 
 			var out sdkerrors.AuthenticationError
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -3411,7 +3426,7 @@ func (s *GlobalData) GetWebPropertyTimeline(ctx context.Context, request operati
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -3432,7 +3447,7 @@ func (s *GlobalData) GetWebPropertyTimeline(ctx context.Context, request operati
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -3468,7 +3483,7 @@ func (s *GlobalData) GetWebPropertyTimeline(ctx context.Context, request operati
 }
 
 // ListDNSIPResolutionBounds - Get DNS names that resolved to an IP (aggregated bounds)
-// Retrieve the domain names that resolved to an IP during a time frame. You can narrow results with `record_types` (A or AAAA).<br><br>Results are aggregated per domain name and multiple distinct ranges for a name will be grouped into one row of results. For example, if `censys.com` resolved to `1.1.1.1` from January 1 to January 7 during two different ranges of January 1 to January 3 and January 5 to January 7, and you targeted January 1 through January 7 with your API call, then this endpoint will group those ranges into one entry for `censys.com` in the response.<br><br>To retrieve domain names for an IP with each record broken down by time range, use the [ranges endpoint](https://docs.censys.com/reference/v3-globaldata-dns-ip-resolution-ranges)<br><br>This endpoint is only available to organizations on the Censys Search and Censys Core plans.<br><br>[Learn more about Censys Active DNS](https://docs.censys.com/docs/platform-active-dns).
+// Retrieve the domain names that resolved to an IP during a time frame. You can narrow results with `record_types` (A or AAAA).<br><br>Results are aggregated per domain name and multiple distinct ranges for a name will be grouped into one row of results. For example, if `censys.com` resolved to `1.1.1.1` from January 1 to January 7 during two different ranges of January 1 to January 3 and January 5 to January 7, and you targeted January 1 through January 7 with your API call, then this endpoint will group those ranges into one entry for `censys.com` in the response.<br><br>To retrieve domain names for an IP with each record broken down by time range, use the [ranges endpoint](https://docs.censys.com/reference/v3-globaldata-dns-ip-resolution-ranges)<br><br>In a SOC environment, use this endpoint to find every domain that has pointed at a malicious IP, with first- and last-seen bounds per name, so you can discover related domains and block them.<br><br>This endpoint is only available to organizations on the Censys Search and Censys Core plans.<br><br>[Learn more about Censys Active DNS](https://docs.censys.com/docs/platform-active-dns).
 func (s *GlobalData) ListDNSIPResolutionBounds(ctx context.Context, request operations.V3GlobaldataDNSIPResolutionBoundRequest, opts ...operations.Option) (*operations.V3GlobaldataDNSIPResolutionBoundResponse, error) {
 	globals := operations.V3GlobaldataDNSIPResolutionBoundGlobals{
 		OrganizationID: s.sdkConfiguration.Globals.OrganizationID,
@@ -3668,7 +3683,7 @@ func (s *GlobalData) ListDNSIPResolutionBounds(ctx context.Context, request oper
 
 			var out sdkerrors.AuthenticationError
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -3695,7 +3710,7 @@ func (s *GlobalData) ListDNSIPResolutionBounds(ctx context.Context, request oper
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -3716,7 +3731,7 @@ func (s *GlobalData) ListDNSIPResolutionBounds(ctx context.Context, request oper
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -3752,7 +3767,7 @@ func (s *GlobalData) ListDNSIPResolutionBounds(ctx context.Context, request oper
 }
 
 // ListDNSIPResolutionRanges - Get DNS names that resolved to an IP (ranges)
-// Retrieve the domain names that resolved to an IP during a time frame. You can narrow results with `record_types` (A or AAAA).<br><br>Record results are broken down based on time range. For example, if `censys.com` resolved to `1.1.1.1` from January 1 to January 7 during two different ranges of January 1 to January 3 and January 5 to January 7, and you targeted January 1 through January 7 with your API call, then this endpoint will return one row for each of those distinct ranges.<br><br>To retrieve domain names for an IP with each result aggregated by name, use the [bounds endpoint endpoint](https://docs.censys.com/reference/v3-globaldata-dns-ip-resolution-bound).<br><br>This endpoint is only available to organizations on the Censys Search and Censys Core plans.<br><br>[Learn more about Censys Active DNS](https://docs.censys.com/docs/platform-active-dns).
+// Retrieve the domain names that resolved to an IP during a time frame. You can narrow results with `record_types` (A or AAAA).<br><br>Record results are broken down based on time range. For example, if `censys.com` resolved to `1.1.1.1` from January 1 to January 7 during two different ranges of January 1 to January 3 and January 5 to January 7, and you targeted January 1 through January 7 with your API call, then this endpoint will return one row for each of those distinct ranges.<br><br>To retrieve domain names for an IP with each result aggregated by name, use the [bounds endpoint endpoint](https://docs.censys.com/reference/v3-globaldata-dns-ip-resolution-bound).<br><br>In a SOC environment, use this endpoint to see the exact time ranges a domain resolved to an IP, to confirm it was active during the incident window or to spot infrastructure reuse.<br><br>This endpoint is only available to organizations on the Censys Search and Censys Core plans.<br><br>[Learn more about Censys Active DNS](https://docs.censys.com/docs/platform-active-dns).
 func (s *GlobalData) ListDNSIPResolutionRanges(ctx context.Context, request operations.V3GlobaldataDNSIPResolutionRangesRequest, opts ...operations.Option) (*operations.V3GlobaldataDNSIPResolutionRangesResponse, error) {
 	globals := operations.V3GlobaldataDNSIPResolutionRangesGlobals{
 		OrganizationID: s.sdkConfiguration.Globals.OrganizationID,
@@ -3952,7 +3967,7 @@ func (s *GlobalData) ListDNSIPResolutionRanges(ctx context.Context, request oper
 
 			var out sdkerrors.AuthenticationError
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -3979,7 +3994,7 @@ func (s *GlobalData) ListDNSIPResolutionRanges(ctx context.Context, request oper
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -4000,7 +4015,7 @@ func (s *GlobalData) ListDNSIPResolutionRanges(ctx context.Context, request oper
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -4036,7 +4051,7 @@ func (s *GlobalData) ListDNSIPResolutionRanges(ctx context.Context, request oper
 }
 
 // ListDNSNameResolutionBounds - Get DNS resolution records for a name (aggregated bounds)
-// Retrieve the DNS resolution records for a name. This endpoint returns observed A, AAAA, MX, NS, SOA, and TXT records for the name you provide. You can filter by one or more record types using record_types.<br><br>Results are aggregated per record distinct ranges for a record will be grouped into one row of results. For example, if `censys.com` resolved to `1.1.1.1` from January 1 to January 7 during two different ranges of January 1 to January 3 and January 5 to January 7, and you targeted January 1 through January 7 with your API call, then this endpoint will group those ranges into one entry for the `1.1.1.1` A record in the response.<br><br>To retrieve records for a name with each record broken down by time range, use the [ranges endpoint](https://docs.censys.com/reference/v3-globaldata-dns-name-resolution-ranges).<br><br>This endpoint is only available to organizations on the Censys Search and Censys Core plans.<br><br>[Learn more about Censys Active DNS](https://docs.censys.com/docs/platform-active-dns).
+// Retrieve the DNS resolution records for a name. This endpoint returns observed A, AAAA, MX, NS, SOA, and TXT records for the name you provide. You can filter by one or more record types using record_types.<br><br>Results are aggregated per record distinct ranges for a record will be grouped into one row of results. For example, if `censys.com` resolved to `1.1.1.1` from January 1 to January 7 during two different ranges of January 1 to January 3 and January 5 to January 7, and you targeted January 1 through January 7 with your API call, then this endpoint will group those ranges into one entry for the `1.1.1.1` A record in the response.<br><br>To retrieve records for a name with each record broken down by time range, use the [ranges endpoint](https://docs.censys.com/reference/v3-globaldata-dns-name-resolution-ranges).<br><br>In a SOC environment, use this endpoint to see the A, AAAA, MX, NS, SOA, and TXT records observed for a suspicious domain, to pivot to its hosting and mail infrastructure.<br><br>This endpoint is only available to organizations on the Censys Search and Censys Core plans.<br><br>[Learn more about Censys Active DNS](https://docs.censys.com/docs/platform-active-dns).
 func (s *GlobalData) ListDNSNameResolutionBounds(ctx context.Context, request operations.V3GlobaldataDNSNameResolutionBoundRequest, opts ...operations.Option) (*operations.V3GlobaldataDNSNameResolutionBoundResponse, error) {
 	globals := operations.V3GlobaldataDNSNameResolutionBoundGlobals{
 		OrganizationID: s.sdkConfiguration.Globals.OrganizationID,
@@ -4236,7 +4251,7 @@ func (s *GlobalData) ListDNSNameResolutionBounds(ctx context.Context, request op
 
 			var out sdkerrors.AuthenticationError
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -4263,7 +4278,7 @@ func (s *GlobalData) ListDNSNameResolutionBounds(ctx context.Context, request op
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -4284,7 +4299,7 @@ func (s *GlobalData) ListDNSNameResolutionBounds(ctx context.Context, request op
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -4320,7 +4335,7 @@ func (s *GlobalData) ListDNSNameResolutionBounds(ctx context.Context, request op
 }
 
 // ListDNSNameResolutionRanges - Get DNS resolution records for a name (ranges)
-// Retrieve the records that resolved for a name during a time frame. This endpoint returns observed A, AAAA, MX, NS, SOA, and TXT records for the name you provide. You can filter by one or more record types using `record_types`.<br><br>Record results are broken down based on time range. For example, if `censys.com` resolved to `1.1.1.1` from January 1 to January 7 during two different ranges of January 1 to January 3 and January 5 to January 7, and you targeted January 1 through January 7 with your API call, then this endpoint will return one row for each of those distinct ranges for the `1.1.1.1` A record.<br><br>To retrieve records for a name with each result aggregated per record, use the [bounds endpoint endpoint](https://docs.censys.com/reference/v3-globaldata-dns-name-resolution-bound).<br><br>This endpoint is only available to organizations on the Censys Search and Censys Core plans.<br><br>[Learn more about Censys Active DNS](https://docs.censys.com/docs/platform-active-dns).
+// Retrieve the records that resolved for a name during a time frame. This endpoint returns observed A, AAAA, MX, NS, SOA, and TXT records for the name you provide. You can filter by one or more record types using `record_types`.<br><br>Record results are broken down based on time range. For example, if `censys.com` resolved to `1.1.1.1` from January 1 to January 7 during two different ranges of January 1 to January 3 and January 5 to January 7, and you targeted January 1 through January 7 with your API call, then this endpoint will return one row for each of those distinct ranges for the `1.1.1.1` A record.<br><br>To retrieve records for a name with each result aggregated per record, use the [bounds endpoint endpoint](https://docs.censys.com/reference/v3-globaldata-dns-name-resolution-bound).<br><br>In a SOC environment, use this endpoint to see when a domain's records changed over time, such as a sudden hosting move after takedown.<br><br>This endpoint is only available to organizations on the Censys Search and Censys Core plans.<br><br>[Learn more about Censys Active DNS](https://docs.censys.com/docs/platform-active-dns).
 func (s *GlobalData) ListDNSNameResolutionRanges(ctx context.Context, request operations.V3GlobaldataDNSNameResolutionRangesRequest, opts ...operations.Option) (*operations.V3GlobaldataDNSNameResolutionRangesResponse, error) {
 	globals := operations.V3GlobaldataDNSNameResolutionRangesGlobals{
 		OrganizationID: s.sdkConfiguration.Globals.OrganizationID,
@@ -4520,7 +4535,7 @@ func (s *GlobalData) ListDNSNameResolutionRanges(ctx context.Context, request op
 
 			var out sdkerrors.AuthenticationError
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -4547,7 +4562,7 @@ func (s *GlobalData) ListDNSNameResolutionRanges(ctx context.Context, request op
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -4568,7 +4583,7 @@ func (s *GlobalData) ListDNSNameResolutionRanges(ctx context.Context, request op
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -4604,7 +4619,7 @@ func (s *GlobalData) ListDNSNameResolutionRanges(ctx context.Context, request op
 }
 
 // CreateTrackedScan - Live Rescan: Initiate a new rescan
-// Initiate a rescan for a known host service at a specific IP and port (`ip:port`) or hostname and port (`hostname:port`). This is equivalent to the [Live Rescan](https://docs.censys.com/docs/platform-live-rescan#/) feature available in the UI, but you can also target web properties in addition to hosts.<br><br>The scan may take several minutes to complete. The response will contain a scan ID that you can use to [monitor the scan's status](https://docs.censys.com/reference/v3-globaldata-scans-get#/). After the scan completes, perform a lookup on the target asset to retrieve detailed scan information.<br><br>This endpoint is available to all Enterprise customers. It costs 10 credits to execute.
+// Initiate a rescan for a known host service at a specific IP and port (`ip:port`) or hostname and port (`hostname:port`). This is equivalent to the [Live Rescan](https://docs.censys.com/docs/platform-live-rescan#/) feature available in the UI, but you can also target web properties in addition to hosts.<br><br>The scan may take several minutes to complete. The response will contain a scan ID that you can use to [monitor the scan's status](https://docs.censys.com/reference/v3-globaldata-scans-get#/). After the scan completes, perform a lookup on the target asset to retrieve detailed scan information.<br><br>In a SOC environment, rescan to ensure triage, an investigation, or a hunt has the most accurate and current state. This includes information like whether C2 servers are still operational, or whether an organization's asset is still exposed to the internet.<br><br>This endpoint is available to all Enterprise customers. It costs 10 credits to execute.
 func (s *GlobalData) CreateTrackedScan(ctx context.Context, request operations.V3GlobaldataScansRescanRequest, opts ...operations.Option) (*operations.V3GlobaldataScansRescanResponse, error) {
 	globals := operations.V3GlobaldataScansRescanGlobals{
 		OrganizationID: s.sdkConfiguration.Globals.OrganizationID,
@@ -4811,7 +4826,7 @@ func (s *GlobalData) CreateTrackedScan(ctx context.Context, request operations.V
 
 			var out sdkerrors.AuthenticationError
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -4826,6 +4841,8 @@ func (s *GlobalData) CreateTrackedScan(ctx context.Context, request operations.V
 		fallthrough
 	case httpRes.StatusCode == 403:
 		fallthrough
+	case httpRes.StatusCode == 409:
+		fallthrough
 	case httpRes.StatusCode == 422:
 		switch {
 		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/problem+json`):
@@ -4836,7 +4853,7 @@ func (s *GlobalData) CreateTrackedScan(ctx context.Context, request operations.V
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -4857,7 +4874,7 @@ func (s *GlobalData) CreateTrackedScan(ctx context.Context, request operations.V
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -4893,7 +4910,7 @@ func (s *GlobalData) CreateTrackedScan(ctx context.Context, request operations.V
 }
 
 // GetTrackedScan - Get scan status
-// Retrieve the current status of a scan by its ID. This endpoint works for both [Live Discovery scans](https://docs.censys.com/reference/v3-threathunting-scans-discovery#/) and [Live Rescans](https://docs.censys.com/reference/v3-globaldata-scans-rescan#/).<br><br>If the scan was successful, perform a lookup on the target asset to retrieve detailed scan information.<br><br>This endpoint is available to all Enterprise customers. This endpoint does not cost any credits to execute.
+// Retrieve the current status of a scan by its ID. This endpoint works for both [Live Discovery scans](https://docs.censys.com/reference/v3-threathunting-scans-discovery#/) and [Live Rescans](https://docs.censys.com/reference/v3-globaldata-scans-rescan#/).<br><br>Use this endpoint to check whether a Live Discovery or Live Rescan scan has finished, so automation knows when fresh data is ready to pull.<br><br>If the scan was successful, perform a lookup on the target asset to retrieve detailed scan information.<br><br>This endpoint is available to all enterprise customers. This endpoint does not cost any credits to execute.
 func (s *GlobalData) GetTrackedScan(ctx context.Context, request operations.V3GlobaldataScansGetRequest, opts ...operations.Option) (*operations.V3GlobaldataScansGetResponse, error) {
 	globals := operations.V3GlobaldataScansGetGlobals{
 		OrganizationID: s.sdkConfiguration.Globals.OrganizationID,
@@ -5093,7 +5110,7 @@ func (s *GlobalData) GetTrackedScan(ctx context.Context, request operations.V3Gl
 
 			var out sdkerrors.AuthenticationError
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -5118,7 +5135,7 @@ func (s *GlobalData) GetTrackedScan(ctx context.Context, request operations.V3Gl
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -5139,7 +5156,7 @@ func (s *GlobalData) GetTrackedScan(ctx context.Context, request operations.V3Gl
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -5175,7 +5192,7 @@ func (s *GlobalData) GetTrackedScan(ctx context.Context, request operations.V3Gl
 }
 
 // Aggregate results for a search query
-// Aggregate results for a Platform search query. This functionality is equivalent to the [Report Builder](https://docs.censys.com/docs/platform-report-builder#/) in the Platform web UI.
+// Aggregate results for a Platform search query. This functionality is equivalent to the [Report Builder](https://docs.censys.com/docs/platform-report-builder#/) in the Platform web UI.<br><br>In a SOC environment, use this endpoint to count and bucket matches by field, such as country, ASN, or port, to size a campaign or spot where malicious infrastructure clusters without pulling every record.
 func (s *GlobalData) Aggregate(ctx context.Context, request operations.V3GlobaldataSearchAggregateRequest, opts ...operations.Option) (*operations.V3GlobaldataSearchAggregateResponse, error) {
 	globals := operations.V3GlobaldataSearchAggregateGlobals{
 		OrganizationID: s.sdkConfiguration.Globals.OrganizationID,
@@ -5382,7 +5399,7 @@ func (s *GlobalData) Aggregate(ctx context.Context, request operations.V3Globald
 
 			var out sdkerrors.AuthenticationError
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -5407,7 +5424,7 @@ func (s *GlobalData) Aggregate(ctx context.Context, request operations.V3Globald
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -5428,7 +5445,7 @@ func (s *GlobalData) Aggregate(ctx context.Context, request operations.V3Globald
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -5671,7 +5688,7 @@ func (s *GlobalData) ConvertLegacySearchQueries(ctx context.Context, request ope
 
 			var out sdkerrors.AuthenticationError
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -5694,7 +5711,7 @@ func (s *GlobalData) ConvertLegacySearchQueries(ctx context.Context, request ope
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -5715,7 +5732,7 @@ func (s *GlobalData) ConvertLegacySearchQueries(ctx context.Context, request ope
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -5751,7 +5768,7 @@ func (s *GlobalData) ConvertLegacySearchQueries(ctx context.Context, request ope
 }
 
 // Search - Run a search query
-// Run a search query across Censys data. Reference the [documentation on Censys Query Language](https://docs.censys.com/docs/censys-query-language#/) for information about query syntax. Host services that match your search criteria will be returned in a `matched_services` object.
+// Run a search query across Censys data. Reference the [documentation on Censys Query Language](https://docs.censys.com/docs/censys-query-language#/) for information about query syntax.<br><br>Host services that match your search criteria will be returned in a `matched_services` object.<br><br>In a SOC environment, use this endpoint to hunt for hosts, web properties, or certificates that match an indicator, such as a C2 banner, JARM, or favicon hash to scope infrastructure tied to an alert.
 func (s *GlobalData) Search(ctx context.Context, request operations.V3GlobaldataSearchQueryRequest, opts ...operations.Option) (*operations.V3GlobaldataSearchQueryResponse, error) {
 	globals := operations.V3GlobaldataSearchQueryGlobals{
 		OrganizationID: s.sdkConfiguration.Globals.OrganizationID,
@@ -5958,7 +5975,7 @@ func (s *GlobalData) Search(ctx context.Context, request operations.V3Globaldata
 
 			var out sdkerrors.AuthenticationError
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -5983,7 +6000,7 @@ func (s *GlobalData) Search(ctx context.Context, request operations.V3Globaldata
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out
@@ -6004,7 +6021,7 @@ func (s *GlobalData) Search(ctx context.Context, request operations.V3Globaldata
 
 			var out sdkerrors.ErrorModel
 			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
+				return nil, sdkerrors.NewResponseValidationError("response did not match the declared error schema", httpRes.StatusCode, string(rawBody), httpRes, err)
 			}
 
 			return nil, &out

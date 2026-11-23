@@ -89,6 +89,14 @@ func (o *templatedObject) materialiseProto() {
 	}
 }
 
+func (o *templatedObject) hasAndGetStr(name unistring.String, receiver Value) (Value, bool) {
+	ownProp := o.getOwnPropStr(name)
+	if ownProp == nil {
+		o.materialiseProto()
+	}
+	return o.hasAndGetOwnStr(name, ownProp, receiver)
+}
+
 func (o *templatedObject) getStr(name unistring.String, receiver Value) Value {
 	ownProp := o.getOwnPropStr(name)
 	if ownProp == nil {
@@ -228,7 +236,7 @@ func (o *templatedObject) hasOwnPropertySym(s *Symbol) bool {
 
 func (o *templatedObject) defineOwnPropertyStr(name unistring.String, descr PropertyDescriptor, throw bool) bool {
 	existingVal := o.getOwnPropStr(name)
-	if v, ok := o._defineOwnProperty(name, existingVal, descr, throw); ok {
+	if v, ok := o._defineOwnProperty(name, nil, existingVal, descr, throw); ok {
 		o.values[name] = v
 		if existingVal == nil {
 			o.materialisePropNames()

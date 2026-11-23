@@ -6,6 +6,9 @@ on:
 permissions:
   contents: read
 
+env:
+  FERN_USE_SDK_GEN_API: "false"
+
 jobs:
   test_fern_publish:
     name: Test Fern Python Publish

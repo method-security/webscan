@@ -1,10 +1,12 @@
 package gofakeit
 
 import (
+	"encoding"
 	"encoding/json"
 	"fmt"
 	"math"
 	"reflect"
+	"slices"
 	"strings"
 	"unicode"
 
@@ -57,12 +59,12 @@ func replaceWithNumbers(f *Faker, str string) string {
 		return str
 	}
 	bytestr := []byte(str)
-	for i := 0; i < len(bytestr); i++ {
+	for i := range bytestr {
 		if bytestr[i] == hashtag {
 			bytestr[i] = byte(randDigit(f))
 		}
 	}
-	if bytestr[0] == '0' {
+	if str[0] == hashtag && bytestr[0] == '0' {
 		bytestr[0] = byte(f.IntN(8)+1) + '0'
 	}
 
@@ -75,7 +77,7 @@ func replaceWithLetters(f *Faker, str string) string {
 		return str
 	}
 	bytestr := []byte(str)
-	for i := 0; i < len(bytestr); i++ {
+	for i := range bytestr {
 		if bytestr[i] == questionmark {
 			bytestr[i] = byte(randLetter(f))
 		}
@@ -90,7 +92,7 @@ func replaceWithHexLetters(f *Faker, str string) string {
 		return str
 	}
 	bytestr := []byte(str)
-	for i := 0; i < len(bytestr); i++ {
+	for i := range bytestr {
 		if bytestr[i] == questionmark {
 			bytestr[i] = byte(randHexLetter(f))
 		}
@@ -129,8 +131,12 @@ func randIntRange(f *Faker, min, max int) int {
 		min, max = max, min // Swap if min is greater than max
 	}
 
-	// Use f.IntN to generate a random number in [0, rangeSize) and shift it into [min, max].
-	return f.IntN(max-min+1) + min
+	// Compute the span as uint so ranges wider than maxInt do not overflow.
+	span := uint(max) - uint(min)
+	if span == maxUint {
+		return int(f.Uint())
+	}
+	return int(f.UintN(span+1)) + min
 }
 
 // Generate random uint between min and max
@@ -143,8 +149,50 @@ func randUintRange(f *Faker, min, max uint) uint {
 		min, max = max, min // Swap if min is greater than max
 	}
 
+	// Full range: max-min+1 would wrap to 0.
+	if max-min == maxUint {
+		return f.Uint()
+	}
+
 	// Use f.UintN to generate a random number in [0, rangeSize) and shift it into [min, max].
 	return f.UintN(max-min+1) + min
+}
+
+// Generate random int64 between min and max
+func randInt64Range(f *Faker, min, max int64) int64 {
+	if min == max {
+		return min
+	}
+
+	if min > max {
+		min, max = max, min // Swap if min is greater than max
+	}
+
+	// Compute the span as uint64 so ranges wider than maxInt64 do not overflow.
+	span := uint64(max) - uint64(min)
+	if span == math.MaxUint64 {
+		return int64(f.Uint64())
+	}
+	return int64(uint64NFunc(f, span+1)) + min
+}
+
+// Generate random uint64 between min and max
+func randUint64Range(f *Faker, min, max uint64) uint64 {
+	if min == max {
+		return min // Immediate return if range is zero
+	}
+
+	if min > max {
+		min, max = max, min // Swap if min is greater than max
+	}
+
+	// Full range: max-min+1 would wrap to 0.
+	if max-min == math.MaxUint64 {
+		return f.Uint64()
+	}
+
+	// Use uint64NFunc to generate a random number in [0, rangeSize) and shift it into [min, max].
+	return uint64NFunc(f, max-min+1) + min
 }
 
 func toFixed(num float64, precision int) float64 {
@@ -199,12 +247,7 @@ func equalSliceInterface(a, b []any) bool {
 }
 
 func stringInSlice(a string, list []string) bool {
-	for _, b := range list {
-		if b == a {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(list, a)
 }
 
 func anyToString(a any) string {
@@ -271,9 +314,35 @@ func title(s string) string {
 		s)
 }
 
+// fieldValue turns a field value that the json, csv and xml encoders do not write well into its text.
+// An error is its message, the encoders would write the struct behind it as {}, and a value with
+// a MarshalText method, like the time.Time of pastdate, is that text. Anything else, a nil pointer
+// too, comes back as it is.
+func fieldValue(value any) (any, error) {
+	if v := reflect.ValueOf(value); v.Kind() == reflect.Pointer && v.IsNil() {
+		return value, nil
+	}
+
+	switch val := value.(type) {
+	case error:
+		return val.Error(), nil
+	case encoding.TextMarshaler:
+		text, err := val.MarshalText()
+		if err != nil {
+			return nil, err
+		}
+		return string(text), nil
+	}
+
+	return value, nil
+}
+
 func funcLookupSplit(str string) ([]string, error) {
 	out := []string{}
 	for str != "" {
+		// An array can come after spaces, like the second value in "2, [6,20]"
+		str = strings.TrimLeftFunc(str, unicode.IsSpace)
+
 		if strings.HasPrefix(str, "[") {
 			startIndex := strings.Index(str, "[")
 			endIndex := strings.Index(str, "]")
@@ -285,7 +354,8 @@ func funcLookupSplit(str string) ([]string, error) {
 			out = append(out, strings.TrimSpace(val))
 			str = strings.Replace(str, val, "", 1)
 
-			// Trim off comma if it has it
+			// Trim off comma if it has it, spaces can come before it
+			str = strings.TrimLeftFunc(str, unicode.IsSpace)
 			if strings.HasPrefix(str, ",") {
 				str = strings.Replace(str, ",", "", 1)
 			}
@@ -354,7 +424,7 @@ func parseMapParams(info *Info, fParams string) (*MapParams, error) {
 
 // Used for splitting the values
 func addSplitValsToMapParams(splitVals []string, info *Info, mapParams *MapParams) (*MapParams, error) {
-	for ii := 0; ii < len(splitVals); ii++ {
+	for ii := range splitVals {
 		if len(info.Params)-1 >= ii {
 			if strings.HasPrefix(splitVals[ii], "[") {
 				lookupSplits, err := funcLookupSplit(strings.TrimRight(strings.TrimLeft(splitVals[ii], "["), "]"))

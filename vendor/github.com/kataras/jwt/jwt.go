@@ -1,8 +1,10 @@
 package jwt
 
 import (
-	"bytes"
 	"encoding/json"
+	jsontext "encoding/json/jsontext"
+	jsonv2 "encoding/json/v2"
+	"errors"
 	"os"
 	"reflect"
 	"time"
@@ -35,7 +37,8 @@ import (
 //
 //	// Verify and extract claims
 //	var verifiedClaims jwt.Map
-//	err = jwt.Verify(jwt.HS256, secretKey, token, &verifiedClaims)
+//	verifiedToken, err := jwt.Verify(jwt.HS256, secretKey, token)
+//	err = verifiedToken.Claims(&verifiedClaims)
 //
 //	// Access claims dynamically
 //	userID := verifiedClaims["sub"].(string)
@@ -52,12 +55,12 @@ type Map = map[string]any
 //   - Leeway calculations for time-based validators
 //
 // The default implementation uses time.Now(), but it can be overridden for:
-//   - **Testing**: Set fixed times to create deterministic test scenarios
-//   - **Time zones**: Use custom time sources for specific timezone requirements
-//   - **Simulation**: Simulate future or past times for testing edge cases
-//   - **Synchronized time**: Use network time protocols for distributed systems
+//   - Testing: Set fixed times to create deterministic test scenarios
+//   - Time zones: Use custom time sources for specific timezone requirements
+//   - Simulation: Simulate future or past times for testing edge cases
+//   - Synchronized time: Use network time protocols for distributed systems
 //
-// **Thread Safety**: Modifications to Clock should be done during application
+// Thread Safety: Modifications to Clock should be done during application
 // initialization before concurrent operations begin. The function itself should
 // be thread-safe as it may be called from multiple goroutines simultaneously.
 //
@@ -87,24 +90,24 @@ var Clock = time.Now
 // across all verification operations in the application. It implements the HeaderValidator
 // interface and is responsible for algorithm validation and basic header consistency checking.
 //
-// **Default Behavior**: The default implementation (compareHeader) performs:
+// Default Behavior: The default implementation (compareHeader) performs:
 //   - Algorithm matching between expected and token header
 //   - Header structure validation (standard vs reversed field order)
 //   - Support for headers with and without "typ": "JWT" field
 //   - Fast byte-level comparison for known algorithm patterns
 //
-// **Customization Use Cases**:
-//   - **Cross-platform compatibility**: Handle tokens from other JWT libraries
-//   - **Legacy token support**: Accept non-standard header formats
-//   - **Third-party integration**: Support tokens from external services
-//   - **Custom validation**: Add application-specific header validation logic
+// Customization Use Cases:
+//   - Cross-platform compatibility: Handle tokens from other JWT libraries
+//   - Legacy token support: Accept non-standard header formats
+//   - Third-party integration: Support tokens from external services
+//   - Custom validation: Add application-specific header validation logic
 //
-// **Global vs Per-Token Validation**:
+// Global vs Per-Token Validation:
 //   - Modifying CompareHeader affects ALL token verification in the application
 //   - For per-token validation, use VerifyWithHeaderValidator instead
 //   - Consider thread safety when modifying this global variable
 //
-// **Thread Safety**: Changes should be made during application initialization
+// Thread Safety: Changes should be made during application initialization
 // before concurrent verification operations begin.
 //
 // Example customization:
@@ -135,7 +138,9 @@ var Clock = time.Now
 //	    return nil, nil, nil, nil // Use provided algorithm and key
 //	}
 //
-// To restore default behavior: jwt.CompareHeader = jwt.compareHeader
+// There is no exported way back to the default, so keep a copy before replacing it:
+//
+//	defaultCompare := jwt.CompareHeader
 var CompareHeader HeaderValidator = compareHeader
 
 // ReadFile defines the file reading function used by key loading utilities.
@@ -145,17 +150,17 @@ var CompareHeader HeaderValidator = compareHeader
 // key loading utilities. The default implementation uses os.ReadFile for
 // standard filesystem access.
 //
-// **Use Cases for Customization**:
-//   - **Embedded files**: Read keys from embedded filesystem (embed.FS)
-//   - **Remote storage**: Fetch keys from cloud storage, databases, or APIs
-//   - **Encrypted storage**: Read and decrypt keys from secure storage
-//   - **Virtual filesystems**: Support non-standard file sources
-//   - **Testing**: Use in-memory file systems for unit tests
+// Use Cases for Customization:
+//   - Embedded files: Read keys from embedded filesystem (embed.FS)
+//   - Remote storage: Fetch keys from cloud storage, databases, or APIs
+//   - Encrypted storage: Read and decrypt keys from secure storage
+//   - Virtual filesystems: Support non-standard file sources
+//   - Testing: Use in-memory file systems for unit tests
 //
-// **Function Signature**: Must match `func(filename string) ([]byte, error)`
+// Function Signature: Must match `func(filename string) ([]byte, error)`
 // to be compatible with standard os.ReadFile behavior.
 //
-// **Thread Safety**: This variable should be set during application initialization
+// Thread Safety: This variable should be set during application initialization
 // before concurrent key loading operations. The function itself should be thread-safe
 // as it may be called from multiple goroutines.
 //
@@ -195,29 +200,54 @@ var CompareHeader HeaderValidator = compareHeader
 //	}
 var ReadFile = os.ReadFile
 
+// marshalOptions reproduces today's json.Marshal (v1) output exactly, using
+// encoding/json/v2 directly for its lower allocation cost:
+//
+//   - Deterministic(true): sorted map keys, so a map[string]any claims value with more
+//     than one key signs the same bytes every run. Required, not cosmetic: without it
+//     testdata/golden.json and every signature over map claims would be irreproducible.
+//   - EscapeForHTML/EscapeForJS(true): matches v1's default escaping of <, >, &, U+2028
+//     and U+2029 inside strings.
+//   - AllowInvalidUTF8(true): v1 silently replaces invalid UTF-8 rather than erroring on
+//     Marshal; keep that leniency so a claim value that signs successfully today still
+//     does.
+//
+// Deliberately not included: OmitEmptyWithLegacySemantics. Claims.NotBefore/IssuedAt/
+// Expiry are tagged "omitzero" rather than "omitempty" for exactly this reason: under
+// bare v2 semantics, omitempty on an int64 does not omit a zero value, so an unset "exp"
+// would start being serialized as "exp":0 instead of left out.
+var marshalOptions = jsonv2.JoinOptions(
+	jsonv2.Deterministic(true),
+	jsontext.EscapeForHTML(true),
+	jsontext.EscapeForJS(true),
+	jsontext.AllowInvalidUTF8(true),
+)
+
 // Marshal defines the JSON marshaling function used for encoding JWT payloads.
 //
 // This package-level variable allows customization of how claims are serialized
 // to JSON before being included in JWT tokens. The default implementation handles
-// both raw byte slices and arbitrary Go values using the standard json.Marshal.
+// both raw byte slices and arbitrary Go values, using encoding/json/v2 with the
+// option set above to reproduce encoding/json's (v1) output exactly, at v2's cost.
 //
-// **Default Behavior**:
+// Default Behavior:
 //   - Raw []byte values are passed through unchanged (for pre-serialized JSON)
-//   - All other values are marshaled using standard json.Marshal
+//   - All other values are marshaled using encoding/json/v2, with options chosen to
+//     match json.Marshal's byte-for-byte output
 //   - Supports any type that implements json.Marshaler interface
 //
-// **Customization Use Cases**:
-//   - **Custom JSON encoding**: Use alternative JSON libraries (e.g., jsoniter, gojay)
-//   - **Field transformation**: Apply custom field naming, omission, or formatting
-//   - **Compression**: Compress payloads before encoding for large claims
-//   - **Encryption**: Encrypt sensitive fields before marshaling
-//   - **Validation**: Add payload validation during marshaling
-//   - **Debugging**: Add logging or monitoring to track payload sizes
+// Customization Use Cases:
+//   - Custom JSON encoding: Use alternative JSON libraries (e.g., jsoniter, gojay)
+//   - Field transformation: Apply custom field naming, omission, or formatting
+//   - Compression: Compress payloads before encoding for large claims
+//   - Encryption: Encrypt sensitive fields before marshaling
+//   - Validation: Add payload validation during marshaling
+//   - Debugging: Add logging or monitoring to track payload sizes
 //
-// **Performance Considerations**: The Marshal function is called for every token
+// Performance Considerations: The Marshal function is called for every token
 // generation, so performance optimizations here can significantly impact throughput.
 //
-// **Thread Safety**: This variable should be set during application initialization.
+// Thread Safety: This variable should be set during application initialization.
 // The function itself must be thread-safe as it's called from concurrent operations.
 //
 // Example customizations:
@@ -251,37 +281,40 @@ var Marshal = func(v any) ([]byte, error) {
 		return b, nil
 	}
 
-	return json.Marshal(v)
+	return jsonv2.Marshal(v, marshalOptions)
 }
 
 // Unmarshal defines the JSON unmarshaling function used for decoding JWT payloads.
 //
 // This package-level variable allows customization of how JWT payload JSON is
-// deserialized into Go data structures. The default implementation uses json.Decoder
-// with UseNumber() enabled to preserve numeric precision and avoid float64 conversion
-// issues common with JSON parsing.
+// deserialized into Go data structures. The default implementation uses
+// encoding/json/v2 with a numberUnmarshalers hook that reproduces what
+// json.Decoder.UseNumber() gave v1: numeric precision preserved when the
+// destination is `any`, rather than lost to a float64 conversion.
 //
-// **Default Behavior (defaultUnmarshal)**:
-//   - Uses json.Decoder with UseNumber() to handle integers correctly
+// Default Behavior (defaultUnmarshal):
+//   - Uses encoding/json/v2 with a custom unmarshal hook for numbers into `any`
 //   - Prevents automatic conversion of all numbers to float64
 //   - Preserves numeric precision for large integers
 //   - Decodes JSON numbers as json.Number type when destination is any
+//   - Tolerates duplicate JSON object keys (Merge/Enrich can produce them) and
+//     case-differing standard claim names, matching today's behavior
 //
-// **Why UseNumber() Matters**:
-//   - Standard json.Unmarshal converts all numbers to float64
+// Why Numeric Precision Matters:
+//   - A destination-agnostic JSON decode converts all numbers to float64
 //   - Float64 cannot accurately represent large integers (>53 bits)
 //   - JWT claims like "iat", "exp", "nbf" are Unix timestamps (large integers)
 //   - User IDs and other identifiers may be large integers
 //
-// **Customization Use Cases**:
-//   - **Alternative JSON libraries**: Use faster or feature-rich JSON libraries
-//   - **Custom number handling**: Different numeric type preferences
-//   - **Field validation**: Add validation during unmarshaling
-//   - **Field transformation**: Apply custom transformations to incoming data
-//   - **Debugging**: Add logging to monitor claim structures
-//   - **Security**: Add input sanitization or filtering
+// Customization Use Cases:
+//   - Alternative JSON libraries: Use faster or feature-rich JSON libraries
+//   - Custom number handling: Different numeric type preferences
+//   - Field validation: Add validation during unmarshaling
+//   - Field transformation: Apply custom transformations to incoming data
+//   - Debugging: Add logging to monitor claim structures
+//   - Security: Add input sanitization or filtering
 //
-// **Thread Safety**: This variable should be set during application initialization.
+// Thread Safety: This variable should be set during application initialization.
 // The function itself must be thread-safe as it's called from concurrent operations.
 //
 // Example customizations:
@@ -318,21 +351,21 @@ var Unmarshal = defaultUnmarshal
 // JWT payload. It's particularly useful for enforcing strict claim requirements
 // in security-critical applications.
 //
-// **Required Field Validation**:
+// Required Field Validation:
 //   - Checks struct fields tagged with `json:"fieldname,required"`
 //   - Validates that required fields are present in the JSON payload
 //   - Ensures required fields have non-zero values (not nil, empty string, etc.)
 //   - Returns ErrMissingKey if any required field is missing or empty
 //
-// **Usage Pattern**: Replace the global Unmarshal function to enable required
+// Usage Pattern: Replace the global Unmarshal function to enable required
 // field validation for all token verification operations in the application.
 //
-// **Field Tag Format**: Use standard JSON tags with "required" option:
+// Field Tag Format: Use standard JSON tags with "required" option:
 //
 //	`json:"field_name,required"` - Field is required and must be present
 //	`json:"field_name,omitempty,required"` - Cannot combine omitempty with required
 //
-// **Validation Rules**:
+// Validation Rules:
 //   - String fields: Must not be empty ("")
 //   - Numeric fields: Must not be zero value (0, 0.0)
 //   - Boolean fields: Must be explicitly set (false is valid)
@@ -340,7 +373,7 @@ var Unmarshal = defaultUnmarshal
 //   - Pointer fields: Must not be nil
 //   - Interface fields: Must not be nil
 //
-// **Performance**: Adds reflection-based validation overhead after unmarshaling.
+// Performance: Adds reflection-based validation overhead after unmarshaling.
 // Consider the performance impact for high-throughput applications.
 //
 // Parameters:
@@ -366,7 +399,8 @@ var Unmarshal = defaultUnmarshal
 //
 //	// Verify token - will fail if required fields are missing
 //	var claims UserClaims
-//	err := jwt.Verify(jwt.HS256, secretKey, token, &claims)
+//	verifiedToken, err := jwt.Verify(jwt.HS256, secretKey, token)
+//	err = verifiedToken.Claims(&claims)
 //	if err != nil {
 //	    // Could be ErrMissingKey if required fields are missing
 //	    log.Printf("Token verification failed: %v", err)
@@ -385,10 +419,45 @@ func UnmarshalWithRequired(payload []byte, dest any) error {
 	return meetRequirements(reflect.ValueOf(dest))
 }
 
+// decodeOptions is used by every JSON payload decode in this package: the package-level
+// Unmarshal var (via unmarshalOptions below) and verify.go's two claims decodes.
+//
+//   - AllowDuplicateNames(true): required. Merge and Enrich can legitimately splice
+//     duplicate object keys (documented as an accepted interoperability hazard, not a
+//     bug, since Merge never reparses its own output). The decoder must keep reading the
+//     last occurrence, exactly as encoding/json (v1) does today.
+//   - AllowInvalidUTF8(true): symmetric with marshalOptions above.
+//   - MatchCaseInsensitiveNames(true): not new behavior — v1 has always case-folded
+//     struct field matching; this option just makes that explicit for v2. A token whose
+//     issuer capitalized a claim name differently, and that verified under Go 1.26, must
+//     keep verifying.
+var decodeOptions = jsonv2.JoinOptions(
+	jsontext.AllowDuplicateNames(true),
+	jsontext.AllowInvalidUTF8(true),
+	jsonv2.MatchCaseInsensitiveNames(true),
+)
+
+// numberUnmarshalers reproduces json.Decoder.UseNumber()'s behavior for a v2 decode into
+// an `any` destination. v2 has no built-in equivalent — a bare v2 decode of a JSON number
+// into `any` produces float64, which loses precision for exp/iat/nbf and large numeric
+// IDs above 2^53. This hook is the only mechanism v2 offers for the any-destination case.
+var numberUnmarshalers = jsonv2.WithUnmarshalers(jsonv2.UnmarshalFromFunc(
+	func(dec *jsontext.Decoder, v *any) error {
+		if dec.PeekKind() == '0' { // jsontext.Kind for "number"
+			val, err := dec.ReadValue()
+			if err != nil {
+				return err
+			}
+			*v = json.Number(val)
+			return nil
+		}
+		return errors.ErrUnsupported // fall through to v2's default handling
+	}))
+
+var unmarshalOptions = jsonv2.JoinOptions(decodeOptions, numberUnmarshalers)
+
 func defaultUnmarshal(payload []byte, dest any) error {
-	dec := json.NewDecoder(bytes.NewReader(payload))
-	dec.UseNumber() // fixes the issue of setting float64 instead of int64 on maps.
-	return dec.Decode(&dest)
+	return jsonv2.Unmarshal(payload, &dest, unmarshalOptions)
 }
 
 // InjectFunc defines a function type for modifying JWT payload data during token processing.
@@ -397,33 +466,33 @@ func defaultUnmarshal(payload []byte, dest any) error {
 // verification but before unmarshaling (decoding). It's the foundation for advanced
 // JWT features like payload encryption, compression, and custom data transformations.
 //
-// **Function Signature**:
+// Function Signature:
 //   - Input: plainPayload []byte - The raw payload data to transform
 //   - Output: []byte - The transformed payload data
 //   - Output: error - Any transformation error
 //
-// **Use Cases**:
-//   - **Encryption**: Encrypt sensitive payload data (see GCM function)
-//   - **Compression**: Compress large payloads to reduce token size
-//   - **Encoding**: Apply custom encoding schemes (base32, hex, etc.)
-//   - **Validation**: Add payload validation with transformation
-//   - **Filtering**: Remove or redact sensitive fields
-//   - **Augmentation**: Add computed fields or metadata
+// Use Cases:
+//   - Encryption: Encrypt sensitive payload data (see GCM function)
+//   - Compression: Compress large payloads to reduce token size
+//   - Encoding: Apply custom encoding schemes (base32, hex, etc.)
+//   - Validation: Add payload validation with transformation
+//   - Filtering: Remove or redact sensitive fields
+//   - Augmentation: Add computed fields or metadata
 //
-// **Usage Contexts**:
-//   - **Signing**: Applied before payload is base64-encoded and signed
-//   - **Verification**: Applied after signature verification but before claims extraction
-//   - **Multi-key scenarios**: Different InjectFunc per key in Keys registry
-//   - **Custom algorithms**: Algorithm-specific payload processing
+// Usage Contexts:
+//   - Signing: Applied before payload is base64-encoded and signed
+//   - Verification: Applied after signature verification but before claims extraction
+//   - Multi-key scenarios: Different InjectFunc per key in Keys registry
+//   - Custom algorithms: Algorithm-specific payload processing
 //
-// **Implementation Requirements**:
+// Implementation Requirements:
 //   - Must be deterministic for the same input (especially for signing)
 //   - Should be reversible if used for both encoding and decoding
 //   - Must handle edge cases gracefully (empty payloads, invalid data)
 //   - Should be thread-safe for concurrent operations
 //   - Error handling should be comprehensive and descriptive
 //
-// **Built-in Implementations**:
+// Built-in Implementations:
 //   - GCM(): Creates encrypt/decrypt function pair for AES-GCM encryption
 //   - Custom implementations for specific transformation needs
 //

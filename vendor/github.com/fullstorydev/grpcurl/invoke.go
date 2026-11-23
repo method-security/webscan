@@ -9,10 +9,10 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/golang/protobuf/jsonpb"     //lint:ignore SA1019 we have to import these because some of their types appear in exported API
-	"github.com/golang/protobuf/proto"      //lint:ignore SA1019 same as above
-	"github.com/jhump/protoreflect/desc"    //lint:ignore SA1019 same as above
-	"github.com/jhump/protoreflect/dynamic" //lint:ignore SA1019 same as above
+	"github.com/golang/protobuf/jsonpb"
+	"github.com/golang/protobuf/proto"
+	"github.com/jhump/protoreflect/desc"
+	"github.com/jhump/protoreflect/dynamic"
 	"github.com/jhump/protoreflect/dynamic/grpcdynamic"
 	"github.com/jhump/protoreflect/grpcreflect"
 	"google.golang.org/grpc"
@@ -106,7 +106,7 @@ func InvokeRPC(ctx context.Context, source DescriptorSource, ch grpcdynamic.Chan
 		case isNotFoundError(err):
 			return fmt.Errorf("target server does not expose service %q", svc)
 		}
-		return fmt.Errorf("failed to query for service descriptor %q: %v", svc, err)
+		return fmt.Errorf("failed to query for service descriptor %q: %w", svc, err)
 	}
 	sd, ok := dsc.(*desc.ServiceDescriptor)
 	if !ok {
@@ -155,7 +155,7 @@ func invokeUnary(ctx context.Context, stub grpcdynamic.Stub, md *desc.MethodDesc
 
 	err := requestData(req)
 	if err != nil && err != io.EOF {
-		return fmt.Errorf("error getting request data: %v", err)
+		return fmt.Errorf("error getting request data: %w", err)
 	}
 	if err != io.EOF {
 		// verify there is no second message, which is a usage error
@@ -163,7 +163,7 @@ func invokeUnary(ctx context.Context, stub grpcdynamic.Stub, md *desc.MethodDesc
 		if err == nil {
 			return fmt.Errorf("method %q is a unary RPC, but request data contained more than 1 message", md.GetFullyQualifiedName())
 		} else if err != io.EOF {
-			return fmt.Errorf("error getting request data: %v", err)
+			return fmt.Errorf("error getting request data: %w", err)
 		}
 	}
 
@@ -205,7 +205,7 @@ func invokeClientStream(ctx context.Context, stub grpcdynamic.Stub, md *desc.Met
 			break
 		}
 		if err != nil {
-			return fmt.Errorf("error getting request data: %v", err)
+			return fmt.Errorf("error getting request data: %w", err)
 		}
 
 		err = str.SendMsg(req)
@@ -249,7 +249,7 @@ func invokeServerStream(ctx context.Context, stub grpcdynamic.Stub, md *desc.Met
 
 	err := requestData(req)
 	if err != nil && err != io.EOF {
-		return fmt.Errorf("error getting request data: %v", err)
+		return fmt.Errorf("error getting request data: %w", err)
 	}
 	if err != io.EOF {
 		// verify there is no second message, which is a usage error
@@ -257,7 +257,7 @@ func invokeServerStream(ctx context.Context, stub grpcdynamic.Stub, md *desc.Met
 		if err == nil {
 			return fmt.Errorf("method %q is a server-streaming RPC, but request data contained more than 1 message", md.GetFullyQualifiedName())
 		} else if err != io.EOF {
-			return fmt.Errorf("error getting request data: %v", err)
+			return fmt.Errorf("error getting request data: %w", err)
 		}
 	}
 
@@ -326,7 +326,7 @@ func invokeBidi(ctx context.Context, stub grpcdynamic.Stub, md *desc.MethodDescr
 					break
 				}
 				if err != nil {
-					err = fmt.Errorf("error getting request data: %v", err)
+					err = fmt.Errorf("error getting request data: %w", err)
 					cancel()
 					break
 				}

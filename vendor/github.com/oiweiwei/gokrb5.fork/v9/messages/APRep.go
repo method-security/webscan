@@ -15,6 +15,12 @@ import (
 	"github.com/oiweiwei/gokrb5.fork/v9/types"
 )
 
+type marshalAPRep struct {
+	PVNO    int                 `asn1:"explicit,tag:0"`
+	MsgType int                 `asn1:"explicit,tag:1"`
+	EncPart types.EncryptedData `asn1:"explicit,tag:2"`
+}
+
 // APRep implements RFC 4120 KRB_AP_REP: https://tools.ietf.org/html/rfc4120#section-5.5.2.
 type APRep struct {
 	PVNO             int                 `asn1:"explicit,tag:0"`
@@ -61,15 +67,23 @@ func NewAPRep(sessionKey types.EncryptionKey, part EncAPRepPart) (APRep, error) 
 		return APRep{}, krberror.Errorf(err, krberror.KRBMsgError, "error creating EncAPRepPart for AP_REP")
 	}
 	return APRep{
-		PVNO:    iana.PVNO,
-		MsgType: msgtype.KRB_AP_REP,
-		EncPart: ed,
+		PVNO:             iana.PVNO,
+		MsgType:          msgtype.KRB_AP_REP,
+		EncPart:          ed,
+		DecryptedEncPart: part,
 	}, nil
 }
 
 // Marshal the APRep struct.
 func (a *APRep) Marshal() ([]byte, error) {
-	b, err := asn1.Marshal(*a)
+
+	m := marshalAPRep{
+		PVNO:    a.PVNO,
+		MsgType: a.MsgType,
+		EncPart: a.EncPart,
+	}
+
+	b, err := asn1.Marshal(m)
 	if err != nil {
 		return nil, krberror.Errorf(err, krberror.EncodingError, "AP_REP marshal error")
 	}
@@ -78,14 +92,22 @@ func (a *APRep) Marshal() ([]byte, error) {
 
 // Unmarshal bytes b into the APRep struct.
 func (a *APRep) Unmarshal(b []byte) error {
-	_, err := asn1.UnmarshalWithParams(b, a, fmt.Sprintf("application,explicit,tag:%v", asnAppTag.APREP))
+
+	var m marshalAPRep
+
+	_, err := asn1.UnmarshalWithParams(b, &m, fmt.Sprintf("application,explicit,tag:%v", asnAppTag.APREP))
 	if err != nil {
 		return processUnmarshalReplyError(b, err)
 	}
 	expectedMsgType := msgtype.KRB_AP_REP
-	if a.MsgType != expectedMsgType {
-		return krberror.NewErrorf(krberror.KRBMsgError, "message ID does not indicate a KRB_AP_REP. Expected: %v; Actual: %v", expectedMsgType, a.MsgType)
+	if m.MsgType != expectedMsgType {
+		return krberror.NewErrorf(krberror.KRBMsgError, "message ID does not indicate a KRB_AP_REP. Expected: %v; Actual: %v", expectedMsgType, m.MsgType)
 	}
+
+	a.PVNO = m.PVNO
+	a.MsgType = m.MsgType
+	a.EncPart = m.EncPart
+
 	return nil
 }
 

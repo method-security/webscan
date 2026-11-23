@@ -146,6 +146,7 @@ func createDocument(info *datamodel.SpecInfo, config *datamodel.DocumentConfigur
 	idxConfig.IgnorePolymorphicCircularReferences = config.IgnorePolymorphicCircularReferences
 	idxConfig.AllowUnknownExtensionContentDetection = config.AllowUnknownExtensionContentDetection
 	idxConfig.SkipExternalRefResolution = config.SkipExternalRefResolution
+	idxConfig.AllowExcessiveAliases = config.AllowExcessiveAliases
 	idxConfig.ResolveNestedRefsWithDocumentContext = config.ResolveNestedRefsWithDocumentContext
 	idxConfig.AvoidCircularReferenceCheck = true
 	idxConfig.BaseURL = config.BaseURL
@@ -236,6 +237,12 @@ func createDocument(info *datamodel.SpecInfo, config *datamodel.DocumentConfigur
 	// set the index on the document.
 	doc.Index = rolodex.GetRootIndex()
 	doc.SpecInfo = info
+	for _, err := range roloErrs {
+		var resolvingErr *index.ResolvingError
+		if errors.As(err, &resolvingErr) && errors.Is(resolvingErr.ErrorRef, index.ErrReferenceChainCycle) {
+			return &doc, errors.Join(errs...)
+		}
+	}
 
 	// build out swagger scalar variables.
 	_ = low.BuildModel(info.RootNode.Content[0], &doc)

@@ -49,6 +49,7 @@ type EndpointScanState struct {
 	Keycloak          *Keycloak                           `json:"keycloak,omitempty"`
 	Kubernetes        *Kubernetes                         `json:"kubernetes,omitempty"`
 	Mcp               *Mcp                                `json:"mcp,omitempty"`
+	NetflixNrdp       *NetflixNrdp                        `json:"netflix_nrdp,omitempty"`
 	NginxProxyManager *NginxProxyManager                  `json:"nginx_proxy_manager,omitempty"`
 	Ollama            *Ollama                             `json:"ollama,omitempty"`
 	OpenDirectory     *OpenDirectory                      `json:"open_directory,omitempty"`
@@ -64,6 +65,7 @@ type EndpointScanState struct {
 	ScanTime          *string                             `json:"scan_time,omitempty"`
 	Screenshots       []Screenshot                        `json:"screenshots,omitempty"`
 	SynologyDsm       *SynologyDsm                        `json:"synology_dsm,omitempty"`
+	TailscaleDerp     *TailscaleDerp                      `json:"tailscale_derp,omitempty"`
 	TransportProtocol *EndpointScanStateTransportProtocol `json:"transport_protocol,omitempty"`
 	Vault             *Vault                              `json:"vault,omitempty"`
 	Wordpress         *Wordpress                          `json:"wordpress,omitempty"`
@@ -216,6 +218,13 @@ func (e *EndpointScanState) GetMcp() *Mcp {
 	return e.Mcp
 }
 
+func (e *EndpointScanState) GetNetflixNrdp() *NetflixNrdp {
+	if e == nil {
+		return nil
+	}
+	return e.NetflixNrdp
+}
+
 func (e *EndpointScanState) GetNginxProxyManager() *NginxProxyManager {
 	if e == nil {
 		return nil
@@ -319,6 +328,13 @@ func (e *EndpointScanState) GetSynologyDsm() *SynologyDsm {
 		return nil
 	}
 	return e.SynologyDsm
+}
+
+func (e *EndpointScanState) GetTailscaleDerp() *TailscaleDerp {
+	if e == nil {
+		return nil
+	}
+	return e.TailscaleDerp
 }
 
 func (e *EndpointScanState) GetTransportProtocol() *EndpointScanStateTransportProtocol {

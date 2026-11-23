@@ -8,6 +8,7 @@ import (
 	"bufio"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"hash"
 	"hash/crc32"
 	"io"
@@ -443,10 +444,6 @@ func readDirectoryHeader(f *File, r io.Reader) error {
 		f.NonUTF8 = f.Flags&0x800 == 0
 	}
 
-	needUSize := f.UncompressedSize == ^uint32(0)
-	needCSize := f.CompressedSize == ^uint32(0)
-	needHeaderOffset := f.headerOffset == int64(^uint32(0))
-
 	// Best effort to find what we need.
 	// Other zip authors might not even follow the basic format,
 	// and we'll just ignore the Extra content in that case.
@@ -468,22 +465,19 @@ parseExtras:
 			// They should only be consulted if the sizes read earlier
 			// are maxed out.
 			// See golang.org/issue/13367.
-			if needUSize {
-				needUSize = false
+			if f.UncompressedSize == ^uint32(0) {
 				if len(fieldBuf) < 8 {
 					return ErrFormat
 				}
 				f.UncompressedSize64 = fieldBuf.uint64()
 			}
-			if needCSize {
-				needCSize = false
+			if f.CompressedSize == ^uint32(0) {
 				if len(fieldBuf) < 8 {
 					return ErrFormat
 				}
 				f.CompressedSize64 = fieldBuf.uint64()
 			}
-			if needHeaderOffset {
-				needHeaderOffset = false
+			if f.headerOffset == int64(^uint32(0)) {
 				if len(fieldBuf) < 8 {
 					return ErrFormat
 				}
@@ -544,20 +538,6 @@ parseExtras:
 		if f.ModifiedTime != 0 || f.ModifiedDate != 0 {
 			f.Modified = modified.In(timeZone(msdosModified.Sub(modified)))
 		}
-	}
-
-	// Assume that uncompressed size 2³²-1 could plausibly happen in
-	// an old zip32 file that was sharding inputs into the largest chunks
-	// possible (or is just malicious; search the web for 42.zip).
-	// If needUSize is true still, it means we didn't see a zip64 extension.
-	// As long as the compressed size is not also 2³²-1 (implausible)
-	// and the header is not also 2³²-1 (equally implausible),
-	// accept the uncompressed size 2³²-1 as valid.
-	// If nothing else, this keeps archive/zip working with 42.zip.
-	_ = needUSize
-
-	if needCSize || needHeaderOffset {
-		return ErrFormat
 	}
 
 	return nil
@@ -642,7 +622,7 @@ func readDirectoryEnd(r io.ReaderAt, size int64) (dir *directoryEnd, baseOffset 
 	d.comment = string(b[:l])
 
 	// These values mean that the file can be a zip64 file
-	if d.directoryRecords == 0xffff || d.directorySize == 0xffff || d.directoryOffset == 0xffffffff {
+	if d.directoryRecords == 0xffff || d.directorySize == 0xffffffff || d.directoryOffset == 0xffffffff {
 		p, err := findDirectory64End(r, directoryEndOffset)
 		if err == nil && p >= 0 {
 			directoryEndOffset = p
@@ -823,78 +803,7 @@ func (f *fileListEntry) ModTime() time.Time {
 func (f *fileListEntry) Info() (fs.FileInfo, error) { return f, nil }
 
 func (f *fileListEntry) String() string {
-	return formatDirEntry(f)
-}
-
-// formatDirEntry returns a formatted version of dir for human readability.
-// Implementations of [DirEntry] can call this from a String method.
-// The outputs for a directory named subdir and a file named hello.go are:
-//
-//	d subdir/
-//	- hello.go
-//
-// TODO: Use fs.FormatDirEntry when Go 1.20 is no longer supported
-func formatDirEntry(dir fs.DirEntry) string {
-	name := dir.Name()
-	b := make([]byte, 0, 5+len(name))
-
-	// The Type method does not return any permission bits,
-	// so strip them from the string.
-	mode := dir.Type().String()
-	mode = mode[:len(mode)-9]
-
-	b = append(b, mode...)
-	b = append(b, ' ')
-	b = append(b, name...)
-	if dir.IsDir() {
-		b = append(b, '/')
-	}
-	return string(b)
-}
-
-// formatFileInfo returns a formatted version of info for human readability.
-// Implementations of [FileInfo] can call this from a String method.
-// The output for a file named "hello.go", 100 bytes, mode 0o644, created
-// January 1, 1970 at noon is
-//
-//	-rw-r--r-- 100 1970-01-01 12:00:00 hello.go
-//
-// TODO: Use fs.FormatFileInfo when Go 1.20 is no longer supported
-func formatFileInfo(info fs.FileInfo) string {
-	name := info.Name()
-	b := make([]byte, 0, 40+len(name))
-	b = append(b, info.Mode().String()...)
-	b = append(b, ' ')
-
-	size := info.Size()
-	var usize uint64
-	if size >= 0 {
-		usize = uint64(size)
-	} else {
-		b = append(b, '-')
-		usize = uint64(-size)
-	}
-	var buf [20]byte
-	i := len(buf) - 1
-	for usize >= 10 {
-		q := usize / 10
-		buf[i] = byte('0' + usize - q*10)
-		i--
-		usize = q
-	}
-	buf[i] = byte('0' + usize)
-	b = append(b, buf[i:]...)
-	b = append(b, ' ')
-
-	b = append(b, info.ModTime().Format(time.DateTime)...)
-	b = append(b, ' ')
-
-	b = append(b, name...)
-	if info.IsDir() {
-		b = append(b, '/')
-	}
-
-	return string(b)
+	return fs.FormatDirEntry(f)
 }
 
 // toValidName coerces name to be a valid name for fs.FS.Open.
@@ -1093,6 +1002,12 @@ func (d *openDir) ReadDir(count int) ([]fs.DirEntry, error) {
 		s, err := d.files[d.offset+i].stat()
 		if err != nil {
 			return nil, err
+		} else if s.Name() == "." || !fs.ValidPath(s.Name()) {
+			return nil, &fs.PathError{
+				Op:   "readdir",
+				Path: d.e.name,
+				Err:  fmt.Errorf("invalid file name: %v", d.files[d.offset+i].name),
+			}
 		}
 		list[i] = s
 	}

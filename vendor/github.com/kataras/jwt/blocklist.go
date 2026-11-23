@@ -3,7 +3,10 @@ package jwt
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -38,17 +41,36 @@ var ErrBlocked = errors.New("jwt: token is blocked")
 //	// Invalidate a token (e.g., on logout)
 //	err = blocklist.InvalidateToken(token, verifiedToken.StandardClaims)
 type Blocklist struct {
-	Clock func() time.Time
 	// GetKey is a function which can be used how to extract
 	// the unique identifier for a token, by default
 	// it checks if the "jti" is not empty, if it's then the key is the token itself.
 	GetKey func(token []byte, claims Claims) string
 
+	// clockFn is what GC reads the current time from. Held in an atomic and reached
+	// through SetClock because the sweeper goroutine loads it on every tick, and the
+	// caller may replace it at any point.
+	//
+	// This was an exported Clock field, and no caller could set it without a data race
+	// once automatic garbage collection was on: NewBlocklist starts the sweeper before it
+	// returns, so there was no moment left in which the write was safe.
+	clockFn atomic.Pointer[func() time.Time]
+
 	entries map[string]int64 // key = token or its ID | value = expiration unix seconds (to remove expired).
 	// ^ we could make it a map[*VerifiedToken]struct{} too
 	// but let's have a more general usage here.
 	mu sync.RWMutex
+
+	stop      chan struct{}
+	closeOnce sync.Once
 }
+
+// neverExpires marks an entry that garbage collection must never remove.
+//
+// A token with no "exp" is valid forever, so its revocation has to last forever too.
+// Storing the claim's zero Expiry instead meant GC saw an entry that expired in 1970 and
+// deleted it on the very next tick, while InvalidateToken had already returned nil. The
+// caller was told the token was revoked and it was not.
+const neverExpires int64 = 1<<63 - 1
 
 var _ TokenValidator = (*Blocklist)(nil)
 
@@ -91,9 +113,14 @@ func NewBlocklist(gcEvery time.Duration) *Blocklist {
 func NewBlocklistContext(ctx context.Context, gcEvery time.Duration) *Blocklist {
 	b := &Blocklist{
 		entries: make(map[string]int64),
-		Clock:   Clock,
-		GetKey:  defaultGetKey,
+		GetKey:  DefaultBlocklistKey,
+		stop:    make(chan struct{}),
 	}
+
+	// Take a copy of the package-level Clock now rather than reading it on every tick.
+	// The sweeper below outlives this call, and a test that swaps jwt.Clock while one is
+	// running would otherwise be racing it.
+	b.SetClock(Clock)
 
 	if gcEvery > 0 {
 		go b.runGC(ctx, gcEvery)
@@ -102,10 +129,75 @@ func NewBlocklistContext(ctx context.Context, gcEvery time.Duration) *Blocklist 
 	return b
 }
 
-// defaultGetKey extracts a unique identifier from a token for blocklist storage.
-// It prefers the "jti" (JWT ID) claim if present, otherwise uses the full token.
-// This function can be customized by setting the Blocklist.GetKey field.
-func defaultGetKey(token []byte, c Claims) string {
+// Close stops the garbage collection goroutine started by NewBlocklist.
+//
+// NewBlocklist passes context.Background(), so without this the goroutine and its ticker
+// live for as long as the process does. Use it when blocklists are created per test, per
+// tenant, or anywhere else that is not process-wide. Calling it more than once is safe,
+// and the entries stay readable afterwards.
+//
+// Close always returns a nil error. It returns one so that callers can defer it in the
+// same shape as anything else they close.
+func (b *Blocklist) Close() error {
+	b.closeOnce.Do(func() {
+		if b.stop != nil {
+			close(b.stop)
+		}
+	})
+
+	return nil
+}
+
+// SetClock sets the clock garbage collection reads the current time from, replacing the
+// package-level Clock for this blocklist alone. Pass nil to go back to it.
+//
+// This is a method rather than a field because automatic garbage collection reads the
+// clock from a goroutine of its own, started before NewBlocklist returns. Calling this at
+// any point is safe, including while that sweeper is mid-tick:
+//
+//	b := jwt.NewBlocklist(time.Hour)
+//	b.SetClock(func() time.Time { return time.Now().UTC() })
+func (b *Blocklist) SetClock(fn func() time.Time) {
+	if fn == nil {
+		b.clockFn.Store(nil)
+		return
+	}
+
+	b.clockFn.Store(&fn)
+}
+
+// clock reports the current time, falling back to the package-level Clock so that a
+// zero-value Blocklist works instead of panicking on a nil function.
+func (b *Blocklist) clock() time.Time {
+	if fn := b.clockFn.Load(); fn != nil {
+		return (*fn)()
+	}
+
+	return Clock()
+}
+
+// getKey extracts the entry key for a token, falling back to DefaultBlocklistKey for the
+// same reason as clock.
+func (b *Blocklist) getKey(token []byte, c Claims) string {
+	if b.GetKey != nil {
+		return b.GetKey(token, c)
+	}
+
+	return DefaultBlocklistKey(token, c)
+}
+
+// DefaultBlocklistKey extracts the entry key for a token. It is what Blocklist.GetKey
+// does unless you replace it.
+//
+// The key is the "jti" claim when the token carries one, and the whole token otherwise.
+// That fallback is the part worth knowing about: an implementation that returns the "jti"
+// unconditionally maps every token without one to the empty key, so revoking a single
+// session blocks every session that also lacks a "jti". Storage backends written against
+// this package have shipped that bug. Call this rather than reimplementing it.
+//
+// Give your tokens a "jti". The fallback keeps whole bearer credentials, signature
+// included, in memory for as long as the entry lives.
+func DefaultBlocklistKey(token []byte, c Claims) string {
 	if c.ID != "" {
 		return c.ID
 	}
@@ -124,10 +216,16 @@ func defaultGetKey(token []byte, c Claims) string {
 //  2. Check if the token key exists in the blocklist
 //  3. Return ErrBlocked if found, otherwise allow the token
 func (b *Blocklist) ValidateToken(token []byte, c Claims, err error) error {
-	key := b.GetKey(token, c)
+	key := b.getKey(token, c)
 	if err != nil {
-		if err == ErrExpired {
-			b.Del(key)
+		if errors.Is(err, ErrExpired) {
+			// Opportunistic cleanup of an entry whose token has expired on its own, not the
+			// revocation itself. The token is already refused by the error returned just
+			// below, and that error has to reach the caller unchanged so that
+			// errors.Is(err, ErrExpired) still holds, so there is nowhere here to report a
+			// failure to. Del never returns one, and an entry left behind is collected by
+			// the next GC pass.
+			_ = b.Del(key)
 		}
 
 		return err // respect the previous error.
@@ -166,10 +264,35 @@ func (b *Blocklist) InvalidateToken(token []byte, c Claims) error {
 		return ErrMissing
 	}
 
-	key := b.GetKey(token, c)
+	key := b.getKey(token, c)
+	if key == "" {
+		// An empty key cannot be looked up: Has refuses it with ErrMissing, so the entry
+		// would sit in the map and match nothing. Storing it and returning nil is the
+		// worst of both, and it is what happened with a GetKey that returned the "jti"
+		// unconditionally: InvalidateToken reported success, the session stayed live, and
+		// nothing anywhere said so.
+		return fmt.Errorf("%w: the key function returned an empty key, so this token "+
+			"cannot be blocked; give it a jti or use DefaultBlocklistKey", ErrMissing)
+	}
+
+	// A token with no usable "exp" never expires, so neither may its revocation.
+	expiry := c.Expiry
+	if expiry <= 0 {
+		expiry = neverExpires
+	}
+
+	// Copy the key before it becomes a map key. When the token carries no "jti" the key
+	// is BytesToString(token), which shares the caller's buffer: storing that string
+	// header means a caller who reuses the buffer silently rewrites the contents of an
+	// existing map key. Copying costs one allocation on a path that runs once per
+	// revocation, not once per request.
+	key = strings.Clone(key)
 
 	b.mu.Lock()
-	b.entries[key] = c.Expiry
+	if b.entries == nil {
+		b.entries = make(map[string]int64)
+	}
+	b.entries[key] = expiry
 	b.mu.Unlock()
 
 	return nil
@@ -237,23 +360,26 @@ func (b *Blocklist) Has(key string) (bool, error) {
 //	removed := blocklist.GC()
 //	log.Printf("Cleaned up %d expired tokens", removed)
 func (b *Blocklist) GC() int {
-	now := b.Clock().Round(time.Second).Unix()
-	var markedForDeletion []string
+	now := b.clock().Round(time.Second).Unix()
 
-	b.mu.RLock()
+	// One write lock for the whole sweep, and deletion while ranging, which Go allows.
+	// The previous form collected under a read lock, released it, then took a write lock
+	// per key: a token revoked in that window was deleted immediately afterwards and
+	// silently stopped being blocked. Holding the lock for the sweep costs latency
+	// proportional to the number of entries, which is the number of revocations still
+	// inside their lifetime, and buys back a revocation that cannot be lost.
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	var n int
 	for token, expiry := range b.entries {
-		if now > expiry {
-			markedForDeletion = append(markedForDeletion, token)
+		if expiry == neverExpires {
+			continue
 		}
-	}
-	b.mu.RUnlock()
 
-	n := len(markedForDeletion)
-	if n > 0 {
-		for _, token := range markedForDeletion {
-			b.mu.Lock()
+		if now > expiry {
 			delete(b.entries, token)
-			b.mu.Unlock()
+			n++
 		}
 	}
 
@@ -264,14 +390,59 @@ func (b *Blocklist) GC() int {
 // It runs in a separate goroutine and can be stopped via context cancellation.
 func (b *Blocklist) runGC(ctx context.Context, every time.Duration) {
 	t := time.NewTicker(every)
+	defer t.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
-			t.Stop()
+			return
+		case <-b.stop:
 			return
 		case <-t.C:
-			b.GC()
+			b.collect()
 		}
 	}
 }
+
+// collect runs one GC pass and swallows a panic from it.
+//
+// GC calls the clock from SetClock, which the caller owns. A panic there would otherwise
+// travel up a goroutine nobody is recovering on and take the whole process down, which is
+// an unreasonable outcome for a cleanup tick. Skipping one pass is not.
+func (b *Blocklist) collect() {
+	defer func() {
+		_ = recover()
+	}()
+
+	b.GC()
+}
+
+// TokenBlocklist is the method set of *Blocklist.
+//
+// The concrete type is the only thing this package exported, so anything wanting to accept
+// either the in-memory blocklist or its own Redis-backed one had to declare this interface
+// itself. At least one downstream package did, in a file whose entire contents were this
+// declaration.
+//
+// Accept this rather than *Blocklist:
+//
+//	func NewVerifier(keys jwt.Keys, blocklist jwt.TokenBlocklist) *Verifier
+//
+// An implementation of your own should call DefaultBlocklistKey rather than deriving the
+// key itself. Getting that wrong has taken a production system down: returning the "jti"
+// unconditionally maps every token without one to the empty key, so one logout blocked
+// every session in the system.
+type TokenBlocklist interface {
+	TokenValidator
+
+	// InvalidateToken revokes a token.
+	InvalidateToken(token []byte, c Claims) error
+	// Del removes an entry by key.
+	Del(key string) error
+	// Has reports whether a key is blocked.
+	Has(key string) (bool, error)
+	// Count reports how many entries are held.
+	Count() (int64, error)
+}
+
+var _ TokenBlocklist = (*Blocklist)(nil)

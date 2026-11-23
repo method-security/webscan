@@ -21,11 +21,11 @@ type decoder20 struct {
 func (d *decoder20) version() int { return decode20Ver }
 
 // init intializes the decoder for decoding a new file.
-func (d *decoder20) init(r byteReader, reset bool, size int64, ver int) {
+func (d *decoder20) init(f archiveFile, reset bool, size int64, ver int) {
 	if d.br == nil {
-		d.br = newRarBitReader(r)
+		d.br = newRarBitReader(f)
 	} else {
-		d.br.reset(r)
+		d.br.reset(f)
 	}
 	d.size = size
 	if reset {
@@ -65,8 +65,7 @@ func readCodeLengthTable20(br *rarBitReader, table []byte) error {
 			if i == 0 {
 				return ErrInvalidLengthTable
 			}
-			var n int
-			n, err = br.readBits(2)
+			n, err := br.readBits(2)
 			if err != nil {
 				return err
 			}

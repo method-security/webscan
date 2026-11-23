@@ -41,7 +41,7 @@ func product(f *Faker) *ProductInfo {
 
 	// Features
 	features := []string{}
-	for i := 0; i < number(f, 1, 5); i++ {
+	for range number(f, 1, 5) {
 		features = append(features, productFeature(f))
 	}
 
@@ -186,15 +186,26 @@ func (f *Faker) ProductUPC() string { return productUPC(f) }
 
 func productUPC(f *Faker) string {
 	// The first digit of a UPC is a fixed digit (usually 0)
-	upc := "0"
+	var upc strings.Builder
+	upc.WriteString("0")
 
-	// Generate the remaining 11 digits randomly
-	for i := 1; i < 12; i++ {
+	// Generate the next 10 digits randomly
+	for i := 1; i < 11; i++ {
 		digit := number(f, 0, 9)
-		upc += fmt.Sprintf("%d", digit)
+		upc.WriteString(fmt.Sprintf("%d", digit))
 	}
 
-	return upc
+	// The last digit is the check digit, the digits in odd positions count three times
+	sum := 0
+	for i, c := range upc.String() {
+		digit := int(c - '0')
+		if i%2 == 0 {
+			digit *= 3
+		}
+		sum += digit
+	}
+
+	return upc.String() + strconv.Itoa((10-sum%10)%10)
 }
 
 // ProductAudience will generate a random target audience
@@ -284,7 +295,7 @@ func productISBN(f *Faker, opts *ISBNOptions) string {
 	// string of n random digits
 	randomDigits := func(f *Faker, n int) string {
 		digits := make([]byte, n)
-		for i := 0; i < n; i++ {
+		for i := range n {
 			digits[i] = byte('0' + number(f, 0, 9))
 		}
 		return string(digits)
@@ -292,10 +303,10 @@ func productISBN(f *Faker, opts *ISBNOptions) string {
 
 	switch opts.Version {
 	case "10":
-		// ISBN-10 format: group(1)-registrant(4)-publication(3)-check(1)
+		// ISBN-10 format: group(1)-registrant(4)-publication(4)-check(1)
 		group := randomDigits(f, 1)
 		registrant := randomDigits(f, 4)
-		publication := randomDigits(f, 3)
+		publication := randomDigits(f, 4)
 		base := group + registrant + publication
 
 		// checksum
@@ -359,7 +370,7 @@ func addProductLookup() {
 	],
 	"color": "navy",
 	"material": "brass",
-	"upc": "012780949980",
+	"upc": "012780949981",
 	"audience": [
 		"adults"
 	],
@@ -510,7 +521,7 @@ func addProductLookup() {
 		Display:     "Product UPC",
 		Category:    "product",
 		Description: "Standardized barcode used for product identification and tracking in retail and commerce",
-		Example:     "012780949980",
+		Example:     "012780949981",
 		Output:      "string",
 		Aliases: []string{
 			"upc code",

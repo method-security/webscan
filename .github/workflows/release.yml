@@ -3,6 +3,9 @@ name: 🎉 Release
 on:
   workflow_call:
 
+env:
+  FERN_USE_SDK_GEN_API: "false"
+
 jobs:
   release:
     name: Release

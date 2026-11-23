@@ -1,3 +1,5 @@
+version: 2
+
 builds:
   - binary: grpcurl
     main: ./cmd/grpcurl
@@ -19,8 +21,6 @@ builds:
     ignore:
       - goos: darwin
         goarch: 386
-      - goos: windows
-        goarch: arm64
       - goos: darwin
         goarch: arm
       - goos: windows
@@ -61,3 +61,6 @@ nfpms:
     formats:
       - deb
       - rpm
+
+changelog:
+  use: github-native

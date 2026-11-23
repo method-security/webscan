@@ -13,7 +13,8 @@ on:
         type: string
 
 env:
-  GO_VERSION: "1.26"
+  FERN_USE_SDK_GEN_API: "false"
+  GO_VERSION: "1.27"
 
 jobs:
   prepare-linux-arm:

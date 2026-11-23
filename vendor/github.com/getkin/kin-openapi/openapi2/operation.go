@@ -10,18 +10,18 @@ import (
 type Operation struct {
 	Extensions map[string]any `json:"-" yaml:"-"`
 
-	Summary      string                 `json:"summary,omitempty" yaml:"summary,omitempty"`
-	Description  string                 `json:"description,omitempty" yaml:"description,omitempty"`
-	Deprecated   bool                   `json:"deprecated,omitempty" yaml:"deprecated,omitempty"`
-	ExternalDocs *openapi3.ExternalDocs `json:"externalDocs,omitempty" yaml:"externalDocs,omitempty"`
-	Tags         []string               `json:"tags,omitempty" yaml:"tags,omitempty"`
-	OperationID  string                 `json:"operationId,omitempty" yaml:"operationId,omitempty"`
-	Parameters   Parameters             `json:"parameters,omitempty" yaml:"parameters,omitempty"`
-	Responses    map[string]*Response   `json:"responses" yaml:"responses"`
-	Consumes     []string               `json:"consumes,omitempty" yaml:"consumes,omitempty"`
-	Produces     []string               `json:"produces,omitempty" yaml:"produces,omitempty"`
-	Schemes      []string               `json:"schemes,omitempty" yaml:"schemes,omitempty"`
-	Security     *SecurityRequirements  `json:"security,omitempty" yaml:"security,omitempty"`
+	Summary      string                 `json:"summary,omitempty,case:strict" yaml:"summary,omitempty"`
+	Description  string                 `json:"description,omitempty,case:strict" yaml:"description,omitempty"`
+	Deprecated   bool                   `json:"deprecated,omitempty,case:strict" yaml:"deprecated,omitempty"`
+	ExternalDocs *openapi3.ExternalDocs `json:"externalDocs,omitempty,case:strict" yaml:"externalDocs,omitempty"`
+	Tags         []string               `json:"tags,omitempty,case:strict" yaml:"tags,omitempty"`
+	OperationID  string                 `json:"operationId,omitempty,case:strict" yaml:"operationId,omitempty"`
+	Parameters   Parameters             `json:"parameters,omitempty,case:strict" yaml:"parameters,omitempty"`
+	Responses    *Responses             `json:"responses,case:strict" yaml:"responses"`
+	Consumes     []string               `json:"consumes,omitempty,case:strict" yaml:"consumes,omitempty"`
+	Produces     []string               `json:"produces,omitempty,case:strict" yaml:"produces,omitempty"`
+	Schemes      []string               `json:"schemes,omitempty,case:strict" yaml:"schemes,omitempty"`
+	Security     *SecurityRequirements  `json:"security,omitempty,case:strict" yaml:"security,omitempty"`
 }
 
 // MarshalJSON returns the JSON encoding of Operation.
@@ -49,7 +49,13 @@ func (operation Operation) MarshalJSON() ([]byte, error) {
 	if x := operation.Parameters; len(x) != 0 {
 		m["parameters"] = x
 	}
-	m["responses"] = operation.Responses
+	// Required, so written even when missing: as null, not as the "{}" YAML
+	// would make of a nil map.
+	if x := operation.Responses; x != nil {
+		m["responses"] = x
+	} else {
+		m["responses"] = nil
+	}
 	if x := operation.Consumes; len(x) != 0 {
 		m["consumes"] = x
 	}
@@ -69,10 +75,12 @@ func (operation Operation) MarshalJSON() ([]byte, error) {
 func (operation *Operation) UnmarshalJSON(data []byte) error {
 	type OperationBis Operation
 	var x OperationBis
-	if err := json.Unmarshal(data, &x); err != nil {
+	if err := unmarshalJSON(data, &x); err != nil {
 		return unmarshalError(err)
 	}
-	_ = json.Unmarshal(data, &x.Extensions)
+	if err := unmarshalJSON(data, &x.Extensions); err != nil {
+		return unmarshalError(err)
+	}
 	delete(x.Extensions, "summary")
 	delete(x.Extensions, "description")
 	delete(x.Extensions, "deprecated")

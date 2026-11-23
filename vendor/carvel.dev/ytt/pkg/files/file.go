@@ -4,12 +4,23 @@
 package files
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 )
+
+// utf8BOM is the UTF-8 encoding of U+FEFF. Some editors, and Windows tooling in
+// particular, write it at the start of a file to record the encoding.
+var utf8BOM = []byte{0xEF, 0xBB, 0xBF}
+
+// TrimUTF8BOM returns data without a leading UTF-8 byte order mark. It only
+// removes the stream marker; a U+FEFF later in the input remains content.
+func TrimUTF8BOM(data []byte) []byte {
+	return bytes.TrimPrefix(data, utf8BOM)
+}
 
 var (
 	yamlExts     = []string{".yaml", ".yml"}
@@ -92,11 +103,18 @@ func NewSortedFilesFromPaths(paths []string, opts SymlinkAllowOpts) ([]*File, er
 			}
 
 			if fileInfo.IsDir() {
-				err := filepath.Walk(path, func(walkedPath string, fi os.FileInfo, err error) error {
+				absDir, err := filepath.Abs(filepath.Clean(path))
+				if err != nil {
+					return nil, fmt.Errorf("Resolving path '%s': %s", path, err)
+				}
+				err = filepath.Walk(absDir, func(
+					walkedPath string, fi os.FileInfo, err error,
+				) error {
 					if err != nil || fi.IsDir() {
 						return err
 					}
-					regLocalSource, err := NewRegularFileLocalSource(walkedPath, path, fi, opts)
+					regLocalSource, err := NewRegularFileLocalSource(
+						walkedPath, absDir, fi, opts)
 					if err != nil {
 						return err
 					}

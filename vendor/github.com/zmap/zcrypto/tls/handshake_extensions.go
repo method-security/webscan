@@ -1,7 +1,6 @@
 package tls
 
 import (
-	"errors"
 	"fmt"
 )
 
@@ -158,28 +157,6 @@ func (e *ExtendedMasterSecretExtension) Marshal() []byte {
 	return result
 }
 
-type NextProtocolNegotiationExtension struct {
-	Protocols []string
-}
-
-func (e *NextProtocolNegotiationExtension) WriteToConfig(c *Config) error {
-	c.NextProtos = e.Protocols
-	return nil
-}
-
-func (e *NextProtocolNegotiationExtension) CheckImplemented() error {
-	return nil
-}
-
-func (e *NextProtocolNegotiationExtension) Marshal() []byte {
-	result := make([]byte, 4)
-	result[0] = byte(extensionNextProtoNeg >> 8)
-	result[1] = byte(extensionNextProtoNeg & 0xff)
-	result[2] = 0
-	result[3] = 0
-	return result
-}
-
 type StatusRequestExtension struct {
 }
 
@@ -238,7 +215,7 @@ func (e *SupportedCurvesExtension) WriteToConfig(c *Config) error {
 func (e *SupportedCurvesExtension) CheckImplemented() error {
 	for _, curve := range e.Curves {
 		found := false
-		for _, supported := range defaultCurvePreferences {
+		for _, supported := range supportedCurvePreferences {
 			if curve == supported {
 				found = true
 			}
@@ -321,28 +298,6 @@ func (e *SessionTicketExtension) Marshal() []byte {
 	return result
 }
 
-type HeartbeatExtension struct {
-	Mode byte
-}
-
-func (e *HeartbeatExtension) WriteToConfig(c *Config) error {
-	return nil
-}
-
-func (e *HeartbeatExtension) CheckImplemented() error {
-	return nil
-}
-
-func (e *HeartbeatExtension) Marshal() []byte {
-	result := make([]byte, 5)
-	result[0] = byte(extensionHeartbeat >> 8)
-	result[1] = byte(extensionHeartbeat & 0xff)
-	result[2] = uint8(1 >> 8)
-	result[3] = uint8(1)
-	result[4] = e.Mode
-	return result
-}
-
 type SignatureAlgorithmExtension struct {
 	SignatureAndHashes []uint16
 }
@@ -353,17 +308,22 @@ func (e *SignatureAlgorithmExtension) WriteToConfig(c *Config) error {
 }
 
 func (e *SignatureAlgorithmExtension) CheckImplemented() error {
-	for _, algs := range e.getStructuredAlgorithms() {
-		found := false
-		for _, supported := range supportedSKXSignatureAlgorithms {
-			if algs.Hash == supported.Hash && algs.Signature == supported.Signature {
-				found = true
-				break
-			}
+	for _, raw := range e.SignatureAndHashes {
+		algs := SigAndHash{
+			Hash:      uint8(raw >> 8),
+			Signature: uint8(raw),
 		}
-		if !found {
-			return errors.New(fmt.Sprintf("Unsupported Hash and Signature Algorithm (%d, %d)", algs.Hash, algs.Signature))
+
+		if isSupportedSignatureAndHash(algs, supportedSKXSignatureAlgorithms) {
+			continue
 		}
+
+		if isSupportedSignatureAlgorithm(SignatureScheme(raw), supportedSignatureAlgorithms) {
+			continue
+		}
+
+		return fmt.Errorf(
+			"unsupported signature scheme 0x%04x", raw)
 	}
 	return nil
 }

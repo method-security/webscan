@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -94,6 +95,8 @@ func (e CertificateInvalidError) Error() string {
 		return "x509: issuer name does not match subject from issuing certificate"
 	case NeverValid:
 		return "x509: certificate will never be valid"
+	case IsSelfSigned:
+		return "x509: certificate is self-signed and not a trusted root"
 	}
 	return "x509: unknown error"
 }
@@ -279,10 +282,26 @@ func (c *Certificate) isValid(certType CertificateType, currentChain Certificate
 //
 // WARNING: this doesn't do any revocation checking.
 func (c *Certificate) Verify(opts VerifyOptions) (current, expired, never []CertificateChain, err error) {
+	// Platform-specific verification needs the ASN.1 contents so
+	// this makes the behavior consistent across platforms.
+	if len(c.Raw) == 0 {
+		return nil, nil, nil, errNotParsed
+	}
+	for i := 0; i < opts.Intermediates.Size(); i++ {
+		c, err := opts.Intermediates.cert(i)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("crypto/x509: error fetching intermediate: %w", err)
+		}
+		if len(c.Raw) == 0 {
+			return nil, nil, nil, errNotParsed
+		}
+	}
 
 	if opts.Roots == nil {
-		err = SystemRootsError{}
-		return
+		opts.Roots = systemRootsPool()
+		if opts.Roots == nil {
+			return nil, nil, nil, SystemRootsError{systemRootsErr}
+		}
 	}
 
 	err = c.isValid(CertificateTypeLeaf, nil)
@@ -290,9 +309,14 @@ func (c *Certificate) Verify(opts VerifyOptions) (current, expired, never []Cert
 		return
 	}
 
-	candidateChains, err := c.buildChains(make(map[int][]CertificateChain), []*Certificate{c}, &opts)
-	if err != nil {
-		return
+	var candidateChains []CertificateChain
+	if opts.Roots.Contains(c) {
+		candidateChains = append(candidateChains, CertificateChain{c})
+	} else {
+		candidateChains, err = c.buildChains(make(map[int][]CertificateChain), CertificateChain{c}, &opts)
+		if err != nil {
+			return nil, nil, nil, err
+		}
 	}
 
 	keyUsages := opts.KeyUsages
@@ -301,13 +325,7 @@ func (c *Certificate) Verify(opts VerifyOptions) (current, expired, never []Cert
 	}
 
 	// If any key usage is acceptable then we're done.
-	hasKeyUsageAny := false
-	for _, usage := range keyUsages {
-		if usage == ExtKeyUsageAny {
-			hasKeyUsageAny = true
-			break
-		}
-	}
+	hasKeyUsageAny := slices.Contains(keyUsages, ExtKeyUsageAny)
 
 	var chains []CertificateChain
 	if hasKeyUsageAny {
@@ -500,10 +518,8 @@ func (c *Certificate) VerifyHostname(h string) error {
 	if ip := net.ParseIP(candidateIP); ip != nil {
 		// We only match IP addresses against IP SANs.
 		// https://tools.ietf.org/html/rfc6125#appendix-B.2
-		for _, candidate := range c.IPAddresses {
-			if ip.Equal(candidate) {
-				return nil
-			}
+		if slices.ContainsFunc(c.IPAddresses, ip.Equal) {
+			return nil
 		}
 		return HostnameError{c, candidateIP}
 	}
@@ -539,8 +555,8 @@ func checkChainForKeyUsage(chain []*Certificate, keyUsages []ExtKeyUsage) bool {
 	// is unacceptable.
 
 NextCert:
-	for i := len(chain) - 1; i >= 0; i-- {
-		cert := chain[i]
+	for _, cert := range slices.Backward(chain) {
+
 		if len(cert.ExtKeyUsage) == 0 && len(cert.UnknownExtKeyUsage) == 0 {
 			// The certificate doesn't have any extended key usage specified.
 			continue

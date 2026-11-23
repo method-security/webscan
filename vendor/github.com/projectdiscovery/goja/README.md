@@ -10,7 +10,7 @@ performance.
 
 This project was largely inspired by [otto](https://github.com/robertkrimen/otto).
 
-The minimum required Go version is 1.25.
+The minimum required Go version is 1.26.
 
 Features
 --------
@@ -24,36 +24,6 @@ Features
 
 Known incompatibilities and caveats
 -----------------------------------
-
-### WeakMap
-WeakMap is implemented by embedding references to the values into the keys. This means that as long
-as the key is reachable all values associated with it in any weak maps also remain reachable and therefore
-cannot be garbage collected even if they are not otherwise referenced, even after the WeakMap is gone.
-The reference to the value is dropped either when the key is explicitly removed from the WeakMap or when the
-key becomes unreachable.
-
-To illustrate this:
-
-```javascript
-var m = new WeakMap();
-var key = {};
-var value = {/* a very large object */};
-m.set(key, value);
-value = undefined;
-m = undefined; // The value does NOT become garbage-collectable at this point
-key = undefined; // Now it does
-// m.delete(key); // This would work too
-```
-
-The reason for it is the limitation of the Go runtime. At the time of writing (version 1.15) having a finalizer
-set on an object which is part of a reference cycle makes the whole cycle non-garbage-collectable. The solution
-above is the only reasonable way I can think of without involving finalizers. This is the third attempt
-(see https://github.com/projectdiscovery/goja/issues/250 and https://github.com/projectdiscovery/goja/issues/199 for more details).
-
-Note, this does not have any effect on the application logic, but may cause a higher-than-expected memory usage.
-
-### WeakRef and FinalizationRegistry
-For the reason mentioned above implementing WeakRef and FinalizationRegistry does not seem to be possible at this stage.
 
 ### JSON
 `JSON.parse()` uses the standard Go library which operates in UTF-8. Therefore, it cannot correctly parse broken UTF-16
@@ -251,7 +221,9 @@ See [Runtime.ToValue()](https://pkg.go.dev/github.com/projectdiscovery/goja#Runt
 Regular Expressions
 -------------------
 
-Goja uses the embedded Go regexp library where possible, otherwise it falls back to [regexp2](https://github.com/dlclark/regexp2).
+Goja uses [regexp2](https://github.com/dlclark/regexp2) library. There are a few known incompatibilities, but they are 
+mostly edge cases and should not affect general usage. See tc39_test.go for the list of exclusions. Any new
+incompatibilities should be reported as bugs.
 
 Exceptions
 ----------

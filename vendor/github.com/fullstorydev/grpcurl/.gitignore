@@ -1,4 +1,6 @@
 dist/
+.claude/
 .idea/
 VERSION
 .tmp/
+*.snap

@@ -17,6 +17,7 @@ import (
 	"crypto/sha256"
 	_ "crypto/sha512"
 	"io"
+	"os"
 	"strings"
 	"unicode"
 
@@ -24,7 +25,6 @@ import (
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
-	"crypto/rsa"
 	_ "crypto/sha1"
 	_ "crypto/sha256"
 	"encoding/pem"
@@ -35,13 +35,29 @@ import (
 	"strconv"
 	"time"
 
+	"crypto/mldsa"
+
 	"github.com/weppos/publicsuffix-go/publicsuffix"
+	"golang.org/x/crypto/ed25519"
+
 	"github.com/zmap/zcrypto/dsa"
 	"github.com/zmap/zcrypto/encoding/asn1"
+	"github.com/zmap/zcrypto/rsa"
 	"github.com/zmap/zcrypto/x509/ct"
 	"github.com/zmap/zcrypto/x509/pkix"
-	"golang.org/x/crypto/ed25519"
 )
+
+func init() {
+	// Go's crypto/rsa package by default rejects RSA keys smaller than 1024, we'll disable this check to allow
+	// handshakes with servers using 512-bit RSA keys.
+	if !strings.Contains(os.Getenv("GODEBUG"), "rsa1024min=0") {
+		if os.Getenv("GODEBUG") == "" {
+			os.Setenv("GODEBUG", "rsa1024min=0")
+		} else {
+			os.Setenv("GODEBUG", os.Getenv("GODEBUG")+",rsa1024min=0")
+		}
+	}
+}
 
 // pkixPublicKey reflects a PKIX public key structure. See SubjectPublicKeyInfo
 // in RFC 3280.
@@ -53,12 +69,12 @@ type pkixPublicKey struct {
 // ParsePKIXPublicKey parses a DER encoded public key. These values are
 // typically found in PEM blocks with "BEGIN PUBLIC KEY".
 //
-// Supported key types include RSA, DSA, and ECDSA. Unknown key
+// Supported key types include RSA, DSA, ECDSA, and MLDSA. Unknown key
 // types result in an error.
 //
 // On success, pub will be of type *rsa.PublicKey, *dsa.PublicKey,
-// or *ecdsa.PublicKey.
-func ParsePKIXPublicKey(derBytes []byte) (pub interface{}, err error) {
+// *ecdsa.PublicKey, or *mldsa(44/65/87).PublicKey.
+func ParsePKIXPublicKey(derBytes []byte) (pub any, err error) {
 	var pki publicKeyInfo
 	if rest, err := asn1.Unmarshal(derBytes, &pki); err != nil {
 		return nil, err
@@ -72,7 +88,7 @@ func ParsePKIXPublicKey(derBytes []byte) (pub interface{}, err error) {
 	return parsePublicKey(algo, &pki)
 }
 
-func marshalPublicKey(pub interface{}) (publicKeyBytes []byte, publicKeyAlgorithm pkix.AlgorithmIdentifier, err error) {
+func marshalPublicKey(pub any) (publicKeyBytes []byte, publicKeyAlgorithm pkix.AlgorithmIdentifier, err error) {
 	switch pub := pub.(type) {
 	case *rsa.PublicKey:
 		publicKeyBytes, err = asn1.Marshal(pkcs1PublicKey{
@@ -88,9 +104,10 @@ func marshalPublicKey(pub interface{}) (publicKeyBytes []byte, publicKeyAlgorith
 		publicKeyAlgorithm.Parameters = asn1.NullRawValue
 	case *ecdsa.PublicKey:
 		publicKeyBytes = elliptic.Marshal(pub.Curve, pub.X, pub.Y)
-		oid, ok := oidFromNamedCurve(pub.Curve)
-		if !ok {
-			return nil, pkix.AlgorithmIdentifier{}, errors.New("x509: unsupported elliptic curve")
+		var oid asn1.ObjectIdentifier
+		oid, err = oidFromNamedCurve(pub.Curve)
+		if err != nil {
+			return nil, pkix.AlgorithmIdentifier{}, err
 		}
 		publicKeyAlgorithm.Algorithm = oidPublicKeyECDSA
 		var paramBytes []byte
@@ -99,6 +116,19 @@ func marshalPublicKey(pub interface{}) (publicKeyBytes []byte, publicKeyAlgorith
 			return
 		}
 		publicKeyAlgorithm.Parameters.FullBytes = paramBytes
+	case *mldsa.PublicKey:
+		publicKeyBytes = pub.Bytes()
+
+		switch pub.Parameters() {
+		case mldsa.MLDSA44():
+			publicKeyAlgorithm.Algorithm = oidPublicKeyMLDSA44
+		case mldsa.MLDSA65():
+			publicKeyAlgorithm.Algorithm = oidPublicKeyMLDSA65
+		case mldsa.MLDSA87():
+			publicKeyAlgorithm.Algorithm = oidPublicKeyMLDSA87
+		default:
+			return nil, pkix.AlgorithmIdentifier{}, errors.New("x509: unknown MLDSA parameter set")
+		}
 	case *AugmentedECDSA:
 		return marshalPublicKey(pub.Pub)
 	case ed25519.PublicKey:
@@ -108,14 +138,14 @@ func marshalPublicKey(pub interface{}) (publicKeyBytes []byte, publicKeyAlgorith
 		publicKeyAlgorithm.Algorithm = oidKeyX25519
 		return []byte(pub), publicKeyAlgorithm, nil
 	default:
-		return nil, pkix.AlgorithmIdentifier{}, errors.New("x509: only RSA, ECDSA, ed25519, or X25519 public keys supported")
+		return nil, pkix.AlgorithmIdentifier{}, errors.New("x509: only RSA, ECDSA, MLDSA, ed25519, or X25519 public keys supported")
 	}
 
 	return publicKeyBytes, publicKeyAlgorithm, nil
 }
 
 // MarshalPKIXPublicKey serialises a public key to DER-encoded PKIX format.
-func MarshalPKIXPublicKey(pub interface{}) ([]byte, error) {
+func MarshalPKIXPublicKey(pub any) ([]byte, error) {
 	var publicKeyBytes []byte
 	var publicKeyAlgorithm pkix.AlgorithmIdentifier
 	var err error
@@ -211,6 +241,9 @@ const (
 	SHA384WithRSAPSS
 	SHA512WithRSAPSS
 	Ed25519Sig
+	MLDSA44Sig
+	MLDSA65Sig
+	MLDSA87Sig
 )
 
 func (algo SignatureAlgorithm) isRSAPSS() bool {
@@ -239,6 +272,9 @@ var algoName = [...]string{
 	ECDSAWithSHA384:  "ECDSA-SHA384",
 	ECDSAWithSHA512:  "ECDSA-SHA512",
 	Ed25519Sig:       "Ed25519",
+	MLDSA44Sig:       "MLDSA44",
+	MLDSA65Sig:       "MLDSA65",
+	MLDSA87Sig:       "MLDSA87",
 }
 
 func (algo SignatureAlgorithm) String() string {
@@ -255,6 +291,9 @@ var keyAlgorithmNames = []string{
 	"ECDSA",
 	"Ed25519",
 	"X25519",
+	"MLDSA44",
+	"MLDSA65",
+	"MLDSA87",
 }
 
 type PublicKeyAlgorithm int
@@ -266,6 +305,9 @@ const (
 	ECDSA
 	Ed25519
 	X25519
+	MLDSA44
+	MLDSA65
+	MLDSA87
 	total_key_algorithms
 )
 
@@ -337,6 +379,9 @@ var (
 	oidSignatureECDSAWithSHA384 = asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 3, 3}
 	oidSignatureECDSAWithSHA512 = asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 3, 4}
 	oidSignatureEd25519         = asn1.ObjectIdentifier{1, 3, 101, 112}
+	oidSignatureMLDSA44         = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 17}
+	oidSignatureMLDSA65         = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 18}
+	oidSignatureMLDSA87         = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 19}
 
 	oidSHA256 = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 2, 1}
 	oidSHA384 = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 2, 2}
@@ -380,6 +425,9 @@ var signatureAlgorithmDetails = []struct {
 	{ECDSAWithSHA384, oidSignatureECDSAWithSHA384, ECDSA, crypto.SHA384},
 	{ECDSAWithSHA512, oidSignatureECDSAWithSHA512, ECDSA, crypto.SHA512},
 	{Ed25519Sig, oidKeyEd25519, Ed25519, cryptoNoDigest},
+	{MLDSA44Sig, oidSignatureMLDSA44, MLDSA44, cryptoNoDigest},
+	{MLDSA65Sig, oidSignatureMLDSA65, MLDSA65, cryptoNoDigest},
+	{MLDSA87Sig, oidSignatureMLDSA87, MLDSA87, cryptoNoDigest},
 }
 
 // pssParameters reflects the parameters in an AlgorithmIdentifier that
@@ -441,6 +489,9 @@ func rsaPSSParameters(hashFunc crypto.Hash) asn1.RawValue {
 
 // GetSignatureAlgorithmFromAI converts asn1 AlgorithmIdentifier to SignatureAlgorithm int
 func GetSignatureAlgorithmFromAI(ai pkix.AlgorithmIdentifier) SignatureAlgorithm {
+	if !asn1.AllowPermissiveParsing && (ai.Algorithm.Equal(oidSignatureMLDSA44) || ai.Algorithm.Equal(oidSignatureMLDSA65) || ai.Algorithm.Equal(oidSignatureMLDSA87)) && len(ai.Parameters.FullBytes) != 0 {
+		return UnknownSignatureAlgorithm
+	}
 	if !ai.Algorithm.Equal(oidSignatureRSAPSS) {
 		for _, details := range signatureAlgorithmDetails {
 			if ai.Algorithm.Equal(details.oid) {
@@ -507,9 +558,13 @@ func GetSignatureAlgorithmFromAI(ai pkix.AlgorithmIdentifier) SignatureAlgorithm
 //	id-ecPublicKey OBJECT IDENTIFIER ::= {
 //	      iso(1) member-body(2) us(840) ansi-X9-62(10045) keyType(2) 1 }
 var (
-	oidPublicKeyRSA   = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 1}
-	oidPublicKeyDSA   = asn1.ObjectIdentifier{1, 2, 840, 10040, 4, 1}
-	oidPublicKeyECDSA = asn1.ObjectIdentifier{1, 2, 840, 10045, 2, 1}
+	oidPublicKeyRSA     = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 1}
+	oidPublicKeyDSA     = asn1.ObjectIdentifier{1, 2, 840, 10040, 4, 1}
+	oidPublicKeyECDSA   = asn1.ObjectIdentifier{1, 2, 840, 10045, 2, 1}
+	oidPublicKeyEd25519 = oidSignatureEd25519
+	oidPublicKeyMLDSA44 = oidSignatureMLDSA44
+	oidPublicKeyMLDSA65 = oidSignatureMLDSA65
+	oidPublicKeyMLDSA87 = oidSignatureMLDSA87
 )
 
 func getPublicKeyAlgorithmFromOID(oid asn1.ObjectIdentifier) PublicKeyAlgorithm {
@@ -524,6 +579,12 @@ func getPublicKeyAlgorithmFromOID(oid asn1.ObjectIdentifier) PublicKeyAlgorithm 
 		return Ed25519
 	case oid.Equal(oidKeyX25519):
 		return X25519
+	case oid.Equal(oidPublicKeyMLDSA44):
+		return MLDSA44
+	case oid.Equal(oidPublicKeyMLDSA65):
+		return MLDSA65
+	case oid.Equal(oidPublicKeyMLDSA87):
+		return MLDSA87
 	}
 	return UnknownPublicKeyAlgorithm
 }
@@ -559,33 +620,33 @@ var (
 	oidKeyEd25519 = asn1.ObjectIdentifier{1, 3, 101, 112}
 )
 
-func namedCurveFromOID(oid asn1.ObjectIdentifier) elliptic.Curve {
+func namedCurveFromOID(oid asn1.ObjectIdentifier) (elliptic.Curve, error) {
 	switch {
 	case oid.Equal(oidNamedCurveP224):
-		return elliptic.P224()
+		return elliptic.P224(), nil
 	case oid.Equal(oidNamedCurveP256):
-		return elliptic.P256()
+		return elliptic.P256(), nil
 	case oid.Equal(oidNamedCurveP384):
-		return elliptic.P384()
+		return elliptic.P384(), nil
 	case oid.Equal(oidNamedCurveP521):
-		return elliptic.P521()
+		return elliptic.P521(), nil
 	}
-	return nil
+	return nil, ErrUnsupportedEllipticCurve
 }
 
-func oidFromNamedCurve(curve elliptic.Curve) (asn1.ObjectIdentifier, bool) {
+func oidFromNamedCurve(curve elliptic.Curve) (asn1.ObjectIdentifier, error) {
 	switch curve {
 	case elliptic.P224():
-		return oidNamedCurveP224, true
+		return oidNamedCurveP224, nil
 	case elliptic.P256():
-		return oidNamedCurveP256, true
+		return oidNamedCurveP256, nil
 	case elliptic.P384():
-		return oidNamedCurveP384, true
+		return oidNamedCurveP384, nil
 	case elliptic.P521():
-		return oidNamedCurveP521, true
+		return oidNamedCurveP521, nil
 	}
 
-	return nil, false
+	return nil, ErrUnsupportedEllipticCurve
 }
 
 // KeyUsage represents the set of actions that are valid for a given key. It's
@@ -714,7 +775,7 @@ type Certificate struct {
 	SignatureAlgorithmOID asn1.ObjectIdentifier
 
 	PublicKeyAlgorithm PublicKeyAlgorithm
-	PublicKey          interface{}
+	PublicKey          any
 
 	PublicKeyAlgorithmOID asn1.ObjectIdentifier
 
@@ -821,6 +882,8 @@ type Certificate struct {
 	ParsedExplicitTexts         [][]string
 	ParsedNoticeRefOrganization [][]string
 
+	UserNotices [][]UserNotice
+
 	// Name constraints
 	NameConstraintsCritical bool // if true then the name constraints are marked critical.
 	PermittedDNSNames       []GeneralSubtreeString
@@ -863,8 +926,9 @@ type Certificate struct {
 
 	IsPrecert bool
 
-	// Internal
-	validSignature bool
+	// ValidSignature is true if the certificate was signed by any roots or
+	// intermediates given in a call to (*Certificate).Verify().
+	ValidSignature bool
 
 	// CT
 	SignedCertificateTimestampList []*ct.SignedCertificateTimestamp
@@ -872,6 +936,9 @@ type Certificate struct {
 	// QWACS
 	CABFOrganizationIdentifier *CABFOrganizationIdentifier
 	QCStatements               *QCStatements
+
+	// Smallstep step-ca provisioner extension
+	StepProvisioner *StepProvisioner
 
 	// Used to speed up the zlint checks. Populated by the GetParsedDNSNames method.
 	parsedDNSNames []ParsedDomainName
@@ -939,6 +1006,10 @@ func (c *Certificate) GetParsedSubjectCommonName(invalidateCache bool) ParsedDom
 // ErrUnsupportedAlgorithm results from attempting to perform an operation that
 // involves algorithms that are not currently implemented.
 var ErrUnsupportedAlgorithm = errors.New("x509: cannot verify signature: algorithm unimplemented")
+
+// ErrUnsupportedEllipticCurve results from attempting to perform an operation that
+// involves elliptic curves that are not currently implemented.
+var ErrUnsupportedEllipticCurve = errors.New("x509: unsupported elliptic curve")
 
 // An InsecureAlgorithmError
 type InsecureAlgorithmError SignatureAlgorithm
@@ -1045,7 +1116,7 @@ func (c *Certificate) CheckSignatureFrom(parent *Certificate) (err error) {
 	return parent.CheckSignature(c.SignatureAlgorithm, c.RawTBSCertificate, c.Signature)
 }
 
-func CheckSignatureFromKey(publicKey interface{}, algo SignatureAlgorithm, signed, signature []byte) (err error) {
+func CheckSignatureFromKey(publicKey any, algo SignatureAlgorithm, signed, signature []byte) (err error) {
 	var hashType crypto.Hash
 
 	switch algo {
@@ -1064,6 +1135,12 @@ func CheckSignatureFromKey(publicKey interface{}, algo SignatureAlgorithm, signe
 	case MD2WithRSA:
 		return InsecureAlgorithmError(algo)
 	case Ed25519Sig:
+		hashType = 0
+	case MLDSA44Sig:
+		hashType = 0
+	case MLDSA65Sig:
+		hashType = 0
+	case MLDSA87Sig:
 		hashType = 0
 	default:
 		return ErrUnsupportedAlgorithm
@@ -1126,6 +1203,33 @@ func CheckSignatureFromKey(publicKey interface{}, algo SignatureAlgorithm, signe
 			return errors.New("x509: Ed25519 verification failure")
 		}
 		return
+	case *mldsa.PublicKey:
+		switch pub.Parameters() {
+		case mldsa.MLDSA44():
+			if algo != MLDSA44Sig {
+				return ErrUnsupportedAlgorithm
+			}
+			if err := mldsa.Verify(pub, digest, signature, nil); err != nil {
+				return errors.New("x509: MLDSA44 verification failure")
+			}
+		case mldsa.MLDSA65():
+			if algo != MLDSA65Sig {
+				return ErrUnsupportedAlgorithm
+			}
+			if err := mldsa.Verify(pub, digest, signature, nil); err != nil {
+				return errors.New("x509: MLDSA65 verification failure")
+			}
+		case mldsa.MLDSA87():
+			if algo != MLDSA87Sig {
+				return ErrUnsupportedAlgorithm
+			}
+			if err := mldsa.Verify(pub, digest, signature, nil); err != nil {
+				return errors.New("x509: MLDSA87 verification failure")
+			}
+		default:
+			return ErrUnsupportedAlgorithm
+		}
+		return
 	}
 	return ErrUnsupportedAlgorithm
 }
@@ -1172,6 +1276,11 @@ type policyQualifierInfo struct {
 type userNotice struct {
 	NoticeRef    noticeReference `asn1:"optional"`
 	ExplicitText asn1.RawValue   `asn1:"optional"`
+}
+
+type UserNotice struct {
+	ExplicitText    *string
+	NoticeReference *NoticeReference
 }
 
 type noticeReference struct {
@@ -1283,7 +1392,7 @@ func getMaxCertValidationLevel(oids []asn1.ObjectIdentifier) CertValidationLevel
 	return maxOID
 }
 
-func parsePublicKey(algo PublicKeyAlgorithm, keyData *publicKeyInfo) (interface{}, error) {
+func parsePublicKey(algo PublicKeyAlgorithm, keyData *publicKeyInfo) (any, error) {
 	asn1Data := keyData.PublicKey.RightAlign()
 	switch algo {
 	case RSA:
@@ -1310,16 +1419,19 @@ func parsePublicKey(algo PublicKeyAlgorithm, keyData *publicKeyInfo) (interface{
 			if p.N.Sign() <= 0 {
 				return nil, errors.New("x509: RSA modulus is not a positive number")
 			}
-			if p.E <= 0 {
+			// ZCrypto - p.E is now *big.Int; use Sign() instead of <= 0
+			// Original: if p.E <= 0 {
+			if p.E.Sign() <= 0 {
 				return nil, errors.New("x509: RSA public exponent is not a positive number")
 			}
 		}
 
-		pub := &rsa.PublicKey{
-			E: p.E,
-			N: p.N,
-		}
-		return pub, nil
+		return &rsa.PublicKey{
+			// Defensively copy E so callers cannot mutate it through the
+			// parsed wire structure.
+			E: new(big.Int).Set(p.E),
+			N: new(big.Int).Set(p.N),
+		}, nil
 	case DSA:
 		var p *big.Int
 		rest, err := asn1.Unmarshal(asn1Data, &p)
@@ -1360,9 +1472,9 @@ func parsePublicKey(algo PublicKeyAlgorithm, keyData *publicKeyInfo) (interface{
 		if len(rest) != 0 {
 			return nil, errors.New("x509: trailing data after ECDSA parameters")
 		}
-		namedCurve := namedCurveFromOID(*namedCurveOID)
-		if namedCurve == nil {
-			return nil, errors.New("x509: unsupported elliptic curve")
+		namedCurve, err := namedCurveFromOID(*namedCurveOID)
+		if err != nil {
+			return nil, err
 		}
 		x, y := elliptic.Unmarshal(namedCurve, asn1Data)
 		if x == nil {
@@ -1391,6 +1503,36 @@ func parsePublicKey(algo PublicKeyAlgorithm, keyData *publicKeyInfo) (interface{
 			return nil, errors.New("x509: trailing data after X25519 public key")
 		}
 		return p, nil
+	case MLDSA44:
+		paramsData := keyData.Algorithm.Parameters.FullBytes
+		if !asn1.AllowPermissiveParsing && len(paramsData) != 0 {
+			return nil, errors.New("x509: invalid MLDSA44 public key parameters")
+		}
+		pub, err := mldsa.NewPublicKey(mldsa.MLDSA44(), asn1Data)
+		if err != nil {
+			return nil, errors.New("x509: failed to unmarshal MLDSA44 public key")
+		}
+		return pub, nil
+	case MLDSA65:
+		paramsData := keyData.Algorithm.Parameters.FullBytes
+		if !asn1.AllowPermissiveParsing && len(paramsData) != 0 {
+			return nil, errors.New("x509: invalid MLDSA65 public key parameters")
+		}
+		pub, err := mldsa.NewPublicKey(mldsa.MLDSA65(), asn1Data)
+		if err != nil {
+			return nil, errors.New("x509: failed to unmarshal MLDSA65 public key")
+		}
+		return pub, nil
+	case MLDSA87:
+		paramsData := keyData.Algorithm.Parameters.FullBytes
+		if !asn1.AllowPermissiveParsing && len(paramsData) != 0 {
+			return nil, errors.New("x509: invalid MLDSA87 public key parameters")
+		}
+		pub, err := mldsa.NewPublicKey(mldsa.MLDSA87(), asn1Data)
+		if err != nil {
+			return nil, errors.New("x509: failed to unmarshal MLDSA87 public key")
+		}
+		return pub, nil
 	default:
 		return nil, nil
 	}
@@ -1656,6 +1798,7 @@ func parseCertificate(in *certificate) (*Certificate, error) {
 	out.SubjectUniqueId = in.TBSCertificate.SubjectUniqueId
 
 	out.ExtensionsMap = make(map[string]pkix.Extension, len(in.TBSCertificate.Extensions))
+
 	for _, e := range in.TBSCertificate.Extensions {
 		out.Extensions = append(out.Extensions, e)
 		out.ExtensionsMap[e.Id.String()] = e
@@ -1669,7 +1812,7 @@ func parseCertificate(in *certificate) (*Certificate, error) {
 
 				if err == nil {
 					var usage int
-					for i := 0; i < 9; i++ {
+					for i := range 9 {
 						if usageBits.At(i) != 0 {
 							usage |= 1 << uint(i)
 						}
@@ -1694,6 +1837,9 @@ func parseCertificate(in *certificate) (*Certificate, error) {
 					out.URIs, out.DirectoryNames, out.EDIPartyNames,
 					out.IPAddresses, out.RegisteredIDs, out.FailedToParseNames, err = parseGeneralNames(e.Value)
 				if err != nil {
+					if asn1.AllowPermissiveParsing {
+						continue
+					}
 					return nil, err
 				}
 
@@ -1707,6 +1853,9 @@ func parseCertificate(in *certificate) (*Certificate, error) {
 					out.IANURIs, out.IANDirectoryNames, out.IANEDIPartyNames,
 					out.IANIPAddresses, out.IANRegisteredIDs, out.FailedToParseNames, err = parseGeneralNames(e.Value)
 				if err != nil {
+					if asn1.AllowPermissiveParsing {
+						continue
+					}
 					return nil, err
 				}
 
@@ -1731,6 +1880,9 @@ func parseCertificate(in *certificate) (*Certificate, error) {
 
 				var constraints nameConstraints
 				_, err := asn1.Unmarshal(e.Value, &constraints)
+				if err != nil && asn1.AllowPermissiveParsing {
+					continue
+				}
 				if err != nil {
 					return nil, err
 				}
@@ -1750,6 +1902,9 @@ func parseCertificate(in *certificate) (*Certificate, error) {
 					case 4:
 						var rawdn pkix.RDNSequence
 						if _, err := asn1.Unmarshal(subtree.Value.Bytes, &rawdn); err != nil {
+							if asn1.AllowPermissiveParsing {
+								continue
+							}
 							return out, err
 						}
 						var dn pkix.Name
@@ -1759,6 +1914,9 @@ func parseCertificate(in *certificate) (*Certificate, error) {
 						var ediName pkix.EDIPartyName
 						_, err = asn1.UnmarshalWithParams(subtree.Value.FullBytes, &ediName, "tag:5")
 						if err != nil {
+							if asn1.AllowPermissiveParsing {
+								continue
+							}
 							return out, err
 						}
 						out.PermittedEdiPartyNames = append(out.PermittedEdiPartyNames, GeneralSubtreeEdi{Data: ediName, Max: subtree.Max, Min: subtree.Min})
@@ -1781,6 +1939,9 @@ func parseCertificate(in *certificate) (*Certificate, error) {
 						var id asn1.ObjectIdentifier
 						_, err = asn1.UnmarshalWithParams(subtree.Value.FullBytes, &id, "tag:8")
 						if err != nil {
+							if asn1.AllowPermissiveParsing {
+								continue
+							}
 							return out, err
 						}
 						out.PermittedRegisteredIDs = append(out.PermittedRegisteredIDs, GeneralSubtreeOid{Data: id, Max: subtree.Max, Min: subtree.Min})
@@ -1797,6 +1958,9 @@ func parseCertificate(in *certificate) (*Certificate, error) {
 					case 4:
 						var rawdn pkix.RDNSequence
 						if _, err := asn1.Unmarshal(subtree.Value.Bytes, &rawdn); err != nil {
+							if asn1.AllowPermissiveParsing {
+								continue
+							}
 							return out, err
 						}
 						var dn pkix.Name
@@ -1806,6 +1970,9 @@ func parseCertificate(in *certificate) (*Certificate, error) {
 						var ediName pkix.EDIPartyName
 						_, err = asn1.Unmarshal(subtree.Value.Bytes, &ediName)
 						if err != nil {
+							if asn1.AllowPermissiveParsing {
+								continue
+							}
 							return out, err
 						}
 						out.ExcludedEdiPartyNames = append(out.ExcludedEdiPartyNames, GeneralSubtreeEdi{Data: ediName, Max: subtree.Max, Min: subtree.Min})
@@ -1828,6 +1995,9 @@ func parseCertificate(in *certificate) (*Certificate, error) {
 						var id asn1.ObjectIdentifier
 						_, err = asn1.Unmarshal(subtree.Value.Bytes, &id)
 						if err != nil {
+							if asn1.AllowPermissiveParsing {
+								continue
+							}
 							return out, err
 						}
 						out.ExcludedRegisteredIDs = append(out.ExcludedRegisteredIDs, GeneralSubtreeOid{Data: id, Max: subtree.Max, Min: subtree.Min})
@@ -1851,6 +2021,9 @@ func parseCertificate(in *certificate) (*Certificate, error) {
 
 				var cdp []distributionPoint
 				_, err := asn1.Unmarshal(e.Value, &cdp)
+				if err != nil && asn1.AllowPermissiveParsing {
+					continue
+				}
 				if err != nil {
 					return nil, err
 				}
@@ -1871,6 +2044,9 @@ func parseCertificate(in *certificate) (*Certificate, error) {
 					for len(dpName) > 0 {
 						dpName, err = asn1.Unmarshal(dpName, &n)
 						if err != nil {
+							if asn1.AllowPermissiveParsing {
+								continue
+							}
 							return nil, err
 						}
 						if n.Tag == 6 {
@@ -1885,6 +2061,9 @@ func parseCertificate(in *certificate) (*Certificate, error) {
 				var a authKeyId
 				_, err = asn1.Unmarshal(e.Value, &a)
 				if err != nil {
+					if asn1.AllowPermissiveParsing {
+						continue
+					}
 					return nil, err
 				}
 				out.AuthorityKeyId = a.Id
@@ -1922,6 +2101,9 @@ func parseCertificate(in *certificate) (*Certificate, error) {
 				// RFC 5280, 4.2.1.2
 				var keyid []byte
 				_, err = asn1.Unmarshal(e.Value, &keyid)
+				if err != nil && asn1.AllowPermissiveParsing {
+					continue
+				}
 				if err != nil {
 					return nil, err
 				}
@@ -1932,6 +2114,9 @@ func parseCertificate(in *certificate) (*Certificate, error) {
 				// RFC 5280 4.2.1.4: Certificate Policies
 				var policies []policyInformation
 				if _, err = asn1.Unmarshal(e.Value, &policies); err != nil {
+					if asn1.AllowPermissiveParsing {
+						continue
+					}
 					return nil, err
 				}
 				out.PolicyIdentifiers = make([]asn1.ObjectIdentifier, len(policies))
@@ -1942,6 +2127,7 @@ func parseCertificate(in *certificate) (*Certificate, error) {
 				out.ParsedExplicitTexts = make([][]string, len(policies))
 				out.ParsedNoticeRefOrganization = make([][]string, len(policies))
 				out.CPSuri = make([][]string, len(policies))
+				out.UserNotices = make([][]UserNotice, len(policies))
 
 				for i, policy := range policies {
 					out.PolicyIdentifiers[i] = policy.Policy
@@ -1950,6 +2136,7 @@ func parseCertificate(in *certificate) (*Certificate, error) {
 						out.QualifierId[i] = append(out.QualifierId[i], qualifier.PolicyQualifierId)
 						userNoticeOID := asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 2, 2}
 						cpsURIOID := asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 2, 1}
+
 						if qualifier.PolicyQualifierId.Equal(userNoticeOID) {
 							var un userNotice
 							_, err := asn1.Unmarshal(qualifier.Qualifier.FullBytes, &un)
@@ -1957,15 +2144,27 @@ func parseCertificate(in *certificate) (*Certificate, error) {
 								return nil, err
 							}
 							if err == nil {
+								groupUserNotice := UserNotice{}
 								if len(un.ExplicitText.Bytes) != 0 {
 									out.ExplicitTexts[i] = append(out.ExplicitTexts[i], un.ExplicitText)
-									out.ParsedExplicitTexts[i] = append(out.ParsedExplicitTexts[i], string(un.ExplicitText.Bytes))
+									parsed := string(un.ExplicitText.Bytes)
+									out.ParsedExplicitTexts[i] = append(out.ParsedExplicitTexts[i], parsed)
+
+									groupUserNotice.ExplicitText = &parsed
 								}
+
 								if un.NoticeRef.Organization.Bytes != nil || un.NoticeRef.NoticeNumbers != nil {
 									out.NoticeRefOrgnization[i] = append(out.NoticeRefOrgnization[i], un.NoticeRef.Organization)
 									out.NoticeRefNumbers[i] = append(out.NoticeRefNumbers[i], un.NoticeRef.NoticeNumbers)
 									out.ParsedNoticeRefOrganization[i] = append(out.ParsedNoticeRefOrganization[i], string(un.NoticeRef.Organization.Bytes))
+
+									groupUserNotice.NoticeReference = &NoticeReference{
+										Organization:  string(un.NoticeRef.Organization.Bytes),
+										NoticeNumbers: un.NoticeRef.NoticeNumbers,
+									}
 								}
+
+								out.UserNotices[i] = append(out.UserNotices[i], groupUserNotice)
 							}
 						}
 						if qualifier.PolicyQualifierId.Equal(cpsURIOID) {
@@ -2001,6 +2200,9 @@ func parseCertificate(in *certificate) (*Certificate, error) {
 			// RFC 5280 4.2.2.1: Authority Information Access
 			var aia []authorityInfoAccess
 			if _, err = asn1.Unmarshal(e.Value, &aia); err != nil {
+				if asn1.AllowPermissiveParsing {
+					continue
+				}
 				return nil, err
 			}
 
@@ -2017,11 +2219,14 @@ func parseCertificate(in *certificate) (*Certificate, error) {
 			}
 		} else if e.Id.Equal(oidExtensionSignedCertificateTimestampList) {
 			err := parseSignedCertificateTimestampList(out, e)
+			if err != nil && asn1.AllowPermissiveParsing {
+				continue
+			}
 			if err != nil {
 				return nil, err
 			}
 		} else if e.Id.Equal(oidExtensionCTPrecertificatePoison) {
-			if e.Value[0] == 5 && e.Value[1] == 0 {
+			if len(e.Value) == 2 && e.Value[0] == 5 && e.Value[1] == 0 {
 				out.IsPrecert = true
 				continue
 			} else {
@@ -2032,6 +2237,9 @@ func parseCertificate(in *certificate) (*Certificate, error) {
 		} else if e.Id.Equal(oidBRTorServiceDescriptor) {
 			descs, err := parseTorServiceDescriptorSyntax(e)
 			if err != nil {
+				if asn1.AllowPermissiveParsing {
+					continue
+				}
 				return nil, err
 			}
 			out.TorServiceDescriptors = descs
@@ -2039,6 +2247,9 @@ func parseCertificate(in *certificate) (*Certificate, error) {
 			cabf := CABFOrganizationIDASN{}
 			_, err := asn1.Unmarshal(e.Value, &cabf)
 			if err != nil {
+				if asn1.AllowPermissiveParsing {
+					continue
+				}
 				return nil, err
 			}
 			out.CABFOrganizationIdentifier = &CABFOrganizationIdentifier{
@@ -2051,13 +2262,28 @@ func parseCertificate(in *certificate) (*Certificate, error) {
 			rawStatements := QCStatementsASN{}
 			_, err := asn1.Unmarshal(e.Value, &rawStatements.QCStatements)
 			if err != nil {
+				if asn1.AllowPermissiveParsing {
+					continue
+				}
 				return nil, err
 			}
 			qcStatements := QCStatements{}
 			if err := qcStatements.Parse(&rawStatements); err != nil {
+				if asn1.AllowPermissiveParsing {
+					continue
+				}
 				return nil, err
 			}
 			out.QCStatements = &qcStatements
+		} else if e.Id.Equal(oidExtStepProvisioner) {
+			stepProvisioner := StepProvisioner{}
+			if _, err := asn1.Unmarshal(e.Value, &stepProvisioner); err != nil {
+				if asn1.AllowPermissiveParsing {
+					continue
+				}
+				return nil, err
+			}
+			out.StepProvisioner = &stepProvisioner
 		}
 
 		//if e.Critical {
@@ -2161,7 +2387,7 @@ type SubjectAndKey struct {
 	RawSubject              []byte
 	RawSubjectPublicKeyInfo []byte
 	Fingerprint             CertificateFingerprint
-	PublicKey               interface{}
+	PublicKey               any
 	PublicKeyAlgorithm      PublicKeyAlgorithm
 }
 
@@ -2192,7 +2418,7 @@ func asn1BitLength(bitString []byte) int {
 	for i := range bitString {
 		b := bitString[len(bitString)-i-1]
 
-		for bit := uint(0); bit < 8; bit++ {
+		for bit := range uint(8) {
 			if (b>>bit)&1 == 1 {
 				return bitLen
 			}
@@ -2480,12 +2706,13 @@ func subjectBytes(cert *Certificate) ([]byte, error) {
 // signingParamsForPublicKey returns the parameters to use for signing with
 // priv. If requestedSigAlgo is not zero then it overrides the default
 // signature algorithm.
-func signingParamsForPublicKey(pub interface{}, requestedSigAlgo SignatureAlgorithm) (hashFunc crypto.Hash, sigAlgo pkix.AlgorithmIdentifier, err error) {
+func signingParamsForPublicKey(pub any, requestedSigAlgo SignatureAlgorithm) (hashFunc crypto.Hash, sigAlgo pkix.AlgorithmIdentifier, err error) {
 	var pubType PublicKeyAlgorithm
 	shouldHash := true
 
 	switch pub := pub.(type) {
 	case *rsa.PublicKey:
+		_ = pub
 		pubType = RSA
 		hashFunc = crypto.SHA256
 		sigAlgo.Algorithm = oidSignatureSHA256WithRSA
@@ -2508,6 +2735,24 @@ func signingParamsForPublicKey(pub interface{}, requestedSigAlgo SignatureAlgori
 			err = errors.New("x509: unknown elliptic curve")
 		}
 
+	case *mldsa.PublicKey:
+		hashFunc = 0
+		shouldHash = false
+
+		switch pub.Parameters() {
+		case mldsa.MLDSA44():
+			pubType = MLDSA44
+			sigAlgo.Algorithm = oidSignatureMLDSA44
+		case mldsa.MLDSA65():
+			pubType = MLDSA65
+			sigAlgo.Algorithm = oidSignatureMLDSA65
+		case mldsa.MLDSA87():
+			pubType = MLDSA87
+			sigAlgo.Algorithm = oidSignatureMLDSA87
+		default:
+			err = errors.New("x509: unknown MLDSA parameter set")
+		}
+
 	case ed25519.PublicKey:
 		pubType = Ed25519
 		hashFunc = 0
@@ -2515,7 +2760,7 @@ func signingParamsForPublicKey(pub interface{}, requestedSigAlgo SignatureAlgori
 		sigAlgo.Algorithm = oidKeyEd25519
 
 	default:
-		err = errors.New("x509: only RSA, ECDSA, Ed25519, and X25519 keys supported")
+		err = errors.New("x509: only RSA, ECDSA, MLDSA, Ed25519, and X25519 keys supported")
 	}
 
 	if err != nil {
@@ -2572,7 +2817,7 @@ func signingParamsForPublicKey(pub interface{}, requestedSigAlgo SignatureAlgori
 // The AuthorityKeyId will be taken from the SubjectKeyId of parent, if any,
 // unless the resulting certificate is self-signed. Otherwise the value from
 // template will be used.
-func CreateCertificate(rand io.Reader, template, parent *Certificate, pub, priv interface{}) (cert []byte, err error) {
+func CreateCertificate(rand io.Reader, template, parent *Certificate, pub, priv any) (cert []byte, err error) {
 	key, ok := priv.(crypto.Signer)
 	if !ok {
 		return nil, errors.New("x509: certificate private key does not implement crypto.Signer")
@@ -2689,7 +2934,7 @@ func ParseDERCRL(derBytes []byte) (*pkix.CertificateList, error) {
 
 // CreateCRL returns a DER encoded CRL, signed by this Certificate, that
 // contains the given list of revoked certificates.
-func (c *Certificate) CreateCRL(rand io.Reader, priv interface{}, revokedCerts []pkix.RevokedCertificate, now, expiry time.Time) (crlBytes []byte, err error) {
+func (c *Certificate) CreateCRL(rand io.Reader, priv any, revokedCerts []pkix.RevokedCertificate, now, expiry time.Time) (crlBytes []byte, err error) {
 	key, ok := priv.(crypto.Signer)
 	if !ok {
 		return nil, errors.New("x509: certificate private key does not implement crypto.Signer")
@@ -2759,7 +3004,7 @@ type CertificateRequest struct {
 	SignatureAlgorithm SignatureAlgorithm
 
 	PublicKeyAlgorithm PublicKeyAlgorithm
-	PublicKey          interface{}
+	PublicKey          any
 
 	Subject pkix.Name
 
@@ -2882,7 +3127,7 @@ func parseCSRExtensions(rawAttributes []asn1.RawValue) ([]pkix.Extension, error)
 //
 // All keys types that are implemented via crypto.Signer are supported (This
 // includes *rsa.PublicKey and *ecdsa.PublicKey.)
-func CreateCertificateRequest(rand io.Reader, template *CertificateRequest, priv interface{}) (csr []byte, err error) {
+func CreateCertificateRequest(rand io.Reader, template *CertificateRequest, priv any) (csr []byte, err error) {
 	key, ok := priv.(crypto.Signer)
 	if !ok {
 		return nil, errors.New("x509: certificate private key does not implement crypto.Signer")
